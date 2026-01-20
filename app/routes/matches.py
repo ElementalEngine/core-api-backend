@@ -181,8 +181,9 @@ async def get_leaderboard_ranking(payload: GetLeaderboardRequest = Form(), db = 
     game_type = payload.game_type
     game_mode = payload.game_mode
     is_seasonal = payload.is_seasonal
+    is_combined = payload.is_combined
     try:
-        return await svc.get_leaderboard(game_type, game, game_mode, is_seasonal)
+        return await svc.get_leaderboard(game_type, game, game_mode, is_seasonal, is_combined)
     except NotFoundError:
         logger.warning(f"🔴 Invalid game type for leaderboard. game:{game} game_mode:{game_mode}")
         raise HTTPException(status_code=404, detail="Match not found")

@@ -14,6 +14,7 @@ class PlayerSchema(BaseModel):
     quit: bool
     delta: float = 0.0
     season_delta: Optional[float] = None
+    combined_delta: Optional[float] = None
     is_sub: bool = False
     subbed_out: bool = False
 
@@ -86,6 +87,7 @@ class GetLeaderboardRequest(BaseModel):
     game_type: str
     game_mode: str
     is_seasonal: bool
+    is_combined: bool
 
 class PlayerLeaderboard(BaseModel):
     discord_id: str

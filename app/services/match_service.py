@@ -74,7 +74,7 @@ class MatchService:
                 player.discord_id = await self.steam_to_discord_id(player.steam_id)
         return match
 
-    def get_stat_table(self, is_cloud: bool, match_type: str, civ_version: str, is_seasonal: bool):
+    def get_stat_table(self, is_cloud: bool, match_type: str, civ_version: str, is_seasonal: bool = False, is_combined: bool = False):
         if is_seasonal:
             if civ_version == "civ6":
                 db = self.civ6_seasonal_stats
@@ -85,7 +85,7 @@ class MatchService:
                 db = self.civ6_lifetime_stats
             else:
                 db = self.civ7_lifetime_stats
-        match_table = ("pbc_" if is_cloud else "rt_") + match_type
+        match_table = ("pbc_" if is_cloud else "rt_") + ('combined' if is_combined else match_type)
         return getattr(db, match_table)
 
     def get_player_stats_db(self, match, player, player_new_stats: StatModel, delta_value_name: str) -> Dict[str, Any]:
@@ -105,7 +105,7 @@ class MatchService:
             player_stats_db[f"civs"] = civs
         return player_stats_db
 
-    async def get_player_ranking(self, match: MatchModel, discord_id: str, player_index: int, is_seasonal: bool) -> StatModel:
+    async def get_player_ranking(self, match: MatchModel, discord_id: str, player_index: int, is_seasonal: bool, is_combined: bool) -> StatModel:
         if discord_id == None:
             return StatModel(
                 index=player_index,
@@ -119,7 +119,7 @@ class MatchService:
                 subbedOut=0,
                 civs={},
             )
-        stat_table = self.get_stat_table(match.is_cloud, match.game_mode, match.game, is_seasonal)
+        stat_table = self.get_stat_table(match.is_cloud, match.game_mode, match.game, is_seasonal, is_combined)
         player = await stat_table.find_one({"_id": Int64(discord_id)})
         if player:
             player['id'] = player.pop('_id')
@@ -139,10 +139,10 @@ class MatchService:
                 civs={},
             )
 
-    async def get_players_ranking(self, match: MatchModel, is_seasonal: bool) -> List[StatModel]:
+    async def get_players_ranking(self, match: MatchModel, is_seasonal: bool = False, is_combined: bool = False) -> List[StatModel]:
         players_ranking = []
         for player_index, player in enumerate(match.players):
-            ranking = await self.get_player_ranking(match, player.discord_id, player_index, is_seasonal)
+            ranking = await self.get_player_ranking(match, player.discord_id, player_index, is_seasonal, is_combined)
             players_ranking.append(ranking)
         return players_ranking
 
@@ -253,10 +253,12 @@ class MatchService:
         parsed['discord_messages_id_list'] = [discord_message_id]
         match = MatchModel(**parsed)
         match = await self.match_id_to_discord(match)
-        players_ranking = await self.get_players_ranking(match, is_seasonal=False)
+        players_ranking = await self.get_players_ranking(match)
         players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
+        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
         match, _ = self.update_player_stats(match, players_ranking, "delta")
         match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
+        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
         res = await self.pending_matches.insert_one(match.dict())
         return {"match_id": str(res.inserted_id), **match.dict()}
     
@@ -304,16 +306,19 @@ class MatchService:
             raise MatchServiceError(f"New order length does not match number of players/teams ({num_teams})")
         for i, player in enumerate(match.players):
             player.placement = int(new_order_list[player.team]) - 1
-        players_ranking = await self.get_players_ranking(match, is_seasonal=False)
+        players_ranking = await self.get_players_ranking(match)
         players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
+        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
         match, _ = self.update_player_stats(match, players_ranking, "delta")
         match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
+        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
         changes = {}
         changes["discord_messages_id_list"] = res['discord_messages_id_list'] + [discord_message_id]
         for i, player in enumerate(match.players):
             changes[f"players.{i}.placement"] = player.placement
             changes[f"players.{i}.delta"] = match.players[i].delta
             changes[f"players.{i}.season_delta"] = match.players[i].season_delta
+            changes[f"players.{i}.combined_delta"] = match.players[i].combined_delta
         await self.pending_matches.update_one({"_id": oid}, {"$set": changes})
         logger.info(f"✅ 🔄 Changed player order for match {match_id}")
         updated = await self.pending_matches.find_one({"_id": oid})
@@ -357,10 +362,13 @@ class MatchService:
             raise MatchServiceError("Player ID out of range. Must be between 1 and number of players")
         match.players[int(player_id)-1].discord_id = player_discord_id
         match.players[int(player_id)-1].steam_id = await self.discord_to_steam_id(player_discord_id)
-        players_ranking = await self.get_players_ranking(match, is_seasonal=False)
+        players_ranking = await self.get_players_ranking(match)
+        print(match.is_cloud, match.game_mode, match.game)
         players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
+        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
         match, _ = self.update_player_stats(match, players_ranking, "delta")
         match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
+        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
         changes = {}
         changes["discord_messages_id_list"] = res['discord_messages_id_list'] + [discord_message_id]
         changes[f"players.{int(player_id)-1}.discord_id"] = player_discord_id
@@ -398,10 +406,12 @@ class MatchService:
             is_sub = False,
             subbed_out = True,
         ))
-        players_ranking = await self.get_players_ranking(match, is_seasonal=False)
+        players_ranking = await self.get_players_ranking(match)
         players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
+        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
         match, _ = self.update_player_stats(match, players_ranking, "delta")
         match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
+        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
         match.discord_messages_id_list = res['discord_messages_id_list'] + [discord_message_id]
         await self.pending_matches.replace_one({"_id": oid}, match.dict())
         updated = await self.pending_matches.find_one({"_id": oid})
@@ -419,10 +429,12 @@ class MatchService:
             raise MatchServiceError("Sub in Player ID out of range. Must be between 1 and number of players - 1")
         match.players[int(sub_out_id)-1].is_sub = False
         match.players.pop(int(sub_out_id))
-        players_ranking = await self.get_players_ranking(match, is_seasonal=False)
+        players_ranking = await self.get_players_ranking(match)
         players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
+        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
         match, _ = self.update_player_stats(match, players_ranking, "delta")
         match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
+        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
         match.discord_messages_id_list = res['discord_messages_id_list'] + [discord_message_id]
         await self.pending_matches.replace_one({"_id": oid}, match.dict())
         updated = await self.pending_matches.find_one({"_id": oid})
@@ -441,14 +453,17 @@ class MatchService:
             for i, player in enumerate(match.players):
                 if player.discord_id == None:
                     raise MatchServiceError(f"Player {player.user_name} has no linked Discord ID")
-            players_ranking = await self.get_players_ranking(match, is_seasonal=False)
+            players_ranking = await self.get_players_ranking(match)
             players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
+            players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
             match, post = self.update_player_stats(match, players_ranking, "delta")
             match, season_post = self.update_player_stats(match, players_season_ranking, "season_delta")
+            match, combined_post = self.update_player_stats(match, players_combined_ranking, "combined_delta")
             match.approved_at = datetime.now(UTC)
             match.approver_discord_id = approver_discord_id
             stats_table = self.get_stat_table(match.is_cloud, match.game_mode, match.game, is_seasonal=False)
             season_stats_table = self.get_stat_table(match.is_cloud, match.game_mode, match.game, is_seasonal=True)
+            combined_stats_table = self.get_stat_table(match.is_cloud, match.game_mode, match.game, is_combined=True)
             session = await self.db.start_session()
             async with session:
                 async with session.start_transaction():
@@ -456,8 +471,10 @@ class MatchService:
                         for i, player in enumerate(match.players):
                             player_stats_db = self.get_player_stats_db(match, player, post[i], "delta")
                             player_season_stats_db = self.get_player_stats_db(match, player, season_post[i], "season_delta")
+                            player_combined_stats_db = self.get_player_stats_db(match, player, combined_post[i], "combined_delta")
                             await stats_table.replace_one({"_id": Int64(player.discord_id)}, player_stats_db, upsert=True, session=session)
                             await season_stats_table.replace_one({"_id": Int64(player.discord_id)}, player_season_stats_db, upsert=True, session=session)
+                            await combined_stats_table.replace_one({"_id": Int64(player.discord_id)}, player_combined_stats_db, upsert=True, session=session)
                             if player.is_sub:
                                 await self.subs_table.update_one(
                                     {"_id": player.discord_id},
@@ -477,8 +494,8 @@ class MatchService:
             logger.info(f"✅ 🔄 Match {match_id} approved")
             return {"match_id": str(validated.inserted_id), **match.dict()}
         
-    async def get_leaderboard(self, is_cloud: str, game: str, game_mode: str, is_seasonal: bool) -> Dict[str, Any]:
-        stats_table = self.get_stat_table(is_cloud == "PBC", game_mode, game, is_seasonal=is_seasonal)
+    async def get_leaderboard(self, is_cloud: str, game: str, game_mode: str, is_seasonal: bool, is_combined: bool) -> Dict[str, Any]:
+        stats_table = self.get_stat_table(is_cloud == "PBC", game_mode, game, is_seasonal=is_seasonal, is_combined=is_combined)
         cursor = stats_table.find({ "games": { "$gt": 2 } }).sort([("mu", -1), ("sigma", 1)]).limit(100)
         leaderboard = []
         async for doc in cursor:
