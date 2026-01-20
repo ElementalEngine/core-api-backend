@@ -376,6 +376,7 @@ class MatchService:
         for i, player in enumerate(res['players']):
             changes[f"players.{i}.delta"] = match.players[i].delta
             changes[f"players.{i}.season_delta"] = match.players[i].season_delta
+            changes[f"players.{i}.combined_delta"] = match.players[i].combined_delta
         await self.pending_matches.update_one({"_id": oid}, {"$set": changes})
         logger.info(f"✅ 🔄 Assigned player id for match {match_id}")
         updated = await self.pending_matches.find_one({"_id": oid})
