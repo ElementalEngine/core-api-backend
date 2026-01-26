@@ -98,3 +98,4 @@ class PlayerLeaderboard(BaseModel):
 
 class LeaderboardRankingResponse(BaseModel):
     rankings: List[PlayerLeaderboard]
+    last_updated: int
