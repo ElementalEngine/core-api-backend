@@ -67,6 +67,11 @@ class AssignDiscordId(BaseModel):
     player_discord_id: str
     discord_message_id: str
 
+class AssignDiscordIdAll(BaseModel):
+    match_id: str
+    discord_id_list: List[str]
+    discord_message_id: str
+
 class AssignSub(BaseModel):
     match_id: str
     sub_in_id: str

@@ -383,6 +383,38 @@ class MatchService:
         updated["match_id"] = str(updated.pop("_id"))
         return updated
 
+    async def assign_discord_id_all(self, match_id: str, player_discord_id: List[str], discord_message_id: str) -> Dict[str, Any]:
+        oid = self._to_oid(match_id)
+        res = await self.pending_matches.find_one({"_id": oid})
+        if res == None:
+            raise NotFoundError("Match not found")
+        match = MatchModel(**res)
+        if len(player_discord_id) != len(match.players):
+            raise MatchServiceError("Number of given players does not match number of players in match.")
+        for player_id, discord_id in enumerate(player_discord_id):
+            match.players[player_id].discord_id = discord_id
+            match.players[player_id].steam_id = await self.discord_to_steam_id(discord_id)
+        players_ranking = await self.get_players_ranking(match)
+        print(match.is_cloud, match.game_mode, match.game)
+        players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
+        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
+        match, _ = self.update_player_stats(match, players_ranking, "delta")
+        match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
+        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
+        changes = {}
+        changes["discord_messages_id_list"] = res['discord_messages_id_list'] + [discord_message_id]
+        for i, player in enumerate(res['players']):
+            changes[f"players.{i}.discord_id"] = player_discord_id[i]
+            changes[f"players.{i}.steam_id"] = match.players[player_id].steam_id
+            changes[f"players.{i}.delta"] = match.players[i].delta
+            changes[f"players.{i}.season_delta"] = match.players[i].season_delta
+            changes[f"players.{i}.combined_delta"] = match.players[i].combined_delta
+        await self.pending_matches.update_one({"_id": oid}, {"$set": changes})
+        logger.info(f"✅ 🔄 Assigned player id for match {match_id}")
+        updated = await self.pending_matches.find_one({"_id": oid})
+        updated["match_id"] = str(updated.pop("_id"))
+        return updated
+
     async def assign_sub(self, match_id: str, sub_in_id: str, sub_out_discord_id: str, discord_message_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.pending_matches.find_one({"_id": oid})
