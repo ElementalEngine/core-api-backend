@@ -134,14 +134,29 @@ class MongoQueries:
 
     def _stats_collection_name(self, *, match_type: str, is_cloud: bool, is_combined: bool) -> str:
         prefix = "pbc_" if is_cloud else "rt_"
-        table = "combined" if is_combined else match_type
+
+        if is_combined:
+            return f"{prefix}combined"
+
+        mt = match_type.strip().lower()
+        # Accept legacy alias but keep internal naming as 'teamer'.
+        if mt == "team":
+            mt = "teamer"
+
+        if mt not in {"ffa", "teamer", "duel"}:
+            raise ValueError(f"Unexpected match_type: {match_type!r} (expected ffa|teamer|duel)")
+
+        # Cloud DB schema uses pbc_team (not pbc_teamer) for team games.
+        table = "team" if (is_cloud and mt == "teamer") else mt
         return f"{prefix}{table}"
 
     def _stats_collection(
         self, *, civ_version: str, is_seasonal: bool, match_type: str, is_cloud: bool, is_combined: bool
     ) -> AsyncIOMotorCollection:
         db = self._client[self._stats_db_name(civ_version=civ_version, is_seasonal=is_seasonal)]
-        return db[self._stats_collection_name(match_type=match_type, is_cloud=is_cloud, is_combined=is_combined)]
+        return db[
+            self._stats_collection_name(match_type=match_type, is_cloud=is_cloud, is_combined=is_combined)
+        ]
 
     async def get_player_stat_doc(
         self,
@@ -161,6 +176,44 @@ class MongoQueries:
             is_combined=is_combined,
         )
         return await col.find_one({"_id": Int64(discord_id)})
+
+    async def get_player_stat_docs_batch(
+        self,
+        *,
+        civ_version: str,
+        is_seasonal: bool,
+        match_type: str,
+        is_cloud: bool,
+        is_combined: bool,
+        discord_ids: List[str],
+    ) -> Dict[str, Dict[str, Any]]:
+        """Batch fetch stat docs by discord id.
+
+        Returns mapping: discord_id -> doc for ids that exist.
+        Missing ids are simply absent.
+        """
+        if not discord_ids:
+            return {}
+
+        col = self._stats_collection(
+            civ_version=civ_version,
+            is_seasonal=is_seasonal,
+            match_type=match_type,
+            is_cloud=is_cloud,
+            is_combined=is_combined,
+        )
+
+        ids = [Int64(did) for did in discord_ids]
+        cursor = col.find({"_id": {"$in": ids}})
+        docs = await cursor.to_list(length=len(ids))
+
+        out: Dict[str, Dict[str, Any]] = {}
+        for d in docs:
+            did = d.get("_id")
+            if did is None:
+                continue
+            out[str(int(did))] = d
+        return out
 
     async def upsert_player_stat_doc(
         self,
@@ -205,10 +258,6 @@ class MongoQueries:
         last = await col.find_one({}, sort=[("lastModified", -1)], projection={"lastModified": 1})
         last_updated = (last or {}).get("lastModified")
 
-        cursor = (
-            col.find({"games": {"$gte": min_games}})
-            .sort("mu", -1)
-            .limit(limit)
-        )
+        cursor = col.find({"games": {"$gte": min_games}}).sort("mu", -1).limit(limit)
         rows = await cursor.to_list(length=limit)
         return LeaderboardResult(rows=rows, last_updated=last_updated)
