@@ -1,16 +1,11 @@
 from typing import List
+from urllib.parse import urlsplit
+from pydantic import AnyHttpUrl, Field, SecretStr, TypeAdapter, model_validator
 from pydantic_settings import BaseSettings
-from pydantic import (
-    Field,
-    AnyHttpUrl,
-    SecretStr,
-    model_validator,
-    TypeAdapter,
-)
 
 class Settings(BaseSettings):
     # MongoDB
-    mongo_url: SecretStr = Field(..., env="MONGO_URL")  
+    mongo_url: SecretStr = Field(..., env="MONGO_URL")
     mongo_db_name: str = Field(..., env="MONGO_DB_NAME")
     # MongoDB connection settings
     mongodb_timeout_ms: int = Field(5000, ge=1000, le=30000, env="MONGODB_TIMEOUT_MS")
@@ -33,9 +28,7 @@ class Settings(BaseSettings):
 
     ts_sigma_free: float = Field(90.0, ge=0, env="TS_SIGMA_FREE")
     ts_teamer_boost: float = Field(1.0, env="TS_TEAMER_BOOST")
-    
     min_points_for_subs: int = Field(5, ge=0, env="MIN_POINTS_FOR_SUBS")
-    
     civ_save_parser_version: str = Field("1.0", env="CIV_SAVE_PARSER_VERSION")
 
     # pydantic v2 model config
@@ -46,16 +39,23 @@ class Settings(BaseSettings):
         "extra": "ignore",
     }
 
-    # expose a parsed, validated list property for callers
     @property
-    def allowed_origins(self) -> List[AnyHttpUrl]:
+    def allowed_origins(self) -> List[str]:
         raw = (self.allowed_origins_raw or "").strip()
-        if not raw:
-            items: List[str] = []
-        else:
-            items = [u.strip() for u in raw.split(",") if u.strip()]
+        items = [u.strip() for u in raw.split(",") if u.strip()] if raw else []
+
         adapter = TypeAdapter(List[AnyHttpUrl])
-        return adapter.validate_python(items)
+        urls = adapter.validate_python(items)
+
+        origins: List[str] = []
+        seen: set[str] = set()
+        for u in urls:
+            parts = urlsplit(str(u))
+            origin = f"{parts.scheme}://{parts.netloc}"
+            if origin not in seen:
+                seen.add(origin)
+                origins.append(origin)
+        return origins
 
     @model_validator(mode="after")
     def _ensure_mongo_uri_scheme(self):
