@@ -21,25 +21,37 @@ from app.utils import get_cpl_name
 logger = logging.getLogger(__name__)
 
 approve_lock = asyncio.Lock()
-RANKING_CONCURRENCY_LIMIT = 4  
+RANKING_CONCURRENCY_LIMIT = 8  
 class NotFoundError(Exception):
     pass
+
 class MatchServiceError(Exception):
     pass
+
+class InvalidIDError(MatchServiceError):
+    pass
+
+class ParseError(MatchServiceError):
+    pass
+
 class MatchService:
     def __init__(self, client: AsyncIOMotorClient):
         self.q = MongoQueries(client)
 
     def _to_oid(self, match_id: str) -> ObjectId:
         if not ObjectId.is_valid(match_id):
-            raise MatchServiceError("Invalid match id")
+            raise InvalidIDError("Invalid match id")
         return ObjectId(match_id)
 
     def _parse_save(self, file_bytes: bytes) -> Dict[str, Any]:
         try:
             return parse_civ6_save(file_bytes)
         except Exception:
-            return parse_civ7_save(file_bytes)
+            try:
+                return parse_civ7_save(file_bytes)
+            except Exception as e7:
+                raise ParseError("Unrecognized save file format") from e7
+
 
     async def discord_to_steam_id(self, discord_id: str) -> str:
         player = await self.q.get_user_by_discord_id(discord_id)
@@ -214,7 +226,6 @@ class MatchService:
         post: StatModel,
         civs: Dict[str, Any],
     ) -> Dict[str, Any]:
-        wins_add = 1 if post and pre and post.discord_id and (post.index is not None) else 0  # no-op, kept safe
 
         # wins/first are driven by placement; caller sets those increments explicitly
         return {
