@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     # API
     api_host: str = Field("0.0.0.0", env="API_HOST")
     api_port: int = Field(8000, gt=0, lt=65536, env="API_PORT")
+    # api_port: int = Field(8001, gt=0, lt=65536, env="API_PORT")
 
     # CORS
     allowed_origins_raw: str = Field("http://localhost:3000", env="ALLOWED_ORIGINS")
