@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Dict, List, Tuple
 
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -154,8 +155,8 @@ class StatsService:
     ) -> Dict[str, StatSet]:
         result: Dict[str, StatSet] = {did: StatSet() for did in discord_ids}
 
-        for mt in _ALLOWED_MATCH_TYPES:
-            docs = await self.q.get_player_stat_docs_batch(
+        tasks = [
+            self.q.get_player_stat_docs_batch(
                 civ_version=civ_version,
                 is_seasonal=is_seasonal,
                 match_type=mt,
@@ -163,7 +164,11 @@ class StatsService:
                 is_combined=False,
                 discord_ids=discord_ids,
             )
+            for mt in _ALLOWED_MATCH_TYPES
+        ]
 
+        docs_by_mt = await asyncio.gather(*tasks)
+        for mt, docs in zip(_ALLOWED_MATCH_TYPES, docs_by_mt, strict=True):
             for did, doc in docs.items():
                 key = str(did)
                 if key not in result:
