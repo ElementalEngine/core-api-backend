@@ -100,10 +100,10 @@ class PlayerLeaderboard(BaseModel):
     Keep this schema backwards-compatible with older bot clients.
     The bot prefers (rating|mu) and (games_played|games).
     """
-
+    rank: int
     discord_id: str
-    wins: int
-    first: int
+    wins: int = 0
+    first: int = 0
 
     # Actual fields returned by MatchService.get_leaderboard
     mu: float = 0.0

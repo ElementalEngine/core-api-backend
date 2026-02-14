@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Form
 from app.dependencies import get_database
-from app.models.schemas import MatchResponse, MatchUpdate, ChangeOrder, DeletePendingMatch, TriggerQuit, AppendDiscordMessageID, AssignDiscordId, AssignDiscordIdAll, AssignSub, RemoveSub, ApproveMatch, GetLeaderboardRequest, LeaderboardRankingResponse
+from app.models.schemas import MatchResponse, MatchUpdate, ChangeOrder, DeletePendingMatch, TriggerQuit, AppendDiscordMessageID, AssignDiscordId, AssignDiscordIdAll, AssignSub, RemoveSub, ApproveMatch, LeaderboardRankingResponse
 from app.services.match_service import MatchService, InvalidIDError, NotFoundError, MatchServiceError
 
 logger = logging.getLogger(__name__)
@@ -196,13 +196,15 @@ async def approve_match(payload: ApproveMatch = Form(), db = Depends(get_databas
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/get-leaderboard-ranking/", response_model=LeaderboardRankingResponse)
-async def get_leaderboard_ranking(payload: GetLeaderboardRequest = Form(), db = Depends(get_database)):
+async def get_leaderboard_ranking(
+    game: str = Form(),
+    game_type: str = Form(),
+    game_mode: str = Form(),
+    is_seasonal: bool = Form(),
+    is_combined: bool = Form(),
+    db = Depends(get_database),
+):
     svc = MatchService(db)
-    game = payload.game
-    game_type = payload.game_type
-    game_mode = payload.game_mode
-    is_seasonal = payload.is_seasonal
-    is_combined = payload.is_combined
     try:
         # NOTE: parameter order matters here.
         # - game: civ_version (civ6|civ7)
@@ -222,5 +224,6 @@ async def get_leaderboard_ranking(payload: GetLeaderboardRequest = Form(), db = 
         logger.warning(f"⚠️ Update error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except ValueError as e:
+        # Most commonly thrown for unexpected match_type (ffa|teamer|duel expected).
         logger.warning(f"⚠️ Invalid leaderboard request: {e}")
         raise HTTPException(status_code=400, detail=str(e))

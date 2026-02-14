@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
-from bson.decimal128 import Decimal128
 from bson.int64 import Int64
 from motor.motor_asyncio import AsyncIOMotorClient
 from trueskill import Rating
@@ -23,6 +22,32 @@ logger = logging.getLogger(__name__)
 
 approve_lock = asyncio.Lock()
 RANKING_CONCURRENCY_LIMIT = 8  
+
+
+def _as_float(value: Any, default: float) -> float:
+    """Safely coerce Mongo values (None/Decimal128/Int64/str) to float."""
+    if value is None:
+        return default
+    try:
+        if hasattr(value, "to_decimal"):
+            value = value.to_decimal()
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_int(value: Any, default: int) -> int:
+    """Safely coerce Mongo values (None/Decimal128/Int64/str) to int."""
+    if value is None:
+        return default
+    try:
+        if hasattr(value, "to_decimal"):
+            value = value.to_decimal()
+        if isinstance(value, str):
+            return int(float(value))
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 class NotFoundError(Exception):
     pass
 
@@ -120,11 +145,11 @@ class MatchService:
         return StatModel(
             discord_id=discord_id,
             index=player_index,
-            mu=float(doc.get("mu", settings.ts_mu)),
-            sigma=float(doc.get("sigma", settings.ts_sigma)),
-            games=int(doc.get("games", 0)),
-            wins=int(doc.get("wins", 0)),
-            first=int(doc.get("first", 0)),
+            mu=_as_float(doc.get("mu"), settings.ts_mu),
+            sigma=_as_float(doc.get("sigma"), settings.ts_sigma),
+            games=_as_int(doc.get("games"), 0),
+            wins=_as_int(doc.get("wins"), 0),
+            first=_as_int(doc.get("first"), 0),
             civs=dict(doc.get("civs", {})) if isinstance(doc.get("civs", {}), dict) else {},
         )
 
@@ -656,56 +681,7 @@ class MatchService:
         is_combined: bool,
         civ_version: str,
     ) -> Dict[str, Any]:
-        def _as_float(value: Any, default: float = 0.0) -> float:
-            if value is None:
-                return default
-            if isinstance(value, Decimal128):
-                try:
-                    return float(value.to_decimal())
-                except Exception:
-                    return default
-            if isinstance(value, (int, float)):
-                return float(value)
-            if isinstance(value, (Int64,)):
-                return float(int(value))
-            if isinstance(value, str):
-                try:
-                    return float(value)
-                except ValueError:
-                    return default
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return default
-
-        def _as_int(value: Any, default: int = 0) -> int:
-            if value is None:
-                return default
-            if isinstance(value, Decimal128):
-                try:
-                    return int(value.to_decimal())
-                except Exception:
-                    return default
-            if isinstance(value, int):
-                return value
-            if isinstance(value, float):
-                try:
-                    return int(value)
-                except Exception:
-                    return default
-            if isinstance(value, (Int64,)):
-                return int(value)
-            if isinstance(value, str):
-                try:
-                    return int(float(value))
-                except ValueError:
-                    return default
-            try:
-                return int(value)
-            except (TypeError, ValueError):
-                return default
-
-        is_cloud_game = is_cloud == "PBC"
+        is_cloud_game = str(is_cloud).strip().lower() in {"pbc", "cloud", "true", "1"}
 
         lb = await self.q.get_leaderboard(
             civ_version=civ_version,
@@ -718,10 +694,8 @@ class MatchService:
         )
 
         out: List[Dict[str, Any]] = []
-        for idx, row in enumerate(lb.rows, start=1):
+        for idx, row in enumerate(lb.rows or [], start=1):
             did = str(row.get("_id"))
-            # DB values can be missing/null or stored as Decimal128/Int64.
-            # Coerce safely to avoid crashing the whole leaderboard update.
             mu = _as_float(row.get("mu"), 0.0)
             games = _as_int(row.get("games"), 0)
             out.append(
@@ -739,10 +713,5 @@ class MatchService:
                     "first": _as_int(row.get("first"), 0),
                 }
             )
-        last_updated_ts = 0
-        if lb.last_updated:
-            if isinstance(lb.last_updated, datetime):
-                last_updated_ts = int(lb.last_updated.timestamp())
-            elif isinstance(lb.last_updated, (int, float, Int64)):
-                last_updated_ts = int(lb.last_updated)
+        last_updated_ts = int(lb.last_updated.timestamp()) if isinstance(lb.last_updated, datetime) else 0
         return {"rankings": out, "last_updated": last_updated_ts}
