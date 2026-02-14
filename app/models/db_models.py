@@ -1,23 +1,81 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field, model_validator
 
 class CivCount(BaseModel):
     civ: str
     count: int
 
 class StatModel(BaseModel):
+    """Stat row used for ranking/stats calculations.
+
+    Canonical identifier across the codebase is discord_id (string). Stats collections
+    historically used Mongo _id equal to the Discord ID (often numeric). This model
+    accepts either shape and normalizes.
+    """
+
     index: int
-    id: int  # discord_id
+
+    # Canonical outward identifier.
+    discord_id: str
+
+    # Back-compat: some call sites / docs refer to the stats document id.
+    # We keep it optional and derive from discord_id where possible.
+    id: Optional[int] = None
+
     mu: float
     sigma: float
     games: int
     wins: int
     first: int
-    subbedIn: int
-    subbedOut: int
-    civs: Optional[Dict[str, int]] = None
+
+    # Subbing fields are not present in older docs; keep safe defaults.
+    subbedIn: int = 0
+    subbedOut: int = 0
+
+    # Civs map is historically {"CivName": <int games>}.
+    civs: Optional[Dict[str, Any]] = None
+
     lastModified: datetime = Field(default_factory=datetime.utcnow)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_ids(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        # Accept Mongo-style `_id` or legacy `id`.
+        raw_id = data.get("id")
+        if raw_id is None and "_id" in data:
+            raw_id = data.get("_id")
+
+        # Accept legacy `discord_id`.
+        raw_discord_id = data.get("discord_id")
+        if raw_discord_id is None and raw_id is not None:
+            raw_discord_id = str(raw_id)
+
+        if raw_discord_id is not None:
+            data["discord_id"] = str(raw_discord_id)
+
+        # Best-effort int id (used when writing stats docs).
+        if raw_id is None and raw_discord_id is not None:
+            try:
+                data["id"] = int(str(raw_discord_id))
+            except (TypeError, ValueError):
+                data["id"] = None
+        elif raw_id is not None:
+            try:
+                data["id"] = int(str(raw_id))
+            except (TypeError, ValueError):
+                data["id"] = None
+
+        # Defaults for older docs.
+        data.setdefault("subbedIn", 0)
+        data.setdefault("subbedOut", 0)
+        return data
 
 class PlayerModel(BaseModel):
     steam_id: Optional[str] = None

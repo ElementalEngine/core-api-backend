@@ -550,7 +550,7 @@ class MatchService:
         logger.info("✅ 🔄 Sub removed for match %s", match_id)
         return updated
 
-    async def approve_match(self, match_id: str) -> List[str]:
+    async def approve_match(self, match_id: str, approver_discord_id: str) -> Dict[str, Any]:
         async with approve_lock:
             oid = self._to_oid(match_id)
             res = await self.q.find_pending_by_id(oid)
@@ -667,11 +667,21 @@ class MatchService:
                     validated_doc["discord_messages_id_list"] = res.get("discord_messages_id_list", [])
                     validated_doc["save_file_hash"] = res.get("save_file_hash", "")
 
+                    # Approval metadata
+                    validated_doc["approved_at"] = now
+                    validated_doc["approver_discord_id"] = approver_discord_id
+
                     await self.q.insert_validated_match(validated_doc, session=session)
                     await self.q.delete_pending_match(oid, session=session)
 
             logger.info("✅ ✅ Approved match %s", match_id)
-            return res.get("discord_messages_id_list", [])
+
+            # Return the approved match payload (API expects MatchResponse)
+            approved = validated_doc
+            approved["match_id"] = str(oid)
+            approved["approved_at"] = now
+            approved["approver_discord_id"] = approver_discord_id
+            return approved
 
     async def get_leaderboard(
         self,
