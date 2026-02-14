@@ -95,11 +95,24 @@ class GetLeaderboardRequest(BaseModel):
     is_combined: bool
 
 class PlayerLeaderboard(BaseModel):
+    """Leaderboard row.
+
+    Keep this schema backwards-compatible with older bot clients.
+    The bot prefers (rating|mu) and (games_played|games).
+    """
+
     discord_id: str
-    rating: int
-    games_played: int
     wins: int
     first: int
+
+    # Actual fields returned by MatchService.get_leaderboard
+    mu: float = 0.0
+    sigma: float = 0.0
+    games: int = 0
+
+    # Backwards-compatible aliases (optional)
+    rating: Optional[int] = None
+    games_played: Optional[int] = None
 
 class LeaderboardRankingResponse(BaseModel):
     rankings: List[PlayerLeaderboard]

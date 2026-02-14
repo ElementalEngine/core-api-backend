@@ -35,6 +35,9 @@ async def append_message_id_list(payload: AppendDiscordMessageID = Form(), db = 
     except MatchServiceError as e:
         logger.warning(f"⚠️ Update error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as e:
+        logger.warning(f"⚠️ Invalid leaderboard request: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/update-match/", response_model=MatchResponse)
 async def update_match(payload: MatchUpdate = Form(), db = Depends(get_database)):
@@ -201,10 +204,23 @@ async def get_leaderboard_ranking(payload: GetLeaderboardRequest = Form(), db = 
     is_seasonal = payload.is_seasonal
     is_combined = payload.is_combined
     try:
-        return await svc.get_leaderboard(game_type, game, game_mode, is_seasonal, is_combined)
+        # NOTE: parameter order matters here.
+        # - game: civ_version (civ6|civ7)
+        # - game_type: PBC|realtime (used to infer cloud)
+        # - game_mode: ffa|teamer|duel|combined (match_type)
+        return await svc.get_leaderboard(
+            match_type=game_mode,
+            is_cloud=game_type,
+            is_seasonal=is_seasonal,
+            is_combined=is_combined,
+            civ_version=game,
+        )
     except NotFoundError:
         logger.warning(f"🔴 Invalid game type for leaderboard. game:{game} game_mode:{game_mode}")
         raise HTTPException(status_code=404, detail="Match not found")
     except MatchServiceError as e:
         logger.warning(f"⚠️ Update error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as e:
+        logger.warning(f"⚠️ Invalid leaderboard request: {e}")
         raise HTTPException(status_code=400, detail=str(e))

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
+from bson.decimal128 import Decimal128
 from bson.int64 import Int64
 from motor.motor_asyncio import AsyncIOMotorClient
 from trueskill import Rating
@@ -655,6 +656,55 @@ class MatchService:
         is_combined: bool,
         civ_version: str,
     ) -> Dict[str, Any]:
+        def _as_float(value: Any, default: float = 0.0) -> float:
+            if value is None:
+                return default
+            if isinstance(value, Decimal128):
+                try:
+                    return float(value.to_decimal())
+                except Exception:
+                    return default
+            if isinstance(value, (int, float)):
+                return float(value)
+            if isinstance(value, (Int64,)):
+                return float(int(value))
+            if isinstance(value, str):
+                try:
+                    return float(value)
+                except ValueError:
+                    return default
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return default
+
+        def _as_int(value: Any, default: int = 0) -> int:
+            if value is None:
+                return default
+            if isinstance(value, Decimal128):
+                try:
+                    return int(value.to_decimal())
+                except Exception:
+                    return default
+            if isinstance(value, int):
+                return value
+            if isinstance(value, float):
+                try:
+                    return int(value)
+                except Exception:
+                    return default
+            if isinstance(value, (Int64,)):
+                return int(value)
+            if isinstance(value, str):
+                try:
+                    return int(float(value))
+                except ValueError:
+                    return default
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return default
+
         is_cloud_game = is_cloud == "PBC"
 
         lb = await self.q.get_leaderboard(
@@ -670,18 +720,29 @@ class MatchService:
         out: List[Dict[str, Any]] = []
         for idx, row in enumerate(lb.rows, start=1):
             did = str(row.get("_id"))
+            # DB values can be missing/null or stored as Decimal128/Int64.
+            # Coerce safely to avoid crashing the whole leaderboard update.
+            mu = _as_float(row.get("mu"), 0.0)
+            games = _as_int(row.get("games"), 0)
             out.append(
                 {
                     "rank": idx,
                     "discord_id": did,
-                    "mu": float(row.get("mu", 0.0)),
-                    "sigma": float(row.get("sigma", 0.0)),
-                    "games": int(row.get("games", 0)),
-                    "wins": int(row.get("wins", 0)),
-                    "first": int(row.get("first", 0)),
+                    "mu": mu,
+                    "sigma": _as_float(row.get("sigma"), 0.0),
+                    "games": games,
+
+                    # Backwards-compatible aliases for older clients.
+                    "rating": int(round(mu)),
+                    "games_played": games,
+                    "wins": _as_int(row.get("wins"), 0),
+                    "first": _as_int(row.get("first"), 0),
                 }
             )
-
-        # Preserve old behavior: if no lastModified exists, return a stable 0
-        last_updated_ts = int(lb.last_updated.timestamp()) if lb.last_updated else 0
+        last_updated_ts = 0
+        if lb.last_updated:
+            if isinstance(lb.last_updated, datetime):
+                last_updated_ts = int(lb.last_updated.timestamp())
+            elif isinstance(lb.last_updated, (int, float, Int64)):
+                last_updated_ts = int(lb.last_updated)
         return {"rankings": out, "last_updated": last_updated_ts}
