@@ -215,6 +215,34 @@ class MongoQueries:
             out[str(int(did))] = d
         return out
 
+    async def get_lifetime_mu_batch(
+        self,
+        *,
+        civ_version: str,
+        match_type: str,
+        is_cloud: bool,
+        discord_ids: List[str],
+    ) -> Dict[str, float]:
+        """Batch fetch lifetime mu values for a match_type.
+
+        Returns mapping discord_id -> mu for docs that exist.
+        """
+        docs = await self.get_player_stat_docs_batch(
+            civ_version=civ_version,
+            is_seasonal=False,
+            match_type=match_type,
+            is_cloud=is_cloud,
+            is_combined=False,
+            discord_ids=discord_ids,
+        )
+
+        out: Dict[str, float] = {}
+        for did, d in docs.items():
+            mu = d.get("mu")
+            if isinstance(mu, (int, float)):
+                out[did] = float(mu)
+        return out
+
     async def upsert_player_stat_doc(
         self,
         *,

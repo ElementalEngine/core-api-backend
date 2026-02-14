@@ -18,6 +18,11 @@ class PlayerSchema(BaseModel):
     is_sub: bool = False
     subbed_out: bool = False
 
+
+class AffectedPlayerRating(BaseModel):
+    discord_id: str
+    rating_mu: float
+
 class MatchResponse(BaseModel):
     match_id: str
     game: str
@@ -36,6 +41,9 @@ class MatchResponse(BaseModel):
     flagged_by: Optional[str] = None
     save_file_hash: str
     reporter_discord_id: str
+
+    # Optional: returned on approval to allow the bot to update rank roles.
+    affected_players: Optional[List[AffectedPlayerRating]] = None
 
 class MatchUpdate(BaseModel):
     match_id: str
@@ -95,24 +103,11 @@ class GetLeaderboardRequest(BaseModel):
     is_combined: bool
 
 class PlayerLeaderboard(BaseModel):
-    """Leaderboard row.
-
-    Keep this schema backwards-compatible with older bot clients.
-    The bot prefers (rating|mu) and (games_played|games).
-    """
-    rank: int
     discord_id: str
-    wins: int = 0
-    first: int = 0
-
-    # Actual fields returned by MatchService.get_leaderboard
-    mu: float = 0.0
-    sigma: float = 0.0
-    games: int = 0
-
-    # Backwards-compatible aliases (optional)
-    rating: Optional[int] = None
-    games_played: Optional[int] = None
+    rating: int
+    games_played: int
+    wins: int
+    first: int
 
 class LeaderboardRankingResponse(BaseModel):
     rankings: List[PlayerLeaderboard]
