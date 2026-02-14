@@ -236,13 +236,33 @@ class MatchService:
         civ_name = get_cpl_name(match.game, player.civ, getattr(player, "leader", None))
 
         civs = dict(existing_civs) if isinstance(existing_civs, dict) else {}
-        if civ_name not in civs:
-            civs[civ_name] = {"games": 0, "wins": 0}
 
-        civs[civ_name]["games"] = int(civs[civ_name].get("games", 0)) + 1
+        def _to_int(v: Any, default: int = 0) -> int:
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                return default
+
+        entry = civs.get(civ_name)
+
+        # Backwards compatibility:
+        # - legacy shape: {"DutchWilhelmina": 3}
+        # - new shape: {"DutchWilhelmina": {"games": 3, "wins": 1}}
+        if isinstance(entry, dict):
+            games = _to_int(entry.get("games", 0), 0)
+            wins = _to_int(entry.get("wins", 0), 0)
+        elif isinstance(entry, int):
+            games = _to_int(entry, 0)
+            wins = 0
+        else:
+            games = 0
+            wins = 0
+
+        games += 1
         if player.placement == 0:
-            civs[civ_name]["wins"] = int(civs[civ_name].get("wins", 0)) + 1
+            wins += 1
 
+        civs[civ_name] = {"games": games, "wins": wins}
         return civs
 
     def build_stats_doc(
@@ -550,7 +570,7 @@ class MatchService:
         logger.info("✅ 🔄 Sub removed for match %s", match_id)
         return updated
 
-    async def approve_match(self, match_id: str, approver_discord_id: str) -> Dict[str, Any]:
+    async def approve_match(self, match_id: str) -> List[str]:
         async with approve_lock:
             oid = self._to_oid(match_id)
             res = await self.q.find_pending_by_id(oid)
@@ -667,21 +687,11 @@ class MatchService:
                     validated_doc["discord_messages_id_list"] = res.get("discord_messages_id_list", [])
                     validated_doc["save_file_hash"] = res.get("save_file_hash", "")
 
-                    # Approval metadata
-                    validated_doc["approved_at"] = now
-                    validated_doc["approver_discord_id"] = approver_discord_id
-
                     await self.q.insert_validated_match(validated_doc, session=session)
                     await self.q.delete_pending_match(oid, session=session)
 
             logger.info("✅ ✅ Approved match %s", match_id)
-
-            # Return the approved match payload (API expects MatchResponse)
-            approved = validated_doc
-            approved["match_id"] = str(oid)
-            approved["approved_at"] = now
-            approved["approver_discord_id"] = approver_discord_id
-            return approved
+            return res.get("discord_messages_id_list", [])
 
     async def get_leaderboard(
         self,
