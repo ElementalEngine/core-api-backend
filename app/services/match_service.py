@@ -512,7 +512,7 @@ class MatchService:
         logger.info("✅ 🔄 Assigned all discord_ids for match %s", match_id)
         return updated
 
-    async def assign_sub(self, match_id: str, sub_out_discord_id: str, sub_in_id: str, discord_message_id: str) -> Dict[str, Any]:
+    async def assign_sub(self, match_id: str, sub_in_id: str, sub_out_discord_id: str, discord_message_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.q.find_pending_by_id(oid)
         if not res:
@@ -520,22 +520,31 @@ class MatchService:
 
         match = MatchModel(**res)
         sub_in_idx = int(sub_in_id)
-        if sub_in_idx < 0 or sub_in_idx >= len(match.players) or match.players[sub_in_idx].discord_id not in (None, "-1", "-2"):
+        if sub_in_idx < 0 or sub_in_idx >= len(match.players):
             raise MatchServiceError("Sub-in slot invalid or already claimed")
 
-        steam_id = await self.discord_to_steam_id(sub_out_discord_id)
-
-        # mark sub-in player
         match.players[sub_in_idx].is_sub = True
-        match.players[sub_in_idx].discord_id = sub_out_discord_id
-        match.players[sub_in_idx].steam_id = steam_id
-
-        # mark subbed-out player (by steam id)
-        for p in match.players:
-            if p.steam_id == steam_id and p is not match.players[sub_in_idx]:
-                p.subbed_out = True
-                p.quit = True
-                break
+        sub_out_player_steam_id = await self.discord_to_steam_id(sub_out_discord_id)
+        match.players.insert(sub_in_idx + 1, PlayerModel(
+            steam_id = sub_out_player_steam_id,
+            user_name = None,
+            civ = match.players[sub_in_idx].civ,
+            team = match.players[sub_in_idx].team,
+            leader = match.players[sub_in_idx].leader,
+            player_alive = match.players[sub_in_idx].player_alive,
+            discord_id = sub_out_discord_id,
+            placement = match.players[sub_in_idx].placement,
+            quit = False,
+            delta = 0.0,
+            is_sub = False,
+            subbed_out = True,
+        ))
+        players_ranking = await self.get_players_ranking(match)
+        players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
+        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
+        match, _ = self.update_player_stats(match, players_ranking, "delta")
+        match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
+        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
 
         await self.q.replace_pending_match(oid, match.dict())
         await self.q.update_pending_match_set(oid, {"discord_messages_id_list": res["discord_messages_id_list"] + [discord_message_id]})
@@ -551,14 +560,14 @@ class MatchService:
             raise NotFoundError("Match not found")
 
         match = MatchModel(**res)
-        idx = int(sub_out_id) - 1
-        if idx < 0 or idx >= len(match.players):
-            raise MatchServiceError("Player ID out of range. Must be between 1 and number of players")
-        if not match.players[idx].is_sub:
+        idx = int(sub_out_id)
+        if idx < 1 or idx >= len(match.players):
+            raise MatchServiceError("Player ID out of range. Must be between 2 and number of players")
+        if not match.players[idx].subbed_out:
             raise MatchServiceError("That player is not marked as a sub")
 
-        # Unmark the sub player
-        match.players[idx].is_sub = False
+        # Unmark the sub-out player
+        match.players[idx - 1].is_sub = False
 
         # Remove the sub slot correctly (fix: pop wrong index)
         match.players.pop(idx)
