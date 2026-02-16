@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/v1", tags=["matches"])
 async def get_match(match_id: str = Form(), db = Depends(get_database)):
     svc = MatchService(db)
     try:
-        return await svc.get(match_id)
+        return await svc.get_match(match_id)
     except InvalidIDError:
         logger.error(f"🔴 Invalid match ID: {match_id}")
         raise HTTPException(status_code=400, detail="Invalid match ID")
@@ -44,7 +44,7 @@ async def update_match(payload: MatchUpdate = Form(), db = Depends(get_database)
     svc = MatchService(db)
     match_id = payload.match_id
     try:
-        return await svc.update(match_id, payload.dict(exclude_unset=True))
+        return await svc.update_match(match_id, payload.dict(exclude_unset=True))
     except InvalidIDError:
         logger.error(f"🔴 Invalid match ID: {match_id}")
         raise HTTPException(status_code=400, detail="Invalid match ID")

@@ -8,6 +8,7 @@ from bson import ObjectId
 from bson.int64 import Int64
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pymongo.client_session import ClientSession
+from pymongo import ASCENDING, DESCENDING
 
 
 # ---- DB / collection names (single source of truth) ----
@@ -283,9 +284,11 @@ class MongoQueries:
             is_combined=is_combined,
         )
 
-        last = await col.find_one({}, sort=[("lastModified", -1)], projection={"lastModified": 1})
+        last = await col.find_one({}, sort=[
+            ("lastModified", DESCENDING)
+        ], projection={"lastModified": 1})
         last_updated = (last or {}).get("lastModified")
 
-        cursor = col.find({"games": {"$gte": min_games}}).sort("mu", -1).limit(limit)
+        cursor = col.find({"games": {"$gte": min_games}}).sort("mu", DESCENDING).sort("sigma", ASCENDING).limit(limit)
         rows = await cursor.to_list(length=limit)
         return LeaderboardResult(rows=rows, last_updated=last_updated)
