@@ -382,6 +382,52 @@ class MatchService:
         logger.info("✅ 🔄 Updated match %s", match_id)
         return updated
 
+    async def set_player_order(self, match_id: str, player_order: str, discord_message_id: str) -> Dict[str, Any]:
+        oid = self._to_oid(match_id)
+        res = await self.q.find_pending_by_id(oid)
+        if not res:
+            raise NotFoundError("Match not found")
+
+        match = MatchModel(**res)
+        if 'team' in match.game_mode.lower():
+            raise MatchServiceError("Cannot set player order for teamer matches. Use change_order instead.")
+        player_order_list = player_order.split(" ")
+        curr_placement = 0
+        placement = {}
+        for i in range(len(player_order_list)):
+            if player_order_list[i].upper() == "TIE":
+                curr_placement = max(curr_placement - 1, 0)
+            else:
+                placement[player_order_list[i]] = curr_placement
+                curr_placement += 1
+
+        for player in match.players:
+            if player.discord_id not in placement:
+                raise MatchServiceError(f"Discord ID {player.discord_id} not found in player order list")
+            player.placement = placement[player.discord_id]
+
+        players_ranking = await self.get_players_ranking(match)
+        players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
+        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
+
+        match, _ = self.update_player_stats(match, players_ranking, "delta")
+        match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
+        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
+
+        changes: Dict[str, Any] = {}
+        changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [discord_message_id]
+        for i, player in enumerate(match.players):
+            changes[f"players.{i}.placement"] = player.placement
+            changes[f"players.{i}.delta"] = match.players[i].delta
+            changes[f"players.{i}.season_delta"] = match.players[i].season_delta
+            changes[f"players.{i}.combined_delta"] = match.players[i].combined_delta
+
+        await self.q.update_pending_match_set(oid, changes)
+        updated = await self.q.find_pending_by_id(oid)
+        updated["match_id"] = str(updated.pop("_id"))
+        logger.info("✅ 🔄 Changed player order for match %s", match_id)
+        return updated
+
     async def change_order(self, match_id: str, new_order: str, discord_message_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.q.find_pending_by_id(oid)

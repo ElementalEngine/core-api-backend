@@ -52,6 +52,11 @@ class MatchUpdate(BaseModel):
     flagged: Optional[bool] = None
     flagged_by: Optional[str] = None
 
+class SetPlayerOrder(BaseModel):
+    match_id: str
+    player_order: str # The players in order with their discord id. e.g. "Calcifer Cisco Canuck ..." separated by spaces and specify ties with "TIE"
+    discord_message_id: str
+
 class ChangeOrder(BaseModel):
     match_id: str
     new_order: str # The order of players as a string, e.g. "1 2 3 4" separated by spaces

@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Form
 from app.dependencies import get_database
-from app.models.schemas import MatchResponse, MatchUpdate, ChangeOrder, DeletePendingMatch, TriggerQuit, AppendDiscordMessageID, AssignDiscordId, AssignDiscordIdAll, AssignSub, RemoveSub, ApproveMatch, LeaderboardRankingResponse
+from app.models.schemas import MatchResponse, MatchUpdate, SetPlayerOrder, ChangeOrder, DeletePendingMatch, TriggerQuit, AppendDiscordMessageID, AssignDiscordId, AssignDiscordIdAll, AssignSub, RemoveSub, ApproveMatch, LeaderboardRankingResponse
 from app.services.match_service import MatchService, InvalidIDError, NotFoundError, MatchServiceError
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,24 @@ async def update_match(payload: MatchUpdate = Form(), db = Depends(get_database)
     match_id = payload.match_id
     try:
         return await svc.update_match(match_id, payload.dict(exclude_unset=True))
+    except InvalidIDError:
+        logger.error(f"🔴 Invalid match ID: {match_id}")
+        raise HTTPException(status_code=400, detail="Invalid match ID")
+    except NotFoundError:
+        logger.warning(f"🔴 Match not found: {match_id}")
+        raise HTTPException(status_code=404, detail="Match not found")
+    except MatchServiceError as e:
+        logger.warning(f"⚠️ Update error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.put("/set-player-order/", response_model=MatchResponse)
+async def set_player_order(payload: SetPlayerOrder = Form(), db = Depends(get_database)):
+    svc = MatchService(db)
+    match_id = payload.match_id
+    player_order = payload.player_order
+    discord_message_id = payload.discord_message_id
+    try:
+        return await svc.set_player_order(match_id, player_order, discord_message_id)
     except InvalidIDError:
         logger.error(f"🔴 Invalid match ID: {match_id}")
         raise HTTPException(status_code=400, detail="Invalid match ID")
