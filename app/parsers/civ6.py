@@ -37,6 +37,7 @@ def extract_player_info(root):
             "player_alive": player_alive,
             "placement": team
         })
+    players = sorted(players, key=lambda p: p['team'])
     return players
 
 def extract_turn(root):
