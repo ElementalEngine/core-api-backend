@@ -402,10 +402,13 @@ class MatchService:
                 placement[player_order_list[i]] = curr_placement
                 curr_placement += 1
 
-        for player in match.players:
-            if player.discord_id not in placement:
+        for i, player in enumerate(match.players):
+            if player.subbed_out == False and player.discord_id not in placement:
                 raise MatchServiceError(f"Discord ID {player.discord_id} not found in player order list")
-            player.placement = placement[player.discord_id]
+            if player.subbed_out:
+                player.placement = match.players[i - 1].placement
+            else:
+                player.placement = placement[player.discord_id]
 
         players_ranking = await self.get_players_ranking(match)
         players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
@@ -783,6 +786,7 @@ class MatchService:
                         validated_doc["approver_discord_id"] = approver_discord_id
                         validated_doc["discord_messages_id_list"] = res.get("discord_messages_id_list", [])
                         validated_doc["save_file_hash"] = res.get("save_file_hash", "")
+                        validated_doc["contest_report_list"] = []
 
                         validated_insert_id = await self.q.insert_validated_match(validated_doc, session=session)
                         await self.q.delete_pending_match(oid, session=session)
