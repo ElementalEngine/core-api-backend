@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Form
 from app.dependencies import get_database
-from app.models.schemas import MatchResponse, MatchUpdate, SetPlayerOrder, ChangeOrder, DeletePendingMatch, TriggerQuit, AppendDiscordMessageID, AssignDiscordId, AssignDiscordIdAll, AssignSub, RemoveSub, ApproveMatch, LeaderboardRankingResponse
+from app.models.schemas import MatchResponse, MatchUpdate, SetPlayerOrder, ChangeOrder, DeletePendingMatch, TriggerQuit, AppendDiscordMessageID, AssignDiscordId, AssignDiscordIdAll, AssignSub, RemoveSub, ApproveMatch, ContestReportRequest, LeaderboardRankingResponse
 from app.services.match_service import MatchService, InvalidIDError, NotFoundError, MatchServiceError
 
 logger = logging.getLogger(__name__)
@@ -208,6 +208,25 @@ async def approve_match(payload: ApproveMatch = Form(), db = Depends(get_databas
         return await svc.approve_match(match_id, approver_discord_id)
     except NotFoundError:
         logger.warning(f"🔴 Match not found. matchID: {match_id}")
+        raise HTTPException(status_code=404, detail="Match not found")
+    except MatchServiceError as e:
+        logger.warning(f"⚠️ Update error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.put("/contest-report/", response_model=MatchResponse)
+async def contest_report(payload: ContestReportRequest = Form(), db = Depends(get_database)):
+    svc = MatchService(db)
+    match_id = payload.match_id
+    contestor_discord_id = payload.contestor_discord_id
+    reason = payload.reason
+    discord_message_id = payload.discord_message_id
+    try:
+        return await svc.contest_report(match_id, contestor_discord_id, reason, discord_message_id)
+    except InvalidIDError:
+        logger.error(f"🔴 Invalid match ID: {match_id}")
+        raise HTTPException(status_code=400, detail="Invalid match ID")
+    except NotFoundError:
+        logger.warning(f"🔴 Match not found: {match_id}")
         raise HTTPException(status_code=404, detail="Match not found")
     except MatchServiceError as e:
         logger.warning(f"⚠️ Update error: {e}")

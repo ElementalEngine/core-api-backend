@@ -93,6 +93,10 @@ class PlayerModel(BaseModel):
     is_sub: bool = False
     subbed_out: bool = False
 
+class ContestReport(BaseModel):
+    contestor_discord_id: str
+    reason: str
+
 class MatchModel(BaseModel):
     game: str  # parsers return "civ6" or "civ7"
     turn: int
@@ -110,3 +114,4 @@ class MatchModel(BaseModel):
     flagged_by: Optional[str] = None
     save_file_hash: str
     reporter_discord_id: str
+    contest_report_list: List[ContestReport]

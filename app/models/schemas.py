@@ -18,6 +18,9 @@ class PlayerSchema(BaseModel):
     is_sub: bool = False
     subbed_out: bool = False
 
+class ContestReport(BaseModel):
+    contestor_discord_id: str
+    reason: str
 
 class AffectedPlayerRating(BaseModel):
     discord_id: str
@@ -41,6 +44,7 @@ class MatchResponse(BaseModel):
     flagged_by: Optional[str] = None
     save_file_hash: str
     reporter_discord_id: str
+    contest_report_list: List[ContestReport]
 
     # Optional: returned on approval to allow the bot to update rank roles.
     affected_players: Optional[List[AffectedPlayerRating]] = None
@@ -94,6 +98,12 @@ class AssignSub(BaseModel):
 class RemoveSub(BaseModel):
     match_id: str
     sub_out_id: str
+    discord_message_id: str
+
+class ContestReportRequest(BaseModel):
+    match_id: str
+    contestor_discord_id: str
+    reason: str
     discord_message_id: str
 
 class ApproveMatch(BaseModel):

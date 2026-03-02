@@ -12,7 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from trueskill import Rating
 
 from app.config import settings
-from app.models.db_models import MatchModel, PlayerModel, StatModel
+from app.models.db_models import MatchModel, PlayerModel, StatModel, ContestReport
 from app.models.mongo_queries import MongoQueries
 from app.parsers import parse_civ6_save, parse_civ7_save  
 from app.services.skill import make_ts_env
@@ -328,6 +328,7 @@ class MatchService:
         parsed["reporter_discord_id"] = reporter_discord_id
         parsed["is_cloud"] = is_cloud
         parsed["discord_messages_id_list"] = [discord_message_id]
+        parsed["contest_report_list"] = []
 
         match = MatchModel(**parsed)
         match = await self.match_id_to_discord(match)
@@ -639,6 +640,25 @@ class MatchService:
         updated = await self.q.find_pending_by_id(oid)
         updated["match_id"] = str(updated.pop("_id"))
         logger.info("✅ 🔄 Sub removed for match %s", match_id)
+        return updated
+    
+    async def contest_report(self, match_id: str, contestor_discord_id: str, reason: str, discord_message_id: str) -> Dict[str, Any]:
+        oid = self._to_oid(match_id)
+        res = await self.q.find_pending_by_id(oid)
+        if not res:
+            raise NotFoundError("Match not found")
+
+        match = MatchModel(**res)
+        contest_report_entry = ContestReport(
+            contestor_discord_id=contestor_discord_id,
+            reason=reason)
+        match.contest_report_list.append(contest_report_entry)
+        match.discord_messages_id_list = match.discord_messages_id_list + [discord_message_id]
+
+        await self.q.replace_pending_match(oid, match.dict())
+        updated = await self.q.find_pending_by_id(oid)
+        updated["match_id"] = str(updated.pop("_id"))
+        logger.info("✅ 🔄 Match %s contested by %s", match_id, contestor_discord_id)
         return updated
 
     async def approve_match(self, match_id: str, approver_discord_id: str) -> List[str]:
