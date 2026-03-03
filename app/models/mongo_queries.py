@@ -289,6 +289,6 @@ class MongoQueries:
         ], projection={"lastModified": 1})
         last_updated = (last or {}).get("lastModified")
 
-        cursor = col.find({"games": {"$gte": min_games}}).sort("mu", DESCENDING).sort("sigma", ASCENDING).limit(limit)
+        cursor = col.find({"games": {"$gte": min_games}}).sort({"mu": DESCENDING, "sigma": ASCENDING}).limit(limit)
         rows = await cursor.to_list(length=limit)
         return LeaderboardResult(rows=rows, last_updated=last_updated)
