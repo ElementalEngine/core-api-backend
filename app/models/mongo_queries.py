@@ -147,9 +147,7 @@ class MongoQueries:
         if mt not in {"ffa", "teamer", "duel"}:
             raise ValueError(f"Unexpected match_type: {match_type!r} (expected ffa|teamer|duel)")
 
-        # Cloud DB schema uses pbc_team (not pbc_teamer) for team games.
-        table = "team" if (is_cloud and mt == "teamer") else mt
-        return f"{prefix}{table}"
+        return f"{prefix}{mt}"
 
     def _stats_collection(
         self, *, civ_version: str, is_seasonal: bool, match_type: str, is_cloud: bool, is_combined: bool
