@@ -301,6 +301,49 @@ class MatchService:
         civs[civ_name] = {"games": games, "wins": wins}
         return civs
 
+    def revert_existing_stat(
+        self,
+        match: MatchModel,
+        player: PlayerModel,
+        existing_civs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        # Normalize civ naming
+        civ_name = get_cpl_name(match.game, player.civ, getattr(player, "leader", None))
+
+        civs = dict(existing_civs) if isinstance(existing_civs, dict) else {}
+
+        def _to_int(v: Any, default: int = 0) -> int:
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                return default
+
+        entry = civs.get(civ_name)
+
+        # Backwards compatibility:
+        # - legacy shape: {"DutchWilhelmina": 3}
+        # - new shape: {"DutchWilhelmina": {"games": 3, "wins": 1}}
+        if isinstance(entry, dict):
+            games = _to_int(entry.get("games", 0), 0)
+            wins = _to_int(entry.get("wins", 0), 0)
+        elif isinstance(entry, int):
+            games = _to_int(entry, 0)
+            wins = 0
+        else:
+            games = 0
+            wins = 0
+
+        games -= 1
+        if player.delta > 0:
+            wins -= 1
+        if games < 0:
+            games = 0
+        if wins < 0:
+            wins = 0
+
+        civs[civ_name] = {"games": games, "wins": wins}
+        return civs
+
     async def create_from_save(
         self, file_bytes: bytes, reporter_discord_id: str, is_cloud: bool, discord_message_id: str
     ) -> Dict[str, Any]:
@@ -663,6 +706,118 @@ class MatchService:
         updated["match_id"] = str(updated.pop("_id"))
         logger.info("✅ 🔄 Match %s contested by %s", match_id, contestor_discord_id)
         return updated
+    
+    async def revert_match(self, match_id: str) -> Dict[str, Any]:
+        oid = self._to_oid(match_id)
+        res = await self.q.find_validated_by_id(oid)
+        if not res:
+            raise NotFoundError("Match not found")
+
+        match = MatchModel(**res)
+        
+        # Pre-states
+        pre_lifetime = await self.get_players_ranking(match)
+        pre_season = await self.get_players_ranking(match, is_seasonal=True)
+        pre_combined = await self.get_players_ranking(match, is_combined=True)
+
+        session = await self.q.start_session()
+        async with session:
+            async with session.start_transaction():
+                try:
+                    # Stats writes
+                    for i, p in enumerate(match.players):
+                        if not p.discord_id or p.discord_id in ("-1", "-2"):
+                            continue
+
+                        did = str(p.discord_id)
+
+                        # lifetime
+                        civs_life = self.revert_existing_stat(match, p, pre_lifetime[i].civs)
+                        doc_life = {
+                            "_id": Int64(did),
+                            "mu": float(pre_lifetime[i].mu - p.delta),
+                            "sigma": float(pre_lifetime[i].sigma + 2),
+                            "games": int(pre_lifetime[i].games) - 1,
+                            "wins": int(pre_lifetime[i].wins) - (1 if p.delta > 0 else 0),
+                            "first": int(pre_lifetime[i].first) - (1 if p.placement == 0 else 0),
+                            "subbed_in": int(pre_lifetime[i].subbedIn) - (1 if p.is_sub else 0),
+                            "subbed_out": int(pre_lifetime[i].subbedOut) - (1 if p.subbed_out else 0),
+                            "civs": civs_life,
+                            "lastModified": datetime.now(UTC),
+                        }
+                        await self.q.upsert_player_stat_doc(
+                            civ_version=match.game,
+                            is_seasonal=False,
+                            match_type=match.game_mode,
+                            is_cloud=match.is_cloud,
+                            is_combined=False,
+                            discord_id=did,
+                            doc=doc_life,
+                            session=session,
+                        )
+
+                        # seasonal
+                        civs_season = self.revert_existing_stat(match, p, pre_season[i].civs)
+                        doc_season = {
+                            "_id": Int64(did),
+                            "mu": float(pre_season[i].mu - p.season_delta),
+                            "sigma": float(pre_season[i].sigma + 2),
+                            "games": int(pre_season[i].games) - 1,
+                            "wins": int(pre_season[i].wins) - (1 if p.season_delta > 0 else 0),
+                            "first": int(pre_season[i].first) - (1 if p.placement == 0 else 0),
+                            "subbed_in": int(pre_season[i].subbedIn) - (1 if p.is_sub else 0),
+                            "subbed_out": int(pre_season[i].subbedOut) - (1 if p.subbed_out else 0),
+                            "civs": civs_season,
+                            "lastModified": datetime.now(UTC),
+                        }
+                        await self.q.upsert_player_stat_doc(
+                            civ_version=match.game,
+                            is_seasonal=True,
+                            match_type=match.game_mode,
+                            is_cloud=match.is_cloud,
+                            is_combined=False,
+                            discord_id=did,
+                            doc=doc_season,
+                            session=session,
+                        )
+
+                        # combined
+                        civs_combined = self.revert_existing_stat(match, p, pre_combined[i].civs)
+                        doc_combined = {
+                            "_id": Int64(did),
+                            "mu": float(pre_combined[i].mu - p.combined_delta),
+                            "sigma": float(pre_combined[i].sigma + 2),
+                            "games": int(pre_combined[i].games) - 1,
+                            "wins": int(pre_combined[i].wins) - (1 if p.combined_delta > 0 else 0),
+                            "first": int(pre_combined[i].first) - (1 if p.placement == 0 else 0),
+                            "subbed_in": int(pre_combined[i].subbedIn) - (1 if p.is_sub else 0),
+                            "subbed_out": int(pre_combined[i].subbedOut) - (1 if p.subbed_out else 0),
+                            "civs": civs_combined,
+                            "lastModified": datetime.now(UTC),
+                        }
+                        await self.q.upsert_player_stat_doc(
+                            civ_version=match.game,
+                            is_seasonal=False,
+                            match_type=match.game_mode,
+                            is_cloud=match.is_cloud,
+                            is_combined=True,
+                            discord_id=did,
+                            doc=doc_combined,
+                            session=session,
+                        )
+
+                        if p.is_sub:
+                            await self.q.dec_subs_in(did, session=session)
+
+                    await self.q.delete_validated_match(oid, session=session)
+
+                    await session.commit_transaction()
+                except Exception as e:
+                    # Abort the transaction in case of an error
+                    print("An error occurred while writing to DB:", e)
+                    await session.abort_transaction()
+                    raise MatchServiceError(f"An error occured during writing to DB: {e}")
+        return {"match_id": str(match_id), **match.dict()}
 
     async def approve_match(self, match_id: str, approver_discord_id: str) -> List[str]:
         async with approve_lock:
@@ -731,7 +886,7 @@ class MatchService:
                                 "mu": float(post_season[i].mu),
                                 "sigma": float(post_season[i].sigma),
                                 "games": int(pre_season[i].games) + 1,
-                                "wins": int(pre_season[i].wins) + (1 if p.delta > 0 else 0),
+                                "wins": int(pre_season[i].wins) + (1 if p.season_delta > 0 else 0),
                                 "first": int(pre_season[i].first) + (1 if p.placement == 0 else 0),
                                 "subbed_in": int(pre_season[i].subbedIn) + (1 if p.is_sub else 0),
                                 "subbed_out": int(pre_season[i].subbedOut) + (1 if p.subbed_out else 0),
@@ -756,7 +911,7 @@ class MatchService:
                                 "mu": float(post_combined[i].mu),
                                 "sigma": float(post_combined[i].sigma),
                                 "games": int(pre_combined[i].games) + 1,
-                                "wins": int(pre_combined[i].wins) + (1 if p.delta > 0 else 0),
+                                "wins": int(pre_combined[i].wins) + (1 if p.combined_delta > 0 else 0),
                                 "first": int(pre_combined[i].first) + (1 if p.placement == 0 else 0),
                                 "subbed_in": int(pre_combined[i].subbedIn) + (1 if p.is_sub else 0),
                                 "subbed_out": int(pre_combined[i].subbedOut) + (1 if p.subbed_out else 0),

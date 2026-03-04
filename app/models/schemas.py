@@ -106,6 +106,9 @@ class ContestReportRequest(BaseModel):
     reason: str
     discord_message_id: str
 
+class RevertMatchRequest(BaseModel):
+    match_id: str
+
 class ApproveMatch(BaseModel):
     match_id: str
     approver_discord_id: str

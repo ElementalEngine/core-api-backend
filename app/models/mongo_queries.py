@@ -74,6 +74,9 @@ class MongoQueries:
     async def find_pending_by_id(self, oid: ObjectId) -> Optional[Dict[str, Any]]:
         return await self._pending.find_one({"_id": oid})
 
+    async def find_validated_by_id(self, oid: ObjectId) -> Optional[Dict[str, Any]]:
+        return await self._validated.find_one({"_id": oid})
+
     async def insert_pending_match(
         self, match_doc: Mapping[str, Any], *, session: ClientSession | None = None
     ) -> ObjectId:
@@ -106,6 +109,12 @@ class MongoQueries:
         res = await self._pending.delete_one({"_id": oid}, session=session)
         return res.deleted_count == 1
 
+    async def delete_validated_match(
+        self, oid: ObjectId, *, session: ClientSession | None = None
+    ) -> bool:
+        res = await self._validated.delete_one({"_id": oid}, session=session)
+        return res.deleted_count == 1
+
     # -------------------- validated matches --------------------
 
     async def insert_validated_match(
@@ -122,6 +131,16 @@ class MongoQueries:
         await self._subs.update_one(
             {"_id": Int64(discord_id)},
             {"$inc": {"subs_in": 1}},
+            upsert=True,
+            session=session,
+        )
+    
+    async def dec_subs_in(
+        self, discord_id: str, *, session: ClientSession | None = None
+    ) -> None:
+        await self._subs.update_one(
+            {"_id": Int64(discord_id)},
+            {"$inc": {"subs_in": -1}},
             upsert=True,
             session=session,
         )
