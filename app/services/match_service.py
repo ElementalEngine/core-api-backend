@@ -92,12 +92,12 @@ class MatchService:
     async def steam_to_discord_id(self, steam_id: str) -> str:
         player = await self.q.get_user_by_steam_id(steam_id)
         if not player:
-            return "-1"
+            return f"-{steam_id}"
         return str(player["discord_id"])
 
     async def match_id_to_discord(self, match: MatchModel) -> MatchModel:
         for player in match.players:
-            if player.steam_id and player.steam_id != '-1':
+            if player.steam_id and player.steam_id != '-1' and player.steam_id.startswith("-") == False:
                 player.discord_id = await self.steam_to_discord_id(player.steam_id)
         return match
 
@@ -110,9 +110,9 @@ class MatchService:
         is_combined: bool = False,
     ) -> StatModel:
         # Missing / placeholder IDs
-        if not discord_id or discord_id in ("-1", "-2"):
+        if not discord_id or discord_id in ("-1", "-2") or discord_id.startswith("-"):
             return StatModel(
-                discord_id="-1",
+                discord_id=discord_id,
                 index=player_index,
                 id=0,
                 mu=settings.ts_mu,
@@ -726,7 +726,7 @@ class MatchService:
                 try:
                     # Stats writes
                     for i, p in enumerate(match.players):
-                        if not p.discord_id or p.discord_id in ("-1", "-2"):
+                        if not p.discord_id or p.discord_id in ("-1", "-2") or p.discord_id.startswith("-"):
                             continue
 
                         did = str(p.discord_id)
@@ -849,7 +849,7 @@ class MatchService:
                     try:
                         # Stats writes
                         for i, p in enumerate(match.players):
-                            if not p.discord_id or p.discord_id in ("-1", "-2"):
+                            if not p.discord_id or p.discord_id in ("-1", "-2") or p.discord_id.startswith("-"):
                                 continue
 
                             did = str(p.discord_id)
