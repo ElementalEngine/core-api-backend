@@ -177,4 +177,5 @@ class TeamGenRequest(BaseModel):
 class TeamGenResponse(BaseModel):
     civ_version: str
     game_type: str
+    game_quality: float
     teams: List[List[str]]

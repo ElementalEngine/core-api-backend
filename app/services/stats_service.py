@@ -174,7 +174,10 @@ class StatsService:
             teams[1].clear()
             random.shuffle(ids)
             for idx in range(len(ids)):
-                teams[int(idx * 2 / len(ids))].append(players_ranking[ids[idx]].teamer)
+                if ids[idx] not in players_ranking or not players_ranking[ids[idx]].teamer:
+                    teams[int(idx * 2 / len(ids))].append(StatRow(mu=settings.ts_mu, sigma=settings.ts_sigma, games=0, wins=0, first=0))
+                else:
+                    teams[int(idx * 2 / len(ids))].append(players_ranking[ids[idx]].teamer)
             game_quality = ts_env.quality(teams)
             # We want to maximize quality, but also allow some randomness if there are multiple good splits.
             if game_quality < best_quality + settings.team_gen_randomness:
@@ -190,6 +193,7 @@ class StatsService:
         return TeamGenResponse(
             civ_version=v,
             game_type="cloud" if is_cloud else "realtime",
+            game_quality=best_quality,
             teams=result,
         )
 
