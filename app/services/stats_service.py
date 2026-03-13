@@ -177,7 +177,7 @@ class StatsService:
                 teams[int(idx * 2 / len(ids))].append(players_ranking[ids[idx]].teamer)
             game_quality = ts_env.quality(teams)
             # We want to maximize quality, but also allow some randomness if there are multiple good splits.
-            if game_quality < best_quality + 0.05:
+            if game_quality < best_quality + settings.team_gen_randomness:
                 continue
             best_quality = game_quality
             best_ids = ids.copy()

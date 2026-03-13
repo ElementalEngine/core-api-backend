@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     
     # Team gen parameters
     team_gen_tries: int = Field(10, gt=0, env="TEAM_GEN_TRIES")
+    team_gen_randomness: float = Field(0.05, lt=0.1, gt=0, env="TEAM_GEN_RANDOMNESS")
 
     # TrueSkill Environment
     ts_mu: float = Field(1250.0, gt=0, env="TS_MU")
