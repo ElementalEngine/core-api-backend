@@ -168,3 +168,13 @@ class BatchStatsResponse(BaseModel):
     civ_version: str
     game_type: str
     results: List[UserStatsResponse]
+
+class TeamGenRequest(BaseModel):
+    civ_version: str
+    game_type: str
+    discord_ids: List[str]
+    
+class TeamGenResponse(BaseModel):
+    civ_version: str
+    game_type: str
+    teams: List[List[str]]

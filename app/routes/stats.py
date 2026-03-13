@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Form, HTTPException
 
 from app.dependencies import get_database
-from app.models.schemas import BatchStatsRequest, BatchStatsResponse, UserStatsResponse
+from app.models.schemas import BatchStatsRequest, BatchStatsResponse, UserStatsResponse, TeamGenRequest, TeamGenResponse
 from app.services.stats_service import InvalidStatsRequestError, StatsNotFoundError, StatsService
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,26 @@ async def get_users_stats_batch(payload: BatchStatsRequest, db=Depends(get_datab
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         logger.exception("Batch stats lookup failed")
+        raise HTTPException(status_code=503, detail="Backend unavailable")
+
+@router.post("/team-gen", response_model=TeamGenResponse)
+async def get_team_gen(payload: TeamGenRequest, db=Depends(get_database)):
+    svc = StatsService(db)
+    ids = payload.discord_ids or []
+    if len(ids) > 200:
+        raise HTTPException(status_code=400, detail="Too many discord ids")
+
+    try:
+        results = await svc.get_team_gen(
+            civ_version=payload.civ_version,
+            game_type=payload.game_type,
+            discord_ids=ids,
+        )
+        return results
+    except InvalidStatsRequestError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("Team gen failed")
         raise HTTPException(status_code=503, detail="Backend unavailable")
 
 

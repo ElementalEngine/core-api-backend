@@ -19,6 +19,9 @@ class Settings(BaseSettings):
 
     # CORS
     allowed_origins_raw: str = Field("http://localhost:3000", env="ALLOWED_ORIGINS")
+    
+    # Team gen parameters
+    team_gen_tries: int = Field(10, gt=0, env="TEAM_GEN_TRIES")
 
     # TrueSkill Environment
     ts_mu: float = Field(1250.0, gt=0, env="TS_MU")

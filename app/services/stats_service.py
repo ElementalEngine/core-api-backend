@@ -4,11 +4,12 @@ import asyncio
 from typing import Dict, List, Tuple
 
 from motor.motor_asyncio import AsyncIOMotorClient
+import random
 
 from app.config import settings
 from app.models.mongo_queries import MongoQueries
-from app.models.schemas import StatRow, StatSet, UserStatsResponse
-
+from app.models.schemas import StatRow, StatSet, UserStatsResponse, TeamGenResponse
+from app.services.skill import make_ts_env
 
 _ALLOWED_CIV_VERSIONS = {"civ6", "civ7"}
 _ALLOWED_GAME_TYPES = {"realtime", "cloud"}
@@ -144,6 +145,53 @@ class StatsService:
                 )
             )
         return out
+    
+    async def get_team_gen(
+        self, *, civ_version: str, game_type: str, discord_ids: List[str]
+    ) -> TeamGenResponse:
+        v, is_cloud = self._validate(civ_version, game_type)
+
+        # Normalize ids as strings; keep caller order.
+        ids = [str(x).strip() for x in discord_ids if str(x).strip()]
+        if not ids:
+            return []
+        if any((not did.isdigit()) for did in ids):
+            raise InvalidStatsRequestError("Invalid discord_ids")
+        
+        players_ranking = await self._load_stat_set(
+            civ_version=v,
+            is_seasonal=False,
+            is_cloud=is_cloud,
+            discord_ids=ids,
+        )
+
+        ts_env = make_ts_env()
+        teams = [[], []]
+        best_quality = 0.0
+        best_ids = ids.copy()
+        for i in range(0, settings.team_gen_tries):
+            teams[0].clear()
+            teams[1].clear()
+            random.shuffle(ids)
+            for idx in range(len(ids)):
+                teams[int(idx * 2 / len(ids))].append(players_ranking[ids[idx]].teamer)
+            game_quality = ts_env.quality(teams)
+            # We want to maximize quality, but also allow some randomness if there are multiple good splits.
+            if game_quality < best_quality + 0.05:
+                continue
+            best_quality = game_quality
+            best_ids = ids.copy()
+
+        result = [[], []]
+        for i in range(len(best_ids)):
+            t = int(i * 2 / len(best_ids))
+            result[t].append(best_ids[i])
+
+        return TeamGenResponse(
+            civ_version=v,
+            game_type="cloud" if is_cloud else "realtime",
+            teams=result,
+        )
 
     async def _load_stat_set(
         self,
