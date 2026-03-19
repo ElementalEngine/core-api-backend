@@ -17,7 +17,7 @@ def test_config_loads_env(monkeypatch):
     monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:3000,https://example.com")
 
     # reload after setting env
-    import app.config as cfg
+    import app.core.config as cfg
     importlib.reload(cfg)
 
     s = cfg.settings

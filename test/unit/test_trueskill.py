@@ -14,9 +14,9 @@ def test_trueskill_1v1_winner_gains(monkeypatch):
     monkeypatch.setenv("TS_TEAMER_BOOST", "1.0")
 
     # reload modules to pick up env
-    import app.config as cfg
+    import app.core.config as cfg
     importlib.reload(cfg)
-    import app.services.skill as skill
+    import app.features.stats.skill as skill
     importlib.reload(skill)
 
     env = skill.make_ts_env()

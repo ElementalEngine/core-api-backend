@@ -1,6 +1,6 @@
 import os
 import pytest
-from app.parsers import civ7
+from app.features.matches.parsers import civ7
 
 def _test_parse_civ7_save(file_path, expected_game, expected_age, expected_turn, expected_mode, expected_map_type, expected_players):
     # Path to a test Civ7 save file
