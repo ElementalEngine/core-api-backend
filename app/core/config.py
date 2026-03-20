@@ -60,6 +60,36 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ALLOWED_ORIGINS"),
     )
 
+    # Auth parameters
+    auth_service_token: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("AUTH_SERVICE_TOKEN"),
+    )
+    auth_session_ttl_minutes: int = Field(
+        default=15,
+        ge=5,
+        le=120,
+        validation_alias=AliasChoices("AUTH_SESSION_TTL_MINUTES"),
+    )
+    auth_oauth_timeout_seconds: int = Field(
+        default=15,
+        ge=5,
+        le=60,
+        validation_alias=AliasChoices("AUTH_OAUTH_TIMEOUT_SECONDS"),
+    )
+    auth_discord_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("AUTH_DISCORD_CLIENT_ID", "DISCORD_CLIENT_ID"),
+    )
+    auth_discord_client_secret: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("AUTH_DISCORD_CLIENT_SECRET", "DISCORD_CLIENT_SECRET"),
+    )
+    auth_discord_redirect_uri: str = Field(
+        default="",
+        validation_alias=AliasChoices("AUTH_DISCORD_REDIRECT_URI", "DISCORD_REDIRECT_URI"),
+    )
+
     # Team gen parameters
     team_gen_tries: int = Field(default=10, gt=0, validation_alias=AliasChoices("TEAM_GEN_TRIES"))
     team_gen_randomness: float = Field(

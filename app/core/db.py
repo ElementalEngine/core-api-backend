@@ -9,6 +9,7 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.features.auth.repository import AuthRepository
 
 configure_logging()
 logger = logging.getLogger("app.db")
@@ -41,6 +42,9 @@ async def db_lifespan(app: FastAPI):
         app.state.mongodb_client = client
         app.state.mongodb = db
         logger.info("🟢 MongoDB connected (db=%s)", db.name)
+
+        await AuthRepository(client).ensure_indexes()
+        logger.info("🟢 Auth indexes ensured")
 
         yield
     except Exception:
