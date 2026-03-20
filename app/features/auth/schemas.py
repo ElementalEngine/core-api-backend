@@ -1,0 +1,67 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.features.auth.enums import RegistrationPlatform, RegistrationSessionStatus, SupportedGame
+
+
+class CreateRegistrationSessionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    discord_user_id: str = Field(min_length=1)
+    game: SupportedGame
+    platform: RegistrationPlatform = RegistrationPlatform.STEAM
+
+    @field_validator("discord_user_id")
+    @classmethod
+    def _normalize_discord_user_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("discord_user_id must not be blank")
+        return normalized
+
+
+class RegistrationSessionResponse(BaseModel):
+    session_id: str
+    authorize_url: str
+    expires_at: datetime
+
+
+class RegistrationSessionStatusResponse(BaseModel):
+    session_id: str
+    status: RegistrationSessionStatus
+    expires_at: datetime | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
+
+
+class AccountRegistrationRecord(BaseModel):
+    status: str
+    method: str
+    registered_at: datetime
+    ownership_verified_at: datetime | None = None
+    playtime_minutes: int | None = None
+
+
+class AccountLookupResponse(BaseModel):
+    discord_id: str
+    steam_id: str | None = None
+    username_snapshot: str | None = None
+    display_name_snapshot: str | None = None
+    registrations: dict[str, AccountRegistrationRecord] = Field(default_factory=dict)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class DiscordOAuthCallbackResult(BaseModel):
+    session_id: str
+    status: RegistrationSessionStatus
+    platform: RegistrationPlatform
+    linked_account_id: str | None = None
+    linked_account_name: str | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
