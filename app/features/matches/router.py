@@ -286,12 +286,16 @@ async def revert_match(payload: RevertMatchRequest = Form(), db=Depends(get_data
 async def get_leaderboard_ranking(payload: GetLeaderboardRequest = Form(), db=Depends(get_database)):
     svc = MatchService(db)
     try:
+        # NOTE: parameter order matters here.
+        # - game: civ_version (civ6|civ7)
+        # - game_type: PBC|realtime (used to infer cloud)
+        # - game_mode: ffa|teamer|duel|combined (match_type)
         return await svc.get_leaderboard(
-            payload.game_type,
-            payload.game,
-            payload.game_mode,
-            payload.is_seasonal,
-            payload.is_combined,
+            match_type=payload.game_mode,
+            is_cloud=payload.game_type,
+            is_seasonal=payload.is_seasonal,
+            is_combined=payload.is_combined,
+            civ_version=payload.game,
         )
     except NotFoundError as exc:
         logger.warning("🔴 Invalid game type for leaderboard. game:%s game_mode:%s", payload.game, payload.game_mode)
