@@ -5,11 +5,15 @@ def test_auth_config_loads_env(monkeypatch):
     monkeypatch.setenv("AUTH_SERVICE_TOKEN", "secret-token")
     monkeypatch.setenv("AUTH_DISCORD_CLIENT_ID", "12345")
     monkeypatch.setenv("AUTH_DISCORD_CLIENT_SECRET", "super-secret")
-    monkeypatch.setenv("AUTH_DISCORD_REDIRECT_URI", "https://example.com/oauth/discord/callback")
+    monkeypatch.setenv(
+        "AUTH_DISCORD_REDIRECT_URI",
+        "https://example.com/oauth/discord/callback",
+    )
     monkeypatch.setenv("AUTH_SESSION_TTL_MINUTES", "30")
     monkeypatch.setenv("AUTH_OAUTH_TIMEOUT_SECONDS", "20")
 
     import app.core.config as cfg
+
     importlib.reload(cfg)
 
     s = cfg.settings

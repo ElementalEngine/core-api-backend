@@ -6,12 +6,13 @@ from urllib.parse import urlencode
 
 from app.core.config import settings
 from app.features.auth.constants import DISCORD_OAUTH_AUTHORIZE_URL, DISCORD_OAUTH_SCOPES
-from app.features.auth.enums import RegistrationSessionStatus
+from app.features.auth.enums import RegistrationOperationStatus, RegistrationSessionStatus
 from app.features.auth.errors import (
     AlreadyRegisteredError,
     AuthConfigurationError,
     SessionExpiredError,
     SessionNotFoundError,
+    SessionNotValidatedError,
     SessionStateConflictError,
 )
 from app.features.auth.repository import AuthRepository
@@ -133,13 +134,31 @@ class SessionService:
 
         status_value = str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))
         if status_value in {
-            RegistrationSessionStatus.VALIDATED.value,
             RegistrationSessionStatus.FAILED.value,
             RegistrationSessionStatus.EXPIRED.value,
             RegistrationSessionStatus.COMPLETED.value,
         }:
             raise SessionStateConflictError(session_id=session_id, status_value=status_value)
 
+        return session
+
+    async def load_validated_session(self, session_id: str) -> dict[str, object]:
+        session = await self._repository.get_registration_session(session_id)
+        if session is None:
+            raise SessionNotFoundError(session_id)
+
+        expires_at = session.get("expires_at")
+        if isinstance(expires_at, datetime) and expires_at <= datetime.now(timezone.utc):
+            await self.mark_failed(
+                session_id,
+                failure_code="REGISTRATION_SESSION_EXPIRED",
+                failure_message="Registration session expired. Please start again.",
+            )
+            raise SessionExpiredError(session_id)
+
+        status_value = str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))
+        if status_value != RegistrationSessionStatus.VALIDATED.value:
+            raise SessionNotValidatedError(session_id, status_value)
         return session
 
     async def mark_validating(self, session_id: str) -> None:
@@ -157,6 +176,10 @@ class SessionService:
         *,
         linked_account_id: str,
         linked_account_name: str | None,
+        ownership_verified_at: datetime | None = None,
+        playtime_minutes: int | None = None,
+        username_snapshot: str | None = None,
+        display_name_snapshot: str | None = None,
     ) -> None:
         await self._repository.update_registration_session(
             session_id,
@@ -164,10 +187,29 @@ class SessionService:
                 "status": RegistrationSessionStatus.VALIDATED.value,
                 "validated_account_id": linked_account_id,
                 "validated_account_name": linked_account_name,
+                "ownership_verified_at": ownership_verified_at,
+                "playtime_minutes": playtime_minutes,
+                "username_snapshot": username_snapshot,
+                "display_name_snapshot": display_name_snapshot,
                 "failure_code": None,
                 "failure_message": None,
                 "updated_at": datetime.now(timezone.utc),
             },
+        )
+
+    async def mark_completed(self, session_id: str) -> None:
+        await self._repository.update_registration_session(
+            session_id,
+            {
+                "status": RegistrationSessionStatus.COMPLETED.value,
+                "updated_at": datetime.now(timezone.utc),
+            },
+        )
+
+    async def link_operation(self, session_id: str, operation_id: str) -> None:
+        await self._repository.update_registration_session(
+            session_id,
+            {"operation_id": operation_id, "updated_at": datetime.now(timezone.utc)},
         )
 
     async def mark_failed(

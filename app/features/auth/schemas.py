@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.features.auth.enums import RegistrationPlatform, RegistrationSessionStatus, SupportedGame
+from app.features.auth.enums import (
+    RegistrationOperationStatus,
+    RegistrationPlatform,
+    RegistrationSessionStatus,
+    RoleIntent,
+    SupportedGame,
+)
 
 
-class CreateRegistrationSessionRequest(BaseModel):
+class _DiscordUserIdModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     discord_user_id: str = Field(min_length=1)
-    game: SupportedGame
-    platform: RegistrationPlatform = RegistrationPlatform.STEAM
 
     @field_validator("discord_user_id")
     @classmethod
@@ -22,6 +26,30 @@ class CreateRegistrationSessionRequest(BaseModel):
         if not normalized:
             raise ValueError("discord_user_id must not be blank")
         return normalized
+
+
+class CreateRegistrationSessionRequest(_DiscordUserIdModel):
+    game: SupportedGame
+    platform: RegistrationPlatform = RegistrationPlatform.STEAM
+
+
+class CompleteRegistrationSessionRequest(_DiscordUserIdModel):
+    pass
+
+
+class FinalizeRegistrationOperationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    result: Literal["succeeded", "failed"]
+    applied_role_intents: list[RoleIntent] = Field(default_factory=list)
+    failure_code: str | None = None
+    failure_message: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_failed_payload(self) -> "FinalizeRegistrationOperationRequest":
+        if self.result == "failed" and (not self.failure_code or not self.failure_message):
+            raise ValueError("failure_code and failure_message are required when result is failed")
+        return self
 
 
 class RegistrationSessionResponse(BaseModel):
@@ -36,6 +64,15 @@ class RegistrationSessionStatusResponse(BaseModel):
     expires_at: datetime | None = None
     failure_code: str | None = None
     failure_message: str | None = None
+
+
+class RegistrationOperationResponse(BaseModel):
+    operation_id: str
+    status: RegistrationOperationStatus | None = None
+    discord_user_id: str
+    steam_id: str
+    game: SupportedGame
+    role_intents: list[RoleIntent]
 
 
 class AccountRegistrationRecord(BaseModel):

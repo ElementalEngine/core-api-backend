@@ -89,6 +89,36 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("AUTH_DISCORD_REDIRECT_URI", "DISCORD_REDIRECT_URI"),
     )
+    auth_steam_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("AUTH_STEAM_API_KEY", "STEAM_API_KEY"),
+    )
+    auth_steam_timeout_seconds: int = Field(
+        default=15,
+        ge=5,
+        le=60,
+        validation_alias=AliasChoices("AUTH_STEAM_TIMEOUT_SECONDS"),
+    )
+    auth_steam_civ6_app_id: int = Field(
+        default=289070,
+        gt=0,
+        validation_alias=AliasChoices("AUTH_STEAM_CIV6_APP_ID"),
+    )
+    auth_steam_civ7_app_id: int = Field(
+        default=1295660,
+        gt=0,
+        validation_alias=AliasChoices("AUTH_STEAM_CIV7_APP_ID"),
+    )
+    auth_steam_civ6_required_minutes: int = Field(
+        default=2880,
+        ge=0,
+        validation_alias=AliasChoices("AUTH_STEAM_CIV6_REQUIRED_MINUTES"),
+    )
+    auth_steam_civ7_required_minutes: int = Field(
+        default=120,
+        ge=0,
+        validation_alias=AliasChoices("AUTH_STEAM_CIV7_REQUIRED_MINUTES"),
+    )
 
     # Team gen parameters
     team_gen_tries: int = Field(default=10, gt=0, validation_alias=AliasChoices("TEAM_GEN_TRIES"))

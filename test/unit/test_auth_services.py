@@ -3,8 +3,15 @@ import importlib
 
 import pytest
 
-from app.features.auth.enums import RegistrationPlatform, RegistrationSessionStatus, SupportedGame
-from app.features.auth.errors import LinkedAccountNotFoundError, ManualRegistrationRequiredError
+from app.features.auth.enums import (
+    RegistrationPlatform,
+    RegistrationSessionStatus,
+    SupportedGame,
+)
+from app.features.auth.errors import (
+    LinkedAccountNotFoundError,
+    ManualRegistrationRequiredError,
+)
 from app.features.auth.oauth_service import DiscordOAuthService
 from app.features.auth.registration_service import RegistrationService
 from app.features.auth.schemas import CreateRegistrationSessionRequest
@@ -44,10 +51,14 @@ class FakeRepo:
 
 def test_session_service_creates_pending_session(monkeypatch):
     monkeypatch.setenv("AUTH_DISCORD_CLIENT_ID", "123")
-    monkeypatch.setenv("AUTH_DISCORD_REDIRECT_URI", "https://example.com/oauth/discord/callback")
+    monkeypatch.setenv(
+        "AUTH_DISCORD_REDIRECT_URI",
+        "https://example.com/oauth/discord/callback",
+    )
     monkeypatch.setenv("AUTH_SERVICE_TOKEN", "secret")
 
     import app.core.config as cfg
+
     importlib.reload(cfg)
     from app.features.auth.session_service import SessionService
 
@@ -56,11 +67,15 @@ def test_session_service_creates_pending_session(monkeypatch):
 
     response = asyncio.run(
         service.create_registration_session(
-            CreateRegistrationSessionRequest(discord_user_id="123456", game=SupportedGame.CIV6)
+            CreateRegistrationSessionRequest(
+                discord_user_id="123456",
+                game=SupportedGame.CIV6,
+            )
         )
     )
     assert response.session_id
     assert "discord.com/oauth2/authorize" in response.authorize_url
+
     status = asyncio.run(service.get_registration_session_status(response.session_id))
     assert status.status is RegistrationSessionStatus.PENDING_AUTH
 
@@ -83,4 +98,7 @@ def test_oauth_service_raises_when_connection_missing():
 
 def test_registration_service_manual_required():
     with pytest.raises(ManualRegistrationRequiredError):
-        RegistrationService.manual_required_for_platform(RegistrationPlatform.EPIC, account_name="epic-user")
+        RegistrationService.manual_required_for_platform(
+            RegistrationPlatform.EPIC,
+            account_name="epic-user",
+        )

@@ -17,16 +17,21 @@ from app.features.auth.errors import (
     to_http_exception,
 )
 from app.features.auth.oauth_service import DiscordOAuthService
+from app.features.auth.operation_service import OperationService
 from app.features.auth.registration_service import RegistrationService
 from app.features.auth.repository import AuthRepository
 from app.features.auth.schemas import (
     AccountLookupResponse,
+    CompleteRegistrationSessionRequest,
     CreateRegistrationSessionRequest,
     DiscordOAuthCallbackResult,
+    FinalizeRegistrationOperationRequest,
+    RegistrationOperationResponse,
     RegistrationSessionResponse,
     RegistrationSessionStatusResponse,
 )
 from app.features.auth.session_service import SessionService
+from app.features.auth.steam_service import SteamService
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +41,6 @@ router = APIRouter(
     dependencies=[Depends(require_service_token)],
 )
 public_router = APIRouter(tags=["auth-public"])
-
 
 
 def _repo(db: AsyncIOMotorClient) -> AuthRepository:
@@ -103,6 +107,63 @@ async def get_registration_session(
         raise to_http_exception(exc) from exc
 
 
+@router.post(
+    "/registration-sessions/{session_id}/complete",
+    response_model=RegistrationOperationResponse,
+)
+async def complete_registration_session(
+    session_id: Annotated[str, Path(min_length=1, max_length=128)],
+    payload: CompleteRegistrationSessionRequest,
+    db: AsyncIOMotorClient = Depends(get_database),
+) -> RegistrationOperationResponse:
+    repository = _repo(db)
+    session_service = SessionService(repository)
+    registration_service = RegistrationService(repository)
+    try:
+        session = await session_service.load_validated_session(session_id)
+        if str(session["discord_user_id"]) != payload.discord_user_id:
+            raise to_http_exception(InvalidStateError())
+
+        operation_id = session.get("operation_id")
+        if operation_id:
+            existing = await repository.get_registration_operation(str(operation_id))
+            if existing is not None:
+                return RegistrationOperationResponse(
+                    operation_id=str(existing["operation_id"]),
+                    status=existing.get("status"),
+                    discord_user_id=str(existing["discord_user_id"]),
+                    steam_id=str(existing["steam_id"]),
+                    game=str(existing["game"]),
+                    role_intents=existing.get("role_intents") or [],
+                )
+
+        await registration_service.assert_registration_conflicts(
+            discord_user_id=str(session["discord_user_id"]),
+            steam_id=str(session["validated_account_id"]),
+            game=str(session["game"]),
+        )
+        operation = await registration_service.create_registration_operation(session=session)
+        await session_service.link_operation(session_id, operation.operation_id)
+        return operation
+    except AuthError as exc:
+        raise to_http_exception(exc) from exc
+
+
+@router.post(
+    "/registration-operations/{operation_id}/finalize",
+    status_code=204,
+)
+async def finalize_registration_operation(
+    operation_id: Annotated[str, Path(min_length=1, max_length=128)],
+    payload: FinalizeRegistrationOperationRequest,
+    db: AsyncIOMotorClient = Depends(get_database),
+) -> None:
+    try:
+        await OperationService(_repo(db)).finalize_operation(operation_id, payload)
+    except AuthError as exc:
+        raise to_http_exception(exc) from exc
+
+
 @public_router.get(
     "/oauth/discord/callback",
     response_model=DiscordOAuthCallbackResult,
@@ -117,6 +178,7 @@ async def discord_oauth_callback(
     session_service = SessionService(repository)
     registration_service = RegistrationService(repository)
     oauth_service = DiscordOAuthService()
+    steam_service = SteamService()
 
     if error or not code or not state:
         if state:
@@ -157,12 +219,29 @@ async def discord_oauth_callback(
         linked_account_name = (
             connection.get("name") if isinstance(connection.get("name"), str) else None
         )
+        username_snapshot = user.get("username") if isinstance(user.get("username"), str) else None
+        display_name_snapshot = (
+            user.get("global_name") if isinstance(user.get("global_name"), str) else username_snapshot
+        )
 
         if platform is RegistrationPlatform.STEAM:
+            steam_validation = await steam_service.validate_linked_account(
+                steam_id=linked_account_id,
+                game=str(session["game"]),
+            )
+            await registration_service.assert_registration_conflicts(
+                discord_user_id=str(session["discord_user_id"]),
+                steam_id=linked_account_id,
+                game=str(session["game"]),
+            )
             await session_service.mark_validated(
                 session_id,
                 linked_account_id=linked_account_id,
                 linked_account_name=linked_account_name,
+                ownership_verified_at=steam_validation.get("ownership_verified_at"),
+                playtime_minutes=int(steam_validation.get("actual_minutes") or 0),
+                username_snapshot=username_snapshot,
+                display_name_snapshot=display_name_snapshot,
             )
             await repository.append_audit_event(
                 {
@@ -173,6 +252,7 @@ async def discord_oauth_callback(
                     "linked_account_id": linked_account_id,
                     "linked_account_name": linked_account_name,
                     "game": str(session["game"]),
+                    "playtime_minutes": int(steam_validation.get("actual_minutes") or 0),
                 }
             )
             return DiscordOAuthCallbackResult(
@@ -181,6 +261,9 @@ async def discord_oauth_callback(
                 platform=platform,
                 linked_account_id=linked_account_id,
                 linked_account_name=linked_account_name,
+                details={
+                    "playtime_minutes": int(steam_validation.get("actual_minutes") or 0),
+                },
             )
 
         registration_service.manual_required_for_platform(
