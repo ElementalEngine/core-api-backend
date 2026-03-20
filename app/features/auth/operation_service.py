@@ -38,7 +38,7 @@ class OperationService:
                 game=str(operation["game"]),
                 username_snapshot=operation.get("username_snapshot"),
                 display_name_snapshot=operation.get("display_name_snapshot"),
-                method="oauth",
+                method=str(operation.get("method") or "oauth"),
                 ownership_verified_at=operation.get("ownership_verified_at") or now,
                 playtime_minutes=int(operation.get("playtime_minutes") or 0),
             )

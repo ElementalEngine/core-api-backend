@@ -14,15 +14,18 @@ from app.features.auth.enums import (
 from app.features.auth.errors import (
     AlreadyRegisteredError,
     DiscordSteamConflictError,
+    RegistrationAccountNotFoundError,
     SteamIdConflictError,
+    SteamLinkRequiredError,
     SteamOwnershipMissingError,
     SteamPlaytimeBelowThresholdError,
     SteamProfilePrivateError,
 )
 from app.features.auth.operation_service import OperationService
 from app.features.auth.registration_service import RegistrationService
-from app.features.auth.schemas import FinalizeRegistrationOperationRequest
+from app.features.auth.schemas import FinalizeRegistrationOperationRequest, ManualRegistrationRequest
 from app.features.auth.steam_service import SteamService
+from app.features.auth.manual_registration_service import ManualRegistrationService
 
 
 class FakeRepo:
@@ -195,3 +198,84 @@ def test_steam_validation_playtime_threshold(monkeypatch):
 
     with pytest.raises(SteamPlaytimeBelowThresholdError):
         asyncio.run(service.validate_linked_account(steam_id="1", game=SupportedGame.CIV7.value))
+
+def test_create_rank_role_operation_requires_existing_registration_account():
+    repo = FakeRepo()
+    service = RegistrationService(repo)
+
+    with pytest.raises(RegistrationAccountNotFoundError):
+        asyncio.run(
+            service.create_rank_role_operation(
+                discord_user_id="missing",
+                game=SupportedGame.CIV7.value,
+            )
+        )
+
+
+def test_create_rank_role_operation_requires_linked_steam():
+    repo = FakeRepo()
+    repo.users_by_discord["1"] = {"discord_id": "1", "registrations": {"civ6": {}}}
+    service = RegistrationService(repo)
+
+    with pytest.raises(SteamLinkRequiredError):
+        asyncio.run(
+            service.create_rank_role_operation(
+                discord_user_id="1",
+                game=SupportedGame.CIV7.value,
+            )
+        )
+
+
+def test_create_rank_role_operation_returns_single_rank_intent():
+    repo = FakeRepo()
+    repo.users_by_discord["1"] = {
+        "discord_id": "1",
+        "steam_id": "steam-1",
+        "registrations": {"civ6": {}},
+        "user_name": "user",
+        "display_name": "User",
+    }
+    repo.users_by_steam["steam-1"] = {"discord_id": "1", "steam_id": "steam-1", "registrations": {"civ6": {}}}
+    service = RegistrationService(repo)
+
+    op = asyncio.run(
+        service.create_rank_role_operation(discord_user_id="1", game=SupportedGame.CIV7.value)
+    )
+
+    assert op.role_intents == [RoleIntent.GRANT_CIV7_RANK]
+    assert repo.operations[op.operation_id]["method"] == "rank_role"
+
+
+class _FakeSteamService:
+    async def validate_linked_account(self, *, steam_id: str, game: str):
+        return {
+            "steam_id": steam_id,
+            "actual_minutes": 500,
+            "ownership_verified_at": datetime.now(timezone.utc),
+        }
+
+
+def test_manual_registration_service_creates_manual_admin_operation():
+    repo = FakeRepo()
+    service = ManualRegistrationService(repo, _FakeSteamService())
+
+    op = asyncio.run(
+        service.create_operation(
+            ManualRegistrationRequest(
+                actor_discord_id="mod-1",
+                subject_discord_id="user-1",
+                steam_id="76561198000000000",
+                game=SupportedGame.CIV6,
+                reason="approved by staff",
+            )
+        )
+    )
+
+    assert op.role_intents == [
+        RoleIntent.GRANT_CIV6_RANK,
+        RoleIntent.GRANT_NOVICE,
+        RoleIntent.REMOVE_NON_VERIFIED,
+    ]
+    assert repo.operations[op.operation_id]["method"] == "manual_admin"
+    assert repo.operations[op.operation_id]["actor_discord_id"] == "mod-1"
+    assert repo.operations[op.operation_id]["reason"] == "approved by staff"

@@ -4,12 +4,19 @@ from datetime import datetime, timezone
 from secrets import token_urlsafe
 from typing import Any
 
-from app.features.auth.enums import RegistrationOperationStatus, RegistrationPlatform, RoleIntent, SupportedGame
+from app.features.auth.enums import (
+    RegistrationOperationStatus,
+    RegistrationPlatform,
+    RoleIntent,
+    SupportedGame,
+)
 from app.features.auth.errors import (
     AlreadyRegisteredError,
     DiscordSteamConflictError,
     ManualRegistrationRequiredError,
+    RegistrationAccountNotFoundError,
     SteamIdConflictError,
+    SteamLinkRequiredError,
 )
 from app.features.auth.repository import AuthRepository
 from app.features.auth.schemas import AccountLookupResponse, RegistrationOperationResponse
@@ -65,45 +72,86 @@ class RegistrationService:
         *,
         session: dict[str, Any],
     ) -> RegistrationOperationResponse:
-        operation_id = token_urlsafe(24)
         game = str(session["game"])
-        role_intents = self._role_intents_for(game)
-        doc = {
-            "operation_id": operation_id,
-            "status": RegistrationOperationStatus.PENDING.value,
-            "source_session_id": str(session["session_id"]),
-            "discord_user_id": str(session["discord_user_id"]),
-            "steam_id": str(session["validated_account_id"]),
-            "game": game,
-            "role_intents": [intent.value for intent in role_intents],
-            "validated_account_name": session.get("validated_account_name"),
-            "username_snapshot": session.get("username_snapshot"),
-            "display_name_snapshot": session.get("display_name_snapshot"),
-            "ownership_verified_at": session.get("ownership_verified_at"),
-            "playtime_minutes": session.get("playtime_minutes"),
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc),
-        }
-        await self._repository.insert_registration_operation(doc)
-        await self._repository.append_audit_event(
-            {
-                "action": "registration_operation_created",
-                "operation_id": operation_id,
-                "discord_user_id": doc["discord_user_id"],
-                "steam_id": doc["steam_id"],
-                "game": game,
-                "role_intents": doc["role_intents"],
-                "source_session_id": doc["source_session_id"],
-            }
+        return await self._insert_operation(
+            discord_user_id=str(session["discord_user_id"]),
+            steam_id=str(session["validated_account_id"]),
+            game=game,
+            role_intents=self._registration_role_intents_for(game),
+            method="oauth",
+            username_snapshot=session.get("username_snapshot"),
+            display_name_snapshot=session.get("display_name_snapshot"),
+            ownership_verified_at=session.get("ownership_verified_at"),
+            playtime_minutes=session.get("playtime_minutes"),
+            source_session_id=str(session["session_id"]),
+            validated_account_name=session.get("validated_account_name"),
         )
-        return RegistrationOperationResponse(
-            operation_id=operation_id,
-            status=RegistrationOperationStatus.PENDING,
-            discord_user_id=doc["discord_user_id"],
-            steam_id=doc["steam_id"],
-            game=SupportedGame(game),
-            role_intents=role_intents,
+
+    async def create_rank_role_operation(
+        self,
+        *,
+        discord_user_id: str,
+        game: str,
+    ) -> RegistrationOperationResponse:
+        existing = await self._repository.get_user_by_discord_id(discord_user_id)
+        if not existing:
+            raise RegistrationAccountNotFoundError(discord_user_id)
+
+        steam_id = existing.get("steam_id")
+        if not steam_id:
+            raise SteamLinkRequiredError(discord_user_id)
+
+        await self.assert_registration_conflicts(
+            discord_user_id=discord_user_id,
+            steam_id=str(steam_id),
+            game=game,
         )
+
+        return await self._insert_operation(
+            discord_user_id=discord_user_id,
+            steam_id=str(steam_id),
+            game=game,
+            role_intents=self._rank_role_intents_for(game),
+            method="rank_role",
+            username_snapshot=existing.get("user_name"),
+            display_name_snapshot=existing.get("display_name"),
+            ownership_verified_at=datetime.now(timezone.utc),
+            playtime_minutes=None,
+            source_session_id=None,
+        )
+
+    async def create_manual_registration_operation(
+        self,
+        *,
+        actor_discord_id: str,
+        subject_discord_id: str,
+        steam_id: str,
+        game: str,
+        reason: str,
+        ownership_verified_at: datetime,
+        playtime_minutes: int,
+    ) -> RegistrationOperationResponse:
+        existing = await self._repository.get_user_by_discord_id(subject_discord_id)
+        await self.assert_registration_conflicts(
+            discord_user_id=subject_discord_id,
+            steam_id=steam_id,
+            game=game,
+        )
+        operation = await self._insert_operation(
+            discord_user_id=subject_discord_id,
+            steam_id=steam_id,
+            game=game,
+            role_intents=self._registration_role_intents_for(game),
+            method="manual_admin",
+            username_snapshot=existing.get("user_name") if existing else None,
+            display_name_snapshot=existing.get("display_name") if existing else None,
+            ownership_verified_at=ownership_verified_at,
+            playtime_minutes=playtime_minutes,
+            source_session_id=None,
+            actor_discord_id=actor_discord_id,
+            reason=reason,
+        )
+        return operation
 
     @staticmethod
     def manual_required_for_platform(
@@ -114,8 +162,71 @@ class RegistrationService:
         if platform in {RegistrationPlatform.EPIC, RegistrationPlatform.XBOX}:
             raise ManualRegistrationRequiredError(platform.value, account_name=account_name)
 
+    async def _insert_operation(
+        self,
+        *,
+        discord_user_id: str,
+        steam_id: str,
+        game: str,
+        role_intents: list[RoleIntent],
+        method: str,
+        username_snapshot: str | None,
+        display_name_snapshot: str | None,
+        ownership_verified_at: datetime | None,
+        playtime_minutes: int | None,
+        source_session_id: str | None,
+        validated_account_name: str | None = None,
+        actor_discord_id: str | None = None,
+        reason: str | None = None,
+    ) -> RegistrationOperationResponse:
+        operation_id = token_urlsafe(24)
+        now = datetime.now(timezone.utc)
+        doc = {
+            "operation_id": operation_id,
+            "status": RegistrationOperationStatus.PENDING.value,
+            "source_session_id": source_session_id,
+            "discord_user_id": discord_user_id,
+            "steam_id": steam_id,
+            "game": game,
+            "role_intents": [intent.value for intent in role_intents],
+            "method": method,
+            "validated_account_name": validated_account_name,
+            "username_snapshot": username_snapshot,
+            "display_name_snapshot": display_name_snapshot,
+            "ownership_verified_at": ownership_verified_at,
+            "playtime_minutes": playtime_minutes,
+            "actor_discord_id": actor_discord_id,
+            "reason": reason,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await self._repository.insert_registration_operation(doc)
+        audit_doc = {
+            "action": "registration_operation_created",
+            "operation_id": operation_id,
+            "discord_user_id": discord_user_id,
+            "steam_id": steam_id,
+            "game": game,
+            "role_intents": doc["role_intents"],
+            "source_session_id": source_session_id,
+            "method": method,
+        }
+        if actor_discord_id is not None:
+            audit_doc["actor_discord_id"] = actor_discord_id
+        if reason is not None:
+            audit_doc["reason"] = reason
+        await self._repository.append_audit_event(audit_doc)
+        return RegistrationOperationResponse(
+            operation_id=operation_id,
+            status=RegistrationOperationStatus.PENDING,
+            discord_user_id=discord_user_id,
+            steam_id=steam_id,
+            game=SupportedGame(game),
+            role_intents=role_intents,
+        )
+
     @staticmethod
-    def _role_intents_for(game: str) -> list[RoleIntent]:
+    def _registration_role_intents_for(game: str) -> list[RoleIntent]:
         if game == SupportedGame.CIV6.value:
             return [
                 RoleIntent.GRANT_CIV6_RANK,
@@ -123,6 +234,12 @@ class RegistrationService:
                 RoleIntent.REMOVE_NON_VERIFIED,
             ]
         return [RoleIntent.GRANT_CIV7_RANK, RoleIntent.REMOVE_NON_VERIFIED]
+
+    @staticmethod
+    def _rank_role_intents_for(game: str) -> list[RoleIntent]:
+        if game == SupportedGame.CIV6.value:
+            return [RoleIntent.GRANT_CIV6_RANK]
+        return [RoleIntent.GRANT_CIV7_RANK]
 
 
 def _to_lookup_response(doc: dict[str, Any]) -> AccountLookupResponse:

@@ -159,6 +159,28 @@ class DiscordSteamConflictError(AuthError):
         )
 
 
+
+
+class RegistrationAccountNotFoundError(AuthError):
+    def __init__(self, discord_user_id: str) -> None:
+        super().__init__(
+            code="REGISTRATION_ACCOUNT_NOT_FOUND",
+            message="Discord ID not found—please register first.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details={"discord_user_id": discord_user_id},
+        )
+
+
+class SteamLinkRequiredError(AuthError):
+    def __init__(self, discord_user_id: str) -> None:
+        super().__init__(
+            code="STEAM_LINK_REQUIRED",
+            message="No Steam account is linked to this Discord account. Please register with Steam first.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details={"discord_user_id": discord_user_id},
+        )
+
+
 class InvalidStateError(AuthError):
     def __init__(self) -> None:
         super().__init__(

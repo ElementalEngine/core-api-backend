@@ -18,6 +18,7 @@ from app.features.auth.errors import (
 )
 from app.features.auth.oauth_service import DiscordOAuthService
 from app.features.auth.operation_service import OperationService
+from app.features.auth.manual_registration_service import ManualRegistrationService
 from app.features.auth.registration_service import RegistrationService
 from app.features.auth.repository import AuthRepository
 from app.features.auth.schemas import (
@@ -26,6 +27,8 @@ from app.features.auth.schemas import (
     CreateRegistrationSessionRequest,
     DiscordOAuthCallbackResult,
     FinalizeRegistrationOperationRequest,
+    ManualRegistrationRequest,
+    RankRoleRequest,
     RegistrationOperationResponse,
     RegistrationSessionResponse,
     RegistrationSessionStatusResponse,
@@ -160,6 +163,69 @@ async def finalize_registration_operation(
 ) -> None:
     try:
         await OperationService(_repo(db)).finalize_operation(operation_id, payload)
+    except AuthError as exc:
+        raise to_http_exception(exc) from exc
+
+
+@router.post(
+    "/rank-role-requests",
+    response_model=RegistrationOperationResponse,
+)
+async def create_rank_role_request(
+    payload: RankRoleRequest,
+    db: AsyncIOMotorClient = Depends(get_database),
+) -> RegistrationOperationResponse:
+    repository = _repo(db)
+    registration_service = RegistrationService(repository)
+    steam_service = SteamService()
+    try:
+        account = await registration_service.lookup_by_discord_id(payload.discord_user_id)
+        if account is None or not account.steam_id:
+            return await registration_service.create_rank_role_operation(
+                discord_user_id=payload.discord_user_id,
+                game=payload.game.value,
+            )
+        steam_validation = await steam_service.validate_linked_account(
+            steam_id=account.steam_id,
+            game=payload.game.value,
+        )
+        operation = await registration_service.create_rank_role_operation(
+            discord_user_id=payload.discord_user_id,
+            game=payload.game.value,
+        )
+        await repository.update_registration_operation(
+            operation.operation_id,
+            {
+                "ownership_verified_at": steam_validation.get("ownership_verified_at"),
+                "playtime_minutes": int(steam_validation.get("actual_minutes") or 0),
+                "updated_at": steam_validation.get("ownership_verified_at"),
+            },
+        )
+        return RegistrationOperationResponse(
+            operation_id=operation.operation_id,
+            status=operation.status,
+            discord_user_id=operation.discord_user_id,
+            steam_id=operation.steam_id,
+            game=operation.game,
+            role_intents=operation.role_intents,
+        )
+    except AuthError as exc:
+        raise to_http_exception(exc) from exc
+
+
+@router.post(
+    "/admin/manual-registrations",
+    response_model=RegistrationOperationResponse,
+)
+async def create_manual_registration(
+    payload: ManualRegistrationRequest,
+    db: AsyncIOMotorClient = Depends(get_database),
+) -> RegistrationOperationResponse:
+    repository = _repo(db)
+    steam_service = SteamService()
+    manual_service = ManualRegistrationService(repository, steam_service)
+    try:
+        return await manual_service.create_operation(payload)
     except AuthError as exc:
         raise to_http_exception(exc) from exc
 

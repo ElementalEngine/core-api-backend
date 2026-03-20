@@ -37,6 +37,44 @@ class CompleteRegistrationSessionRequest(_DiscordUserIdModel):
     pass
 
 
+class RankRoleRequest(_DiscordUserIdModel):
+    game: SupportedGame
+
+
+class ManualRegistrationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actor_discord_id: str = Field(min_length=1)
+    subject_discord_id: str = Field(min_length=1)
+    steam_id: str = Field(min_length=5, max_length=20)
+    game: SupportedGame
+    reason: str = Field(min_length=1, max_length=500)
+
+    @field_validator("actor_discord_id", "subject_discord_id")
+    @classmethod
+    def _normalize_discord_ids(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("discord id must not be blank")
+        return normalized
+
+    @field_validator("steam_id")
+    @classmethod
+    def _normalize_steam_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized.isdigit():
+            raise ValueError("steam_id must be numeric")
+        return normalized
+
+    @field_validator("reason")
+    @classmethod
+    def _normalize_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("reason must not be blank")
+        return normalized
+
+
 class FinalizeRegistrationOperationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
