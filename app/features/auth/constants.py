@@ -22,3 +22,5 @@ DEFAULT_STEAM_PLAYTIME_MINUTES: Final[dict[str, int]] = {
     "civ6": 2880,
     "civ7": 120,
 }
+
+STEAM_OWNED_GAMES_URL: Final[str] = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"

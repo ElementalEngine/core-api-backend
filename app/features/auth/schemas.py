@@ -46,32 +46,16 @@ class ManualRegistrationRequest(BaseModel):
 
     actor_discord_id: str = Field(min_length=1)
     subject_discord_id: str = Field(min_length=1)
-    steam_id: str = Field(min_length=5, max_length=20)
+    steam_id: str = Field(min_length=1)
     game: SupportedGame
     reason: str = Field(min_length=1, max_length=500)
 
-    @field_validator("actor_discord_id", "subject_discord_id")
+    @field_validator("actor_discord_id", "subject_discord_id", "steam_id", "reason")
     @classmethod
-    def _normalize_discord_ids(cls, value: str) -> str:
+    def _normalize_required_text(cls, value: str) -> str:
         normalized = value.strip()
         if not normalized:
-            raise ValueError("discord id must not be blank")
-        return normalized
-
-    @field_validator("steam_id")
-    @classmethod
-    def _normalize_steam_id(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized.isdigit():
-            raise ValueError("steam_id must be numeric")
-        return normalized
-
-    @field_validator("reason")
-    @classmethod
-    def _normalize_reason(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("reason must not be blank")
+            raise ValueError("value must not be blank")
         return normalized
 
 

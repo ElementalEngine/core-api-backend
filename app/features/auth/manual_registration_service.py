@@ -11,20 +11,23 @@ class ManualRegistrationService:
         self._registration_service = RegistrationService(repository)
         self._steam_service = steam_service
 
-    async def create_operation(
+    async def create_manual_registration(
         self,
         payload: ManualRegistrationRequest,
     ) -> RegistrationOperationResponse:
-        steam_validation = await self._steam_service.validate_linked_account(
+        validation = await self._steam_service.validate_linked_account(
+            steam_id=payload.steam_id,
+            game=payload.game.value,
+        )
+        await self._registration_service.assert_registration_conflicts(
+            discord_user_id=payload.subject_discord_id,
             steam_id=payload.steam_id,
             game=payload.game.value,
         )
         return await self._registration_service.create_manual_registration_operation(
             actor_discord_id=payload.actor_discord_id,
             subject_discord_id=payload.subject_discord_id,
-            steam_id=payload.steam_id,
-            game=payload.game.value,
+            game=payload.game,
+            steam_validation=validation,
             reason=payload.reason,
-            ownership_verified_at=steam_validation["ownership_verified_at"],
-            playtime_minutes=int(steam_validation.get("actual_minutes") or 0),
         )

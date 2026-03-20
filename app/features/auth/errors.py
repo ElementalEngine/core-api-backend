@@ -139,6 +139,101 @@ class AlreadyRegisteredError(AuthError):
         )
 
 
+class InvalidStateError(AuthError):
+    def __init__(self) -> None:
+        super().__init__(
+            code="INVALID_AUTH_STATE",
+            message="The registration link is invalid or has already been used.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class SessionStateConflictError(AuthError):
+    def __init__(self, session_id: str, status_value: str) -> None:
+        super().__init__(
+            code="INVALID_AUTH_STATE",
+            message="The registration link is invalid or has already been used.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details={"session_id": session_id, "status": status_value},
+        )
+
+
+class DiscordUserMismatchError(AuthError):
+    def __init__(self, *, session_user_id: str, request_user_id: str) -> None:
+        super().__init__(
+            code="DISCORD_USER_MISMATCH",
+            message="The authenticated Discord account did not match the registration session.",
+            status_code=status.HTTP_403_FORBIDDEN,
+            details={"session_user_id": session_user_id, "request_user_id": request_user_id},
+        )
+
+
+class OperationNotFoundError(AuthError):
+    def __init__(self, operation_id: str) -> None:
+        super().__init__(
+            code="REGISTRATION_OPERATION_NOT_FOUND",
+            message="Registration operation was not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details={"operation_id": operation_id},
+        )
+
+
+class OperationStateConflictError(AuthError):
+    def __init__(self, operation_id: str, status_value: str) -> None:
+        super().__init__(
+            code="REGISTRATION_OPERATION_STATE_CONFLICT",
+            message="Registration operation is no longer pending.",
+            status_code=status.HTTP_409_CONFLICT,
+            details={"operation_id": operation_id, "status": status_value},
+        )
+
+
+class SteamProfilePrivateError(AuthError):
+    def __init__(self) -> None:
+        super().__init__(
+            code="STEAM_PROFILE_PRIVATE",
+            message="Your Steam profile must be public to register automatically.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class SteamOwnershipMissingError(AuthError):
+    def __init__(self, game: str) -> None:
+        super().__init__(
+            code="STEAM_OWNERSHIP_MISSING",
+            message=f"Your Steam account does not appear to own {game.upper()}.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details={"game": game},
+        )
+
+
+class SteamPlaytimeBelowThresholdError(AuthError):
+    def __init__(self, *, game: str, required_minutes: int, actual_minutes: int) -> None:
+        super().__init__(
+            code="STEAM_PLAYTIME_BELOW_THRESHOLD",
+            message=(
+                f"Your playtime does not meet the requirement for {game.upper()}. "
+                f"Required: {required_minutes} minutes. Your playtime: {actual_minutes} minutes."
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details={
+                "game": game,
+                "required_minutes": required_minutes,
+                "actual_minutes": actual_minutes,
+            },
+        )
+
+
+class SteamValidationError(AuthError):
+    def __init__(self) -> None:
+        super().__init__(
+            code="STEAM_API_FAILURE",
+            message="We could not verify your Steam account right now. Please try again.",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            retryable=True,
+        )
+
+
 class SteamIdConflictError(AuthError):
     def __init__(self, *, steam_id: str, existing_discord_id: str) -> None:
         super().__init__(
@@ -159,116 +254,22 @@ class DiscordSteamConflictError(AuthError):
         )
 
 
-
-
-class RegistrationAccountNotFoundError(AuthError):
+class RankRoleEligibilityError(AuthError):
     def __init__(self, discord_user_id: str) -> None:
         super().__init__(
-            code="REGISTRATION_ACCOUNT_NOT_FOUND",
-            message="Discord ID not found—please register first.",
+            code="RANK_ROLE_NOT_ELIGIBLE",
+            message="No linked Steam registration account was found for this Discord user.",
             status_code=status.HTTP_404_NOT_FOUND,
             details={"discord_user_id": discord_user_id},
         )
 
 
-class SteamLinkRequiredError(AuthError):
-    def __init__(self, discord_user_id: str) -> None:
+class ManualRegistrationInputError(AuthError):
+    def __init__(self, message: str) -> None:
         super().__init__(
-            code="STEAM_LINK_REQUIRED",
-            message="No Steam account is linked to this Discord account. Please register with Steam first.",
+            code="MANUAL_REGISTRATION_INVALID",
+            message=message,
             status_code=status.HTTP_400_BAD_REQUEST,
-            details={"discord_user_id": discord_user_id},
-        )
-
-
-class InvalidStateError(AuthError):
-    def __init__(self) -> None:
-        super().__init__(
-            code="INVALID_AUTH_STATE",
-            message="The registration link is invalid or has already been used.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
-
-
-class SessionStateConflictError(AuthError):
-    def __init__(self, session_id: str, status_value: str) -> None:
-        super().__init__(
-            code="INVALID_AUTH_STATE",
-            message="The registration link is invalid or has already been used.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-            details={"session_id": session_id, "status": status_value},
-        )
-
-
-class OperationNotFoundError(AuthError):
-    def __init__(self, operation_id: str) -> None:
-        super().__init__(
-            code="REGISTRATION_OPERATION_NOT_FOUND",
-            message="Registration operation was not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-            details={"operation_id": operation_id},
-        )
-
-
-class OperationStateConflictError(AuthError):
-    def __init__(self, operation_id: str, status_value: str) -> None:
-        super().__init__(
-            code="REGISTRATION_OPERATION_NOT_PENDING",
-            message="Registration operation is no longer pending.",
-            status_code=status.HTTP_409_CONFLICT,
-            details={"operation_id": operation_id, "status": status_value},
-        )
-
-
-class SteamValidationError(AuthError):
-    pass
-
-
-class SteamProfilePrivateError(SteamValidationError):
-    def __init__(self, steam_id: str) -> None:
-        super().__init__(
-            code="STEAM_PROFILE_PRIVATE",
-            message="Your Steam profile and game details must be public to register automatically.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-            details={"steam_id": steam_id},
-        )
-
-
-class SteamOwnershipMissingError(SteamValidationError):
-    def __init__(self, *, steam_id: str, game: str, app_id: int) -> None:
-        super().__init__(
-            code="STEAM_OWNERSHIP_MISSING",
-            message=f"Your Steam account does not appear to own {game.upper()}.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-            details={"steam_id": steam_id, "game": game, "app_id": app_id},
-        )
-
-
-class SteamPlaytimeBelowThresholdError(SteamValidationError):
-    def __init__(self, *, steam_id: str, game: str, required_minutes: int, actual_minutes: int) -> None:
-        super().__init__(
-            code="STEAM_PLAYTIME_BELOW_THRESHOLD",
-            message=(
-                f"Your playtime does not meet the requirement for {game.upper()}. "
-                f"Required: {required_minutes} minutes. Your playtime: {actual_minutes} minutes."
-            ),
-            status_code=status.HTTP_400_BAD_REQUEST,
-            details={
-                "steam_id": steam_id,
-                "game": game,
-                "required_minutes": required_minutes,
-                "actual_minutes": actual_minutes,
-            },
-        )
-
-
-class SteamApiError(SteamValidationError):
-    def __init__(self) -> None:
-        super().__init__(
-            code="STEAM_API_FAILURE",
-            message="We could not verify your Steam account right now. Please try again.",
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            retryable=True,
         )
 
 

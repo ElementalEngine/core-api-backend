@@ -6,10 +6,11 @@ from urllib.parse import urlencode
 
 from app.core.config import settings
 from app.features.auth.constants import DISCORD_OAUTH_AUTHORIZE_URL, DISCORD_OAUTH_SCOPES
-from app.features.auth.enums import RegistrationOperationStatus, RegistrationSessionStatus
+from app.features.auth.enums import RegistrationSessionStatus
 from app.features.auth.errors import (
     AlreadyRegisteredError,
     AuthConfigurationError,
+    DiscordUserMismatchError,
     SessionExpiredError,
     SessionNotFoundError,
     SessionNotValidatedError,
@@ -81,34 +82,12 @@ class SessionService:
         session = await self._repository.get_registration_session(session_id)
         if session is None:
             raise SessionNotFoundError(session_id)
-
-        expires_at = session.get("expires_at")
-        status_value = session.get("status", RegistrationSessionStatus.PENDING_AUTH.value)
-        if (
-            isinstance(expires_at, datetime)
-            and expires_at <= datetime.now(timezone.utc)
-            and status_value
-            not in {
-                RegistrationSessionStatus.EXPIRED.value,
-                RegistrationSessionStatus.COMPLETED.value,
-                RegistrationSessionStatus.FAILED.value,
-            }
-        ):
-            status_value = RegistrationSessionStatus.EXPIRED.value
-            await self._repository.update_registration_session(
-                session_id,
-                {
-                    "status": status_value,
-                    "failure_code": "REGISTRATION_SESSION_EXPIRED",
-                    "failure_message": "Registration session expired. Please start again.",
-                    "updated_at": datetime.now(timezone.utc),
-                },
-            )
+        session = await self._coerce_expired_session(session, raise_on_expired=False)
 
         return RegistrationSessionStatusResponse(
             session_id=session_id,
-            status=RegistrationSessionStatus(status_value),
-            expires_at=expires_at,
+            status=RegistrationSessionStatus(str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))),
+            expires_at=session.get("expires_at"),
             failure_code=session.get("failure_code"),
             failure_message=session.get("failure_message"),
         )
@@ -117,23 +96,12 @@ class SessionService:
         session = await self._repository.get_registration_session_by_state(state_token)
         if session is None:
             raise SessionNotFoundError("state")
+        session = await self._coerce_expired_session(session, raise_on_expired=True)
 
         session_id = str(session["session_id"])
-        expires_at = session.get("expires_at")
-        if isinstance(expires_at, datetime) and expires_at <= datetime.now(timezone.utc):
-            await self._repository.update_registration_session(
-                session_id,
-                {
-                    "status": RegistrationSessionStatus.EXPIRED.value,
-                    "failure_code": "REGISTRATION_SESSION_EXPIRED",
-                    "failure_message": "Registration session expired. Please start again.",
-                    "updated_at": datetime.now(timezone.utc),
-                },
-            )
-            raise SessionExpiredError(session_id)
-
         status_value = str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))
         if status_value in {
+            RegistrationSessionStatus.VALIDATED.value,
             RegistrationSessionStatus.FAILED.value,
             RegistrationSessionStatus.EXPIRED.value,
             RegistrationSessionStatus.COMPLETED.value,
@@ -142,19 +110,22 @@ class SessionService:
 
         return session
 
-    async def load_validated_session(self, session_id: str) -> dict[str, object]:
+    async def load_session_for_completion(
+        self,
+        *,
+        session_id: str,
+        discord_user_id: str,
+    ) -> dict[str, object]:
         session = await self._repository.get_registration_session(session_id)
         if session is None:
             raise SessionNotFoundError(session_id)
+        session = await self._coerce_expired_session(session, raise_on_expired=True)
 
-        expires_at = session.get("expires_at")
-        if isinstance(expires_at, datetime) and expires_at <= datetime.now(timezone.utc):
-            await self.mark_failed(
-                session_id,
-                failure_code="REGISTRATION_SESSION_EXPIRED",
-                failure_message="Registration session expired. Please start again.",
+        if str(session.get("discord_user_id", "")) != discord_user_id:
+            raise DiscordUserMismatchError(
+                session_user_id=str(session.get("discord_user_id", "")),
+                request_user_id=discord_user_id,
             )
-            raise SessionExpiredError(session_id)
 
         status_value = str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))
         if status_value != RegistrationSessionStatus.VALIDATED.value:
@@ -176,10 +147,8 @@ class SessionService:
         *,
         linked_account_id: str,
         linked_account_name: str | None,
-        ownership_verified_at: datetime | None = None,
-        playtime_minutes: int | None = None,
-        username_snapshot: str | None = None,
-        display_name_snapshot: str | None = None,
+        oauth_username_snapshot: str | None = None,
+        oauth_display_name_snapshot: str | None = None,
     ) -> None:
         await self._repository.update_registration_session(
             session_id,
@@ -187,29 +156,12 @@ class SessionService:
                 "status": RegistrationSessionStatus.VALIDATED.value,
                 "validated_account_id": linked_account_id,
                 "validated_account_name": linked_account_name,
-                "ownership_verified_at": ownership_verified_at,
-                "playtime_minutes": playtime_minutes,
-                "username_snapshot": username_snapshot,
-                "display_name_snapshot": display_name_snapshot,
+                "oauth_username_snapshot": oauth_username_snapshot,
+                "oauth_display_name_snapshot": oauth_display_name_snapshot,
                 "failure_code": None,
                 "failure_message": None,
                 "updated_at": datetime.now(timezone.utc),
             },
-        )
-
-    async def mark_completed(self, session_id: str) -> None:
-        await self._repository.update_registration_session(
-            session_id,
-            {
-                "status": RegistrationSessionStatus.COMPLETED.value,
-                "updated_at": datetime.now(timezone.utc),
-            },
-        )
-
-    async def link_operation(self, session_id: str, operation_id: str) -> None:
-        await self._repository.update_registration_session(
-            session_id,
-            {"operation_id": operation_id, "updated_at": datetime.now(timezone.utc)},
         )
 
     async def mark_failed(
@@ -229,6 +181,40 @@ class SessionService:
         if extra:
             changes.update(extra)
         await self._repository.update_registration_session(session_id, changes)
+
+    async def _coerce_expired_session(
+        self,
+        session: dict[str, object],
+        *,
+        raise_on_expired: bool,
+    ) -> dict[str, object]:
+        session_id = str(session["session_id"])
+        expires_at = session.get("expires_at")
+        status_value = str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))
+        if (
+            isinstance(expires_at, datetime)
+            and expires_at <= datetime.now(timezone.utc)
+            and status_value
+            not in {
+                RegistrationSessionStatus.EXPIRED.value,
+                RegistrationSessionStatus.COMPLETED.value,
+                RegistrationSessionStatus.FAILED.value,
+            }
+        ):
+            status_value = RegistrationSessionStatus.EXPIRED.value
+            await self._repository.update_registration_session(
+                session_id,
+                {
+                    "status": status_value,
+                    "failure_code": "REGISTRATION_SESSION_EXPIRED",
+                    "failure_message": "Registration session expired. Please start again.",
+                    "updated_at": datetime.now(timezone.utc),
+                },
+            )
+            session = {**session, "status": status_value, "failure_code": "REGISTRATION_SESSION_EXPIRED", "failure_message": "Registration session expired. Please start again."}
+        if raise_on_expired and status_value == RegistrationSessionStatus.EXPIRED.value:
+            raise SessionExpiredError(session_id)
+        return session
 
     @staticmethod
     def _build_authorize_url(state_token: str) -> str:

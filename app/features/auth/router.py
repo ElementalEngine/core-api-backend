@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, status
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.core.dependencies import get_database, require_service_token
@@ -16,9 +16,9 @@ from app.features.auth.errors import (
     SessionNotFoundError,
     to_http_exception,
 )
+from app.features.auth.manual_registration_service import ManualRegistrationService
 from app.features.auth.oauth_service import DiscordOAuthService
 from app.features.auth.operation_service import OperationService
-from app.features.auth.manual_registration_service import ManualRegistrationService
 from app.features.auth.registration_service import RegistrationService
 from app.features.auth.repository import AuthRepository
 from app.features.auth.schemas import (
@@ -50,42 +50,29 @@ def _repo(db: AsyncIOMotorClient) -> AuthRepository:
     return AuthRepository(db)
 
 
-@router.get(
-    "/admin/accounts/discord/{discord_id}",
-    response_model=AccountLookupResponse,
-)
+@router.get("/admin/accounts/discord/{discord_id}", response_model=AccountLookupResponse)
 async def lookup_account_by_discord(
     discord_id: Annotated[str, Path(min_length=1, max_length=64)],
     db: AsyncIOMotorClient = Depends(get_database),
 ) -> AccountLookupResponse:
     account = await RegistrationService(_repo(db)).lookup_by_discord_id(discord_id)
     if account is None:
-        raise to_http_exception(
-            AccountLookupNotFoundError(field="discord_id", value=discord_id)
-        )
+        raise to_http_exception(AccountLookupNotFoundError(field="discord_id", value=discord_id))
     return account
 
 
-@router.get(
-    "/admin/accounts/steam/{steam_id}",
-    response_model=AccountLookupResponse,
-)
+@router.get("/admin/accounts/steam/{steam_id}", response_model=AccountLookupResponse)
 async def lookup_account_by_steam(
     steam_id: Annotated[str, Path(min_length=1, max_length=64)],
     db: AsyncIOMotorClient = Depends(get_database),
 ) -> AccountLookupResponse:
     account = await RegistrationService(_repo(db)).lookup_by_steam_id(steam_id)
     if account is None:
-        raise to_http_exception(
-            AccountLookupNotFoundError(field="steam_id", value=steam_id)
-        )
+        raise to_http_exception(AccountLookupNotFoundError(field="steam_id", value=steam_id))
     return account
 
 
-@router.post(
-    "/registration-sessions",
-    response_model=RegistrationSessionResponse,
-)
+@router.post("/registration-sessions", response_model=RegistrationSessionResponse)
 async def create_registration_session(
     payload: CreateRegistrationSessionRequest,
     db: AsyncIOMotorClient = Depends(get_database),
@@ -96,10 +83,7 @@ async def create_registration_session(
         raise to_http_exception(exc) from exc
 
 
-@router.get(
-    "/registration-sessions/{session_id}",
-    response_model=RegistrationSessionStatusResponse,
-)
+@router.get("/registration-sessions/{session_id}", response_model=RegistrationSessionStatusResponse)
 async def get_registration_session(
     session_id: Annotated[str, Path(min_length=1, max_length=128)],
     db: AsyncIOMotorClient = Depends(get_database),
@@ -122,39 +106,33 @@ async def complete_registration_session(
     repository = _repo(db)
     session_service = SessionService(repository)
     registration_service = RegistrationService(repository)
+    steam_service = SteamService()
     try:
-        session = await session_service.load_validated_session(session_id)
-        if str(session["discord_user_id"]) != payload.discord_user_id:
-            raise to_http_exception(InvalidStateError())
-
-        operation_id = session.get("operation_id")
-        if operation_id:
-            existing = await repository.get_registration_operation(str(operation_id))
-            if existing is not None:
-                return RegistrationOperationResponse(
-                    operation_id=str(existing["operation_id"]),
-                    status=existing.get("status"),
-                    discord_user_id=str(existing["discord_user_id"]),
-                    steam_id=str(existing["steam_id"]),
-                    game=str(existing["game"]),
-                    role_intents=existing.get("role_intents") or [],
-                )
-
-        await registration_service.assert_registration_conflicts(
-            discord_user_id=str(session["discord_user_id"]),
-            steam_id=str(session["validated_account_id"]),
+        session = await session_service.load_session_for_completion(
+            session_id=session_id,
+            discord_user_id=payload.discord_user_id,
+        )
+        steam_id = str(session.get("validated_account_id", ""))
+        validation = await steam_service.validate_linked_account(
+            steam_id=steam_id,
             game=str(session["game"]),
         )
-        operation = await registration_service.create_registration_operation(session=session)
-        await session_service.link_operation(session_id, operation.operation_id)
-        return operation
+        await registration_service.assert_registration_conflicts(
+            discord_user_id=payload.discord_user_id,
+            steam_id=steam_id,
+            game=str(session["game"]),
+        )
+        return await registration_service.create_registration_operation(
+            session=session,
+            steam_validation=validation,
+        )
     except AuthError as exc:
         raise to_http_exception(exc) from exc
 
 
 @router.post(
     "/registration-operations/{operation_id}/finalize",
-    status_code=204,
+    status_code=status.HTTP_204_NO_CONTENT,
 )
 async def finalize_registration_operation(
     operation_id: Annotated[str, Path(min_length=1, max_length=128)],
@@ -167,10 +145,7 @@ async def finalize_registration_operation(
         raise to_http_exception(exc) from exc
 
 
-@router.post(
-    "/rank-role-requests",
-    response_model=RegistrationOperationResponse,
-)
+@router.post("/rank-role-requests", response_model=RegistrationOperationResponse)
 async def create_rank_role_request(
     payload: RankRoleRequest,
     db: AsyncIOMotorClient = Depends(get_database),
@@ -179,61 +154,35 @@ async def create_rank_role_request(
     registration_service = RegistrationService(repository)
     steam_service = SteamService()
     try:
-        account = await registration_service.lookup_by_discord_id(payload.discord_user_id)
-        if account is None or not account.steam_id:
-            return await registration_service.create_rank_role_operation(
-                discord_user_id=payload.discord_user_id,
-                game=payload.game.value,
-            )
-        steam_validation = await steam_service.validate_linked_account(
-            steam_id=account.steam_id,
+        steam_id = await registration_service.get_registered_steam_id(
+            payload.discord_user_id,
+            payload.game.value,
+        )
+        validation = await steam_service.validate_linked_account(
+            steam_id=steam_id,
             game=payload.game.value,
         )
-        operation = await registration_service.create_rank_role_operation(
+        return await registration_service.create_rank_role_operation(
             discord_user_id=payload.discord_user_id,
-            game=payload.game.value,
-        )
-        await repository.update_registration_operation(
-            operation.operation_id,
-            {
-                "ownership_verified_at": steam_validation.get("ownership_verified_at"),
-                "playtime_minutes": int(steam_validation.get("actual_minutes") or 0),
-                "updated_at": steam_validation.get("ownership_verified_at"),
-            },
-        )
-        return RegistrationOperationResponse(
-            operation_id=operation.operation_id,
-            status=operation.status,
-            discord_user_id=operation.discord_user_id,
-            steam_id=operation.steam_id,
-            game=operation.game,
-            role_intents=operation.role_intents,
+            game=payload.game,
+            steam_validation=validation,
         )
     except AuthError as exc:
         raise to_http_exception(exc) from exc
 
 
-@router.post(
-    "/admin/manual-registrations",
-    response_model=RegistrationOperationResponse,
-)
+@router.post("/admin/manual-registrations", response_model=RegistrationOperationResponse)
 async def create_manual_registration(
     payload: ManualRegistrationRequest,
     db: AsyncIOMotorClient = Depends(get_database),
 ) -> RegistrationOperationResponse:
-    repository = _repo(db)
-    steam_service = SteamService()
-    manual_service = ManualRegistrationService(repository, steam_service)
     try:
-        return await manual_service.create_operation(payload)
+        return await ManualRegistrationService(_repo(db), SteamService()).create_manual_registration(payload)
     except AuthError as exc:
         raise to_http_exception(exc) from exc
 
 
-@public_router.get(
-    "/oauth/discord/callback",
-    response_model=DiscordOAuthCallbackResult,
-)
+@public_router.get("/oauth/discord/callback", response_model=DiscordOAuthCallbackResult)
 async def discord_oauth_callback(
     code: Annotated[str | None, Query()] = None,
     state: Annotated[str | None, Query()] = None,
@@ -244,7 +193,6 @@ async def discord_oauth_callback(
     session_service = SessionService(repository)
     registration_service = RegistrationService(repository)
     oauth_service = DiscordOAuthService()
-    steam_service = SteamService()
 
     if error or not code or not state:
         if state:
@@ -282,32 +230,15 @@ async def discord_oauth_callback(
             raise to_http_exception(InvalidStateError())
 
         linked_account_id = str(connection.get("id", ""))
-        linked_account_name = (
-            connection.get("name") if isinstance(connection.get("name"), str) else None
-        )
-        username_snapshot = user.get("username") if isinstance(user.get("username"), str) else None
-        display_name_snapshot = (
-            user.get("global_name") if isinstance(user.get("global_name"), str) else username_snapshot
-        )
+        linked_account_name = connection.get("name") if isinstance(connection.get("name"), str) else None
 
         if platform is RegistrationPlatform.STEAM:
-            steam_validation = await steam_service.validate_linked_account(
-                steam_id=linked_account_id,
-                game=str(session["game"]),
-            )
-            await registration_service.assert_registration_conflicts(
-                discord_user_id=str(session["discord_user_id"]),
-                steam_id=linked_account_id,
-                game=str(session["game"]),
-            )
             await session_service.mark_validated(
                 session_id,
                 linked_account_id=linked_account_id,
                 linked_account_name=linked_account_name,
-                ownership_verified_at=steam_validation.get("ownership_verified_at"),
-                playtime_minutes=int(steam_validation.get("actual_minutes") or 0),
-                username_snapshot=username_snapshot,
-                display_name_snapshot=display_name_snapshot,
+                oauth_username_snapshot=user.get("username") if isinstance(user.get("username"), str) else None,
+                oauth_display_name_snapshot=user.get("global_name") if isinstance(user.get("global_name"), str) else None,
             )
             await repository.append_audit_event(
                 {
@@ -318,7 +249,6 @@ async def discord_oauth_callback(
                     "linked_account_id": linked_account_id,
                     "linked_account_name": linked_account_name,
                     "game": str(session["game"]),
-                    "playtime_minutes": int(steam_validation.get("actual_minutes") or 0),
                 }
             )
             return DiscordOAuthCallbackResult(
@@ -327,21 +257,12 @@ async def discord_oauth_callback(
                 platform=platform,
                 linked_account_id=linked_account_id,
                 linked_account_name=linked_account_name,
-                details={
-                    "playtime_minutes": int(steam_validation.get("actual_minutes") or 0),
-                },
             )
 
-        registration_service.manual_required_for_platform(
-            platform,
-            account_name=linked_account_name,
-        )
+        registration_service.manual_required_for_platform(platform, account_name=linked_account_name)
         raise AssertionError("manual_required_for_platform should have raised")
     except (SessionNotFoundError, SessionExpiredError, AuthError) as exc:
-        if isinstance(exc, AuthError) and not isinstance(
-            exc,
-            (SessionNotFoundError, SessionExpiredError),
-        ):
+        if isinstance(exc, AuthError) and not isinstance(exc, (SessionNotFoundError, SessionExpiredError)):
             try:
                 session = await repository.get_registration_session_by_state(state)
                 if session is not None:
