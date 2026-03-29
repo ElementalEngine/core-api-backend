@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import Any, Iterable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -19,6 +20,9 @@ from app.features.auth.errors import (
     LinkedAccountFetchError,
     LinkedAccountNotFoundError,
 )
+
+logger = logging.getLogger(__name__)
+DISCORD_HTTP_USER_AGENT = "CivPlayersAuth/1.0 (+https://elementalengine.net)"
 
 
 class DiscordOAuthService:
@@ -46,17 +50,41 @@ class DiscordOAuthService:
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
                     "Accept": "application/json",
+                    "User-Agent": DISCORD_HTTP_USER_AGENT,
                 },
                 method="POST",
             )
             try:
                 with urlopen(req, timeout=settings.auth_oauth_timeout_seconds) as resp:
                     body = json.loads(resp.read().decode("utf-8"))
-            except (HTTPError, URLError, TimeoutError) as exc:
-                raise DiscordOAuthError() from exc
+            except HTTPError as exc:
+                response_body = ""
+                try:
+                    response_body = exc.read().decode("utf-8", errors="replace")
+                except Exception:
+                    response_body = "<unavailable>"
+                logger.warning(
+                    "Discord OAuth token exchange failed with HTTP %s. redirect_uri=%s response=%s",
+                    exc.code,
+                    settings.auth_discord_redirect_uri,
+                    response_body[:1000],
+                )
+                raise DiscordOAuthError("Discord rejected the authentication callback. Please try again.") from exc
+            except (URLError, TimeoutError) as exc:
+                logger.warning(
+                    "Discord OAuth token exchange network failure. redirect_uri=%s error=%r",
+                    settings.auth_discord_redirect_uri,
+                    exc,
+                )
+                raise DiscordOAuthError("Discord authentication is temporarily unavailable. Please try again.") from exc
             token = body.get("access_token")
             if not isinstance(token, str) or not token:
-                raise DiscordOAuthError()
+                logger.warning(
+                    "Discord OAuth token exchange returned no access_token. redirect_uri=%s body=%s",
+                    settings.auth_discord_redirect_uri,
+                    json.dumps(body)[:1000],
+                )
+                raise DiscordOAuthError("Discord did not return a valid access token. Please try again.")
             return token
 
         return await asyncio.to_thread(_exchange)
@@ -104,13 +132,32 @@ class DiscordOAuthService:
                 headers={
                     "Accept": "application/json",
                     "Authorization": f"Bearer {access_token}",
+                    "User-Agent": DISCORD_HTTP_USER_AGENT,
                 },
                 method="GET",
             )
             try:
                 with urlopen(req, timeout=settings.auth_oauth_timeout_seconds) as resp:
                     return json.loads(resp.read().decode("utf-8"))
-            except (HTTPError, URLError, TimeoutError) as exc:
+            except HTTPError as exc:
+                response_body = ""
+                try:
+                    response_body = exc.read().decode("utf-8", errors="replace")
+                except Exception:
+                    response_body = "<unavailable>"
+                logger.warning(
+                    "Discord API request failed. url=%s status=%s response=%s",
+                    url,
+                    exc.code,
+                    response_body[:1000],
+                )
+                raise LinkedAccountFetchError() from exc
+            except (URLError, TimeoutError) as exc:
+                logger.warning(
+                    "Discord API network failure. url=%s error=%r",
+                    url,
+                    exc,
+                )
                 raise LinkedAccountFetchError() from exc
 
         return await asyncio.to_thread(_request)

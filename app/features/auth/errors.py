@@ -87,7 +87,7 @@ class LinkedAccountFetchError(AuthError):
 class LinkedAccountNotFoundError(AuthError):
     def __init__(self, platform: str) -> None:
         message = {
-            "steam": "No Steam account was found in your Discord linked accounts.",
+            "steam": "No Steam account was found in your Discord linked accounts. Check Discord Settings → Connections and try again.",
             "epic": "We could not confirm a linked Epic account on your Discord profile.",
             "xbox": "We could not confirm a linked Xbox account on your Discord profile.",
         }.get(platform, "No supported linked account was found.")
@@ -192,7 +192,7 @@ class SteamProfilePrivateError(AuthError):
     def __init__(self) -> None:
         super().__init__(
             code="STEAM_PROFILE_PRIVATE",
-            message="Your Steam profile must be public to register automatically.",
+            message="Your Steam profile must be public and your playtime must be visible to register automatically.",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 

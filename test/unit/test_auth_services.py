@@ -1,5 +1,6 @@
 import asyncio
 import importlib
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -80,6 +81,33 @@ def test_session_service_creates_pending_session(monkeypatch):
     assert status.status is RegistrationSessionStatus.PENDING_AUTH
 
 
+
+
+def test_session_service_coerces_naive_expiry(monkeypatch):
+    monkeypatch.setenv("AUTH_DISCORD_CLIENT_ID", "123")
+    monkeypatch.setenv(
+        "AUTH_DISCORD_REDIRECT_URI",
+        "https://example.com/oauth/discord/callback",
+    )
+    monkeypatch.setenv("AUTH_SERVICE_TOKEN", "secret")
+
+    import app.core.config as cfg
+
+    importlib.reload(cfg)
+    from app.features.auth.session_service import SessionService
+
+    repo = FakeRepo()
+    repo.sessions["sess-1"] = {
+        "session_id": "sess-1",
+        "status": RegistrationSessionStatus.PENDING_AUTH.value,
+        "expires_at": (datetime.now(timezone.utc) - timedelta(minutes=1)).replace(tzinfo=None),
+    }
+
+    status = asyncio.run(SessionService(repo).get_registration_session_status("sess-1"))
+
+    assert status.status is RegistrationSessionStatus.EXPIRED
+    assert repo.sessions["sess-1"]["status"] == RegistrationSessionStatus.EXPIRED.value
+
 def test_oauth_service_picks_expected_connection():
     picked = DiscordOAuthService._pick_connection(
         [
@@ -102,3 +130,38 @@ def test_registration_service_manual_required():
             RegistrationPlatform.EPIC,
             account_name="epic-user",
         )
+
+def test_session_status_includes_validated_account_details(monkeypatch):
+    monkeypatch.setenv("AUTH_DISCORD_CLIENT_ID", "123")
+    monkeypatch.setenv("AUTH_DISCORD_REDIRECT_URI", "https://example.com/oauth/discord/callback")
+    monkeypatch.setenv("AUTH_SERVICE_TOKEN", "secret")
+
+    import app.core.config as cfg
+
+    importlib.reload(cfg)
+    from app.features.auth.session_service import SessionService
+
+    repo = FakeRepo()
+    repo.sessions["sess-2"] = {
+        "session_id": "sess-2",
+        "status": RegistrationSessionStatus.VALIDATED.value,
+        "game": SupportedGame.CIV6.value,
+        "platform": RegistrationPlatform.STEAM.value,
+        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "validated_account_id": "76561198000000000",
+        "validated_account_name": "Project Cisco",
+        "oauth_username_snapshot": "cisco",
+        "oauth_display_name_snapshot": "Cisco",
+        "oauth_locale": "en-GB",
+        "oauth_verified": False,
+        "oauth_mfa_enabled": True,
+        "oauth_premium_type": 0,
+    }
+
+    status = asyncio.run(SessionService(repo).get_registration_session_status("sess-2"))
+
+    assert status.game is SupportedGame.CIV6
+    assert status.platform is RegistrationPlatform.STEAM
+    assert status.linked_account_name == "Project Cisco"
+    assert status.oauth_locale == "en-GB"
+    assert status.oauth_mfa_enabled is True

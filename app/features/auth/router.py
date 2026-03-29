@@ -127,12 +127,28 @@ async def complete_registration_session(
             steam_validation=validation,
         )
     except AuthError as exc:
+        logger.warning(
+            "Complete registration failed. session_id=%s discord_user_id=%s code=%s message=%s details=%s",
+            session_id,
+            payload.discord_user_id,
+            exc.code,
+            exc.message,
+            exc.details,
+        )
         raise to_http_exception(exc) from exc
+    except Exception:
+        logger.exception(
+            "Complete registration crashed unexpectedly. session_id=%s discord_user_id=%s",
+            session_id,
+            payload.discord_user_id,
+        )
+        raise
 
 
 @router.post(
     "/registration-operations/{operation_id}/finalize",
-    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    status_code=status.HTTP_200_OK,
 )
 async def finalize_registration_operation(
     operation_id: Annotated[str, Path(min_length=1, max_length=128)],
@@ -191,7 +207,6 @@ async def discord_oauth_callback(
 ) -> DiscordOAuthCallbackResult:
     repository = _repo(db)
     session_service = SessionService(repository)
-    registration_service = RegistrationService(repository)
     oauth_service = DiscordOAuthService()
 
     if error or not code or not state:
@@ -239,6 +254,10 @@ async def discord_oauth_callback(
                 linked_account_name=linked_account_name,
                 oauth_username_snapshot=user.get("username") if isinstance(user.get("username"), str) else None,
                 oauth_display_name_snapshot=user.get("global_name") if isinstance(user.get("global_name"), str) else None,
+                oauth_locale=user.get("locale") if isinstance(user.get("locale"), str) else None,
+                oauth_verified=user.get("verified") if isinstance(user.get("verified"), bool) else None,
+                oauth_mfa_enabled=user.get("mfa_enabled") if isinstance(user.get("mfa_enabled"), bool) else None,
+                oauth_premium_type=user.get("premium_type") if isinstance(user.get("premium_type"), int) else None,
             )
             await repository.append_audit_event(
                 {
@@ -248,7 +267,6 @@ async def discord_oauth_callback(
                     "platform": platform.value,
                     "linked_account_id": linked_account_id,
                     "linked_account_name": linked_account_name,
-                    "game": str(session["game"]),
                 }
             )
             return DiscordOAuthCallbackResult(
@@ -257,12 +275,33 @@ async def discord_oauth_callback(
                 platform=platform,
                 linked_account_id=linked_account_id,
                 linked_account_name=linked_account_name,
+                details={"message": "Discord authentication completed. You can return to Discord."},
             )
 
-        registration_service.manual_required_for_platform(platform, account_name=linked_account_name)
-        raise AssertionError("manual_required_for_platform should have raised")
+        await session_service.mark_failed(
+            session_id,
+            failure_code=f"{platform.value.upper()}_MANUAL_REQUIRED",
+            failure_message="Automatic registration is not available for this linked account type.",
+            extra={"linked_account_name": linked_account_name},
+        )
+        return DiscordOAuthCallbackResult(
+            session_id=session_id,
+            status=RegistrationSessionStatus.FAILED,
+            platform=platform,
+            linked_account_id=linked_account_id,
+            linked_account_name=linked_account_name,
+            failure_code=f"{platform.value.upper()}_MANUAL_REQUIRED",
+            failure_message="Automatic registration is not available for this linked account type.",
+            details={"message": "Please return to Discord and contact staff for manual registration."},
+        )
     except (SessionNotFoundError, SessionExpiredError, AuthError) as exc:
-        if isinstance(exc, AuthError) and not isinstance(exc, (SessionNotFoundError, SessionExpiredError)):
+        logger.warning(
+            "Auth callback failed. code=%s message=%s state=%s",
+            exc.code,
+            exc.message,
+            state[:12] if state else None,
+        )
+        if state:
             try:
                 session = await repository.get_registration_session_by_state(state)
                 if session is not None:
@@ -270,28 +309,8 @@ async def discord_oauth_callback(
                         str(session["session_id"]),
                         failure_code=exc.code,
                         failure_message=exc.message,
-                        extra={"details": exc.details} if exc.details else None,
+                        extra=exc.details if isinstance(exc.details, dict) else None,
                     )
             except Exception:
-                logger.exception("Failed to persist auth callback failure state")
+                logger.exception("Failed to persist OAuth callback failure state")
         raise to_http_exception(exc) from exc
-    except Exception as exc:
-        logger.exception("Unexpected auth callback failure")
-        try:
-            session = await repository.get_registration_session_by_state(state)
-            if session is not None:
-                await session_service.mark_failed(
-                    str(session["session_id"]),
-                    failure_code="DISCORD_LINKED_ACCOUNT_FETCH_FAILED",
-                    failure_message="We could not read your Discord linked accounts. Please try again.",
-                )
-        except Exception:
-            logger.exception("Failed to persist unexpected callback failure")
-        raise to_http_exception(
-            AuthError(
-                code="DISCORD_LINKED_ACCOUNT_FETCH_FAILED",
-                message="We could not read your Discord linked accounts. Please try again.",
-                status_code=502,
-                retryable=True,
-            )
-        ) from exc

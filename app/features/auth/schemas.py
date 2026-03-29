@@ -83,9 +83,20 @@ class RegistrationSessionResponse(BaseModel):
 class RegistrationSessionStatusResponse(BaseModel):
     session_id: str
     status: RegistrationSessionStatus
+    game: SupportedGame | None = None
+    platform: RegistrationPlatform | None = None
     expires_at: datetime | None = None
+    linked_account_id: str | None = None
+    linked_account_name: str | None = None
+    oauth_username_snapshot: str | None = None
+    oauth_display_name_snapshot: str | None = None
+    oauth_locale: str | None = None
+    oauth_verified: bool | None = None
+    oauth_mfa_enabled: bool | None = None
+    oauth_premium_type: int | None = None
     failure_code: str | None = None
     failure_message: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class RegistrationOperationResponse(BaseModel):
