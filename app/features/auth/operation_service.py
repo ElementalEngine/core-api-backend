@@ -32,7 +32,14 @@ class OperationService:
         if payload.result == "succeeded":
             await self._repository.upsert_registered_user(
                 discord_user_id=str(operation["discord_user_id"]),
-                steam_id=str(operation["steam_id"]),
+                linked_platform=str(operation.get("linked_platform") or "steam"),
+                linked_account_id=str(operation.get("linked_account_id") or operation["steam_id"]),
+                linked_account_name=(
+                    str(operation["linked_account_name"])
+                    if operation.get("linked_account_name")
+                    else (str(operation["steam_name"]) if operation.get("steam_name") else None)
+                ),
+                steam_id=(str(operation["steam_id"]) if operation.get("steam_id") else None),
                 steam_name=(str(operation["steam_name"]) if operation.get("steam_name") else None),
                 game=str(operation["game"]),
                 method="manual_admin" if operation.get("type") == "manual_registration" else "oauth",
@@ -68,6 +75,8 @@ class OperationService:
                     "operation_id": operation_id,
                     "result": "succeeded",
                     "discord_user_id": str(operation["discord_user_id"]),
+                    "linked_platform": str(operation.get("linked_platform") or "steam"),
+                    "linked_account_id": str(operation.get("linked_account_id") or operation["steam_id"]),
                     "steam_id": str(operation["steam_id"]),
                     "game": str(operation["game"]),
                 }

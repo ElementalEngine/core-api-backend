@@ -64,6 +64,9 @@ class AuthRepository:
     async def get_user_by_steam_id(self, steam_id: str) -> dict[str, Any] | None:
         return await self._users.find_one({"steam_id": steam_id})
 
+    async def get_user_by_linked_account(self, platform: str, account_id: str) -> dict[str, Any] | None:
+        return await self._users.find_one({"linked_platform": platform, "linked_account_id": account_id})
+
     async def insert_registration_session(self, doc: Mapping[str, Any]) -> None:
         await self._sessions.insert_one(dict(doc))
 
@@ -96,7 +99,10 @@ class AuthRepository:
         self,
         *,
         discord_user_id: str,
-        steam_id: str,
+        linked_platform: str,
+        linked_account_id: str,
+        linked_account_name: str | None,
+        steam_id: str | None,
         steam_name: str | None,
         game: str,
         method: str,
@@ -115,6 +121,9 @@ class AuthRepository:
             {
                 "$set": {
                     "discord_id": discord_user_id,
+                    "linked_platform": linked_platform,
+                    "linked_account_id": linked_account_id,
+                    "linked_account_name": linked_account_name,
                     "steam_id": steam_id,
                     "steam_name": steam_name,
                     "user_name": username_snapshot,

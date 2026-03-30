@@ -13,6 +13,7 @@ from app.features.auth.enums import (
 from app.features.auth.errors import (
     AlreadyRegisteredError,
     DiscordSteamConflictError,
+    LinkedAccountConflictError,
     ManualRegistrationRequiredError,
     RankRoleEligibilityError,
     SteamIdConflictError,
@@ -43,24 +44,44 @@ class RegistrationService:
         self,
         *,
         discord_user_id: str,
-        steam_id: str,
+        platform: RegistrationPlatform,
+        account_id: str,
         game: str,
     ) -> None:
         existing_by_discord = await self._repository.get_user_by_discord_id(discord_user_id)
-        existing_by_steam = await self._repository.get_user_by_steam_id(steam_id)
+        existing_by_linked = (
+            await self._repository.get_user_by_steam_id(account_id)
+            if platform is RegistrationPlatform.STEAM
+            else await self._repository.get_user_by_linked_account(platform.value, account_id)
+        )
 
-        if existing_by_steam and str(existing_by_steam.get("discord_id")) != discord_user_id:
-            raise SteamIdConflictError(
-                steam_id=steam_id,
-                existing_discord_id=str(existing_by_steam.get("discord_id", "")),
+        if existing_by_linked and str(existing_by_linked.get("discord_id")) != discord_user_id:
+            if platform is RegistrationPlatform.STEAM:
+                raise SteamIdConflictError(
+                    steam_id=account_id,
+                    existing_discord_id=str(existing_by_linked.get("discord_id", "")),
+                )
+            raise LinkedAccountConflictError(
+                platform=platform.value,
+                account_id=account_id,
+                existing_discord_id=str(existing_by_linked.get("discord_id", "")),
             )
 
         if existing_by_discord:
-            existing_steam = existing_by_discord.get("steam_id")
-            if existing_steam and str(existing_steam) != steam_id:
-                raise DiscordSteamConflictError(
-                    discord_user_id=discord_user_id,
-                    existing_steam_id=str(existing_steam),
+            existing_platform = existing_by_discord.get("linked_platform")
+            existing_account = existing_by_discord.get("linked_account_id")
+            if existing_platform and existing_account and (
+                str(existing_platform) != platform.value or str(existing_account) != account_id
+            ):
+                if str(existing_platform) == RegistrationPlatform.STEAM.value:
+                    raise DiscordSteamConflictError(
+                        discord_user_id=discord_user_id,
+                        existing_steam_id=str(existing_account),
+                    )
+                raise LinkedAccountConflictError(
+                    platform=str(existing_platform),
+                    account_id=str(existing_account),
+                    existing_discord_id=discord_user_id,
                 )
             regs = existing_by_discord.get("registrations") or {}
             if game in regs:
@@ -94,6 +115,9 @@ class RegistrationService:
         return await self._create_operation(
             operation_type="registration",
             discord_user_id=str(session["discord_user_id"]),
+            linked_platform=RegistrationPlatform.STEAM,
+            linked_account_id=str(steam_validation["steam_id"]),
+            linked_account_name=(str(session["validated_account_name"]) if session.get("validated_account_name") else None),
             steam_id=str(steam_validation["steam_id"]),
             steam_name=(str(session["validated_account_name"]) if session.get("validated_account_name") else None),
             game=game,
@@ -119,6 +143,9 @@ class RegistrationService:
         return await self._create_operation(
             operation_type="rank_role",
             discord_user_id=discord_user_id,
+            linked_platform=RegistrationPlatform.STEAM,
+            linked_account_id=str(steam_validation["steam_id"]),
+            linked_account_name=None,
             steam_id=str(steam_validation["steam_id"]),
             steam_name=None,
             game=game,
@@ -134,18 +161,25 @@ class RegistrationService:
         actor_discord_id: str,
         subject_discord_id: str,
         game: SupportedGame,
-        steam_validation: dict[str, Any],
+        platform: RegistrationPlatform,
+        account_id: str,
+        account_name: str | None,
+        ownership_verified_at: datetime | None,
+        playtime_minutes: int | None,
         reason: str,
     ) -> RegistrationOperationResponse:
         return await self._create_operation(
             operation_type="manual_registration",
             discord_user_id=subject_discord_id,
-            steam_id=str(steam_validation["steam_id"]),
-            steam_name=(str(steam_validation["steam_name"]) if steam_validation.get("steam_name") else None),
+            linked_platform=platform,
+            linked_account_id=account_id,
+            linked_account_name=account_name,
+            steam_id=account_id if platform is RegistrationPlatform.STEAM else None,
+            steam_name=account_name if platform is RegistrationPlatform.STEAM else None,
             game=game,
             role_intents=_build_registration_role_intents(game),
-            ownership_verified_at=steam_validation.get("ownership_verified_at"),
-            playtime_minutes=steam_validation.get("playtime_minutes"),
+            ownership_verified_at=ownership_verified_at,
+            playtime_minutes=playtime_minutes,
             audit_action="manual_registration_operation_created",
             extra_operation_fields={
                 "actor_discord_id": actor_discord_id,
@@ -158,7 +192,10 @@ class RegistrationService:
         *,
         operation_type: str,
         discord_user_id: str,
-        steam_id: str,
+        linked_platform: RegistrationPlatform,
+        linked_account_id: str,
+        linked_account_name: str | None,
+        steam_id: str | None,
         steam_name: str | None,
         game: SupportedGame,
         role_intents: list[RoleIntent],
@@ -180,6 +217,9 @@ class RegistrationService:
             "type": operation_type,
             "status": RegistrationOperationStatus.PENDING.value,
             "discord_user_id": discord_user_id,
+            "linked_platform": linked_platform.value,
+            "linked_account_id": linked_account_id,
+            "linked_account_name": linked_account_name,
             "steam_id": steam_id,
             "steam_name": steam_name,
             "game": game.value,
@@ -203,6 +243,8 @@ class RegistrationService:
                 "action": audit_action,
                 "operation_id": operation_id,
                 "discord_user_id": discord_user_id,
+                "linked_platform": linked_platform.value,
+                "linked_account_id": linked_account_id,
                 "steam_id": steam_id,
                 "game": game.value,
                 "role_intents": [intent.value for intent in role_intents],
@@ -212,8 +254,11 @@ class RegistrationService:
             operation_id=operation_id,
             status=RegistrationOperationStatus.PENDING,
             discord_user_id=discord_user_id,
-            steam_id=steam_id,
+            steam_id=steam_id or linked_account_id,
             steam_name=steam_name,
+            linked_platform=linked_platform,
+            linked_account_id=linked_account_id,
+            linked_account_name=linked_account_name,
             game=game,
             role_intents=role_intents,
         )
@@ -238,12 +283,16 @@ def _build_registration_role_intents(game: SupportedGame) -> list[RoleIntent]:
 
 
 def _to_lookup_response(doc: dict[str, Any]) -> AccountLookupResponse:
+    linked_platform = (RegistrationPlatform(str(doc["linked_platform"])) if doc.get("linked_platform") else (RegistrationPlatform.STEAM if doc.get("steam_id") else None))
     return AccountLookupResponse(
         discord_id=str(doc.get("discord_id", "")),
         discord_username=(str(doc["user_name"]) if doc.get("user_name") else None),
         discord_display_name=(str(doc["display_name"]) if doc.get("display_name") else None),
         steam_id=(str(doc["steam_id"]) if doc.get("steam_id") else None),
         steam_name=(str(doc["steam_name"]) if doc.get("steam_name") else None),
+        linked_platform=linked_platform,
+        linked_account_id=(str(doc["linked_account_id"]) if doc.get("linked_account_id") else (str(doc["steam_id"]) if doc.get("steam_id") else None)),
+        linked_account_name=(str(doc["linked_account_name"]) if doc.get("linked_account_name") else (str(doc["steam_name"]) if doc.get("steam_name") else None)),
         registrations=doc.get("registrations") or {},
         created_at=doc.get("created_at"),
         updated_at=doc.get("updated_at"),

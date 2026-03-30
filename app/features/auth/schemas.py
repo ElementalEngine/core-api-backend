@@ -46,11 +46,12 @@ class ManualRegistrationRequest(BaseModel):
 
     actor_discord_id: str = Field(min_length=1)
     subject_discord_id: str = Field(min_length=1)
-    steam_id: str = Field(min_length=1)
+    platform: RegistrationPlatform
+    account_id: str = Field(min_length=1)
     game: SupportedGame
     reason: str = Field(min_length=1, max_length=500)
 
-    @field_validator("actor_discord_id", "subject_discord_id", "steam_id", "reason")
+    @field_validator("actor_discord_id", "subject_discord_id", "account_id", "reason")
     @classmethod
     def _normalize_required_text(cls, value: str) -> str:
         normalized = value.strip()
@@ -103,6 +104,9 @@ class RegistrationOperationResponse(BaseModel):
     discord_user_id: str
     steam_id: str
     steam_name: str | None = None
+    linked_platform: RegistrationPlatform | None = None
+    linked_account_id: str | None = None
+    linked_account_name: str | None = None
     game: SupportedGame
     role_intents: list[RoleIntent]
 
@@ -121,6 +125,9 @@ class AccountLookupResponse(BaseModel):
     discord_display_name: str | None = None
     steam_id: str | None = None
     steam_name: str | None = None
+    linked_platform: RegistrationPlatform | None = None
+    linked_account_id: str | None = None
+    linked_account_name: str | None = None
     registrations: dict[str, AccountRegistrationRecord] = Field(default_factory=dict)
     created_at: datetime | None = None
     updated_at: datetime | None = None

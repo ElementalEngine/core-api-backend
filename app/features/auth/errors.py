@@ -244,6 +244,16 @@ class SteamIdConflictError(AuthError):
         )
 
 
+class LinkedAccountConflictError(AuthError):
+    def __init__(self, *, platform: str, account_id: str, existing_discord_id: str) -> None:
+        super().__init__(
+            code="LINKED_ACCOUNT_CONFLICT",
+            message="This linked account is already connected to another Discord account. Please contact staff if you believe this is a mistake.",
+            status_code=status.HTTP_409_CONFLICT,
+            details={"platform": platform, "account_id": account_id, "existing_discord_id": existing_discord_id},
+        )
+
+
 class DiscordSteamConflictError(AuthError):
     def __init__(self, *, discord_user_id: str, existing_steam_id: str) -> None:
         super().__init__(
@@ -258,28 +268,22 @@ class RankRoleEligibilityError(AuthError):
     def __init__(self, discord_user_id: str) -> None:
         super().__init__(
             code="RANK_ROLE_NOT_ELIGIBLE",
-            message="No linked Steam registration account was found for this Discord user.",
-            status_code=status.HTTP_404_NOT_FOUND,
-            details={"discord_user_id": discord_user_id},
-        )
-
-
-class ManualRegistrationInputError(AuthError):
-    def __init__(self, message: str) -> None:
-        super().__init__(
-            code="MANUAL_REGISTRATION_INVALID",
-            message=message,
+            message="You must complete registration before you can add a ranked role.",
             status_code=status.HTTP_400_BAD_REQUEST,
+            details={"discord_user_id": discord_user_id},
         )
 
 
 def to_http_exception(error: AuthError) -> HTTPException:
     payload = ErrorResponse(
-        error=ErrorDetail(
-            code=error.code,
-            message=error.message,
-            details=error.details,
-            retryable=error.retryable,
+        detail=ErrorDetail(
+            error={
+                "code": error.code,
+                "message": error.message,
+                "details": error.details,
+                "retryable": error.retryable,
+                "correlation_id": None,
+            }
         )
     )
-    return HTTPException(status_code=error.status_code, detail=payload.model_dump())
+    return HTTPException(status_code=error.status_code, detail=payload.detail.model_dump())
