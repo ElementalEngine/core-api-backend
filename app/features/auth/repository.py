@@ -97,10 +97,14 @@ class AuthRepository:
         *,
         discord_user_id: str,
         steam_id: str,
+        steam_name: str | None,
         game: str,
         method: str,
         username_snapshot: str | None,
         display_name_snapshot: str | None,
+        locale_snapshot: str | None,
+        verified_snapshot: bool | None,
+        mfa_enabled_snapshot: bool | None,
         ownership_verified_at: datetime | None,
         playtime_minutes: int | None,
     ) -> None:
@@ -112,8 +116,12 @@ class AuthRepository:
                 "$set": {
                     "discord_id": discord_user_id,
                     "steam_id": steam_id,
+                    "steam_name": steam_name,
                     "user_name": username_snapshot,
                     "display_name": display_name_snapshot,
+                    "locale": locale_snapshot,
+                    "verified": verified_snapshot,
+                    "mfa_enabled": mfa_enabled_snapshot,
                     registration_key: {
                         "status": "active",
                         "method": method,

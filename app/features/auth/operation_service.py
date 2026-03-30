@@ -33,10 +33,14 @@ class OperationService:
             await self._repository.upsert_registered_user(
                 discord_user_id=str(operation["discord_user_id"]),
                 steam_id=str(operation["steam_id"]),
+                steam_name=(str(operation["steam_name"]) if operation.get("steam_name") else None),
                 game=str(operation["game"]),
                 method="manual_admin" if operation.get("type") == "manual_registration" else "oauth",
-                username_snapshot=operation.get("username_snapshot"),
-                display_name_snapshot=operation.get("display_name_snapshot"),
+                username_snapshot=(str(operation["username_snapshot"]) if operation.get("username_snapshot") else None),
+                display_name_snapshot=(str(operation["display_name_snapshot"]) if operation.get("display_name_snapshot") else None),
+                locale_snapshot=(str(operation["locale_snapshot"]) if operation.get("locale_snapshot") else None),
+                verified_snapshot=(bool(operation["verified_snapshot"]) if isinstance(operation.get("verified_snapshot"), bool) else None),
+                mfa_enabled_snapshot=(bool(operation["mfa_enabled_snapshot"]) if isinstance(operation.get("mfa_enabled_snapshot"), bool) else None),
                 ownership_verified_at=operation.get("ownership_verified_at"),
                 playtime_minutes=operation.get("playtime_minutes"),
             )

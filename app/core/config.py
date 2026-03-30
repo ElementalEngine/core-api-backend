@@ -50,7 +50,6 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("MONGODB_MIN_POOL_SIZE"),
     )
 
-    # API
     api_host: str = Field(default="0.0.0.0", validation_alias=AliasChoices("API_HOST"))
     api_port: int = Field(default=8000, gt=0, lt=65536, validation_alias=AliasChoices("API_PORT"))
 
@@ -66,13 +65,13 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("AUTH_SERVICE_TOKEN"),
     )
     auth_session_ttl_minutes: int = Field(
-        default=15,
+        default=5,
         ge=5,
         le=120,
         validation_alias=AliasChoices("AUTH_SESSION_TTL_MINUTES"),
     )
     auth_oauth_timeout_seconds: int = Field(
-        default=15,
+        default=5,
         ge=5,
         le=60,
         validation_alias=AliasChoices("AUTH_OAUTH_TIMEOUT_SECONDS"),
@@ -94,7 +93,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("AUTH_STEAM_API_KEY", "STEAM_API_KEY"),
     )
     auth_steam_timeout_seconds: int = Field(
-        default=15,
+        default=5,
         ge=5,
         le=60,
         validation_alias=AliasChoices("AUTH_STEAM_TIMEOUT_SECONDS"),

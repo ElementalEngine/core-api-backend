@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from app.core.config import settings
 from app.features.auth.constants import DISCORD_OAUTH_AUTHORIZE_URL, DISCORD_OAUTH_SCOPES
-from app.features.auth.enums import RegistrationPlatform, RegistrationSessionStatus, SupportedGame
+from app.features.auth.enums import RegistrationSessionStatus, RegistrationPlatform, SupportedGame
 from app.features.auth.errors import (
     AlreadyRegisteredError,
     AuthConfigurationError,
@@ -84,33 +84,21 @@ class SessionService:
             raise SessionNotFoundError(session_id)
         session = await self._coerce_expired_session(session, raise_on_expired=False)
 
-        raw_game = session.get("game")
-        raw_platform = session.get("platform")
-        details: dict[str, object] = {}
-        if session.get("validated_account_name"):
-            details["linked_account_name"] = str(session["validated_account_name"])
-        if session.get("oauth_username_snapshot"):
-            details["username"] = str(session["oauth_username_snapshot"])
-        if session.get("oauth_display_name_snapshot"):
-            details["display_name"] = str(session["oauth_display_name_snapshot"])
-
         return RegistrationSessionStatusResponse(
             session_id=session_id,
             status=RegistrationSessionStatus(str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))),
-            game=SupportedGame(str(raw_game)) if isinstance(raw_game, str) else None,
-            platform=RegistrationPlatform(str(raw_platform)) if isinstance(raw_platform, str) else None,
             expires_at=session.get("expires_at"),
-            linked_account_id=str(session["validated_account_id"]) if session.get("validated_account_id") else None,
-            linked_account_name=str(session["validated_account_name"]) if session.get("validated_account_name") else None,
-            oauth_username_snapshot=str(session["oauth_username_snapshot"]) if session.get("oauth_username_snapshot") else None,
-            oauth_display_name_snapshot=str(session["oauth_display_name_snapshot"]) if session.get("oauth_display_name_snapshot") else None,
-            oauth_locale=str(session["oauth_locale"]) if session.get("oauth_locale") else None,
-            oauth_verified=session.get("oauth_verified") if isinstance(session.get("oauth_verified"), bool) else None,
-            oauth_mfa_enabled=session.get("oauth_mfa_enabled") if isinstance(session.get("oauth_mfa_enabled"), bool) else None,
-            oauth_premium_type=int(session["oauth_premium_type"]) if isinstance(session.get("oauth_premium_type"), int) else None,
             failure_code=session.get("failure_code"),
             failure_message=session.get("failure_message"),
-            details=details,
+            game=(SupportedGame(str(session["game"])) if session.get("game") else None),
+            platform=(RegistrationPlatform(str(session["platform"])) if session.get("platform") else None),
+            linked_account_id=(str(session["validated_account_id"]) if session.get("validated_account_id") else None),
+            linked_account_name=(str(session["validated_account_name"]) if session.get("validated_account_name") else None),
+            discord_username=(str(session["oauth_username_snapshot"]) if session.get("oauth_username_snapshot") else None),
+            discord_display_name=(str(session["oauth_display_name_snapshot"]) if session.get("oauth_display_name_snapshot") else None),
+            discord_locale=(str(session["oauth_locale_snapshot"]) if session.get("oauth_locale_snapshot") else None),
+            discord_verified=(bool(session["oauth_verified_snapshot"]) if isinstance(session.get("oauth_verified_snapshot"), bool) else None),
+            discord_mfa_enabled=(bool(session["oauth_mfa_enabled_snapshot"]) if isinstance(session.get("oauth_mfa_enabled_snapshot"), bool) else None),
         )
 
     async def load_session_by_state(self, state_token: str) -> dict[str, object]:
@@ -170,10 +158,9 @@ class SessionService:
         linked_account_name: str | None,
         oauth_username_snapshot: str | None = None,
         oauth_display_name_snapshot: str | None = None,
-        oauth_locale: str | None = None,
-        oauth_verified: bool | None = None,
-        oauth_mfa_enabled: bool | None = None,
-        oauth_premium_type: int | None = None,
+        oauth_locale_snapshot: str | None = None,
+        oauth_verified_snapshot: bool | None = None,
+        oauth_mfa_enabled_snapshot: bool | None = None,
     ) -> None:
         await self._repository.update_registration_session(
             session_id,
@@ -183,10 +170,9 @@ class SessionService:
                 "validated_account_name": linked_account_name,
                 "oauth_username_snapshot": oauth_username_snapshot,
                 "oauth_display_name_snapshot": oauth_display_name_snapshot,
-                "oauth_locale": oauth_locale,
-                "oauth_verified": oauth_verified,
-                "oauth_mfa_enabled": oauth_mfa_enabled,
-                "oauth_premium_type": oauth_premium_type,
+                "oauth_locale_snapshot": oauth_locale_snapshot,
+                "oauth_verified_snapshot": oauth_verified_snapshot,
+                "oauth_mfa_enabled_snapshot": oauth_mfa_enabled_snapshot,
                 "failure_code": None,
                 "failure_message": None,
                 "updated_at": datetime.now(timezone.utc),
@@ -219,11 +205,7 @@ class SessionService:
     ) -> dict[str, object]:
         session_id = str(session["session_id"])
         expires_at = session.get("expires_at")
-        normalized_expires_at = (
-            self._normalize_utc_datetime(expires_at)
-            if isinstance(expires_at, datetime)
-            else None
-        )
+        normalized_expires_at = self._normalize_datetime(expires_at) if isinstance(expires_at, datetime) else None
         status_value = str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))
         if (
             normalized_expires_at is not None
@@ -256,7 +238,7 @@ class SessionService:
         return session
 
     @staticmethod
-    def _normalize_utc_datetime(value: datetime) -> datetime:
+    def _normalize_datetime(value: datetime) -> datetime:
         if value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)
         return value.astimezone(timezone.utc)
