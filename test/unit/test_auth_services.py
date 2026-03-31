@@ -30,6 +30,9 @@ class FakeRepo:
     async def get_user_by_steam_id(self, steam_id: str):
         return self.user_doc
 
+    async def get_user_by_linked_account(self, platform: str, account_id: str):
+        return self.user_doc
+
     async def insert_registration_session(self, doc):
         self.sessions[doc["session_id"]] = dict(doc)
         self.sessions[f"state:{doc['state_token']}"] = self.sessions[doc["session_id"]]
@@ -152,10 +155,9 @@ def test_session_status_includes_validated_account_details(monkeypatch):
         "validated_account_name": "Project Cisco",
         "oauth_username_snapshot": "cisco",
         "oauth_display_name_snapshot": "Cisco",
-        "oauth_locale": "en-GB",
-        "oauth_verified": False,
-        "oauth_mfa_enabled": True,
-        "oauth_premium_type": 0,
+        "oauth_locale_snapshot": "en-GB",
+        "oauth_verified_snapshot": False,
+        "oauth_mfa_enabled_snapshot": True,
     }
 
     status = asyncio.run(SessionService(repo).get_registration_session_status("sess-2"))
@@ -163,5 +165,5 @@ def test_session_status_includes_validated_account_details(monkeypatch):
     assert status.game is SupportedGame.CIV6
     assert status.platform is RegistrationPlatform.STEAM
     assert status.linked_account_name == "Project Cisco"
-    assert status.oauth_locale == "en-GB"
-    assert status.oauth_mfa_enabled is True
+    assert status.discord_locale == "en-GB"
+    assert status.discord_mfa_enabled is True

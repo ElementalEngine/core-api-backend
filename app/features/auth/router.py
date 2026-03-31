@@ -119,7 +119,8 @@ async def complete_registration_session(
         )
         await registration_service.assert_registration_conflicts(
             discord_user_id=payload.discord_user_id,
-            steam_id=steam_id,
+            platform=RegistrationPlatform.STEAM,
+            account_id=steam_id,
             game=str(session["game"]),
         )
         return await registration_service.create_registration_operation(

@@ -29,6 +29,7 @@ class FakeRepo:
     def __init__(self):
         self.users_by_discord = {}
         self.users_by_steam = {}
+        self.users_by_linked = {}
         self.operations = {}
         self.sessions = {}
         self.audit = []
@@ -39,6 +40,9 @@ class FakeRepo:
 
     async def get_user_by_steam_id(self, steam_id: str):
         return self.users_by_steam.get(steam_id)
+
+    async def get_user_by_linked_account(self, platform: str, account_id: str):
+        return self.users_by_linked.get((platform, account_id))
 
     async def insert_registration_operation(self, doc):
         self.operations[doc["operation_id"]] = dict(doc)
@@ -94,7 +98,8 @@ def test_registration_conflicts(existing_discord, existing_steam, expected_error
         asyncio.run(
             service.assert_registration_conflicts(
                 discord_user_id="1",
-                steam_id="steam-1",
+                platform=RegistrationPlatform.STEAM,
+                account_id="steam-1",
                 game=SupportedGame.CIV6.value,
             )
         )
@@ -107,6 +112,8 @@ def test_operation_finalize_success_upserts_user_and_completes_session():
         "status": RegistrationOperationStatus.PENDING.value,
         "source_session_id": "sess-1",
         "discord_user_id": "123",
+        "linked_platform": RegistrationPlatform.STEAM.value,
+        "linked_account_id": "765",
         "steam_id": "765",
         "game": SupportedGame.CIV6.value,
         "type": "registration",
@@ -140,6 +147,8 @@ def test_operation_finalize_failure_marks_session_failed():
         "status": RegistrationOperationStatus.PENDING.value,
         "source_session_id": "sess-2",
         "discord_user_id": "123",
+        "linked_platform": RegistrationPlatform.STEAM.value,
+        "linked_account_id": "765",
         "steam_id": "765",
         "game": SupportedGame.CIV7.value,
     }
