@@ -48,3 +48,16 @@ class StatsRepository:
             is_combined=is_combined,
             discord_ids=discord_ids,
         )
+
+    async def reset_player_stat_doc(
+        self,
+        *,
+        civ_version: str,
+        is_cloud: bool,
+        discord_id: str,
+    ) -> Optional[Dict[str, object]]:
+        return await self._queries.reset_player_stat_doc(
+            civ_version=civ_version,
+            is_cloud=is_cloud,
+            discord_id=discord_id,
+        )

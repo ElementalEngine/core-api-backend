@@ -59,6 +59,18 @@ async def get_users_stats_batch(payload: BatchStatsRequest, db=Depends(get_datab
         logger.exception("Batch stats lookup failed")
         raise HTTPException(status_code=503, detail="Backend unavailable") from exc
 
+@router.put("/reset/user", response_model=UserStatsResponse)
+async def reset_user_stats(civ_version: str, game_type: str, discord_id: str, db=Depends(get_database)):
+    service = StatsService(db)
+    try:
+        return await service.reset_user_stats(civ_version=civ_version, game_type=game_type, discord_id=discord_id)
+    except InvalidStatsRequestError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except StatsNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - exercised in integration tests
+        logger.exception("Reset Stats lookup failed")
+        raise HTTPException(status_code=503, detail="Backend unavailable") from exc
 
 @router.post("/team-gen", response_model=TeamGenResponse)
 async def get_team_gen(payload: TeamGenRequest, db=Depends(get_database)):

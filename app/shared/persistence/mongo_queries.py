@@ -194,6 +194,41 @@ class MongoQueries:
             is_combined=is_combined,
         )
         return await col.find_one({"_id": Int64(discord_id)})
+    
+    async def reset_player_stat_doc(
+        self,
+        *,
+        civ_version: str,
+        is_cloud: bool,
+        discord_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        session = await self.start_session()
+        async with session:
+            async with session.start_transaction():
+                try:
+                    stat_reset = {
+                        'civ_version': civ_version,
+                        'is_cloud': is_cloud,
+                        'discord_id': discord_id,
+                        'stat_reset': True,
+                    }
+                    await self.insert_validated_match(stat_reset, session=session)
+                    for match_type in ["ffa", "teamer", "duel"]:
+                        for is_combined in [False, True]:
+                            for is_seasonal in [False, True]:
+                                await self._stats_collection(
+                                    civ_version=civ_version,
+                                    is_seasonal=is_seasonal,
+                                    match_type=match_type,
+                                    is_cloud=is_cloud,
+                                    is_combined=is_combined,
+                                ).delete_one({"_id": Int64(discord_id)}, session=session)
+                    await session.commit_transaction()
+                except Exception as e:
+                    # Abort the transaction in case of an error
+                    print("An error occurred while writing to DB:", e)
+                    await session.abort_transaction()
+                    raise ValueError(f"An error occured during writing to DB: {e}")
 
     async def get_player_stat_docs_batch(
         self,

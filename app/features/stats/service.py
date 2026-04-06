@@ -127,6 +127,50 @@ class StatsService:
             )
             for discord_id in ids
         ]
+        
+    async def reset_user_stats(self, *, civ_version: str, game_type: str, discord_id: str) -> UserStatsResponse:
+        version, is_cloud = self._validate(civ_version, game_type)
+        normalized_discord_id = str(discord_id).strip()
+        if not normalized_discord_id:
+            raise InvalidStatsRequestError("Missing discord_id")
+        if not normalized_discord_id.isdigit():
+            raise InvalidStatsRequestError("Invalid discord_id")
+
+        lifetime_map = await self._load_stat_set(
+            civ_version=version,
+            is_seasonal=False,
+            is_cloud=is_cloud,
+            discord_ids=[normalized_discord_id],
+        )
+
+        if is_cloud:
+            season_map: Dict[str, StatSet] = {normalized_discord_id: StatSet()}
+        else:
+            season_map = await self._load_stat_set(
+                civ_version=version,
+                is_seasonal=True,
+                is_cloud=is_cloud,
+                discord_ids=[normalized_discord_id],
+            )
+            
+        await self._reset_stat_set(
+            civ_version=version,
+            is_cloud=is_cloud,
+            discord_id=normalized_discord_id,
+        )
+
+        response = UserStatsResponse(
+            discord_id=normalized_discord_id,
+            civ_version=version,
+            game_type="cloud" if is_cloud else "realtime",
+            lifetime=lifetime_map.get(normalized_discord_id, StatSet()),
+            season=season_map.get(normalized_discord_id, StatSet()),
+        )
+
+        if not self._has_any_stats(response):
+            raise StatsNotFoundError("No stats found")
+
+        return response
 
     async def get_team_gen(self, *, civ_version: str, game_type: str, discord_ids: List[str]) -> TeamGenResponse:
         version, is_cloud = self._validate(civ_version, game_type)
@@ -217,3 +261,19 @@ class StatsService:
                 else:
                     current.duel = row
         return result
+
+    async def _reset_stat_set(
+        self,
+        *,
+        civ_version: str,
+        is_cloud: bool,
+        discord_id: str,
+    ):
+
+        await self.repository.reset_player_stat_doc(
+            civ_version=civ_version,
+            is_cloud=is_cloud,
+            discord_id=discord_id,
+        )
+
+        return
