@@ -260,7 +260,7 @@ async def approve_match(payload: ApproveMatch = Form(), db=Depends(get_database)
 async def contest_report(payload: ContestReportRequest = Form(), db=Depends(get_database)):
     svc = MatchService(db)
     try:
-        return await svc.contest_report(payload.match_id, payload.contester_discord_id)
+        return await svc.contest_report(payload.match_id, payload.contestor_discord_id, payload.reason, payload.discord_message_id)
     except NotFoundError as exc:
         logger.warning("🔴 Match not found. matchID: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
