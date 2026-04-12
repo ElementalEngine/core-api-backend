@@ -39,8 +39,8 @@ class StatsService:
             games=int(doc.get("games", 0)),
             wins=int(doc.get("wins", 0)),
             first=int(doc.get("first", 0)),
-            subbedIn=int(doc.get("subbedIn", 0)),
-            subbedOut=int(doc.get("subbedOut", 0)),
+            subbedIn=int(doc.get("subbedIn", doc.get("subbed_in", 0))),
+            subbedOut=int(doc.get("subbedOut", doc.get("subbed_out", 0))),
             lastModified=doc.get("lastModified"),
         )
 
