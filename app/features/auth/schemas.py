@@ -50,6 +50,9 @@ class ManualRegistrationRequest(BaseModel):
     account_id: str = Field(min_length=1)
     game: SupportedGame
     reason: str = Field(min_length=1, max_length=500)
+    account_name: str | None = None
+    discord_username: str | None = None
+    discord_display_name: str | None = None
 
     @field_validator("actor_discord_id", "subject_discord_id", "account_id", "reason")
     @classmethod
@@ -129,8 +132,8 @@ class AccountLookupResponse(BaseModel):
     linked_account_id: str | None = None
     linked_account_name: str | None = None
     registrations: dict[str, AccountRegistrationRecord] = Field(default_factory=dict)
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    first_registered_at: datetime | None = None
+    record_version: int | None = None
 
 
 class DiscordOAuthCallbackResult(BaseModel):

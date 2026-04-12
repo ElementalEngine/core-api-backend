@@ -275,17 +275,6 @@ async def discord_oauth_callback(
                 oauth_verified_snapshot=user.get("verified") if isinstance(user.get("verified"), bool) else None,
                 oauth_mfa_enabled_snapshot=user.get("mfa_enabled") if isinstance(user.get("mfa_enabled"), bool) else None,
             )
-            await repository.append_audit_event(
-                {
-                    "action": "registration_session_validated",
-                    "session_id": session_id,
-                    "discord_user_id": str(session["discord_user_id"]),
-                    "platform": platform.value,
-                    "linked_account_id": linked_account_id,
-                    "linked_account_name": linked_account_name,
-                    "game": str(session["game"]),
-                }
-            )
             return DiscordOAuthCallbackResult(
                 session_id=session_id,
                 status=RegistrationSessionStatus.VALIDATED,

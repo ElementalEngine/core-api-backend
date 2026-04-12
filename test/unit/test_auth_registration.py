@@ -7,6 +7,7 @@ from pydantic import SecretStr
 import app.features.auth.steam_service as steam_module
 from app.features.auth.enums import (
     RegistrationOperationStatus,
+    RegistrationPlatform,
     RegistrationSessionStatus,
     RoleIntent,
     SupportedGame,

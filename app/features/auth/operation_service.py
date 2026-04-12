@@ -39,15 +39,10 @@ class OperationService:
                     if operation.get("linked_account_name")
                     else (str(operation["steam_name"]) if operation.get("steam_name") else None)
                 ),
-                steam_id=(str(operation["steam_id"]) if operation.get("steam_id") else None),
-                steam_name=(str(operation["steam_name"]) if operation.get("steam_name") else None),
                 game=str(operation["game"]),
                 method="manual_admin" if operation.get("type") == "manual_registration" else "oauth",
-                username_snapshot=(str(operation["username_snapshot"]) if operation.get("username_snapshot") else None),
-                display_name_snapshot=(str(operation["display_name_snapshot"]) if operation.get("display_name_snapshot") else None),
-                locale_snapshot=(str(operation["locale_snapshot"]) if operation.get("locale_snapshot") else None),
-                verified_snapshot=(bool(operation["verified_snapshot"]) if isinstance(operation.get("verified_snapshot"), bool) else None),
-                mfa_enabled_snapshot=(bool(operation["mfa_enabled_snapshot"]) if isinstance(operation.get("mfa_enabled_snapshot"), bool) else None),
+                discord_username=(str(operation["username_snapshot"]) if operation.get("username_snapshot") else None),
+                display_name=(str(operation["display_name_snapshot"]) if operation.get("display_name_snapshot") else None),
                 ownership_verified_at=operation.get("ownership_verified_at"),
                 playtime_minutes=operation.get("playtime_minutes"),
             )
@@ -62,25 +57,16 @@ class OperationService:
             )
             source_session_id = operation.get("source_session_id")
             if isinstance(source_session_id, str) and source_session_id:
-                await self._repository.update_registration_session(
-                    source_session_id,
-                    {
-                        "status": RegistrationSessionStatus.COMPLETED.value,
-                        "updated_at": now,
-                    },
-                )
-            await self._repository.append_audit_event(
-                {
-                    "action": "registration_operation_finalized",
-                    "operation_id": operation_id,
-                    "result": "succeeded",
-                    "discord_user_id": str(operation["discord_user_id"]),
-                    "linked_platform": str(operation.get("linked_platform") or "steam"),
-                    "linked_account_id": str(operation.get("linked_account_id") or operation["steam_id"]),
-                    "steam_id": str(operation["steam_id"]),
-                    "game": str(operation["game"]),
-                }
-            )
+                try:
+                    await self._repository.update_registration_session(
+                        source_session_id,
+                        {
+                            "status": RegistrationSessionStatus.COMPLETED.value,
+                            "updated_at": now,
+                        },
+                    )
+                except Exception:
+                    pass
             return
 
         await self._repository.update_registration_operation(
@@ -95,23 +81,15 @@ class OperationService:
         )
         source_session_id = operation.get("source_session_id")
         if isinstance(source_session_id, str) and source_session_id:
-            await self._repository.update_registration_session(
-                source_session_id,
-                {
-                    "status": RegistrationSessionStatus.FAILED.value,
-                    "failure_code": payload.failure_code,
-                    "failure_message": payload.failure_message,
-                    "updated_at": now,
-                },
-            )
-        await self._repository.append_audit_event(
-            {
-                "action": "registration_operation_finalized",
-                "operation_id": operation_id,
-                "result": "failed",
-                "discord_user_id": str(operation["discord_user_id"]),
-                "steam_id": str(operation["steam_id"]),
-                "game": str(operation["game"]),
-                "failure_code": payload.failure_code,
-            }
-        )
+            try:
+                await self._repository.update_registration_session(
+                    source_session_id,
+                    {
+                        "status": RegistrationSessionStatus.FAILED.value,
+                        "failure_code": payload.failure_code,
+                        "failure_message": payload.failure_message,
+                        "updated_at": now,
+                    },
+                )
+            except Exception:
+                pass

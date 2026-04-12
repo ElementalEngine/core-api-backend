@@ -89,12 +89,20 @@ class RegistrationService:
 
     async def get_registered_steam_id(self, discord_user_id: str, game: str) -> str:
         user = await self._repository.get_user_by_discord_id(discord_user_id)
-        if not user or not user.get("steam_id"):
+        if not user:
             raise RankRoleEligibilityError(discord_user_id)
+
+        steam_id = user.get("steam_id")
+        if not steam_id and user.get("linked_platform") == RegistrationPlatform.STEAM.value:
+            steam_id = user.get("linked_account_id")
+
+        if not steam_id:
+            raise RankRoleEligibilityError(discord_user_id)
+
         regs = user.get("registrations") or {}
         if game in regs:
             raise AlreadyRegisteredError(game)
-        return str(user["steam_id"])
+        return str(steam_id)
 
     @staticmethod
     def manual_required_for_platform(
@@ -130,7 +138,6 @@ class RegistrationService:
             mfa_enabled_snapshot=(bool(session["oauth_mfa_enabled_snapshot"]) if isinstance(session.get("oauth_mfa_enabled_snapshot"), bool) else None),
             ownership_verified_at=steam_validation.get("ownership_verified_at"),
             playtime_minutes=steam_validation.get("playtime_minutes"),
-            audit_action="registration_operation_created",
         )
 
     async def create_rank_role_operation(
@@ -152,7 +159,6 @@ class RegistrationService:
             role_intents=[_rank_role_for_game(game)],
             ownership_verified_at=steam_validation.get("ownership_verified_at"),
             playtime_minutes=steam_validation.get("playtime_minutes"),
-            audit_action="rank_role_operation_created",
         )
 
     async def create_manual_registration_operation(
@@ -167,6 +173,8 @@ class RegistrationService:
         ownership_verified_at: datetime | None,
         playtime_minutes: int | None,
         reason: str,
+        username_snapshot: str | None = None,
+        display_name_snapshot: str | None = None,
     ) -> RegistrationOperationResponse:
         return await self._create_operation(
             operation_type="manual_registration",
@@ -180,7 +188,8 @@ class RegistrationService:
             role_intents=_build_registration_role_intents(game),
             ownership_verified_at=ownership_verified_at,
             playtime_minutes=playtime_minutes,
-            audit_action="manual_registration_operation_created",
+            username_snapshot=username_snapshot,
+            display_name_snapshot=display_name_snapshot,
             extra_operation_fields={
                 "actor_discord_id": actor_discord_id,
                 "manual_reason": reason,
@@ -199,7 +208,6 @@ class RegistrationService:
         steam_name: str | None,
         game: SupportedGame,
         role_intents: list[RoleIntent],
-        audit_action: str,
         source_session_id: str | None = None,
         username_snapshot: str | None = None,
         display_name_snapshot: str | None = None,
@@ -238,18 +246,6 @@ class RegistrationService:
         if extra_operation_fields:
             operation_doc.update(extra_operation_fields)
         await self._repository.insert_registration_operation(operation_doc)
-        await self._repository.append_audit_event(
-            {
-                "action": audit_action,
-                "operation_id": operation_id,
-                "discord_user_id": discord_user_id,
-                "linked_platform": linked_platform.value,
-                "linked_account_id": linked_account_id,
-                "steam_id": steam_id,
-                "game": game.value,
-                "role_intents": [intent.value for intent in role_intents],
-            }
-        )
         return RegistrationOperationResponse(
             operation_id=operation_id,
             status=RegistrationOperationStatus.PENDING,
@@ -286,7 +282,7 @@ def _to_lookup_response(doc: dict[str, Any]) -> AccountLookupResponse:
     linked_platform = (RegistrationPlatform(str(doc["linked_platform"])) if doc.get("linked_platform") else (RegistrationPlatform.STEAM if doc.get("steam_id") else None))
     return AccountLookupResponse(
         discord_id=str(doc.get("discord_id", "")),
-        discord_username=(str(doc["user_name"]) if doc.get("user_name") else None),
+        discord_username=(str(doc["discord_username"]) if doc.get("discord_username") else (str(doc["user_name"]) if doc.get("user_name") else None)),
         discord_display_name=(str(doc["display_name"]) if doc.get("display_name") else None),
         steam_id=(str(doc["steam_id"]) if doc.get("steam_id") else None),
         steam_name=(str(doc["steam_name"]) if doc.get("steam_name") else None),
@@ -294,6 +290,6 @@ def _to_lookup_response(doc: dict[str, Any]) -> AccountLookupResponse:
         linked_account_id=(str(doc["linked_account_id"]) if doc.get("linked_account_id") else (str(doc["steam_id"]) if doc.get("steam_id") else None)),
         linked_account_name=(str(doc["linked_account_name"]) if doc.get("linked_account_name") else (str(doc["steam_name"]) if doc.get("steam_name") else None)),
         registrations=doc.get("registrations") or {},
-        created_at=doc.get("created_at"),
-        updated_at=doc.get("updated_at"),
+        first_registered_at=doc.get("first_registered_at") or doc.get("created_at"),
+        record_version=(int(doc["__v"]) if isinstance(doc.get("__v"), int) else None),
     )

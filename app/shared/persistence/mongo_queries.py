@@ -64,7 +64,7 @@ class MongoQueries:
         return await self._users.find_one({"discord_id": discord_id})
 
     async def get_user_by_steam_id(self, steam_id: str) -> Optional[Dict[str, Any]]:
-        return await self._users.find_one({"steam_id": steam_id})
+        return await self._users.find_one({"$or": [{"steam_id": steam_id}, {"linked_platform": "steam", "linked_account_id": steam_id}]})
 
     # -------------------- pending matches --------------------
 

@@ -60,15 +60,6 @@ class SessionService:
                 "updated_at": now,
             }
         )
-        await self._repository.append_audit_event(
-            {
-                "action": "registration_session_created",
-                "discord_user_id": payload.discord_user_id,
-                "game": payload.game.value,
-                "platform": payload.platform.value,
-                "session_id": session_id,
-            }
-        )
         return RegistrationSessionResponse(
             session_id=session_id,
             authorize_url=self._build_authorize_url(state_token),

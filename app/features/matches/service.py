@@ -87,7 +87,12 @@ class MatchService:
         player = await self.q.get_user_by_discord_id(discord_id)
         if not player:
             raise MatchServiceError(f"User {discord_id} not found")
-        return str(player["steam_id"])
+        steam_id = player.get("steam_id")
+        if steam_id:
+            return str(steam_id)
+        if player.get("linked_platform") == "steam" and player.get("linked_account_id"):
+            return str(player["linked_account_id"])
+        raise MatchServiceError(f"User {discord_id} does not have a linked Steam account")
 
     async def steam_to_discord_id(self, steam_id: str) -> str:
         player = await self.q.get_user_by_steam_id(steam_id)
