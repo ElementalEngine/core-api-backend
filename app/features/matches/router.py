@@ -273,7 +273,7 @@ async def contest_report(payload: ContestReportRequest = Form(), db=Depends(get_
 async def revert_match(payload: RevertMatchRequest = Form(), db=Depends(get_database)):
     svc = MatchService(db)
     try:
-        return await svc.revert_match(payload.match_id, payload.reverter_discord_id)
+        return await svc.revert_match(payload.match_id)
     except NotFoundError as exc:
         logger.warning("🔴 Match not found. matchID: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc

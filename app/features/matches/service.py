@@ -745,8 +745,8 @@ class MatchService:
                             "games": int(pre_lifetime[i].games) - 1,
                             "wins": int(pre_lifetime[i].wins) - (1 if p.delta > 0 else 0),
                             "first": int(pre_lifetime[i].first) - (1 if p.placement == 0 else 0),
-                            "subbed_in": int(pre_lifetime[i].subbedIn) - (1 if p.is_sub else 0),
-                            "subbed_out": int(pre_lifetime[i].subbedOut) - (1 if p.subbed_out else 0),
+                            "subbedIn": int(pre_lifetime[i].subbedIn) - (1 if p.is_sub else 0),
+                            "subbedOut": int(pre_lifetime[i].subbedOut) - (1 if p.subbed_out else 0),
                             "civs": civs_life,
                             "lastModified": datetime.now(UTC),
                         }
@@ -770,8 +770,8 @@ class MatchService:
                             "games": int(pre_season[i].games) - 1,
                             "wins": int(pre_season[i].wins) - (1 if p.season_delta > 0 else 0),
                             "first": int(pre_season[i].first) - (1 if p.placement == 0 else 0),
-                            "subbed_in": int(pre_season[i].subbedIn) - (1 if p.is_sub else 0),
-                            "subbed_out": int(pre_season[i].subbedOut) - (1 if p.subbed_out else 0),
+                            "subbedIn": int(pre_season[i].subbedIn) - (1 if p.is_sub else 0),
+                            "subbedOut": int(pre_season[i].subbedOut) - (1 if p.subbed_out else 0),
                             "civs": civs_season,
                             "lastModified": datetime.now(UTC),
                         }
@@ -795,8 +795,8 @@ class MatchService:
                             "games": int(pre_combined[i].games) - 1,
                             "wins": int(pre_combined[i].wins) - (1 if p.combined_delta > 0 else 0),
                             "first": int(pre_combined[i].first) - (1 if p.placement == 0 else 0),
-                            "subbed_in": int(pre_combined[i].subbedIn) - (1 if p.is_sub else 0),
-                            "subbed_out": int(pre_combined[i].subbedOut) - (1 if p.subbed_out else 0),
+                            "subbedIn": int(pre_combined[i].subbedIn) - (1 if p.is_sub else 0),
+                            "subbedOut": int(pre_combined[i].subbedOut) - (1 if p.subbed_out else 0),
                             "civs": civs_combined,
                             "lastModified": datetime.now(UTC),
                         }
@@ -824,7 +824,7 @@ class MatchService:
                     raise MatchServiceError(f"An error occured during writing to DB: {e}")
         return {"match_id": str(match_id), **match.dict()}
 
-    async def approve_match(self, match_id: str, approver_discord_id: str) -> List[str]:
+    async def approve_match(self, match_id: str, approver_discord_id: str) -> Dict[str, Any]:
         async with approve_lock:
             oid = self._to_oid(match_id)
             res = await self.q.find_pending_by_id(oid)
@@ -868,8 +868,8 @@ class MatchService:
                                 "games": int(pre_lifetime[i].games) + 1,
                                 "wins": int(pre_lifetime[i].wins) + (1 if p.delta > 0 else 0),
                                 "first": int(pre_lifetime[i].first) + (1 if p.placement == 0 else 0),
-                                "subbed_in": int(pre_lifetime[i].subbedIn) + (1 if p.is_sub else 0),
-                                "subbed_out": int(pre_lifetime[i].subbedOut) + (1 if p.subbed_out else 0),
+                                "subbedIn": int(pre_lifetime[i].subbedIn) + (1 if p.is_sub else 0),
+                                "subbedOut": int(pre_lifetime[i].subbedOut) + (1 if p.subbed_out else 0),
                                 "civs": civs_life,
                                 "lastModified": datetime.now(UTC),
                             }
@@ -893,8 +893,8 @@ class MatchService:
                                 "games": int(pre_season[i].games) + 1,
                                 "wins": int(pre_season[i].wins) + (1 if p.season_delta > 0 else 0),
                                 "first": int(pre_season[i].first) + (1 if p.placement == 0 else 0),
-                                "subbed_in": int(pre_season[i].subbedIn) + (1 if p.is_sub else 0),
-                                "subbed_out": int(pre_season[i].subbedOut) + (1 if p.subbed_out else 0),
+                                "subbedIn": int(pre_season[i].subbedIn) + (1 if p.is_sub else 0),
+                                "subbedOut": int(pre_season[i].subbedOut) + (1 if p.subbed_out else 0),
                                 "civs": civs_season,
                                 "lastModified": datetime.now(UTC),
                             }
@@ -918,8 +918,8 @@ class MatchService:
                                 "games": int(pre_combined[i].games) + 1,
                                 "wins": int(pre_combined[i].wins) + (1 if p.combined_delta > 0 else 0),
                                 "first": int(pre_combined[i].first) + (1 if p.placement == 0 else 0),
-                                "subbed_in": int(pre_combined[i].subbedIn) + (1 if p.is_sub else 0),
-                                "subbed_out": int(pre_combined[i].subbedOut) + (1 if p.subbed_out else 0),
+                                "subbedIn": int(pre_combined[i].subbedIn) + (1 if p.is_sub else 0),
+                                "subbedOut": int(pre_combined[i].subbedOut) + (1 if p.subbed_out else 0),
                                 "civs": civs_combined,
                                 "lastModified": datetime.now(UTC),
                             }
@@ -959,7 +959,12 @@ class MatchService:
                         raise MatchServiceError(f"An error occured during writing to DB: {e}")
 
             logger.info("✅ ✅ Approved match %s", match_id)
-            return {"match_id": str(validated_insert_id), **match.dict()}
+            affected_players = [
+                {"discord_id": str(player.discord_id), "rating_mu": float(post_lifetime[index].mu)}
+                for index, player in enumerate(match.players)
+                if player.discord_id and player.discord_id not in ("-1", "-2") and not str(player.discord_id).startswith("-")
+            ]
+            return {"match_id": str(validated_insert_id), **match.dict(), "affected_players": affected_players}
 
     async def get_leaderboard(
         self,
