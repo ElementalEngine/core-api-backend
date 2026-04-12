@@ -125,17 +125,35 @@ class RegistrationService:
             discord_user_id=str(session["discord_user_id"]),
             linked_platform=RegistrationPlatform.STEAM,
             linked_account_id=str(steam_validation["steam_id"]),
-            linked_account_name=(str(session["validated_account_name"]) if session.get("validated_account_name") else None),
+            linked_account_name=(
+                str(session["validated_account_name"]) if session.get("validated_account_name") else None
+            ),
             steam_id=str(steam_validation["steam_id"]),
-            steam_name=(str(session["validated_account_name"]) if session.get("validated_account_name") else None),
+            steam_name=(
+                str(session["validated_account_name"]) if session.get("validated_account_name") else None
+            ),
             game=game,
             role_intents=_build_registration_role_intents(game),
             source_session_id=str(session["session_id"]),
-            username_snapshot=(str(session["oauth_username_snapshot"]) if session.get("oauth_username_snapshot") else None),
-            display_name_snapshot=(str(session["oauth_display_name_snapshot"]) if session.get("oauth_display_name_snapshot") else None),
-            locale_snapshot=(str(session["oauth_locale_snapshot"]) if session.get("oauth_locale_snapshot") else None),
-            verified_snapshot=(bool(session["oauth_verified_snapshot"]) if isinstance(session.get("oauth_verified_snapshot"), bool) else None),
-            mfa_enabled_snapshot=(bool(session["oauth_mfa_enabled_snapshot"]) if isinstance(session.get("oauth_mfa_enabled_snapshot"), bool) else None),
+            username_snapshot=(
+                str(session["oauth_username_snapshot"]) if session.get("oauth_username_snapshot") else None
+            ),
+            display_name_snapshot=(
+                str(session["oauth_display_name_snapshot"]) if session.get("oauth_display_name_snapshot") else None
+            ),
+            locale_snapshot=(
+                str(session["oauth_locale_snapshot"]) if session.get("oauth_locale_snapshot") else None
+            ),
+            verified_snapshot=(
+                bool(session["oauth_verified_snapshot"])
+                if isinstance(session.get("oauth_verified_snapshot"), bool)
+                else None
+            ),
+            mfa_enabled_snapshot=(
+                bool(session["oauth_mfa_enabled_snapshot"])
+                if isinstance(session.get("oauth_mfa_enabled_snapshot"), bool)
+                else None
+            ),
             ownership_verified_at=steam_validation.get("ownership_verified_at"),
             playtime_minutes=steam_validation.get("playtime_minutes"),
         )
@@ -172,7 +190,7 @@ class RegistrationService:
         account_name: str | None,
         ownership_verified_at: datetime | None,
         playtime_minutes: int | None,
-        reason: str,
+        reason: str | None,
         username_snapshot: str | None = None,
         display_name_snapshot: str | None = None,
     ) -> RegistrationOperationResponse:
@@ -192,7 +210,7 @@ class RegistrationService:
             display_name_snapshot=display_name_snapshot,
             extra_operation_fields={
                 "actor_discord_id": actor_discord_id,
-                "manual_reason": reason,
+                **({"manual_reason": reason} if reason else {}),
             },
         )
 
@@ -245,7 +263,9 @@ class RegistrationService:
         }
         if extra_operation_fields:
             operation_doc.update(extra_operation_fields)
+
         await self._repository.insert_registration_operation(operation_doc)
+
         return RegistrationOperationResponse(
             operation_id=operation_id,
             status=RegistrationOperationStatus.PENDING,
@@ -277,23 +297,37 @@ def _build_registration_role_intents(game: SupportedGame) -> list[RoleIntent]:
     return [RoleIntent.GRANT_CIV7_RANK, RoleIntent.REMOVE_NON_VERIFIED]
 
 
-
 def _to_lookup_response(doc: dict[str, Any]) -> AccountLookupResponse:
-    linked_platform = (RegistrationPlatform(str(doc["linked_platform"])) if doc.get("linked_platform") else (RegistrationPlatform.STEAM if doc.get("steam_id") else None))
+    linked_platform = (
+        RegistrationPlatform(str(doc["linked_platform"]))
+        if doc.get("linked_platform")
+        else (RegistrationPlatform.STEAM if doc.get("steam_id") else None)
+    )
     return AccountLookupResponse(
         discord_id=str(doc.get("discord_id", "")),
-        discord_username=(str(doc["discord_username"]) if doc.get("discord_username") else (str(doc["user_name"]) if doc.get("user_name") else None)),
+        discord_username=(
+            str(doc["discord_username"])
+            if doc.get("discord_username")
+            else (str(doc["user_name"]) if doc.get("user_name") else None)
+        ),
         discord_display_name=(str(doc["display_name"]) if doc.get("display_name") else None),
         steam_id=(str(doc["steam_id"]) if doc.get("steam_id") else None),
         steam_name=(str(doc["steam_name"]) if doc.get("steam_name") else None),
         linked_platform=linked_platform,
-        linked_account_id=(str(doc["linked_account_id"]) if doc.get("linked_account_id") else (str(doc["steam_id"]) if doc.get("steam_id") else None)),
-        linked_account_name=(str(doc["linked_account_name"]) if doc.get("linked_account_name") else (str(doc["steam_name"]) if doc.get("steam_name") else None)),
+        linked_account_id=(
+            str(doc["linked_account_id"])
+            if doc.get("linked_account_id")
+            else (str(doc["steam_id"]) if doc.get("steam_id") else None)
+        ),
+        linked_account_name=(
+            str(doc["linked_account_name"])
+            if doc.get("linked_account_name")
+            else (str(doc["steam_name"]) if doc.get("steam_name") else None)
+        ),
         registrations=doc.get("registrations") or {},
         server_registered_at=_resolve_server_registered_at(doc),
         record_version=(int(doc["__v"]) if isinstance(doc.get("__v"), int) else None),
     )
-
 
 
 def _resolve_server_registered_at(doc: dict[str, Any]) -> datetime | None:
@@ -313,4 +347,5 @@ def _resolve_server_registered_at(doc: dict[str, Any]) -> datetime | None:
                 registered_at = value.get("registered_at")
                 if isinstance(registered_at, datetime):
                     candidates.append(registered_at)
+
     return min(candidates) if candidates else None
