@@ -53,7 +53,7 @@ class SteamService:
                 steam_id,
                 normalized_game,
             )
-            raise SteamProfilePrivateError()
+            raise SteamProfilePrivateError(game=normalized_game)
 
         if not isinstance(games, list):
             logger.info(

@@ -66,9 +66,14 @@ class SessionNotValidatedError(AuthError):
 
 class AccountLookupNotFoundError(AuthError):
     def __init__(self, *, field: str, value: str) -> None:
+        label = {
+            "discord_id": f"Discord ID {value}",
+            "linked_account_id": f"linked account ID {value}",
+            "steam_id": f"linked account ID {value}",
+        }.get(field, value)
         super().__init__(
             code="ACCOUNT_NOT_FOUND",
-            message="No linked registration account was found.",
+            message=f"No account record was found for {label}.",
             status_code=status.HTTP_404_NOT_FOUND,
             details={field: value},
         )
@@ -78,7 +83,7 @@ class LinkedAccountFetchError(AuthError):
     def __init__(self) -> None:
         super().__init__(
             code="DISCORD_LINKED_ACCOUNT_FETCH_FAILED",
-            message="We could not read your Discord linked accounts. Please try again.",
+            message="We could not read your Discord linked accounts right now. Please try again.",
             status_code=status.HTTP_502_BAD_GATEWAY,
             retryable=True,
         )
@@ -87,7 +92,10 @@ class LinkedAccountFetchError(AuthError):
 class LinkedAccountNotFoundError(AuthError):
     def __init__(self, platform: str) -> None:
         message = {
-            "steam": "No Steam account was found in your Discord linked accounts. Check Discord Settings → Connections and try again.",
+            "steam": (
+                "No linked Steam account was found on your Discord profile. "
+                "Open Discord Settings → Connections, add Steam, enable Display on profile, then try again."
+            ),
             "epic": "We could not confirm a linked Epic account on your Discord profile.",
             "xbox": "We could not confirm a linked Xbox account on your Discord profile.",
         }.get(platform, "No supported linked account was found.")
@@ -189,11 +197,15 @@ class OperationStateConflictError(AuthError):
 
 
 class SteamProfilePrivateError(AuthError):
-    def __init__(self) -> None:
+    def __init__(self, *, game: str) -> None:
         super().__init__(
             code="STEAM_PROFILE_PRIVATE",
-            message="Your Steam profile must be public and your playtime must be visible to register automatically.",
+            message=(
+                f"We could not verify {game.upper()} because your Steam game details or playtime are hidden. "
+                "Make your Steam profile public, set Game details to Public, then try again."
+            ),
             status_code=status.HTTP_400_BAD_REQUEST,
+            details={"game": game},
         )
 
 
@@ -201,7 +213,10 @@ class SteamOwnershipMissingError(AuthError):
     def __init__(self, game: str) -> None:
         super().__init__(
             code="STEAM_OWNERSHIP_MISSING",
-            message=f"Your Steam account does not appear to own {game.upper()}.",
+            message=(
+                f"Your linked Steam account was found, but {game.upper()} does not appear to be owned on that account. "
+                "Check that the correct Steam account is linked in Discord."
+            ),
             status_code=status.HTTP_400_BAD_REQUEST,
             details={"game": game},
         )
@@ -212,8 +227,8 @@ class SteamPlaytimeBelowThresholdError(AuthError):
         super().__init__(
             code="STEAM_PLAYTIME_BELOW_THRESHOLD",
             message=(
-                f"Your playtime does not meet the requirement for {game.upper()}. "
-                f"Required: {required_minutes} minutes. Your playtime: {actual_minutes} minutes."
+                f"Your linked Steam account owns {game.upper()}, but it does not meet the minimum playtime requirement yet. "
+                f"Required: {required_minutes} minutes. Found: {actual_minutes} minutes."
             ),
             status_code=status.HTTP_400_BAD_REQUEST,
             details={
@@ -276,14 +291,12 @@ class RankRoleEligibilityError(AuthError):
 
 def to_http_exception(error: AuthError) -> HTTPException:
     payload = ErrorResponse(
-        detail=ErrorDetail(
-            error={
-                "code": error.code,
-                "message": error.message,
-                "details": error.details,
-                "retryable": error.retryable,
-                "correlation_id": None,
-            }
+        error=ErrorDetail(
+            code=error.code,
+            message=error.message,
+            details=error.details,
+            retryable=error.retryable,
+            correlation_id=None,
         )
     )
-    return HTTPException(status_code=error.status_code, detail=payload.detail.model_dump())
+    return HTTPException(status_code=error.status_code, detail=payload.model_dump())

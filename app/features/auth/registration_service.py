@@ -34,49 +34,14 @@ class RegistrationService:
 
     async def lookup_by_discord_id(self, discord_id: str) -> DiscordLookupResponse | None:
         docs = await self._repository.find_users_by_discord_id(discord_id)
-        if not docs:
-            return None
-
-        primary = docs[0]
-        linked_accounts = [_to_linked_account_hit(doc) for doc in docs]
-        linked_accounts = [hit for hit in linked_accounts if hit is not None]
-        linked_accounts.sort(
-            key=lambda hit: (
-                hit.linked_platform.value if hit.linked_platform else "",
-                hit.linked_account_id,
-                hit.linked_account_name or "",
-            )
-        )
-
-        return DiscordLookupResponse(
-            discord_id=discord_id,
-            discord_username=_resolve_discord_username(primary),
-            discord_display_name=_resolve_display_name(primary),
-            linked_accounts=linked_accounts,
-        )
+        return _to_discord_lookup_response(docs) if docs else None
 
     async def lookup_by_linked_account_id(self, linked_account_id: str) -> LinkedAccountLookupResponse | None:
         docs = await self._repository.find_users_by_linked_account_id(linked_account_id)
-        if not docs:
-            return None
+        return _to_linked_account_lookup_response(docs, linked_account_id) if docs else None
 
-        discord_accounts = [_to_discord_account_hit(doc) for doc in docs]
-        discord_accounts.sort(
-            key=lambda hit: (
-                hit.discord_id,
-                hit.discord_username or "",
-                hit.discord_display_name or "",
-            )
-        )
-
-        primary = _pick_primary_linked_account_doc(docs, linked_account_id)
-
-        return LinkedAccountLookupResponse(
-            linked_account_id=linked_account_id,
-            linked_account_name=_resolve_linked_account_name(primary),
-            linked_platform=_resolve_linked_platform(primary),
-            discord_accounts=discord_accounts,
-        )
+    async def lookup_by_steam_id(self, steam_id: str) -> LinkedAccountLookupResponse | None:
+        return await self.lookup_by_linked_account_id(steam_id)
 
     async def assert_not_already_registered(self, *, discord_user_id: str, game: str) -> None:
         existing = await self._repository.get_user_by_discord_id(discord_user_id)
@@ -114,6 +79,12 @@ class RegistrationService:
         if existing_by_discord:
             existing_platform = existing_by_discord.get("linked_platform")
             existing_account = existing_by_discord.get("linked_account_id")
+            existing_steam = existing_by_discord.get("steam_id")
+            if platform is RegistrationPlatform.STEAM and existing_steam and str(existing_steam) != account_id:
+                raise DiscordSteamConflictError(
+                    discord_user_id=discord_user_id,
+                    existing_steam_id=str(existing_steam),
+                )
             if existing_platform and existing_account and (
                 str(existing_platform) != platform.value or str(existing_account) != account_id
             ):
@@ -341,51 +312,70 @@ def _build_registration_role_intents(game: SupportedGame) -> list[RoleIntent]:
     return [RoleIntent.GRANT_CIV7_RANK, RoleIntent.REMOVE_NON_VERIFIED]
 
 
-def _pick_primary_linked_account_doc(docs: list[dict[str, Any]], linked_account_id: str) -> dict[str, Any]:
+def _to_discord_lookup_response(docs: list[dict[str, Any]]) -> DiscordLookupResponse:
+    primary = docs[0]
+    seen: set[tuple[str | None, str]] = set()
+    linked_accounts: list[LinkedAccountLookupHit] = []
+
     for doc in docs:
-        if _resolve_linked_account_id(doc) == linked_account_id:
-            return doc
-    return docs[0]
+        platform = _normalize_platform(doc)
+        account_id = _normalize_linked_account_id(doc)
+        if not account_id:
+            continue
+        key = (platform.value if platform else None, account_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        linked_accounts.append(
+            LinkedAccountLookupHit(
+                linked_platform=platform,
+                linked_account_id=account_id,
+                linked_account_name=_normalize_linked_account_name(doc),
+            )
+        )
+
+    linked_accounts.sort(key=lambda hit: ((hit.linked_platform.value if hit.linked_platform else ""), hit.linked_account_id))
+
+    return DiscordLookupResponse(
+        discord_id=str(primary.get("discord_id", "")),
+        discord_username=_normalize_discord_username(primary),
+        discord_display_name=_normalize_display_name(primary),
+        linked_accounts=linked_accounts,
+    )
 
 
+def _to_linked_account_lookup_response(
+    docs: list[dict[str, Any]],
+    linked_account_id: str,
+) -> LinkedAccountLookupResponse:
+    primary_doc = next((doc for doc in docs if _normalize_linked_account_id(doc) == linked_account_id), docs[0])
+    seen: set[str] = set()
+    discord_accounts: list[DiscordAccountLookupHit] = []
 
-def _to_linked_account_hit(doc: dict[str, Any]) -> LinkedAccountLookupHit | None:
-    linked_account_id = _resolve_linked_account_id(doc)
-    if not linked_account_id:
-        return None
+    for doc in docs:
+        discord_id = str(doc.get("discord_id", "")).strip()
+        if not discord_id or discord_id in seen:
+            continue
+        seen.add(discord_id)
+        discord_accounts.append(
+            DiscordAccountLookupHit(
+                discord_id=discord_id,
+                discord_username=_normalize_discord_username(doc),
+                discord_display_name=_normalize_display_name(doc),
+            )
+        )
 
-    return LinkedAccountLookupHit(
-        linked_platform=_resolve_linked_platform(doc),
+    discord_accounts.sort(key=lambda hit: hit.discord_id)
+
+    return LinkedAccountLookupResponse(
         linked_account_id=linked_account_id,
-        linked_account_name=_resolve_linked_account_name(doc),
+        linked_account_name=_normalize_linked_account_name(primary_doc),
+        linked_platform=_normalize_platform(primary_doc),
+        discord_accounts=discord_accounts,
     )
 
 
-
-def _to_discord_account_hit(doc: dict[str, Any]) -> DiscordAccountLookupHit:
-    return DiscordAccountLookupHit(
-        discord_id=str(doc.get("discord_id", "")),
-        discord_username=_resolve_discord_username(doc),
-        discord_display_name=_resolve_display_name(doc),
-    )
-
-
-
-def _resolve_discord_username(doc: dict[str, Any]) -> str | None:
-    if doc.get("discord_username"):
-        return str(doc["discord_username"])
-    if doc.get("user_name"):
-        return str(doc["user_name"])
-    return None
-
-
-
-def _resolve_display_name(doc: dict[str, Any]) -> str | None:
-    return str(doc["display_name"]) if doc.get("display_name") else None
-
-
-
-def _resolve_linked_platform(doc: dict[str, Any]) -> RegistrationPlatform | None:
+def _normalize_platform(doc: dict[str, Any]) -> RegistrationPlatform | None:
     if doc.get("linked_platform"):
         return RegistrationPlatform(str(doc["linked_platform"]))
     if doc.get("steam_id"):
@@ -393,8 +383,7 @@ def _resolve_linked_platform(doc: dict[str, Any]) -> RegistrationPlatform | None
     return None
 
 
-
-def _resolve_linked_account_id(doc: dict[str, Any]) -> str | None:
+def _normalize_linked_account_id(doc: dict[str, Any]) -> str | None:
     if doc.get("linked_account_id"):
         return str(doc["linked_account_id"])
     if doc.get("steam_id"):
@@ -402,10 +391,21 @@ def _resolve_linked_account_id(doc: dict[str, Any]) -> str | None:
     return None
 
 
-
-def _resolve_linked_account_name(doc: dict[str, Any]) -> str | None:
+def _normalize_linked_account_name(doc: dict[str, Any]) -> str | None:
     if doc.get("linked_account_name"):
         return str(doc["linked_account_name"])
     if doc.get("steam_name"):
         return str(doc["steam_name"])
     return None
+
+
+def _normalize_discord_username(doc: dict[str, Any]) -> str | None:
+    if doc.get("discord_username"):
+        return str(doc["discord_username"])
+    if doc.get("user_name"):
+        return str(doc["user_name"])
+    return None
+
+
+def _normalize_display_name(doc: dict[str, Any]) -> str | None:
+    return str(doc["display_name"]) if doc.get("display_name") else None

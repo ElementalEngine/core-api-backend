@@ -56,8 +56,12 @@ class AuthRepository:
         return await self._users.find_one({"discord_id": discord_id})
 
     async def find_users_by_discord_id(self, discord_id: str, *, limit: int = 25) -> list[dict[str, Any]]:
-        cursor = self._users.find({"discord_id": discord_id}).limit(limit)
-        return await cursor.to_list(length=limit)
+        cursor = (
+            self._users.find({"discord_id": discord_id})
+            .sort([("linked_platform", ASCENDING), ("linked_account_id", ASCENDING), ("steam_id", ASCENDING)])
+            .limit(max(1, limit))
+        )
+        return await cursor.to_list(length=max(1, limit))
 
     async def get_user_by_steam_id(self, steam_id: str) -> dict[str, Any] | None:
         return await self._users.find_one(
@@ -70,15 +74,19 @@ class AuthRepository:
         )
 
     async def find_users_by_linked_account_id(self, linked_account_id: str, *, limit: int = 25) -> list[dict[str, Any]]:
-        cursor = self._users.find(
-            {
-                "$or": [
-                    {"linked_account_id": linked_account_id},
-                    {"steam_id": linked_account_id},
-                ]
-            }
-        ).limit(limit)
-        return await cursor.to_list(length=limit)
+        cursor = (
+            self._users.find(
+                {
+                    "$or": [
+                        {"linked_account_id": linked_account_id},
+                        {"steam_id": linked_account_id},
+                    ]
+                }
+            )
+            .sort([("discord_id", ASCENDING), ("linked_platform", ASCENDING), ("linked_account_id", ASCENDING)])
+            .limit(max(1, limit))
+        )
+        return await cursor.to_list(length=max(1, limit))
 
     async def get_user_by_linked_account(self, platform: str, account_id: str) -> dict[str, Any] | None:
         return await self._users.find_one({"linked_platform": platform, "linked_account_id": account_id})

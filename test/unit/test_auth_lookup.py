@@ -41,11 +41,7 @@ def test_lookup_by_discord_id_returns_all_linked_account_hits():
     assert response is not None
     assert response.discord_id == "111111111111111111"
     assert response.discord_username == "primary_test_user"
-    assert [hit.linked_account_id for hit in response.linked_accounts] == [
-        "epic-test-001",
-        "76561190000000001",
-    ]
-
+    assert [hit.linked_account_id for hit in response.linked_accounts] == ["epic-test-001", "76561190000000001"]
 
 def test_lookup_by_linked_account_id_returns_all_discord_hits_with_steam_compatibility():
     repo = FakeRepo()
@@ -72,7 +68,7 @@ def test_lookup_by_linked_account_id_returns_all_discord_hits_with_steam_compati
     assert response is not None
     assert response.linked_account_id == "76561190000000001"
     assert response.linked_platform is not None
-    assert [hit.discord_id for hit in response.discord_accounts] == [
-        "222222222222222222",
+    assert sorted(hit.discord_id for hit in response.discord_accounts) == [
         "111111111111111111",
+        "222222222222222222",
     ]
