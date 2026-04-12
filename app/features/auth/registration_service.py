@@ -19,20 +19,64 @@ from app.features.auth.errors import (
     SteamIdConflictError,
 )
 from app.features.auth.repository import AuthRepository
-from app.features.auth.schemas import AccountLookupResponse, RegistrationOperationResponse
+from app.features.auth.schemas import (
+    DiscordAccountLookupHit,
+    DiscordLookupResponse,
+    LinkedAccountLookupHit,
+    LinkedAccountLookupResponse,
+    RegistrationOperationResponse,
+)
 
 
 class RegistrationService:
     def __init__(self, repository: AuthRepository) -> None:
         self._repository = repository
 
-    async def lookup_by_discord_id(self, discord_id: str) -> AccountLookupResponse | None:
-        doc = await self._repository.get_user_by_discord_id(discord_id)
-        return _to_lookup_response(doc) if doc else None
+    async def lookup_by_discord_id(self, discord_id: str) -> DiscordLookupResponse | None:
+        docs = await self._repository.find_users_by_discord_id(discord_id)
+        if not docs:
+            return None
 
-    async def lookup_by_steam_id(self, steam_id: str) -> AccountLookupResponse | None:
-        doc = await self._repository.get_user_by_steam_id(steam_id)
-        return _to_lookup_response(doc) if doc else None
+        primary = docs[0]
+        linked_accounts = [_to_linked_account_hit(doc) for doc in docs]
+        linked_accounts = [hit for hit in linked_accounts if hit is not None]
+        linked_accounts.sort(
+            key=lambda hit: (
+                hit.linked_platform.value if hit.linked_platform else "",
+                hit.linked_account_id,
+                hit.linked_account_name or "",
+            )
+        )
+
+        return DiscordLookupResponse(
+            discord_id=discord_id,
+            discord_username=_resolve_discord_username(primary),
+            discord_display_name=_resolve_display_name(primary),
+            linked_accounts=linked_accounts,
+        )
+
+    async def lookup_by_linked_account_id(self, linked_account_id: str) -> LinkedAccountLookupResponse | None:
+        docs = await self._repository.find_users_by_linked_account_id(linked_account_id)
+        if not docs:
+            return None
+
+        discord_accounts = [_to_discord_account_hit(doc) for doc in docs]
+        discord_accounts.sort(
+            key=lambda hit: (
+                hit.discord_id,
+                hit.discord_username or "",
+                hit.discord_display_name or "",
+            )
+        )
+
+        primary = _pick_primary_linked_account_doc(docs, linked_account_id)
+
+        return LinkedAccountLookupResponse(
+            linked_account_id=linked_account_id,
+            linked_account_name=_resolve_linked_account_name(primary),
+            linked_platform=_resolve_linked_platform(primary),
+            discord_accounts=discord_accounts,
+        )
 
     async def assert_not_already_registered(self, *, discord_user_id: str, game: str) -> None:
         existing = await self._repository.get_user_by_discord_id(discord_user_id)
@@ -297,55 +341,71 @@ def _build_registration_role_intents(game: SupportedGame) -> list[RoleIntent]:
     return [RoleIntent.GRANT_CIV7_RANK, RoleIntent.REMOVE_NON_VERIFIED]
 
 
-def _to_lookup_response(doc: dict[str, Any]) -> AccountLookupResponse:
-    linked_platform = (
-        RegistrationPlatform(str(doc["linked_platform"]))
-        if doc.get("linked_platform")
-        else (RegistrationPlatform.STEAM if doc.get("steam_id") else None)
+def _pick_primary_linked_account_doc(docs: list[dict[str, Any]], linked_account_id: str) -> dict[str, Any]:
+    for doc in docs:
+        if _resolve_linked_account_id(doc) == linked_account_id:
+            return doc
+    return docs[0]
+
+
+
+def _to_linked_account_hit(doc: dict[str, Any]) -> LinkedAccountLookupHit | None:
+    linked_account_id = _resolve_linked_account_id(doc)
+    if not linked_account_id:
+        return None
+
+    return LinkedAccountLookupHit(
+        linked_platform=_resolve_linked_platform(doc),
+        linked_account_id=linked_account_id,
+        linked_account_name=_resolve_linked_account_name(doc),
     )
-    return AccountLookupResponse(
+
+
+
+def _to_discord_account_hit(doc: dict[str, Any]) -> DiscordAccountLookupHit:
+    return DiscordAccountLookupHit(
         discord_id=str(doc.get("discord_id", "")),
-        discord_username=(
-            str(doc["discord_username"])
-            if doc.get("discord_username")
-            else (str(doc["user_name"]) if doc.get("user_name") else None)
-        ),
-        discord_display_name=(str(doc["display_name"]) if doc.get("display_name") else None),
-        steam_id=(str(doc["steam_id"]) if doc.get("steam_id") else None),
-        steam_name=(str(doc["steam_name"]) if doc.get("steam_name") else None),
-        linked_platform=linked_platform,
-        linked_account_id=(
-            str(doc["linked_account_id"])
-            if doc.get("linked_account_id")
-            else (str(doc["steam_id"]) if doc.get("steam_id") else None)
-        ),
-        linked_account_name=(
-            str(doc["linked_account_name"])
-            if doc.get("linked_account_name")
-            else (str(doc["steam_name"]) if doc.get("steam_name") else None)
-        ),
-        registrations=doc.get("registrations") or {},
-        server_registered_at=_resolve_server_registered_at(doc),
-        record_version=(int(doc["__v"]) if isinstance(doc.get("__v"), int) else None),
+        discord_username=_resolve_discord_username(doc),
+        discord_display_name=_resolve_display_name(doc),
     )
 
 
-def _resolve_server_registered_at(doc: dict[str, Any]) -> datetime | None:
-    explicit = doc.get("server_registered_at")
-    if isinstance(explicit, datetime):
-        return explicit
 
-    historical = doc.get("first_registered_at") or doc.get("created_at")
-    if isinstance(historical, datetime):
-        return historical
+def _resolve_discord_username(doc: dict[str, Any]) -> str | None:
+    if doc.get("discord_username"):
+        return str(doc["discord_username"])
+    if doc.get("user_name"):
+        return str(doc["user_name"])
+    return None
 
-    registrations = doc.get("registrations") or {}
-    candidates: list[datetime] = []
-    if isinstance(registrations, dict):
-        for value in registrations.values():
-            if isinstance(value, dict):
-                registered_at = value.get("registered_at")
-                if isinstance(registered_at, datetime):
-                    candidates.append(registered_at)
 
-    return min(candidates) if candidates else None
+
+def _resolve_display_name(doc: dict[str, Any]) -> str | None:
+    return str(doc["display_name"]) if doc.get("display_name") else None
+
+
+
+def _resolve_linked_platform(doc: dict[str, Any]) -> RegistrationPlatform | None:
+    if doc.get("linked_platform"):
+        return RegistrationPlatform(str(doc["linked_platform"]))
+    if doc.get("steam_id"):
+        return RegistrationPlatform.STEAM
+    return None
+
+
+
+def _resolve_linked_account_id(doc: dict[str, Any]) -> str | None:
+    if doc.get("linked_account_id"):
+        return str(doc["linked_account_id"])
+    if doc.get("steam_id"):
+        return str(doc["steam_id"])
+    return None
+
+
+
+def _resolve_linked_account_name(doc: dict[str, Any]) -> str | None:
+    if doc.get("linked_account_name"):
+        return str(doc["linked_account_name"])
+    if doc.get("steam_name"):
+        return str(doc["steam_name"])
+    return None

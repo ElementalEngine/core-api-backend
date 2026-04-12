@@ -22,11 +22,12 @@ from app.features.auth.operation_service import OperationService
 from app.features.auth.registration_service import RegistrationService
 from app.features.auth.repository import AuthRepository
 from app.features.auth.schemas import (
-    AccountLookupResponse,
     CompleteRegistrationSessionRequest,
     CreateRegistrationSessionRequest,
+    DiscordLookupResponse,
     DiscordOAuthCallbackResult,
     FinalizeRegistrationOperationRequest,
+    LinkedAccountLookupResponse,
     ManualRegistrationRequest,
     RankRoleRequest,
     RegistrationOperationResponse,
@@ -46,27 +47,39 @@ router = APIRouter(
 public_router = APIRouter(tags=["auth-public"])
 
 
+
 def _repo(db: AsyncIOMotorClient) -> AuthRepository:
     return AuthRepository(db)
 
 
-@router.get("/admin/accounts/discord/{discord_id}", response_model=AccountLookupResponse)
+@router.get("/admin/accounts/discord/{discord_id}", response_model=DiscordLookupResponse)
 async def lookup_account_by_discord(
     discord_id: Annotated[str, Path(min_length=1, max_length=64)],
     db: AsyncIOMotorClient = Depends(get_database),
-) -> AccountLookupResponse:
+) -> DiscordLookupResponse:
     account = await RegistrationService(_repo(db)).lookup_by_discord_id(discord_id)
     if account is None:
         raise to_http_exception(AccountLookupNotFoundError(field="discord_id", value=discord_id))
     return account
 
 
-@router.get("/admin/accounts/steam/{steam_id}", response_model=AccountLookupResponse)
+@router.get("/admin/accounts/linked-account/{linked_account_id}", response_model=LinkedAccountLookupResponse)
+async def lookup_account_by_linked_account(
+    linked_account_id: Annotated[str, Path(min_length=1, max_length=64)],
+    db: AsyncIOMotorClient = Depends(get_database),
+) -> LinkedAccountLookupResponse:
+    account = await RegistrationService(_repo(db)).lookup_by_linked_account_id(linked_account_id)
+    if account is None:
+        raise to_http_exception(AccountLookupNotFoundError(field="linked_account_id", value=linked_account_id))
+    return account
+
+
+@router.get("/admin/accounts/steam/{steam_id}", response_model=LinkedAccountLookupResponse)
 async def lookup_account_by_steam(
     steam_id: Annotated[str, Path(min_length=1, max_length=64)],
     db: AsyncIOMotorClient = Depends(get_database),
-) -> AccountLookupResponse:
-    account = await RegistrationService(_repo(db)).lookup_by_steam_id(steam_id)
+) -> LinkedAccountLookupResponse:
+    account = await RegistrationService(_repo(db)).lookup_by_linked_account_id(steam_id)
     if account is None:
         raise to_http_exception(AccountLookupNotFoundError(field="steam_id", value=steam_id))
     return account
@@ -261,38 +274,49 @@ async def discord_oauth_callback(
             )
             raise to_http_exception(InvalidStateError())
 
-        linked_account_id = str(connection.get("id", ""))
-        linked_account_name = connection.get("name") if isinstance(connection.get("name"), str) else None
+        connection_id = str(connection.get("id") or "")
+        connection_name = str(connection.get("name") or "") or None
+        RegistrationService.manual_required_for_platform(platform, account_name=connection_name)
 
+        steam_validation: dict[str, str] | None = None
         if platform is RegistrationPlatform.STEAM:
-            await session_service.mark_validated(
-                session_id,
-                linked_account_id=linked_account_id,
-                linked_account_name=linked_account_name,
-                oauth_username_snapshot=user.get("username") if isinstance(user.get("username"), str) else None,
-                oauth_display_name_snapshot=user.get("global_name") if isinstance(user.get("global_name"), str) else None,
-                oauth_locale_snapshot=user.get("locale") if isinstance(user.get("locale"), str) else None,
-                oauth_verified_snapshot=user.get("verified") if isinstance(user.get("verified"), bool) else None,
-                oauth_mfa_enabled_snapshot=user.get("mfa_enabled") if isinstance(user.get("mfa_enabled"), bool) else None,
+            steam_validation = await SteamService().validate_linked_account(
+                steam_id=connection_id,
+                game=str(session["game"]),
             )
-            return DiscordOAuthCallbackResult(
-                session_id=session_id,
-                status=RegistrationSessionStatus.VALIDATED,
-                platform=platform,
-                linked_account_id=linked_account_id,
-                linked_account_name=linked_account_name,
-            )
-
-        registration_service.manual_required_for_platform(platform, account_name=linked_account_name)
-        raise AssertionError("manual_required_for_platform should have raised")
-    except (SessionNotFoundError, SessionExpiredError, AuthError) as exc:
+        await registration_service.assert_registration_conflicts(
+            discord_user_id=str(session["discord_user_id"]),
+            platform=platform,
+            account_id=connection_id,
+            game=str(session["game"]),
+        )
+        await session_service.mark_validated(
+            session_id,
+            account_id=connection_id,
+            account_name=connection_name,
+            oauth_user=user,
+            extra=steam_validation,
+        )
+        return DiscordOAuthCallbackResult(
+            session_id=session_id,
+            status=RegistrationSessionStatus.VALIDATED,
+            platform=platform,
+            linked_account_id=connection_id,
+            linked_account_name=connection_name,
+            details={"steam": steam_validation} if steam_validation else {},
+        )
+    except SessionNotFoundError as exc:
+        raise to_http_exception(exc) from exc
+    except SessionExpiredError as exc:
+        raise to_http_exception(exc) from exc
+    except AuthError as exc:
         logger.warning(
-            "Auth callback failed. code=%s message=%s state=%s",
+            "OAuth callback failed. code=%s message=%s details=%s",
             exc.code,
             exc.message,
-            state[:12] if state else None,
+            exc.details,
         )
-        if isinstance(exc, AuthError) and not isinstance(exc, (SessionNotFoundError, SessionExpiredError)):
+        if state:
             try:
                 session = await repository.get_registration_session_by_state(state)
                 if session is not None:
@@ -300,27 +324,28 @@ async def discord_oauth_callback(
                         str(session["session_id"]),
                         failure_code=exc.code,
                         failure_message=exc.message,
-                        extra={"details": exc.details} if exc.details else None,
+                        extra=exc.details,
                     )
             except Exception:
-                logger.exception("Failed to persist auth callback failure state")
+                logger.exception("Failed to mark OAuth session failed")
         raise to_http_exception(exc) from exc
     except Exception as exc:
-        logger.exception("Unexpected auth callback failure")
-        try:
-            session = await repository.get_registration_session_by_state(state)
-            if session is not None:
-                await session_service.mark_failed(
-                    str(session["session_id"]),
-                    failure_code="AUTH_CALLBACK_INTERNAL_ERROR",
-                    failure_message="The authentication callback could not be completed. Please try again.",
-                )
-        except Exception:
-            logger.exception("Failed to persist unexpected callback failure")
+        logger.exception("Unexpected OAuth callback failure")
+        if state:
+            try:
+                session = await repository.get_registration_session_by_state(state)
+                if session is not None:
+                    await session_service.mark_failed(
+                        str(session["session_id"]),
+                        failure_code="UNEXPECTED_AUTH_ERROR",
+                        failure_message="Unexpected authentication error. Please try again.",
+                    )
+            except Exception:
+                logger.exception("Failed to persist unexpected OAuth callback error")
         raise to_http_exception(
             AuthError(
-                code="AUTH_CALLBACK_INTERNAL_ERROR",
-                message="The authentication callback could not be completed. Please try again.",
+                code="UNEXPECTED_AUTH_ERROR",
+                message="Unexpected authentication error. Please try again.",
                 status_code=502,
                 retryable=True,
             )
