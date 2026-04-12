@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.features.auth.enums import (
     RegistrationOperationStatus,
@@ -47,20 +47,28 @@ class ManualRegistrationRequest(BaseModel):
     actor_discord_id: str = Field(min_length=1)
     subject_discord_id: str = Field(min_length=1)
     platform: RegistrationPlatform
-    account_id: str = Field(min_length=1)
+    platform_account_id: str = Field(min_length=1, validation_alias=AliasChoices("platform_account_id", "account_id"))
     game: SupportedGame
     reason: str = Field(min_length=1, max_length=500)
-    account_name: str | None = None
+    platform_account_name: str | None = Field(default=None, validation_alias=AliasChoices("platform_account_name", "account_name"))
     discord_username: str | None = None
     discord_display_name: str | None = None
 
-    @field_validator("actor_discord_id", "subject_discord_id", "account_id", "reason")
+    @field_validator("actor_discord_id", "subject_discord_id", "platform_account_id", "reason")
     @classmethod
     def _normalize_required_text(cls, value: str) -> str:
         normalized = value.strip()
         if not normalized:
             raise ValueError("value must not be blank")
         return normalized
+
+    @field_validator("platform_account_name", "discord_username", "discord_display_name")
+    @classmethod
+    def _normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class FinalizeRegistrationOperationRequest(BaseModel):
@@ -132,7 +140,7 @@ class AccountLookupResponse(BaseModel):
     linked_account_id: str | None = None
     linked_account_name: str | None = None
     registrations: dict[str, AccountRegistrationRecord] = Field(default_factory=dict)
-    first_registered_at: datetime | None = None
+    server_registered_at: datetime | None = None
     record_version: int | None = None
 
 

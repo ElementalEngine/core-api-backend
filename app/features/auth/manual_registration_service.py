@@ -17,21 +17,22 @@ class ManualRegistrationService:
     ) -> RegistrationOperationResponse:
         ownership_verified_at = None
         playtime_minutes = None
-        account_name = payload.account_name
+        account_name = payload.platform_account_name
 
         if payload.platform.value == 'steam':
             validation = await self._steam_service.validate_linked_account(
-                steam_id=payload.account_id,
+                steam_id=payload.platform_account_id,
                 game=payload.game.value,
             )
             ownership_verified_at = validation.get('ownership_verified_at')
             playtime_minutes = validation.get('playtime_minutes')
-            account_name = str(validation['steam_name']) if validation.get('steam_name') else account_name
+            if not account_name and validation.get('steam_name'):
+                account_name = str(validation['steam_name'])
 
         await self._registration_service.assert_registration_conflicts(
             discord_user_id=payload.subject_discord_id,
             platform=payload.platform,
-            account_id=payload.account_id,
+            account_id=payload.platform_account_id,
             game=payload.game.value,
         )
         return await self._registration_service.create_manual_registration_operation(
@@ -39,7 +40,7 @@ class ManualRegistrationService:
             subject_discord_id=payload.subject_discord_id,
             game=payload.game,
             platform=payload.platform,
-            account_id=payload.account_id,
+            account_id=payload.platform_account_id,
             account_name=account_name,
             ownership_verified_at=ownership_verified_at,
             playtime_minutes=playtime_minutes,

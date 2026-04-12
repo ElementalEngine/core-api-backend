@@ -149,6 +149,7 @@ class AuthRepository:
             "updated_at": "",
             "created_at": "",
             "user_name": "",
+            "first_registered_at": "",
         }
 
         if discord_username:
@@ -166,10 +167,9 @@ class AuthRepository:
         else:
             unset_payload["linked_account_name"] = ""
 
-        if existing:
-            historical_first_registered_at = existing.get("first_registered_at") or existing.get("created_at")
-            if isinstance(historical_first_registered_at, datetime):
-                set_payload["first_registered_at"] = historical_first_registered_at
+        existing_server_registered_at = _resolve_server_registered_at(existing) if existing else None
+        if existing_server_registered_at is not None:
+            set_payload["server_registered_at"] = existing_server_registered_at
 
         update_doc: dict[str, Any] = {
             "$set": set_payload,
@@ -177,10 +177,34 @@ class AuthRepository:
         }
         if existing is None:
             update_doc["$setOnInsert"] = {
-                "first_registered_at": now,
+                "server_registered_at": now,
                 "__v": 0,
             }
         elif material_changed:
             update_doc["$inc"] = {"__v": 1}
 
         await self._users.update_one({"discord_id": discord_user_id}, update_doc, upsert=True)
+
+
+
+def _resolve_server_registered_at(existing: Mapping[str, Any] | None) -> datetime | None:
+    if not existing:
+        return None
+
+    explicit = existing.get("server_registered_at")
+    if isinstance(explicit, datetime):
+        return explicit
+
+    historical = existing.get("first_registered_at") or existing.get("created_at")
+    if isinstance(historical, datetime):
+        return historical
+
+    registrations = existing.get("registrations") or {}
+    candidates: list[datetime] = []
+    if isinstance(registrations, Mapping):
+        for value in registrations.values():
+            if isinstance(value, Mapping):
+                registered_at = value.get("registered_at")
+                if isinstance(registered_at, datetime):
+                    candidates.append(registered_at)
+    return min(candidates) if candidates else None

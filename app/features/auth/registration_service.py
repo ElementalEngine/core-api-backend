@@ -290,6 +290,27 @@ def _to_lookup_response(doc: dict[str, Any]) -> AccountLookupResponse:
         linked_account_id=(str(doc["linked_account_id"]) if doc.get("linked_account_id") else (str(doc["steam_id"]) if doc.get("steam_id") else None)),
         linked_account_name=(str(doc["linked_account_name"]) if doc.get("linked_account_name") else (str(doc["steam_name"]) if doc.get("steam_name") else None)),
         registrations=doc.get("registrations") or {},
-        first_registered_at=doc.get("first_registered_at") or doc.get("created_at"),
+        server_registered_at=_resolve_server_registered_at(doc),
         record_version=(int(doc["__v"]) if isinstance(doc.get("__v"), int) else None),
     )
+
+
+
+def _resolve_server_registered_at(doc: dict[str, Any]) -> datetime | None:
+    explicit = doc.get("server_registered_at")
+    if isinstance(explicit, datetime):
+        return explicit
+
+    historical = doc.get("first_registered_at") or doc.get("created_at")
+    if isinstance(historical, datetime):
+        return historical
+
+    registrations = doc.get("registrations") or {}
+    candidates: list[datetime] = []
+    if isinstance(registrations, dict):
+        for value in registrations.values():
+            if isinstance(value, dict):
+                registered_at = value.get("registered_at")
+                if isinstance(registered_at, datetime):
+                    candidates.append(registered_at)
+    return min(candidates) if candidates else None
