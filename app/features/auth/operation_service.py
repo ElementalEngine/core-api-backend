@@ -58,23 +58,7 @@ class OperationService:
                     "updated_at": now,
                 },
             )
-            source_session_id = operation.get("source_session_id")
-            if isinstance(source_session_id, str) and source_session_id:
-                try:
-                    await self._repository.update_registration_session(
-                        source_session_id,
-                        {
-                            "status": RegistrationSessionStatus.COMPLETED.value,
-                            "updated_at": now,
-                        },
-                    )
-                except Exception:
-                    logger.warning(
-                        "Failed to mark source session completed after successful operation finalize. operation_id=%s session_id=%s",
-                        operation_id,
-                        source_session_id,
-                        exc_info=True,
-                    )
+            await self._mark_source_session_completed(operation_id, operation.get("source_session_id"), now)
             return
 
         await self._repository.update_registration_operation(
@@ -87,22 +71,57 @@ class OperationService:
                 "updated_at": now,
             },
         )
-        source_session_id = operation.get("source_session_id")
-        if isinstance(source_session_id, str) and source_session_id:
-            try:
-                await self._repository.update_registration_session(
-                    source_session_id,
-                    {
-                        "status": RegistrationSessionStatus.FAILED.value,
-                        "failure_code": payload.failure_code,
-                        "failure_message": payload.failure_message,
-                        "updated_at": now,
-                    },
-                )
-            except Exception:
-                logger.warning(
-                    "Failed to mark source session failed after failed operation finalize. operation_id=%s session_id=%s",
-                    operation_id,
-                    source_session_id,
-                    exc_info=True,
-                )
+        await self._mark_source_session_failed(
+            operation_id,
+            operation.get("source_session_id"),
+            now,
+            payload.failure_code,
+            payload.failure_message,
+        )
+
+    async def _mark_source_session_completed(self, operation_id: str, source_session_id: object, now: datetime) -> None:
+        if not isinstance(source_session_id, str) or not source_session_id:
+            return
+        try:
+            await self._repository.update_registration_session(
+                source_session_id,
+                {
+                    "status": RegistrationSessionStatus.COMPLETED.value,
+                    "updated_at": now,
+                },
+            )
+        except Exception:
+            logger.warning(
+                "Failed to mark source session completed after successful finalize. operation_id=%s session_id=%s",
+                operation_id,
+                source_session_id,
+                exc_info=True,
+            )
+
+    async def _mark_source_session_failed(
+        self,
+        operation_id: str,
+        source_session_id: object,
+        now: datetime,
+        failure_code: str | None,
+        failure_message: str | None,
+    ) -> None:
+        if not isinstance(source_session_id, str) or not source_session_id:
+            return
+        try:
+            await self._repository.update_registration_session(
+                source_session_id,
+                {
+                    "status": RegistrationSessionStatus.FAILED.value,
+                    "failure_code": failure_code,
+                    "failure_message": failure_message,
+                    "updated_at": now,
+                },
+            )
+        except Exception:
+            logger.warning(
+                "Failed to mark source session failed after failed finalize. operation_id=%s session_id=%s",
+                operation_id,
+                source_session_id,
+                exc_info=True,
+            )

@@ -8,6 +8,7 @@ from pymongo import ASCENDING
 
 from app.features.auth.constants import (
     AUTH_DB_NAME,
+    AUTH_OPERATION_RETENTION_SECONDS,
     COL_REGISTRATION_OPERATIONS,
     COL_REGISTRATION_SESSIONS,
 )
@@ -51,6 +52,12 @@ class AuthRepository:
             [("discord_user_id", ASCENDING)],
             name="auth_operation_discord_id_idx",
         )
+        await self._operations.create_index(
+            [("completed_at", ASCENDING)],
+            expireAfterSeconds=AUTH_OPERATION_RETENTION_SECONDS,
+            partialFilterExpression={"completed_at": {"$exists": True}},
+            name="auth_operation_completed_ttl",
+        )
         await self._users.create_index(
             [("discord_id", ASCENDING)],
             name="auth_user_discord_id_idx",
@@ -72,14 +79,6 @@ class AuthRepository:
     async def get_user_by_discord_id(self, discord_id: str) -> dict[str, Any] | None:
         return await self._users.find_one({"discord_id": discord_id})
 
-    async def find_users_by_discord_id(self, discord_id: str, *, limit: int = 25) -> list[dict[str, Any]]:
-        cursor = (
-            self._users.find({"discord_id": discord_id})
-            .sort([("linked_platform", ASCENDING), ("linked_account_id", ASCENDING), ("steam_id", ASCENDING)])
-            .limit(max(1, limit))
-        )
-        return await cursor.to_list(length=max(1, limit))
-
     async def get_user_by_steam_id(self, steam_id: str) -> dict[str, Any] | None:
         return await self._users.find_one(
             {
@@ -89,21 +88,6 @@ class AuthRepository:
                 ]
             }
         )
-
-    async def find_users_by_linked_account_id(self, linked_account_id: str, *, limit: int = 25) -> list[dict[str, Any]]:
-        cursor = (
-            self._users.find(
-                {
-                    "$or": [
-                        {"linked_account_id": linked_account_id},
-                        {"steam_id": linked_account_id},
-                    ]
-                }
-            )
-            .sort([("discord_id", ASCENDING), ("linked_platform", ASCENDING), ("linked_account_id", ASCENDING)])
-            .limit(max(1, limit))
-        )
-        return await cursor.to_list(length=max(1, limit))
 
     async def get_user_by_linked_account(self, platform: str, account_id: str) -> dict[str, Any] | None:
         return await self._users.find_one({"linked_platform": platform, "linked_account_id": account_id})
@@ -223,44 +207,38 @@ class AuthRepository:
         else:
             unset_payload["linked_account_name"] = ""
 
-        existing_server_registered_at = _resolve_server_registered_at(existing) if existing else None
-        if existing_server_registered_at is not None:
-            set_payload["server_registered_at"] = existing_server_registered_at
+        server_registered_at = self._resolve_server_registered_at(existing, now)
+        if server_registered_at:
+            set_payload["server_registered_at"] = server_registered_at
+        else:
+            unset_payload["server_registered_at"] = ""
 
-        update_doc: dict[str, Any] = {
-            "$set": set_payload,
-            "$unset": unset_payload,
-        }
-        if existing is None:
-            update_doc["$setOnInsert"] = {
-                "server_registered_at": now,
-                "__v": 0,
-            }
-        elif material_changed:
-            update_doc["$inc"] = {"__v": 1}
+        if material_changed:
+            set_payload["__v"] = int(existing.get("__v", 0)) + 1 if existing else 1
 
+        update_doc: dict[str, Any] = {"$set": set_payload}
+        if unset_payload:
+            update_doc["$unset"] = unset_payload
         await self._users.update_one({"discord_id": discord_user_id}, update_doc, upsert=True)
 
+    @staticmethod
+    def _resolve_server_registered_at(existing: Mapping[str, Any] | None, fallback: datetime) -> datetime:
+        if not existing:
+            return fallback
 
+        for key in ("server_registered_at", "first_registered_at", "created_at"):
+            value = existing.get(key)
+            if isinstance(value, datetime):
+                return value
 
-def _resolve_server_registered_at(existing: Mapping[str, Any] | None) -> datetime | None:
-    if not existing:
-        return None
+        registrations = existing.get("registrations") or {}
+        if isinstance(registrations, dict):
+            candidates = [
+                value.get("registered_at")
+                for value in registrations.values()
+                if isinstance(value, dict) and isinstance(value.get("registered_at"), datetime)
+            ]
+            if candidates:
+                return min(candidates)
 
-    explicit = existing.get("server_registered_at")
-    if isinstance(explicit, datetime):
-        return explicit
-
-    historical = existing.get("first_registered_at") or existing.get("created_at")
-    if isinstance(historical, datetime):
-        return historical
-
-    registrations = existing.get("registrations") or {}
-    candidates: list[datetime] = []
-    if isinstance(registrations, Mapping):
-        for value in registrations.values():
-            if isinstance(value, Mapping):
-                registered_at = value.get("registered_at")
-                if isinstance(registered_at, datetime):
-                    candidates.append(registered_at)
-    return min(candidates) if candidates else None
+        return fallback

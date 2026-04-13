@@ -22,7 +22,7 @@ from app.features.auth.errors import (
 )
 from app.features.auth.operation_service import OperationService
 from app.features.auth.registration_service import RegistrationService
-from app.features.auth.schemas import FinalizeRegistrationOperationRequest
+from app.features.auth.schemas import FinalizeRegistrationOperationRequest, ManualRegistrationRequest
 from app.features.auth.steam_service import SteamService
 
 
@@ -206,3 +206,16 @@ def test_steam_validation_playtime_threshold(monkeypatch):
 
     with pytest.raises(SteamPlaytimeBelowThresholdError):
         asyncio.run(service.validate_linked_account(steam_id="1", game=SupportedGame.CIV7.value))
+
+
+def test_manual_registration_request_allows_missing_reason():
+    payload = ManualRegistrationRequest(
+        actor_discord_id="111111111111111111",
+        subject_discord_id="222222222222222222",
+        platform=RegistrationPlatform.STEAM,
+        platform_account_id="76561190000000001",
+        platform_account_name="Primary Steam",
+        game=SupportedGame.CIV6,
+    )
+
+    assert payload.reason is None
