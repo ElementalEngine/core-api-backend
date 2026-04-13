@@ -305,6 +305,7 @@ async def discord_oauth_callback(
     session_service = SessionService(repository)
     registration_service = RegistrationService(repository)
     oauth_service = DiscordOAuthService()
+    steam_service = SteamService()
 
     if error or not code or not state:
         if state:
@@ -320,6 +321,16 @@ async def discord_oauth_callback(
             except Exception:
                 logger.exception("Failed to persist OAuth callback denial state")
         raise to_http_exception(InvalidStateError())
+
+    session_id: str | None = None
+    platform: RegistrationPlatform | None = None
+    linked_account_id: str | None = None
+    linked_account_name: str | None = None
+    oauth_username_snapshot: str | None = None
+    oauth_display_name_snapshot: str | None = None
+    oauth_locale_snapshot: str | None = None
+    oauth_verified_snapshot: bool | None = None
+    oauth_mfa_enabled_snapshot: bool | None = None
 
     try:
         session = await session_service.load_session_by_state(state)
@@ -358,6 +369,12 @@ async def discord_oauth_callback(
 
         RegistrationService.manual_required_for_platform(platform, account_name=linked_account_name)
 
+        if platform is RegistrationPlatform.STEAM:
+            await steam_service.validate_linked_account(
+                steam_id=linked_account_id,
+                game=str(session["game"]),
+            )
+
         await session_service.mark_validated(
             session_id,
             linked_account_id=linked_account_id,
@@ -390,11 +407,26 @@ async def discord_oauth_callback(
         try:
             session = await repository.get_registration_session_by_state(state)
             if session is not None:
+                extra: dict[str, object] = dict(exc.details) if isinstance(exc.details, dict) else {}
+                if linked_account_id:
+                    extra.setdefault("validated_account_id", linked_account_id)
+                if linked_account_name:
+                    extra.setdefault("validated_account_name", linked_account_name)
+                if oauth_username_snapshot:
+                    extra.setdefault("oauth_username_snapshot", oauth_username_snapshot)
+                if oauth_display_name_snapshot:
+                    extra.setdefault("oauth_display_name_snapshot", oauth_display_name_snapshot)
+                if oauth_locale_snapshot:
+                    extra.setdefault("oauth_locale_snapshot", oauth_locale_snapshot)
+                if oauth_verified_snapshot is not None:
+                    extra.setdefault("oauth_verified_snapshot", oauth_verified_snapshot)
+                if oauth_mfa_enabled_snapshot is not None:
+                    extra.setdefault("oauth_mfa_enabled_snapshot", oauth_mfa_enabled_snapshot)
                 await session_service.mark_failed(
                     str(session["session_id"]),
                     failure_code=exc.code,
                     failure_message=exc.message,
-                    extra=exc.details if isinstance(exc.details, dict) else None,
+                    extra=extra or None,
                 )
         except Exception:
             logger.exception("Failed to persist OAuth callback auth error state")
@@ -403,14 +435,30 @@ async def discord_oauth_callback(
         try:
             session = await repository.get_registration_session_by_state(state)
             if session is not None:
+                extra: dict[str, object] = {}
+                if linked_account_id:
+                    extra["validated_account_id"] = linked_account_id
+                if linked_account_name:
+                    extra["validated_account_name"] = linked_account_name
+                if oauth_username_snapshot:
+                    extra["oauth_username_snapshot"] = oauth_username_snapshot
+                if oauth_display_name_snapshot:
+                    extra["oauth_display_name_snapshot"] = oauth_display_name_snapshot
+                if oauth_locale_snapshot:
+                    extra["oauth_locale_snapshot"] = oauth_locale_snapshot
+                if oauth_verified_snapshot is not None:
+                    extra["oauth_verified_snapshot"] = oauth_verified_snapshot
+                if oauth_mfa_enabled_snapshot is not None:
+                    extra["oauth_mfa_enabled_snapshot"] = oauth_mfa_enabled_snapshot
                 await session_service.mark_failed(
                     str(session["session_id"]),
                     failure_code="AUTH_CALLBACK_INTERNAL_ERROR",
                     failure_message="The auth service could not finish Discord verification. Please try again.",
+                    extra=extra or None,
                 )
         except Exception:
             logger.exception("Failed to persist OAuth callback internal error state")
-        logger.exception("Unexpected OAuth callback failure. state=%s", state)
+        logger.exception("Unexpected OAuth callback failure. state=%s session_id=%s platform=%s", state, session_id, platform.value if platform else None)
         raise to_http_exception(
             _internal_auth_error(
                 "AUTH_CALLBACK_INTERNAL_ERROR",
