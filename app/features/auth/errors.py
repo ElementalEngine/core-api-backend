@@ -68,7 +68,8 @@ class AccountLookupNotFoundError(AuthError):
     def __init__(self, *, field: str, value: str) -> None:
         label = {
             "discord_id": f"Discord ID {value}",
-            "steam_id": f"Steam ID {value}",
+            "linked_account_id": f"linked account ID {value}",
+            "steam_id": f"linked account ID {value}",
         }.get(field, value)
         super().__init__(
             code="ACCOUNT_NOT_FOUND",
@@ -133,15 +134,6 @@ class DiscordOAuthError(AuthError):
             message=message,
             status_code=status.HTTP_502_BAD_GATEWAY,
             retryable=True,
-        )
-
-
-class DiscordOAuthDeniedError(AuthError):
-    def __init__(self, message: str = "Discord authentication was cancelled or denied. Please start again.") -> None:
-        super().__init__(
-            code="DISCORD_OAUTH_DENIED",
-            message=message,
-            status_code=status.HTTP_400_BAD_REQUEST,
         )
 
 
@@ -267,34 +259,23 @@ class SteamIdConflictError(AuthError):
         )
 
 
-class DiscordSteamConflictError(AuthError):
-    def __init__(self, *, discord_user_id: str, existing_steam_id: str) -> None:
-        super().__init__(
-            code="DISCORD_ID_CONFLICT",
-            message="This Discord account is already linked to another Steam account. Please contact staff if you believe this is a mistake.",
-            status_code=status.HTTP_409_CONFLICT,
-            details={"discord_user_id": discord_user_id, "existing_steam_id": existing_steam_id},
-        )
-
-
-class DiscordIdConflictError(DiscordSteamConflictError):
-    pass
-
-
 class LinkedAccountConflictError(AuthError):
     def __init__(self, *, platform: str, account_id: str, existing_discord_id: str) -> None:
         super().__init__(
             code="LINKED_ACCOUNT_CONFLICT",
-            message=(
-                f"This {platform} account is already linked to another Discord account. "
-                "Please contact staff if you believe this is a mistake."
-            ),
+            message="This linked account is already connected to another Discord account. Please contact staff if you believe this is a mistake.",
             status_code=status.HTTP_409_CONFLICT,
-            details={
-                "platform": platform,
-                "account_id": account_id,
-                "existing_discord_id": existing_discord_id,
-            },
+            details={"platform": platform, "account_id": account_id, "existing_discord_id": existing_discord_id},
+        )
+
+
+class DiscordSteamConflictError(AuthError):
+    def __init__(self, *, discord_user_id: str, existing_steam_id: str) -> None:
+        super().__init__(
+            code="DISCORD_ID_CONFLICT",
+            message="Your Discord account is already linked to a different Steam account. Please contact staff to resolve the conflict.",
+            status_code=status.HTTP_409_CONFLICT,
+            details={"discord_user_id": discord_user_id, "existing_steam_id": existing_steam_id},
         )
 
 
@@ -302,19 +283,20 @@ class RankRoleEligibilityError(AuthError):
     def __init__(self, discord_user_id: str) -> None:
         super().__init__(
             code="RANK_ROLE_NOT_ELIGIBLE",
-            message="You must complete full registration with a linked Steam account before adding another rank role.",
+            message="You must complete registration before you can add a ranked role.",
             status_code=status.HTTP_400_BAD_REQUEST,
             details={"discord_user_id": discord_user_id},
         )
 
 
 def to_http_exception(error: AuthError) -> HTTPException:
-    detail = ErrorResponse(
+    payload = ErrorResponse(
         error=ErrorDetail(
             code=error.code,
             message=error.message,
-            retryable=error.retryable,
             details=error.details,
+            retryable=error.retryable,
+            correlation_id=None,
         )
-    ).model_dump(exclude_none=True)
-    return HTTPException(status_code=error.status_code, detail=detail)
+    )
+    return HTTPException(status_code=error.status_code, detail=payload.model_dump())

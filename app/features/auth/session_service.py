@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from app.core.config import settings
 from app.features.auth.constants import DISCORD_OAUTH_AUTHORIZE_URL, DISCORD_OAUTH_SCOPES
-from app.features.auth.enums import RegistrationPlatform, RegistrationSessionStatus, SupportedGame
+from app.features.auth.enums import RegistrationSessionStatus, RegistrationPlatform, SupportedGame
 from app.features.auth.errors import (
     AlreadyRegisteredError,
     AuthConfigurationError,
@@ -77,7 +77,7 @@ class SessionService:
 
         return RegistrationSessionStatusResponse(
             session_id=session_id,
-            status=self._parse_status_value(session.get("status")),
+            status=RegistrationSessionStatus(str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))),
             expires_at=session.get("expires_at"),
             failure_code=session.get("failure_code"),
             failure_message=session.get("failure_message"),
@@ -188,13 +188,6 @@ class SessionService:
             changes.update(extra)
         await self._repository.update_registration_session(session_id, changes)
 
-    @staticmethod
-    def _parse_status_value(value: object) -> RegistrationSessionStatus:
-        try:
-            return RegistrationSessionStatus(str(value or RegistrationSessionStatus.PENDING_AUTH.value))
-        except ValueError:
-            return RegistrationSessionStatus.FAILED
-
     async def _coerce_expired_session(
         self,
         session: dict[str, object],
@@ -205,24 +198,33 @@ class SessionService:
         expires_at = session.get("expires_at")
         normalized_expires_at = self._normalize_datetime(expires_at) if isinstance(expires_at, datetime) else None
         status_value = str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))
-
-        if normalized_expires_at is None:
-            return session
-        if normalized_expires_at > datetime.now(timezone.utc):
-            return session
-
-        if status_value != RegistrationSessionStatus.EXPIRED.value:
+        if (
+            normalized_expires_at is not None
+            and normalized_expires_at <= datetime.now(timezone.utc)
+            and status_value
+            not in {
+                RegistrationSessionStatus.EXPIRED.value,
+                RegistrationSessionStatus.COMPLETED.value,
+                RegistrationSessionStatus.FAILED.value,
+            }
+        ):
+            status_value = RegistrationSessionStatus.EXPIRED.value
             await self._repository.update_registration_session(
                 session_id,
                 {
-                    "status": RegistrationSessionStatus.EXPIRED.value,
+                    "status": status_value,
+                    "failure_code": "REGISTRATION_SESSION_EXPIRED",
+                    "failure_message": "Registration session expired. Please start again.",
                     "updated_at": datetime.now(timezone.utc),
                 },
             )
-            session = dict(session)
-            session["status"] = RegistrationSessionStatus.EXPIRED.value
-
-        if raise_on_expired:
+            session = {
+                **session,
+                "status": status_value,
+                "failure_code": "REGISTRATION_SESSION_EXPIRED",
+                "failure_message": "Registration session expired. Please start again.",
+            }
+        if raise_on_expired and status_value == RegistrationSessionStatus.EXPIRED.value:
             raise SessionExpiredError(session_id)
         return session
 

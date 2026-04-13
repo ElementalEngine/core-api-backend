@@ -122,26 +122,30 @@ class RegistrationOperationResponse(BaseModel):
     role_intents: list[RoleIntent]
 
 
-class AccountRegistrationRecord(BaseModel):
-    status: str = 'registered'
-    method: str = 'unknown'
-    registered_at: datetime | None = None
-    ownership_verified_at: datetime | None = None
-    playtime_minutes: int | None = None
+class LinkedAccountLookupHit(BaseModel):
+    linked_platform: RegistrationPlatform | None = None
+    linked_account_id: str
+    linked_account_name: str | None = None
 
 
-class AccountLookupResponse(BaseModel):
+class DiscordLookupResponse(BaseModel):
     discord_id: str
     discord_username: str | None = None
     discord_display_name: str | None = None
-    steam_id: str | None = None
-    steam_name: str | None = None
-    linked_platform: RegistrationPlatform | None = None
-    linked_account_id: str | None = None
+    linked_accounts: list[LinkedAccountLookupHit] = Field(default_factory=list)
+
+
+class DiscordAccountLookupHit(BaseModel):
+    discord_id: str
+    discord_username: str | None = None
+    discord_display_name: str | None = None
+
+
+class LinkedAccountLookupResponse(BaseModel):
+    linked_account_id: str
     linked_account_name: str | None = None
-    registrations: dict[str, AccountRegistrationRecord] = Field(default_factory=dict)
-    server_registered_at: datetime | None = None
-    record_version: int | None = None
+    linked_platform: RegistrationPlatform | None = None
+    discord_accounts: list[DiscordAccountLookupHit] = Field(default_factory=list)
 
 
 class DiscordOAuthCallbackResult(BaseModel):
