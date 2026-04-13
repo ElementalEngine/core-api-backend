@@ -11,6 +11,7 @@ from app.features.auth.enums import RegistrationPlatform, RegistrationSessionSta
 from app.features.auth.errors import (
     AccountLookupNotFoundError,
     AuthError,
+    DiscordUserMismatchError,
     InvalidStateError,
     SessionExpiredError,
     SessionNotFoundError,
@@ -343,22 +344,6 @@ async def discord_oauth_callback(
             platform=platform,
         )
         user_id = str(user.get("id", ""))
-        if user_id and user_id != str(session["discord_user_id"]):
-            await session_service.mark_failed(
-                session_id,
-                failure_code="DISCORD_USER_MISMATCH",
-                failure_message="Authenticated Discord account did not match the registration session.",
-                extra={"oauth_discord_user_id": user_id},
-            )
-            raise to_http_exception(
-                AuthError(
-                    code="DISCORD_USER_MISMATCH",
-                    message="Authenticated Discord account did not match the registration session.",
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    details={"oauth_discord_user_id": user_id},
-                )
-            )
-
         linked_account_id = str(connection.get("id") or "").strip()
         linked_account_name = str(connection.get("name") or "").strip() or None
         oauth_username_snapshot = str(user.get("username") or "").strip() or None
@@ -366,6 +351,12 @@ async def discord_oauth_callback(
         oauth_locale_snapshot = str(user.get("locale") or "").strip() or None
         oauth_verified_snapshot = user.get("verified") if isinstance(user.get("verified"), bool) else None
         oauth_mfa_enabled_snapshot = user.get("mfa_enabled") if isinstance(user.get("mfa_enabled"), bool) else None
+
+        if user_id and user_id != str(session["discord_user_id"]):
+            raise DiscordUserMismatchError(
+                session_user_id=str(session["discord_user_id"]),
+                request_user_id=user_id,
+            )
 
         RegistrationService.manual_required_for_platform(platform, account_name=linked_account_name)
 

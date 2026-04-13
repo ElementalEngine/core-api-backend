@@ -51,6 +51,23 @@ class AuthRepository:
             [("discord_user_id", ASCENDING)],
             name="auth_operation_discord_id_idx",
         )
+        await self._users.create_index(
+            [("discord_id", ASCENDING)],
+            name="auth_user_discord_id_idx",
+        )
+        await self._users.create_index(
+            [("linked_account_id", ASCENDING)],
+            name="auth_user_linked_account_id_idx",
+        )
+        await self._users.create_index(
+            [("linked_platform", ASCENDING), ("linked_account_id", ASCENDING)],
+            name="auth_user_linked_platform_account_idx",
+        )
+        await self._users.create_index(
+            [("steam_id", ASCENDING)],
+            sparse=True,
+            name="auth_user_steam_id_idx",
+        )
 
     async def get_user_by_discord_id(self, discord_id: str) -> dict[str, Any] | None:
         return await self._users.find_one({"discord_id": discord_id})
@@ -130,7 +147,23 @@ class AuthRepository:
     ) -> None:
         now = datetime.now(timezone.utc)
         registration_key = f"registrations.{game}"
-        existing = await self._users.find_one({"discord_id": discord_user_id})
+        existing = await self._users.find_one(
+            {"discord_id": discord_user_id},
+            {
+                "discord_username": 1,
+                "user_name": 1,
+                "display_name": 1,
+                "linked_platform": 1,
+                "linked_account_id": 1,
+                "linked_account_name": 1,
+                "steam_id": 1,
+                "server_registered_at": 1,
+                "first_registered_at": 1,
+                "created_at": 1,
+                "registrations": 1,
+                "__v": 1,
+            },
+        )
 
         registration_doc = {
             "method": method,

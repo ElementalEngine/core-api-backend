@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 
 from app.features.auth.enums import RegistrationOperationStatus, RegistrationSessionStatus
 from app.features.auth.errors import OperationNotFoundError, OperationStateConflictError
 from app.features.auth.repository import AuthRepository
 from app.features.auth.schemas import FinalizeRegistrationOperationRequest
+
+logger = logging.getLogger(__name__)
 
 
 class OperationService:
@@ -66,7 +69,12 @@ class OperationService:
                         },
                     )
                 except Exception:
-                    pass
+                    logger.warning(
+                        "Failed to mark source session completed after successful operation finalize. operation_id=%s session_id=%s",
+                        operation_id,
+                        source_session_id,
+                        exc_info=True,
+                    )
             return
 
         await self._repository.update_registration_operation(
@@ -92,4 +100,9 @@ class OperationService:
                     },
                 )
             except Exception:
-                pass
+                logger.warning(
+                    "Failed to mark source session failed after failed operation finalize. operation_id=%s session_id=%s",
+                    operation_id,
+                    source_session_id,
+                    exc_info=True,
+                )
