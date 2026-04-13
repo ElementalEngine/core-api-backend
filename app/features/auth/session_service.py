@@ -75,9 +75,11 @@ class SessionService:
             raise SessionNotFoundError(session_id)
         session = await self._coerce_expired_session(session, raise_on_expired=False)
 
+        status = self._coerce_status(session.get("status"))
+
         return RegistrationSessionStatusResponse(
             session_id=session_id,
-            status=RegistrationSessionStatus(str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))),
+            status=status,
             expires_at=session.get("expires_at"),
             failure_code=session.get("failure_code"),
             failure_message=session.get("failure_message"),
@@ -227,6 +229,13 @@ class SessionService:
         if raise_on_expired and status_value == RegistrationSessionStatus.EXPIRED.value:
             raise SessionExpiredError(session_id)
         return session
+
+    @staticmethod
+    def _coerce_status(value: object) -> RegistrationSessionStatus:
+        try:
+            return RegistrationSessionStatus(str(value or RegistrationSessionStatus.PENDING_AUTH.value))
+        except ValueError:
+            return RegistrationSessionStatus.FAILED
 
     @staticmethod
     def _normalize_datetime(value: datetime) -> datetime:

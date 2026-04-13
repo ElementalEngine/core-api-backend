@@ -11,6 +11,7 @@ from app.features.auth.enums import RegistrationPlatform, RegistrationSessionSta
 from app.features.auth.errors import (
     AccountLookupNotFoundError,
     AuthError,
+    DiscordOAuthError,
     DiscordUserMismatchError,
     InvalidStateError,
     SessionExpiredError,
@@ -309,6 +310,11 @@ async def discord_oauth_callback(
     steam_service = SteamService()
 
     if error or not code or not state:
+        failure_message = (
+            "Discord authentication was cancelled or denied. Please start again."
+            if error
+            else "Discord authentication did not complete correctly. Please start again."
+        )
         if state:
             try:
                 session = await repository.get_registration_session_by_state(state)
@@ -316,12 +322,14 @@ async def discord_oauth_callback(
                     await session_service.mark_failed(
                         str(session["session_id"]),
                         failure_code="DISCORD_OAUTH_FAILED",
-                        failure_message="Discord authentication was cancelled or denied. Please start again.",
+                        failure_message=failure_message,
                         extra={"oauth_error": error} if error else None,
                     )
             except Exception:
                 logger.exception("Failed to persist OAuth callback denial state")
-        raise to_http_exception(InvalidStateError())
+        if not state:
+            raise to_http_exception(InvalidStateError())
+        raise to_http_exception(DiscordOAuthError(failure_message))
 
     session_id: str | None = None
     platform: RegistrationPlatform | None = None
