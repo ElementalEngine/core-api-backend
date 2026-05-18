@@ -959,11 +959,13 @@ class MatchService:
                         raise MatchServiceError(f"An error occured during writing to DB: {e}")
 
             logger.info("✅ ✅ Approved match %s", match_id)
-            affected_players = [
-                {"discord_id": str(player.discord_id), "rating_mu": float(post_lifetime[index].mu)}
-                for index, player in enumerate(match.players)
-                if player.discord_id and player.discord_id not in ("-1", "-2") and not str(player.discord_id).startswith("-")
-            ]
+            affected_players = []
+            if match.game_mode.lower() == "ffa" or match.is_cloud:
+                affected_players = [
+                    {"discord_id": str(player.discord_id), "rating_mu": float(post_combined[index].mu) if match.is_cloud else post_lifetime[index].mu}
+                    for index, player in enumerate(match.players)
+                    if player.discord_id and player.discord_id not in ("-1", "-2") and not str(player.discord_id).startswith("-")
+                ]
             return {"match_id": str(validated_insert_id), **match.dict(), "affected_players": affected_players}
 
     async def get_leaderboard(
