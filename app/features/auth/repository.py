@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
+from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pymongo import ASCENDING
 
@@ -146,7 +147,6 @@ class AuthRepository:
         playtime_minutes: int | None,
     ) -> None:
         now = datetime.now(timezone.utc)
-        registration_key = f"registrations.{game}"
         existing = await self._users.find_one(
             {"discord_id": discord_user_id},
             {
@@ -165,82 +165,164 @@ class AuthRepository:
             },
         )
 
-        registration_doc = {
-            "method": method,
-            "registered_at": now,
-            "ownership_verified_at": ownership_verified_at,
-            "playtime_minutes": playtime_minutes,
-        }
-
-        existing_username = None
-        if existing:
-            raw_username = existing.get("discord_username") or existing.get("user_name")
-            existing_username = str(raw_username) if raw_username else None
-
-        current_registration = ((existing or {}).get("registrations") or {}).get(game)
-        material_changed = existing is None or any(
-            [
-                existing_username != discord_username,
-                (existing or {}).get("display_name") != display_name,
-                (existing or {}).get("linked_platform") != linked_platform,
-                (existing or {}).get("linked_account_id") != linked_account_id,
-                (existing or {}).get("linked_account_name") != linked_account_name,
-                current_registration != registration_doc,
-            ]
+        registration_doc = _build_registration_entry(
+            now=now,
+            method=method,
+            ownership_verified_at=ownership_verified_at,
+            playtime_minutes=playtime_minutes,
         )
 
-        set_payload: dict[str, Any] = {
-            "discord_id": discord_user_id,
-            "linked_platform": linked_platform,
-            "linked_account_id": linked_account_id,
-            registration_key: registration_doc,
-        }
-        unset_payload: dict[str, str] = {
-            "steam_id": "",
-            "steam_name": "",
-            "locale": "",
-            "verified": "",
-            "mfa_enabled": "",
-            "auth_version": "",
-            "updated_at": "",
-            "created_at": "",
-            "user_name": "",
-            "first_registered_at": "",
-        }
-
-        if discord_username:
-            set_payload["discord_username"] = discord_username
-        else:
-            unset_payload["discord_username"] = ""
-
-        if display_name:
-            set_payload["display_name"] = display_name
-        else:
-            unset_payload["display_name"] = ""
-
-        if linked_account_name:
-            set_payload["linked_account_name"] = linked_account_name
-        else:
-            unset_payload["linked_account_name"] = ""
-
-        existing_server_registered_at = _resolve_server_registered_at(existing) if existing else None
-        if existing_server_registered_at is not None:
-            set_payload["server_registered_at"] = existing_server_registered_at
-
-        update_doc: dict[str, Any] = {
-            "$set": set_payload,
-            "$unset": unset_payload,
-        }
         if existing is None:
-            update_doc["$setOnInsert"] = {
-                "server_registered_at": now,
-                "__v": 0,
-            }
-        elif material_changed:
-            update_doc["$inc"] = {"__v": 1}
+            await self._users.insert_one(
+                _build_new_user_document(
+                    discord_user_id=discord_user_id,
+                    discord_username=discord_username,
+                    display_name=display_name,
+                    linked_platform=linked_platform,
+                    linked_account_id=linked_account_id,
+                    linked_account_name=linked_account_name,
+                    game=game,
+                    registration_doc=registration_doc,
+                    server_registered_at=now,
+                )
+            )
+            return
 
-        await self._users.update_one({"discord_id": discord_user_id}, update_doc, upsert=True)
+        await self._users.update_one(
+            {"discord_id": discord_user_id},
+            _build_existing_user_update(
+                existing=existing,
+                discord_user_id=discord_user_id,
+                discord_username=discord_username,
+                display_name=display_name,
+                linked_platform=linked_platform,
+                linked_account_id=linked_account_id,
+                linked_account_name=linked_account_name,
+                game=game,
+                registration_doc=registration_doc,
+            ),
+        )
 
+
+
+def _build_registration_entry(
+    *,
+    now: datetime,
+    method: str,
+    ownership_verified_at: datetime | None,
+    playtime_minutes: int | None,
+) -> dict[str, Any]:
+    return {
+        "method": method,
+        "registered_at": now,
+        "ownership_verified_at": ownership_verified_at,
+        "playtime_minutes": playtime_minutes,
+    }
+
+
+def _build_new_user_document(
+    *,
+    discord_user_id: str,
+    discord_username: str | None,
+    display_name: str | None,
+    linked_platform: str,
+    linked_account_id: str,
+    linked_account_name: str | None,
+    game: str,
+    registration_doc: Mapping[str, Any],
+    server_registered_at: datetime,
+) -> dict[str, Any]:
+    document: dict[str, Any] = {
+        "_id": ObjectId(),
+        "discord_id": discord_user_id,
+    }
+    if discord_username:
+        document["discord_username"] = discord_username
+    if display_name:
+        document["display_name"] = display_name
+    document["linked_account_id"] = linked_account_id
+    if linked_account_name:
+        document["linked_account_name"] = linked_account_name
+    document["linked_platform"] = linked_platform
+    document["registrations"] = {game: dict(registration_doc)}
+    document["server_registered_at"] = server_registered_at
+    document["__v"] = 0
+    return document
+
+
+def _build_existing_user_update(
+    *,
+    existing: Mapping[str, Any],
+    discord_user_id: str,
+    discord_username: str | None,
+    display_name: str | None,
+    linked_platform: str,
+    linked_account_id: str,
+    linked_account_name: str | None,
+    game: str,
+    registration_doc: Mapping[str, Any],
+) -> dict[str, Any]:
+    registration_key = f"registrations.{game}"
+    raw_username = existing.get("discord_username") or existing.get("user_name")
+    existing_username = str(raw_username) if raw_username else None
+    current_registration = (existing.get("registrations") or {}).get(game)
+
+    material_changed = any(
+        [
+            existing_username != discord_username,
+            existing.get("display_name") != display_name,
+            existing.get("linked_platform") != linked_platform,
+            existing.get("linked_account_id") != linked_account_id,
+            existing.get("linked_account_name") != linked_account_name,
+            current_registration != dict(registration_doc),
+        ]
+    )
+
+    set_payload: dict[str, Any] = {
+        "discord_id": discord_user_id,
+        "linked_platform": linked_platform,
+        "linked_account_id": linked_account_id,
+        registration_key: dict(registration_doc),
+    }
+    unset_payload: dict[str, str] = {
+        "steam_id": "",
+        "steam_name": "",
+        "locale": "",
+        "verified": "",
+        "mfa_enabled": "",
+        "auth_version": "",
+        "updated_at": "",
+        "created_at": "",
+        "user_name": "",
+        "first_registered_at": "",
+    }
+
+    if discord_username:
+        set_payload["discord_username"] = discord_username
+    else:
+        unset_payload["discord_username"] = ""
+
+    if display_name:
+        set_payload["display_name"] = display_name
+    else:
+        unset_payload["display_name"] = ""
+
+    if linked_account_name:
+        set_payload["linked_account_name"] = linked_account_name
+    else:
+        unset_payload["linked_account_name"] = ""
+
+    existing_server_registered_at = _resolve_server_registered_at(existing)
+    if existing_server_registered_at is not None:
+        set_payload["server_registered_at"] = existing_server_registered_at
+
+    update_doc: dict[str, Any] = {
+        "$set": set_payload,
+        "$unset": unset_payload,
+    }
+    if material_changed:
+        update_doc["$inc"] = {"__v": 1}
+    return update_doc
 
 
 def _resolve_server_registered_at(existing: Mapping[str, Any] | None) -> datetime | None:
