@@ -86,3 +86,9 @@ civ6_leaders_dict['LEADER_LIME_PHOE_AHIRAM'] = 'Ahiram'
 civ6_leaders_dict['LEADER_SUK_VERCINGETORIX_DLC'] = 'Vercingetorix'
 civ6_leaders_dict['LEADER_SUK_TRISONG_DETSEN'] = 'Trisong'
 civ6_leaders_dict['LEADER_SUK_AL_HASAN'] = 'AlHasan'
+
+# BBG Expanded 2.0 Civs
+civ6_leaders_dict['LEADER_MER_MARIA_THERESA'] = 'AustriaMariaTeresa'
+civ6_leaders_dict['LEADER_CVS_ANACAONA'] = 'TainoAnacaona'
+civ6_leaders_dict['LEADER_JFD_STANISLAW'] = 'PolandStanislausII'
+civ6_leaders_dict['LEADER_MER_THEODORIC'] = 'GothsTheodoric'
