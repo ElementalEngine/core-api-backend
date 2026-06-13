@@ -35,6 +35,7 @@ from app.features.auth.schemas import (
     RegistrationOperationResponse,
     RegistrationSessionResponse,
     RegistrationSessionStatusResponse,
+    SelfServiceRegistrationRequest,
 )
 from app.features.auth.session_service import SessionService
 from app.features.auth.steam_service import SteamService
@@ -268,7 +269,7 @@ async def create_manual_registration(
     db: AsyncIOMotorClient = Depends(get_database),
 ) -> RegistrationOperationResponse:
     try:
-        return await ManualRegistrationService(_repo(db), SteamService()).create_manual_registration(payload)
+        return await ManualRegistrationService(_repo(db)).create_manual_registration(payload)
     except AuthError as exc:
         logger.warning(
             "Manual registration failed. actor=%s subject=%s code=%s message=%s details=%s",
@@ -292,6 +293,39 @@ async def create_manual_registration(
             _internal_auth_error(
                 "MANUAL_REGISTRATION_FAILED",
                 "The auth service could not complete manual registration right now. Please try again.",
+            )
+        ) from exc
+
+
+@router.post("/manual-registration-requests", response_model=RegistrationOperationResponse)
+async def create_self_service_registration(
+    payload: SelfServiceRegistrationRequest,
+    db: AsyncIOMotorClient = Depends(get_database),
+) -> RegistrationOperationResponse:
+    try:
+        return await ManualRegistrationService(_repo(db)).create_self_service_registration(payload)
+    except AuthError as exc:
+        logger.warning(
+            "Self-service registration failed. discord_user_id=%s game=%s platform=%s code=%s message=%s",
+            payload.discord_user_id,
+            payload.game.value,
+            payload.platform.value,
+            exc.code,
+            exc.message,
+        )
+        raise to_http_exception(exc) from exc
+    except Exception as exc:
+        logger.exception(
+            "Unexpected self-service registration failure. discord_user_id=%s game=%s platform=%s account_id=%s",
+            payload.discord_user_id,
+            payload.game.value,
+            payload.platform.value,
+            payload.platform_account_id,
+        )
+        raise to_http_exception(
+            _internal_auth_error(
+                "SELF_SERVICE_REGISTRATION_FAILED",
+                "The auth service could not complete self-service registration right now. Please try again.",
             )
         ) from exc
 

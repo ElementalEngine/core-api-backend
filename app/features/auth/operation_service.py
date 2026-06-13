@@ -33,6 +33,12 @@ class OperationService:
 
         now = datetime.now(timezone.utc)
         if payload.result == "succeeded":
+            registration_method = operation.get("registration_method")
+            if not registration_method:
+                # Back-compat for operations created before registration_method existed.
+                registration_method = (
+                    "manual_admin" if operation.get("type") == "manual_registration" else "oauth"
+                )
             await self._repository.upsert_registered_user(
                 discord_user_id=str(operation["discord_user_id"]),
                 linked_platform=str(operation.get("linked_platform") or "steam"),
@@ -43,7 +49,7 @@ class OperationService:
                     else (str(operation["steam_name"]) if operation.get("steam_name") else None)
                 ),
                 game=str(operation["game"]),
-                method="manual_admin" if operation.get("type") == "manual_registration" else "oauth",
+                method=str(registration_method),
                 discord_username=(str(operation["username_snapshot"]) if operation.get("username_snapshot") else None),
                 display_name=(str(operation["display_name_snapshot"]) if operation.get("display_name_snapshot") else None),
                 ownership_verified_at=operation.get("ownership_verified_at"),

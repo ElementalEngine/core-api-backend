@@ -6,6 +6,8 @@ from typing import Any, Literal
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.features.auth.enums import (
+    ManualRegistrationChoice,
+    RegistrationMethod,
     RegistrationOperationStatus,
     RegistrationPlatform,
     RegistrationSessionStatus,
@@ -46,7 +48,7 @@ class ManualRegistrationRequest(BaseModel):
 
     actor_discord_id: str = Field(min_length=1)
     subject_discord_id: str = Field(min_length=1)
-    platform: RegistrationPlatform
+    platform: ManualRegistrationChoice
     platform_account_id: str = Field(min_length=1, validation_alias=AliasChoices("platform_account_id", "account_id"))
     game: SupportedGame
     reason: str | None = Field(default=None, max_length=500)
@@ -63,6 +65,44 @@ class ManualRegistrationRequest(BaseModel):
         return normalized
 
     @field_validator("reason", "platform_account_name", "discord_username", "discord_display_name")
+    @classmethod
+    def _normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class SelfServiceRegistrationRequest(BaseModel):
+    """Civ7 non-Steam self-service registration (currently 2K only).
+
+    The Auth Bot supplies the Discord identity fields automatically. game/platform are
+    accepted but the backend enforces game=civ7 + platform=2k (see ManualRegistrationService).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    discord_user_id: str = Field(min_length=1)
+    game: SupportedGame
+    platform: RegistrationPlatform
+    platform_account_id: str = Field(
+        min_length=1, validation_alias=AliasChoices("platform_account_id", "account_id")
+    )
+    platform_account_name: str | None = Field(
+        default=None, validation_alias=AliasChoices("platform_account_name", "account_name")
+    )
+    discord_username: str | None = None
+    discord_display_name: str | None = None
+
+    @field_validator("discord_user_id", "platform_account_id")
+    @classmethod
+    def _normalize_required_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("value must not be blank")
+        return normalized
+
+    @field_validator("platform_account_name", "discord_username", "discord_display_name")
     @classmethod
     def _normalize_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -118,14 +158,22 @@ class RegistrationOperationResponse(BaseModel):
     linked_platform: RegistrationPlatform | None = None
     linked_account_id: str | None = None
     linked_account_name: str | None = None
+    registration_method: RegistrationMethod | None = None
     game: SupportedGame
     role_intents: list[RoleIntent]
+
+
+class RegistrationSummary(BaseModel):
+    game: SupportedGame
+    method: str | None = None
+    registered_at: datetime | None = None
 
 
 class LinkedAccountLookupHit(BaseModel):
     linked_platform: RegistrationPlatform | None = None
     linked_account_id: str
     linked_account_name: str | None = None
+    registrations: list[RegistrationSummary] = Field(default_factory=list)
 
 
 class DiscordLookupResponse(BaseModel):
@@ -139,6 +187,7 @@ class DiscordAccountLookupHit(BaseModel):
     discord_id: str
     discord_username: str | None = None
     discord_display_name: str | None = None
+    registrations: list[RegistrationSummary] = Field(default_factory=list)
 
 
 class LinkedAccountLookupResponse(BaseModel):

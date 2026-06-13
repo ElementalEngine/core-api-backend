@@ -72,3 +72,28 @@ def test_lookup_by_linked_account_id_returns_all_discord_hits_with_steam_compati
         "111111111111111111",
         "222222222222222222",
     ]
+
+def test_lookup_surfaces_registration_method_and_renders_legacy_xbox():
+    repo = FakeRepo()
+    repo.discord_docs = [
+        {
+            "discord_id": "d-1",
+            "linked_platform": "2k",
+            "linked_account_id": "2k-1",
+            "registrations": {"civ7": {"method": "self_service_2k"}},
+        },
+        {
+            "discord_id": "d-1",
+            "linked_platform": "xbox",
+            "linked_account_id": "xb-1",
+            "registrations": {"civ6": {"method": "admin_staff_attested"}},
+        },
+    ]
+
+    response = asyncio.run(RegistrationService(repo).lookup_by_discord_id("d-1"))
+
+    assert response is not None
+    platforms = {hit.linked_platform.value for hit in response.linked_accounts if hit.linked_platform}
+    assert {"2k", "xbox"} <= platforms  # legacy xbox renders, does not error
+    methods = {summary.method for hit in response.linked_accounts for summary in hit.registrations}
+    assert {"self_service_2k", "admin_staff_attested"} <= methods

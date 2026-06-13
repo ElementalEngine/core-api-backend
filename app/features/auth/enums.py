@@ -11,6 +11,7 @@ class SupportedGame(StrEnum):
 class RegistrationPlatform(StrEnum):
     STEAM = "steam"
     EPIC = "epic"
+    TWOK = "2k"
     XBOX = "xbox"
 
     @property
@@ -18,7 +19,55 @@ class RegistrationPlatform(StrEnum):
         return {
             RegistrationPlatform.STEAM: "steam",
             RegistrationPlatform.EPIC: "epicgames",
+            RegistrationPlatform.TWOK: "2k",
             RegistrationPlatform.XBOX: "xbox",
+        }[self]
+
+
+class RegistrationMethod(StrEnum):
+    """How a registration's account ownership was established.
+
+    Stored at registrations.<game>.method. Legacy records may carry the pre-change
+    values "oauth" (treated as OAUTH_STEAM_API) or "manual_admin" (treated as attested).
+    """
+
+    OAUTH_STEAM_API = "oauth_steam_api"
+    ADMIN_STEAM_FAMILY_SHARE = "admin_steam_family_share"
+    ADMIN_STAFF_ATTESTED = "admin_staff_attested"
+    SELF_SERVICE_2K = "self_service_2k"
+
+
+class ManualRegistrationChoice(StrEnum):
+    """Staff-facing platform choice for `/manual-register`.
+
+    Distinct from RegistrationPlatform because "Steam Family Share" is not a stored
+    platform: it persists as linked_platform=steam with method=admin_steam_family_share.
+    The backend owns the mapping to (stored platform, method) via `resolved()`.
+    """
+
+    STEAM = "steam"
+    STEAM_FAMILY_SHARE = "steam_family_share"
+    EPIC = "epic"
+    TWOK = "2k"
+
+    def resolved(self) -> tuple[RegistrationPlatform, RegistrationMethod]:
+        return {
+            ManualRegistrationChoice.STEAM: (
+                RegistrationPlatform.STEAM,
+                RegistrationMethod.ADMIN_STAFF_ATTESTED,
+            ),
+            ManualRegistrationChoice.STEAM_FAMILY_SHARE: (
+                RegistrationPlatform.STEAM,
+                RegistrationMethod.ADMIN_STEAM_FAMILY_SHARE,
+            ),
+            ManualRegistrationChoice.EPIC: (
+                RegistrationPlatform.EPIC,
+                RegistrationMethod.ADMIN_STAFF_ATTESTED,
+            ),
+            ManualRegistrationChoice.TWOK: (
+                RegistrationPlatform.TWOK,
+                RegistrationMethod.ADMIN_STAFF_ATTESTED,
+            ),
         }[self]
 
 
@@ -42,3 +91,7 @@ class RoleIntent(StrEnum):
     GRANT_CIV7_RANK = "grant_civ7_rank"
     GRANT_NOVICE = "grant_novice"
     REMOVE_NON_VERIFIED = "remove_non_verified"
+
+STEAM_API_REGISTRATION_METHODS: frozenset[str] = frozenset(
+    {RegistrationMethod.OAUTH_STEAM_API.value, "oauth"}
+)

@@ -89,6 +89,35 @@ def test_session_service_creates_pending_session(monkeypatch):
 
 
 
+@pytest.mark.parametrize("platform", [RegistrationPlatform.EPIC, RegistrationPlatform.TWOK, RegistrationPlatform.XBOX])
+def test_session_service_rejects_non_steam_oauth_sessions(monkeypatch, platform):
+    monkeypatch.setenv("AUTH_DISCORD_CLIENT_ID", "123")
+    monkeypatch.setenv("AUTH_DISCORD_REDIRECT_URI", "https://example.com/oauth/discord/callback")
+    monkeypatch.setenv("AUTH_SERVICE_TOKEN", "secret")
+
+    import app.core.config as cfg
+    import app.features.auth.session_service as session_module
+
+    importlib.reload(cfg)
+    importlib.reload(session_module)
+    SessionService = session_module.SessionService
+
+    repo = FakeRepo()
+    service = SessionService(repo)
+
+    with pytest.raises(ManualRegistrationRequiredError):
+        asyncio.run(
+            service.create_registration_session(
+                CreateRegistrationSessionRequest(
+                    discord_user_id="123456",
+                    game=SupportedGame.CIV7,
+                    platform=platform,
+                )
+            )
+        )
+
+    assert not repo.sessions
+
 
 def test_session_service_coerces_naive_expiry(monkeypatch):
     monkeypatch.setenv("AUTH_DISCORD_CLIENT_ID", "123")
@@ -242,3 +271,13 @@ def test_oauth_callback_denial_returns_discord_oauth_failed(monkeypatch):
             "extra": {"oauth_error": "access_denied"},
         }
     ]
+
+
+def test_manual_required_for_2k_raises():
+    with pytest.raises(ManualRegistrationRequiredError):
+        RegistrationService.manual_required_for_platform(RegistrationPlatform.TWOK)
+
+
+def test_manual_not_required_for_steam():
+    # Should not raise.
+    RegistrationService.manual_required_for_platform(RegistrationPlatform.STEAM)

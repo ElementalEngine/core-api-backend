@@ -5,6 +5,8 @@ from secrets import token_urlsafe
 from typing import Any
 
 from app.features.auth.enums import (
+    STEAM_API_REGISTRATION_METHODS,
+    RegistrationMethod,
     RegistrationOperationStatus,
     RegistrationPlatform,
     RoleIntent,
@@ -25,6 +27,7 @@ from app.features.auth.schemas import (
     LinkedAccountLookupHit,
     LinkedAccountLookupResponse,
     RegistrationOperationResponse,
+    RegistrationSummary,
 )
 
 
@@ -114,7 +117,13 @@ class RegistrationService:
         if not steam_id:
             raise RankRoleEligibilityError(discord_user_id)
 
+        # Rank roles require an account whose Steam ownership is API-verifiable. Only
+        # OAuth-Steam registrations (and the legacy "oauth" value) qualify. Steam Family
+        # Share and any admin-attested registration are explicitly ineligible even though
+        # they may carry a steam linked account.
         regs = user.get("registrations") or {}
+        if not _has_steam_api_registration(regs):
+            raise RankRoleEligibilityError(discord_user_id)
         if game in regs:
             raise AlreadyRegisteredError(game)
         return str(steam_id)
@@ -125,7 +134,9 @@ class RegistrationService:
         *,
         account_name: str | None = None,
     ) -> None:
-        if platform in {RegistrationPlatform.EPIC, RegistrationPlatform.XBOX}:
+        # The OAuth/session flow can only validate Steam. Any other platform must be
+        # registered through a manual/self-service path.
+        if platform is not RegistrationPlatform.STEAM:
             raise ManualRegistrationRequiredError(platform.value, account_name=account_name)
 
     async def create_registration_operation(
@@ -148,6 +159,7 @@ class RegistrationService:
                 str(session["validated_account_name"]) if session.get("validated_account_name") else None
             ),
             game=game,
+            registration_method=RegistrationMethod.OAUTH_STEAM_API,
             role_intents=_build_registration_role_intents(game),
             source_session_id=str(session["session_id"]),
             username_snapshot=(
@@ -189,6 +201,7 @@ class RegistrationService:
             steam_id=str(steam_validation["steam_id"]),
             steam_name=None,
             game=game,
+            registration_method=RegistrationMethod.OAUTH_STEAM_API,
             role_intents=[_rank_role_for_game(game)],
             ownership_verified_at=steam_validation.get("ownership_verified_at"),
             playtime_minutes=steam_validation.get("playtime_minutes"),
@@ -201,10 +214,9 @@ class RegistrationService:
         subject_discord_id: str,
         game: SupportedGame,
         platform: RegistrationPlatform,
+        method: RegistrationMethod,
         account_id: str,
         account_name: str | None,
-        ownership_verified_at: datetime | None,
-        playtime_minutes: int | None,
         reason: str | None,
         username_snapshot: str | None = None,
         display_name_snapshot: str | None = None,
@@ -218,15 +230,45 @@ class RegistrationService:
             steam_id=account_id if platform is RegistrationPlatform.STEAM else None,
             steam_name=account_name if platform is RegistrationPlatform.STEAM else None,
             game=game,
+            registration_method=method,
             role_intents=_build_registration_role_intents(game),
-            ownership_verified_at=ownership_verified_at,
-            playtime_minutes=playtime_minutes,
+            ownership_verified_at=None,
+            playtime_minutes=None,
             username_snapshot=username_snapshot,
             display_name_snapshot=display_name_snapshot,
             extra_operation_fields={
                 "actor_discord_id": actor_discord_id,
                 **({"manual_reason": reason} if reason else {}),
             },
+        )
+
+    async def create_self_service_registration_operation(
+        self,
+        *,
+        discord_user_id: str,
+        game: SupportedGame,
+        platform: RegistrationPlatform,
+        account_id: str,
+        account_name: str | None,
+        method: RegistrationMethod,
+        username_snapshot: str | None = None,
+        display_name_snapshot: str | None = None,
+    ) -> RegistrationOperationResponse:
+        return await self._create_operation(
+            operation_type="self_service_registration",
+            discord_user_id=discord_user_id,
+            linked_platform=platform,
+            linked_account_id=account_id,
+            linked_account_name=account_name,
+            steam_id=None,
+            steam_name=None,
+            game=game,
+            registration_method=method,
+            role_intents=_build_registration_role_intents(game),
+            ownership_verified_at=None,
+            playtime_minutes=None,
+            username_snapshot=username_snapshot,
+            display_name_snapshot=display_name_snapshot,
         )
 
     async def _create_operation(
@@ -240,6 +282,7 @@ class RegistrationService:
         steam_id: str | None,
         steam_name: str | None,
         game: SupportedGame,
+        registration_method: RegistrationMethod,
         role_intents: list[RoleIntent],
         source_session_id: str | None = None,
         username_snapshot: str | None = None,
@@ -264,6 +307,7 @@ class RegistrationService:
             "steam_id": steam_id,
             "steam_name": steam_name,
             "game": game.value,
+            "registration_method": registration_method.value,
             "role_intents": [intent.value for intent in role_intents],
             "source_session_id": source_session_id,
             "username_snapshot": username_snapshot,
@@ -290,9 +334,36 @@ class RegistrationService:
             linked_platform=linked_platform,
             linked_account_id=linked_account_id,
             linked_account_name=linked_account_name,
+            registration_method=registration_method,
             game=game,
             role_intents=role_intents,
         )
+
+
+def _registration_summaries(doc: dict[str, Any]) -> list[RegistrationSummary]:
+    regs = doc.get("registrations") or {}
+    summaries: list[RegistrationSummary] = []
+    for game_key, entry in regs.items():
+        try:
+            game = SupportedGame(str(game_key))
+        except ValueError:
+            continue
+        method: str | None = None
+        registered_at: datetime | None = None
+        if isinstance(entry, dict):
+            method = str(entry["method"]) if entry.get("method") else None
+            raw_registered_at = entry.get("registered_at")
+            registered_at = raw_registered_at if isinstance(raw_registered_at, datetime) else None
+        summaries.append(RegistrationSummary(game=game, method=method, registered_at=registered_at))
+    summaries.sort(key=lambda summary: summary.game.value)
+    return summaries
+
+
+def _has_steam_api_registration(registrations: dict[str, Any]) -> bool:
+    for entry in registrations.values():
+        if isinstance(entry, dict) and str(entry.get("method") or "") in STEAM_API_REGISTRATION_METHODS:
+            return True
+    return False
 
 
 def _rank_role_for_game(game: SupportedGame) -> RoleIntent:
@@ -331,6 +402,7 @@ def _to_discord_lookup_response(docs: list[dict[str, Any]]) -> DiscordLookupResp
                 linked_platform=platform,
                 linked_account_id=account_id,
                 linked_account_name=_normalize_linked_account_name(doc),
+                registrations=_registration_summaries(doc),
             )
         )
 
@@ -362,6 +434,7 @@ def _to_linked_account_lookup_response(
                 discord_id=discord_id,
                 discord_username=_normalize_discord_username(doc),
                 discord_display_name=_normalize_display_name(doc),
+                registrations=_registration_summaries(doc),
             )
         )
 

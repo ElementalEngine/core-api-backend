@@ -11,6 +11,7 @@ from app.features.auth.errors import (
     AlreadyRegisteredError,
     AuthConfigurationError,
     DiscordUserMismatchError,
+    ManualRegistrationRequiredError,
     SessionExpiredError,
     SessionNotFoundError,
     SessionNotValidatedError,
@@ -32,6 +33,9 @@ class SessionService:
         self,
         payload: CreateRegistrationSessionRequest,
     ) -> RegistrationSessionResponse:
+        if payload.platform is not RegistrationPlatform.STEAM:
+            raise ManualRegistrationRequiredError(payload.platform.value)
+
         existing = await self._repository.get_user_by_discord_id(payload.discord_user_id)
         regs = (existing or {}).get("registrations") or {}
         if payload.game.value in regs:

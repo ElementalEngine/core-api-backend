@@ -289,6 +289,16 @@ class RankRoleEligibilityError(AuthError):
         )
 
 
+class SelfServiceRegistrationNotAllowedError(AuthError):
+    def __init__(self, *, game: str, platform: str) -> None:
+        super().__init__(
+            code="SELF_SERVICE_REGISTRATION_NOT_ALLOWED",
+            message="Self-service manual registration is only available for Civ 7 on 2K.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details={"game": game, "platform": platform},
+        )
+
+
 def to_http_exception(error: AuthError) -> HTTPException:
     payload = ErrorResponse(
         error=ErrorDetail(
