@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Final
+from typing import Final, Literal
 
 from pydantic import BaseModel, Field
 
@@ -42,7 +42,7 @@ class SuspensionDocument(BaseModel):
     moderate: InfractionRecord = Field(default_factory=InfractionRecord)
     major: InfractionRecord = Field(default_factory=InfractionRecord)
     extreme: InfractionRecord = Field(default_factory=InfractionRecord)
-    active_category: TierCategory | None = None  # additive — None on old docs is safe
+    active_category: TierCategory | Literal["flat"] | None = None  # additive — None on old docs is safe
 
 
 # ─── Pending suspension document ─────────────────────────────────────────────
@@ -51,7 +51,7 @@ class PendingSuspensionDocument(BaseModel):
     id: str = Field(alias="_id")            # discord_id stored as _id
     punishment_type: str                    # tier category name or flat type name
     reason: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ─── Request shapes ───────────────────────────────────────────────────────────
@@ -122,8 +122,7 @@ class SuspensionRecordResponse(BaseModel):
     suspended: bool
     ends: datetime | None
     suspended_roles: list[str]
-    active_category: TierCategory | None
-    # tier fields omitted — clients use this endpoint only for state checks
+    active_category: TierCategory | Literal["flat"] | None
 
 
 class ActiveSuspension(BaseModel):

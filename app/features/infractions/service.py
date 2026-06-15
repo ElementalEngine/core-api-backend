@@ -145,8 +145,9 @@ async def record_flat_suspension(
     new_ends = current_end + timedelta(days=days_added)
 
     await upsert_suspension(db, discord_id, {
-        "suspended": True,
-        "ends":      new_ends,
+        "suspended":       True,
+        "ends":            new_ends,
+        "active_category": "flat",
     })
 
     return FlatSuspensionResponse(
