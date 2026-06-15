@@ -22,6 +22,15 @@ def get_mongo_database(request: Request) -> AsyncIOMotorDatabase:
         raise AppDependencyError("Mongo database not initialized")
     return database
 
+def require_lj_token(authorization: str | None = Header(default=None)) -> None:
+    configured = settings.lj_service_token.get_secret_value()
+    if not configured:
+        payload = ErrorResponse(error=ErrorDetail(code="LJ_SERVICE_MISCONFIGURED", message="LJ service token is not configured on the backend.", retryable=False))
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=payload.model_dump())
+    scheme, _, token = (authorization or "").partition(" ")
+    if scheme.lower() != "bearer" or not token or not constant_time_equals(token, configured):
+        payload = ErrorResponse(error=ErrorDetail(code="UNAUTHORIZED", message="Missing or invalid service authorization.", retryable=False))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=payload.model_dump())
 
 def require_service_token(authorization: str | None = Header(default=None)) -> None:
     configured = settings.auth_service_token.get_secret_value()

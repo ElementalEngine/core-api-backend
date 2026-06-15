@@ -10,6 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.features.auth.repository import AuthRepository
+from app.features.infractions.repository import create_indexes as create_infraction_indexes
 
 configure_logging()
 logger = logging.getLogger("app.db")
@@ -45,6 +46,9 @@ async def db_lifespan(app: FastAPI):
 
         await AuthRepository(client).ensure_indexes()
         logger.info("🟢 Auth indexes ensured")
+        
+        await create_infraction_indexes(client)
+        logger.info("🟢 Infraction indexes ensured")
 
         yield
     except Exception:
