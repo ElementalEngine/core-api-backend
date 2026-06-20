@@ -25,6 +25,7 @@ from app.features.infractions.repository import (
     find_pending_suspension as _repo_find_pending,
     find_suspension,
     get_active_suspensions as _repo_get_active_suspensions,
+    get_overdue_suspensions as _repo_get_overdue_suspensions,
     upsert_suspension,
 )
 
@@ -284,6 +285,10 @@ async def get_record(db: AsyncIOMotorClient, discord_id: str) -> SuspensionRecor
 
 async def get_active_suspensions(db: AsyncIOMotorClient) -> list[ActiveSuspension]:
     return await _repo_get_active_suspensions(db)
+
+
+async def get_overdue_suspensions(db: AsyncIOMotorClient) -> list[ActiveSuspension]:
+    return await _repo_get_overdue_suspensions(db)
 
 
 # ─── Pending suspensions ─────────────────────────────────────────────────────

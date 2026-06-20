@@ -55,6 +55,20 @@ async def get_active_suspensions(
         logger.exception("get_active_suspensions failed")
         raise to_http_exception(_internal_error("GET_ACTIVE_FAILED", "Could not retrieve active suspensions.")) from exc
 
+# GET /overdue must also be declared BEFORE /{discord_id} to prevent path collision.
+
+@router.get("/overdue", response_model=list[ActiveSuspension])
+async def get_overdue_suspensions(
+    db: AsyncIOMotorClient = Depends(get_database),
+) -> list[ActiveSuspension]:
+    try:
+        return await svc.get_overdue_suspensions(db)
+    except InfractionError as exc:
+        raise to_http_exception(exc) from exc
+    except Exception as exc:
+        logger.exception("get_overdue_suspensions failed")
+        raise to_http_exception(_internal_error("GET_OVERDUE_FAILED", "Could not retrieve overdue suspensions.")) from exc
+
 
 @router.get("/{discord_id}", response_model=SuspensionRecordResponse)
 async def get_record(
