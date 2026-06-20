@@ -85,8 +85,10 @@ async def record_tier_infraction(
     discord_id: str,
     category: TierCategory,
     reason: str | None,
+    suspended_roles: list[str],
 ) -> TierInfractionResponse:
     record = await find_or_create_suspension(db, discord_id)
+    was_already_suspended = record.suspended
 
     current_tier: int = _get_infraction(record, category).tier
     new_tier: int = min(current_tier + 1, TIER_CAPS[category.value])
@@ -113,6 +115,8 @@ async def record_tier_infraction(
     }
     if suspended:
         update["active_category"] = category.value
+        if not was_already_suspended:
+            update["suspendedRoles"] = suspended_roles
 
     await upsert_suspension(db, discord_id, update)
 
@@ -136,19 +140,25 @@ async def record_flat_suspension(
     discord_id: str,
     flat_type: FlatType,
     reason: str | None,
+    suspended_roles: list[str],
 ) -> FlatSuspensionResponse:
     record = await find_or_create_suspension(db, discord_id)
+    was_already_suspended = record.suspended
 
     days_added = FLAT_DAYS[flat_type.value]
     now = _utcnow()
     current_end = _current_end_or_now(record, now)
     new_ends = current_end + timedelta(days=days_added)
 
-    await upsert_suspension(db, discord_id, {
+    update: dict[str, Any] = {
         "suspended":       True,
         "ends":            new_ends,
         "active_category": "flat",
-    })
+    }
+    if not was_already_suspended:
+        update["suspendedRoles"] = suspended_roles
+
+    await upsert_suspension(db, discord_id, update)
 
     return FlatSuspensionResponse(
         discord_id=discord_id,

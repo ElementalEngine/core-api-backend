@@ -58,10 +58,12 @@ class PendingSuspensionDocument(BaseModel):
 
 class RecordTierInfractionRequest(BaseModel):
     reason: str | None = None
+    suspended_roles: list[str] = Field(default_factory=list)
 
 
 class RecordFlatSuspensionRequest(BaseModel):
     reason: str | None = None
+    suspended_roles: list[str] = Field(default_factory=list)
 
 
 class ModifyDaysRequest(BaseModel):

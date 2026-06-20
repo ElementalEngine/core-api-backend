@@ -35,6 +35,7 @@ async def db_lifespan(app: FastAPI):
             socketTimeoutMS=timeout_ms,
             retryReads=True,
             retryWrites=True,
+            tz_aware=True,
         )
 
         await client.admin.command("ping")

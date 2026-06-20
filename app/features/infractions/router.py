@@ -78,7 +78,7 @@ async def record_tier_infraction(
     db: AsyncIOMotorClient = Depends(get_database),
 ) -> TierInfractionResponse:
     try:
-        return await svc.record_tier_infraction(db, discord_id, category, payload.reason)
+        return await svc.record_tier_infraction(db, discord_id, category, payload.reason, payload.suspended_roles)
     except InfractionError as exc:
         raise to_http_exception(exc) from exc
     except Exception as exc:
@@ -94,7 +94,7 @@ async def record_flat_suspension(
     db: AsyncIOMotorClient = Depends(get_database),
 ) -> FlatSuspensionResponse:
     try:
-        return await svc.record_flat_suspension(db, discord_id, flat_type, payload.reason)
+        return await svc.record_flat_suspension(db, discord_id, flat_type, payload.reason, payload.suspended_roles)
     except InfractionError as exc:
         raise to_http_exception(exc) from exc
     except Exception as exc:
