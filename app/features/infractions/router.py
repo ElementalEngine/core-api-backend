@@ -34,7 +34,7 @@ router = APIRouter(
     dependencies=[Depends(require_lj_token)],
 )
 
-_DiscordId = Annotated[str, Path(min_length=1, max_length=64)]
+_DiscordId = Annotated[str, Path(min_length=17, max_length=20, pattern=r"^\d+$")]
 
 
 def _internal_error(code: str, message: str) -> InfractionError:
