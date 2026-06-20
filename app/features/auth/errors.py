@@ -228,7 +228,7 @@ class SteamPlaytimeBelowThresholdError(AuthError):
             code="STEAM_PLAYTIME_BELOW_THRESHOLD",
             message=(
                 f"Your linked Steam account owns {game.upper()}, but it does not meet the minimum playtime requirement yet. "
-                f"Required: {required_minutes} minutes. Found: {actual_minutes} minutes."
+                f"Required: {required_minutes} minutes. Found: {actual_minutes} minutes. If 0 hours are found: Make sure 'Always keep my total playing time private . . .' is unchecked."
             ),
             status_code=status.HTTP_400_BAD_REQUEST,
             details={
