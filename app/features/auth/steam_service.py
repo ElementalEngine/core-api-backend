@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import subprocess
 from datetime import datetime, timezone
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from app.core.config import settings
 from app.features.auth.constants import (
@@ -103,80 +105,50 @@ class SteamService:
             api_key = settings.auth_steam_api_key.get_secret_value()
             timeout_seconds = max(1, int(settings.auth_steam_timeout_seconds))
 
-            command = [
-                "/usr/bin/curl",
-                "-sS",
-                "-G",
-                STEAM_OWNED_GAMES_URL,
-                "--max-time",
-                str(timeout_seconds),
-                "-H",
-                "Accept: application/json",
-                "-H",
-                f"User-Agent: {STEAM_HTTP_USER_AGENT}",
-                "--data-urlencode",
-                f"key={api_key}",
-                "--data-urlencode",
-                f"steamid={steam_id}",
-                "--data-urlencode",
-                f"appids_filter[0]={app_id}",
-                "--data-urlencode",
-                "include_played_free_games=1",
-                "-w",
-                "\n%{http_code}",
-            ]
+            query = urlencode(
+                {
+                    "key": api_key,
+                    "steamid": steam_id,
+                    "appids_filter[0]": str(app_id),
+                    "include_played_free_games": "1",
+                },
+                safe="[]",
+            )
+            req = Request(
+                f"{STEAM_OWNED_GAMES_URL}?{query}",
+                headers={
+                    "Accept": "application/json",
+                    "User-Agent": STEAM_HTTP_USER_AGENT,
+                },
+                method="GET",
+            )
 
             try:
-                result = subprocess.run(command, check=False, capture_output=True, text=True)
-            except FileNotFoundError as exc:
+                with urlopen(req, timeout=timeout_seconds) as resp:
+                    status_code = int(resp.status)
+                    body = resp.read().decode("utf-8")
+            except HTTPError as exc:
+                response_body = ""
+                try:
+                    response_body = exc.read().decode("utf-8", errors="replace")
+                except Exception:
+                    response_body = "<unavailable>"
                 logger.warning(
-                    "Steam validation curl binary not found. steam_id=%s app_id=%s error=%r",
+                    "Steam owned-games request failed. steam_id=%s app_id=%s status=%s response=%s",
+                    steam_id,
+                    app_id,
+                    exc.code,
+                    response_body[:1000],
+                )
+                raise SteamValidationError() from exc
+            except (URLError, TimeoutError) as exc:
+                logger.warning(
+                    "Steam owned-games network failure. steam_id=%s app_id=%s error=%r",
                     steam_id,
                     app_id,
                     exc,
                 )
                 raise SteamValidationError() from exc
-            except OSError as exc:
-                logger.warning(
-                    "Steam validation curl execution failed. steam_id=%s app_id=%s error=%r",
-                    steam_id,
-                    app_id,
-                    exc,
-                )
-                raise SteamValidationError() from exc
-
-            if result.returncode != 0:
-                logger.warning(
-                    "Steam owned-games curl failed. steam_id=%s app_id=%s returncode=%s stderr=%s",
-                    steam_id,
-                    app_id,
-                    result.returncode,
-                    (result.stderr or "")[:1000],
-                )
-                raise SteamValidationError()
-
-            stdout = result.stdout or ""
-            if "\n" not in stdout:
-                logger.warning(
-                    "Steam owned-games curl returned unexpected output. steam_id=%s app_id=%s output=%s",
-                    steam_id,
-                    app_id,
-                    stdout[:1000],
-                )
-                raise SteamValidationError()
-
-            body, status_text = stdout.rsplit("\n", 1)
-            try:
-                status_code = int(status_text.strip())
-            except ValueError:
-                logger.warning(
-                    "Steam owned-games curl returned invalid status code. steam_id=%s app_id=%s status=%s output=%s",
-                    steam_id,
-                    app_id,
-                    status_text,
-                    stdout[:1000],
-                )
-                raise SteamValidationError()
 
             if status_code != 200:
                 logger.warning(
