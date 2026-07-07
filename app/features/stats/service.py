@@ -153,12 +153,6 @@ class StatsService:
                 discord_ids=[normalized_discord_id],
             )
             
-        await self._reset_stat_set(
-            civ_version=version,
-            is_cloud=is_cloud,
-            discord_id=normalized_discord_id,
-        )
-
         response = UserStatsResponse(
             discord_id=normalized_discord_id,
             civ_version=version,
@@ -167,8 +161,17 @@ class StatsService:
             season=season_map.get(normalized_discord_id, StatSet()),
         )
 
+        # A user with no stats must 404 without side effects — previously the reset
+        # transaction ran first and inserted a stat_reset marker even when there was
+        # nothing to reset.
         if not self._has_any_stats(response):
             raise StatsNotFoundError("No stats found")
+
+        await self._reset_stat_set(
+            civ_version=version,
+            is_cloud=is_cloud,
+            discord_id=normalized_discord_id,
+        )
 
         return response
 
@@ -208,6 +211,10 @@ class StatsService:
                 ranked_teams[target_team].append(stat_set.teamer)
 
             game_quality = ts_env.quality(ranked_teams)
+            # Deliberate (confirmed 2026-07-07): a new shuffle only replaces the current
+            # pick when it beats it by at least team_gen_randomness, so the returned
+            # split is within that margin of the best seen while favoring earlier random
+            # shuffles — variety without giving up balance.
             if game_quality < best_quality + settings.team_gen_randomness:
                 continue
             best_quality = game_quality
