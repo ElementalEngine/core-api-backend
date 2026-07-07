@@ -258,3 +258,27 @@ def test_update_match_rejects_empty_payload():
     repo = FakeRepo(match_doc=make_match_doc([make_player()]))
     with pytest.raises(MatchServiceError, match="Empty update payload"):
         asyncio.run(make_service(repo).update_match(OID, {}))
+
+
+def test_revert_doc_math_uses_per_scope_deltas():
+    # delta stored, season/combined missing (legacy) — lifetime mu subtracts the delta,
+    # season/combined subtract 0.0 instead of raising.
+    stored = {"_id": 123, "mu": 30.0, "sigma": 5.0, "games": 10, "wins": 4, "first": 2}
+    players = [make_player(delta=5.0, season_delta=None, combined_delta=None)]
+    repo = FakeRepo(match_doc=make_match_doc(players), stat_doc=stored)
+
+    asyncio.run(make_service(repo).revert_match(OID))
+
+    docs = {
+        (u["is_seasonal"], u["is_combined"]): u["doc"] for u in repo.upserts
+    }
+    assert docs[(False, False)]["mu"] == pytest.approx(25.0)  # 30 - 5 (lifetime)
+    assert docs[(True, False)]["mu"] == pytest.approx(30.0)  # 30 - 0 (season, legacy None)
+    assert docs[(False, True)]["mu"] == pytest.approx(30.0)  # 30 - 0 (combined, legacy None)
+    for doc in docs.values():
+        assert doc["sigma"] == pytest.approx(7.0)  # 5 + 2
+        assert doc["games"] == 9
+    # wins: lifetime decrements (delta 5 > 0), season/combined don't (coerced 0)
+    assert docs[(False, False)]["wins"] == 3
+    assert docs[(True, False)]["wins"] == 4
+    assert docs[(False, True)]["wins"] == 4

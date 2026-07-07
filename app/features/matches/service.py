@@ -277,22 +277,47 @@ class MatchService:
             post[i].mu = p_current_ranking.mu + getattr(p, delta_value_name)
         return match, post
 
-    def update_existing_stat(
+    async def _recompute_deltas(self, match: MatchModel) -> MatchModel:
+        """Recompute the delta/season_delta/combined_delta triple on match.players.
+
+        This spine (three ranking loads + three rating passes) used to be copy-pasted
+        in six methods.
+        """
+        players_ranking = await self.get_players_ranking(match)
+        players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
+        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
+
+        match, _ = self.update_player_stats(match, players_ranking, "delta")
+        match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
+        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
+        return match
+
+    def _player_delta_changes(self, match: MatchModel) -> Dict[str, Any]:
+        """$set keys for every player's recomputed deltas."""
+        changes: Dict[str, Any] = {}
+        for i, player in enumerate(match.players):
+            changes[f"players.{i}.delta"] = player.delta
+            changes[f"players.{i}.season_delta"] = player.season_delta
+            changes[f"players.{i}.combined_delta"] = player.combined_delta
+        return changes
+
+    async def _reload_pending(self, oid: ObjectId) -> Dict[str, Any]:
+        """Re-fetch a pending match and rename _id -> match_id for the response."""
+        updated = await self.q.find_pending_by_id(oid)
+        updated["match_id"] = str(updated.pop("_id"))
+        return updated
+
+    def _shift_civ_stat(
         self,
         match: MatchModel,
         player: PlayerModel,
         existing_civs: Dict[str, Any],
+        step: int,
     ) -> Dict[str, Any]:
         # Normalize civ naming
         civ_name = get_cpl_name(match.game, player.civ, getattr(player, "leader", None))
 
         civs = dict(existing_civs) if isinstance(existing_civs, dict) else {}
-
-        def _to_int(v: Any, default: int = 0) -> int:
-            try:
-                return int(v)
-            except (TypeError, ValueError):
-                return default
 
         entry = civs.get(civ_name)
 
@@ -300,21 +325,32 @@ class MatchService:
         # - legacy shape: {"DutchWilhelmina": 3}
         # - new shape: {"DutchWilhelmina": {"games": 3, "wins": 1}}
         if isinstance(entry, dict):
-            games = _to_int(entry.get("games", 0), 0)
-            wins = _to_int(entry.get("wins", 0), 0)
+            games = _as_int(entry.get("games", 0), 0)
+            wins = _as_int(entry.get("wins", 0), 0)
         elif isinstance(entry, int):
-            games = _to_int(entry, 0)
+            games = entry
             wins = 0
         else:
             games = 0
             wins = 0
 
-        games += 1
+        games += step
         if player.delta > 0:
-            wins += 1
+            wins += step
+        if step < 0:
+            games = max(0, games)
+            wins = max(0, wins)
 
         civs[civ_name] = {"games": games, "wins": wins}
         return civs
+
+    def update_existing_stat(
+        self,
+        match: MatchModel,
+        player: PlayerModel,
+        existing_civs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return self._shift_civ_stat(match, player, existing_civs, +1)
 
     def revert_existing_stat(
         self,
@@ -322,42 +358,41 @@ class MatchService:
         player: PlayerModel,
         existing_civs: Dict[str, Any],
     ) -> Dict[str, Any]:
-        # Normalize civ naming
-        civ_name = get_cpl_name(match.game, player.civ, getattr(player, "leader", None))
+        return self._shift_civ_stat(match, player, existing_civs, -1)
 
-        civs = dict(existing_civs) if isinstance(existing_civs, dict) else {}
+    def _build_stat_doc(
+        self,
+        *,
+        discord_id: str,
+        pre: StatModel,
+        player: PlayerModel,
+        mu: float,
+        sigma: float,
+        delta_value: float,
+        civs: Dict[str, Any],
+        step: int,
+    ) -> Dict[str, Any]:
+        """One stats document for approve (step=+1) or revert (step=-1).
 
-        def _to_int(v: Any, default: int = 0) -> int:
-            try:
-                return int(v)
-            except (TypeError, ValueError):
-                return default
+        Reverted counters clamp at 0 so a revert can never write negative stats.
+        """
 
-        entry = civs.get(civ_name)
+        def shift(current: int, hit: bool) -> int:
+            value = current + (step if hit else 0)
+            return max(0, value) if step < 0 else value
 
-        # Backwards compatibility:
-        # - legacy shape: {"DutchWilhelmina": 3}
-        # - new shape: {"DutchWilhelmina": {"games": 3, "wins": 1}}
-        if isinstance(entry, dict):
-            games = _to_int(entry.get("games", 0), 0)
-            wins = _to_int(entry.get("wins", 0), 0)
-        elif isinstance(entry, int):
-            games = _to_int(entry, 0)
-            wins = 0
-        else:
-            games = 0
-            wins = 0
-
-        games -= 1
-        if player.delta > 0:
-            wins -= 1
-        if games < 0:
-            games = 0
-        if wins < 0:
-            wins = 0
-
-        civs[civ_name] = {"games": games, "wins": wins}
-        return civs
+        return {
+            "_id": Int64(discord_id),
+            "mu": float(mu),
+            "sigma": float(sigma),
+            "games": shift(int(pre.games), True),
+            "wins": shift(int(pre.wins), delta_value > 0),
+            "first": shift(int(pre.first), player.placement == 0),
+            "subbedIn": shift(int(pre.subbedIn), player.is_sub),
+            "subbedOut": shift(int(pre.subbedOut), player.subbed_out),
+            "civs": civs,
+            "lastModified": datetime.now(UTC),
+        }
 
     async def create_from_save(
         self, file_bytes: bytes, reporter_discord_id: str, is_cloud: bool, discord_message_id: str
@@ -390,14 +425,7 @@ class MatchService:
 
         match = MatchModel(**parsed)
         match = await self.match_id_to_discord(match)
-
-        players_ranking = await self.get_players_ranking(match)
-        players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
-        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
-
-        match, _ = self.update_player_stats(match, players_ranking, "delta")
-        match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
-        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
+        match = await self._recompute_deltas(match)
 
         inserted_id = await self.q.insert_pending_match(match.dict())
         return {"match_id": str(inserted_id), **match.dict()}
@@ -414,9 +442,7 @@ class MatchService:
         updated_list = current_list + discord_message_id_list
 
         await self.q.update_pending_match_set(oid, {"discord_messages_id_list": updated_list})
-        updated = await self.q.find_pending_by_id(oid)
-        updated["match_id"] = str(updated.pop("_id"))
-        return updated
+        return await self._reload_pending(oid)
 
     async def get_match(self, match_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
@@ -436,10 +462,8 @@ class MatchService:
             raise NotFoundError("Match not found")
 
         await self.q.update_pending_match_set(oid, update_data)
-        updated = await self.q.find_pending_by_id(oid)
-        updated["match_id"] = str(updated.pop("_id"))
         logger.info("✅ 🔄 Updated match %s", match_id)
-        return updated
+        return await self._reload_pending(oid)
 
     async def set_player_order(self, match_id: str, player_order: str, discord_message_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
@@ -468,27 +492,17 @@ class MatchService:
             else:
                 player.placement = placement[player.discord_id]
 
-        players_ranking = await self.get_players_ranking(match)
-        players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
-        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
-
-        match, _ = self.update_player_stats(match, players_ranking, "delta")
-        match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
-        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
+        match = await self._recompute_deltas(match)
 
         changes: Dict[str, Any] = {}
         changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [discord_message_id]
+        changes.update(self._player_delta_changes(match))
         for i, player in enumerate(match.players):
             changes[f"players.{i}.placement"] = player.placement
-            changes[f"players.{i}.delta"] = match.players[i].delta
-            changes[f"players.{i}.season_delta"] = match.players[i].season_delta
-            changes[f"players.{i}.combined_delta"] = match.players[i].combined_delta
 
         await self.q.update_pending_match_set(oid, changes)
-        updated = await self.q.find_pending_by_id(oid)
-        updated["match_id"] = str(updated.pop("_id"))
         logger.info("✅ 🔄 Changed player order for match %s", match_id)
-        return updated
+        return await self._reload_pending(oid)
 
     async def change_order(self, match_id: str, new_order: str, discord_message_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
@@ -509,27 +523,17 @@ class MatchService:
                 )
             player.placement = _require_int(new_order_list[player.team], "new_order") - 1
 
-        players_ranking = await self.get_players_ranking(match)
-        players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
-        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
-
-        match, _ = self.update_player_stats(match, players_ranking, "delta")
-        match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
-        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
+        match = await self._recompute_deltas(match)
 
         changes: Dict[str, Any] = {}
         changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [discord_message_id]
+        changes.update(self._player_delta_changes(match))
         for i, player in enumerate(match.players):
             changes[f"players.{i}.placement"] = player.placement
-            changes[f"players.{i}.delta"] = match.players[i].delta
-            changes[f"players.{i}.season_delta"] = match.players[i].season_delta
-            changes[f"players.{i}.combined_delta"] = match.players[i].combined_delta
 
         await self.q.update_pending_match_set(oid, changes)
-        updated = await self.q.find_pending_by_id(oid)
-        updated["match_id"] = str(updated.pop("_id"))
         logger.info("✅ 🔄 Changed player order for match %s", match_id)
-        return updated
+        return await self._reload_pending(oid)
 
     async def delete_pending_match(self, match_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
@@ -559,10 +563,8 @@ class MatchService:
 
         changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [discord_message_id]
         await self.q.update_pending_match_set(oid, changes)
-        updated = await self.q.find_pending_by_id(oid)
-        updated["match_id"] = str(updated.pop("_id"))
         logger.info("✅ 🔄 Match %s, player %s quit toggled", match_id, quitter_discord_id)
-        return updated
+        return await self._reload_pending(oid)
 
     async def assign_discord_id(self, match_id: str, player_id: str, player_discord_id: str, discord_message_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
@@ -578,28 +580,17 @@ class MatchService:
         match.players[idx].discord_id = player_discord_id
         match.players[idx].steam_id = await self.discord_to_steam_id(player_discord_id)
 
-        players_ranking = await self.get_players_ranking(match)
-        players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
-        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
-
-        match, _ = self.update_player_stats(match, players_ranking, "delta")
-        match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
-        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
+        match = await self._recompute_deltas(match)
 
         changes: Dict[str, Any] = {}
         changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [discord_message_id]
         changes[f"players.{idx}.discord_id"] = player_discord_id
         changes[f"players.{idx}.steam_id"] = match.players[idx].steam_id
-        for i in range(len(match.players)):
-            changes[f"players.{i}.delta"] = match.players[i].delta
-            changes[f"players.{i}.season_delta"] = match.players[i].season_delta
-            changes[f"players.{i}.combined_delta"] = match.players[i].combined_delta
+        changes.update(self._player_delta_changes(match))
 
         await self.q.update_pending_match_set(oid, changes)
-        updated = await self.q.find_pending_by_id(oid)
-        updated["match_id"] = str(updated.pop("_id"))
         logger.info("✅ 🔄 Assigned discord_id for match %s (player %s)", match_id, player_id)
-        return updated
+        return await self._reload_pending(oid)
 
     async def assign_discord_id_all(self, match_id: str, player_discord_id: list[str], discord_message_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
@@ -616,28 +607,18 @@ class MatchService:
             match.players[i].discord_id = did
             match.players[i].steam_id = await self.discord_to_steam_id(did)
 
-        players_ranking = await self.get_players_ranking(match)
-        players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
-        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
-
-        match, _ = self.update_player_stats(match, players_ranking, "delta")
-        match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
-        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
+        match = await self._recompute_deltas(match)
 
         changes: Dict[str, Any] = {}
         changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [discord_message_id]
+        changes.update(self._player_delta_changes(match))
         for i, p in enumerate(match.players):
             changes[f"players.{i}.discord_id"] = p.discord_id
             changes[f"players.{i}.steam_id"] = p.steam_id
-            changes[f"players.{i}.delta"] = p.delta
-            changes[f"players.{i}.season_delta"] = p.season_delta
-            changes[f"players.{i}.combined_delta"] = p.combined_delta
 
         await self.q.update_pending_match_set(oid, changes)
-        updated = await self.q.find_pending_by_id(oid)
-        updated["match_id"] = str(updated.pop("_id"))
         logger.info("✅ 🔄 Assigned all discord_ids for match %s", match_id)
-        return updated
+        return await self._reload_pending(oid)
 
     async def assign_sub(self, match_id: str, sub_in_id: str, sub_out_discord_id: str, discord_message_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
@@ -666,20 +647,13 @@ class MatchService:
             is_sub = False,
             subbed_out = True,
         ))
-        players_ranking = await self.get_players_ranking(match)
-        players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
-        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
-        match, _ = self.update_player_stats(match, players_ranking, "delta")
-        match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
-        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
-        
+        match = await self._recompute_deltas(match)
+
         match.discord_messages_id_list = match.discord_messages_id_list + [discord_message_id]
 
         await self.q.replace_pending_match(oid, match.dict())
-        updated = await self.q.find_pending_by_id(oid)
-        updated["match_id"] = str(updated.pop("_id"))
         logger.info("✅ 🔄 Sub assigned for match %s", match_id)
-        return updated
+        return await self._reload_pending(oid)
 
     async def remove_sub(self, match_id: str, sub_out_id: str, discord_message_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
@@ -702,10 +676,8 @@ class MatchService:
         match.discord_messages_id_list = match.discord_messages_id_list + [discord_message_id]
 
         await self.q.replace_pending_match(oid, match.dict())
-        updated = await self.q.find_pending_by_id(oid)
-        updated["match_id"] = str(updated.pop("_id"))
         logger.info("✅ 🔄 Sub removed for match %s", match_id)
-        return updated
+        return await self._reload_pending(oid)
     
     async def contest_report(self, match_id: str, contestor_discord_id: str, reason: str, discord_message_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
@@ -721,10 +693,8 @@ class MatchService:
         match.discord_messages_id_list = match.discord_messages_id_list + [discord_message_id]
 
         await self.q.replace_pending_match(oid, match.dict())
-        updated = await self.q.find_pending_by_id(oid)
-        updated["match_id"] = str(updated.pop("_id"))
         logger.info("✅ 🔄 Match %s contested by %s", match_id, contestor_discord_id)
-        return updated
+        return await self._reload_pending(oid)
     
     async def revert_match(self, match_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
@@ -756,80 +726,31 @@ class MatchService:
                         season_delta = _as_float(p.season_delta, 0.0)
                         combined_delta = _as_float(p.combined_delta, 0.0)
 
-                        # lifetime
-                        civs_life = self.revert_existing_stat(match, p, pre_lifetime[i].civs)
-                        doc_life = {
-                            "_id": Int64(did),
-                            "mu": float(pre_lifetime[i].mu - delta),
-                            "sigma": float(pre_lifetime[i].sigma + 2),
-                            "games": max(0, int(pre_lifetime[i].games) - 1),
-                            "wins": max(0, int(pre_lifetime[i].wins) - (1 if delta > 0 else 0)),
-                            "first": max(0, int(pre_lifetime[i].first) - (1 if p.placement == 0 else 0)),
-                            "subbedIn": max(0, int(pre_lifetime[i].subbedIn) - (1 if p.is_sub else 0)),
-                            "subbedOut": max(0, int(pre_lifetime[i].subbedOut) - (1 if p.subbed_out else 0)),
-                            "civs": civs_life,
-                            "lastModified": datetime.now(UTC),
-                        }
-                        await self.q.upsert_player_stat_doc(
-                            civ_version=match.game,
-                            is_seasonal=False,
-                            match_type=match.game_mode,
-                            is_cloud=match.is_cloud,
-                            is_combined=False,
-                            discord_id=did,
-                            doc=doc_life,
-                            session=session,
-                        )
-
-                        # seasonal
-                        civs_season = self.revert_existing_stat(match, p, pre_season[i].civs)
-                        doc_season = {
-                            "_id": Int64(did),
-                            "mu": float(pre_season[i].mu - season_delta),
-                            "sigma": float(pre_season[i].sigma + 2),
-                            "games": max(0, int(pre_season[i].games) - 1),
-                            "wins": max(0, int(pre_season[i].wins) - (1 if season_delta > 0 else 0)),
-                            "first": max(0, int(pre_season[i].first) - (1 if p.placement == 0 else 0)),
-                            "subbedIn": max(0, int(pre_season[i].subbedIn) - (1 if p.is_sub else 0)),
-                            "subbedOut": max(0, int(pre_season[i].subbedOut) - (1 if p.subbed_out else 0)),
-                            "civs": civs_season,
-                            "lastModified": datetime.now(UTC),
-                        }
-                        await self.q.upsert_player_stat_doc(
-                            civ_version=match.game,
-                            is_seasonal=True,
-                            match_type=match.game_mode,
-                            is_cloud=match.is_cloud,
-                            is_combined=False,
-                            discord_id=did,
-                            doc=doc_season,
-                            session=session,
-                        )
-
-                        # combined
-                        civs_combined = self.revert_existing_stat(match, p, pre_combined[i].civs)
-                        doc_combined = {
-                            "_id": Int64(did),
-                            "mu": float(pre_combined[i].mu - combined_delta),
-                            "sigma": float(pre_combined[i].sigma + 2),
-                            "games": max(0, int(pre_combined[i].games) - 1),
-                            "wins": max(0, int(pre_combined[i].wins) - (1 if combined_delta > 0 else 0)),
-                            "first": max(0, int(pre_combined[i].first) - (1 if p.placement == 0 else 0)),
-                            "subbedIn": max(0, int(pre_combined[i].subbedIn) - (1 if p.is_sub else 0)),
-                            "subbedOut": max(0, int(pre_combined[i].subbedOut) - (1 if p.subbed_out else 0)),
-                            "civs": civs_combined,
-                            "lastModified": datetime.now(UTC),
-                        }
-                        await self.q.upsert_player_stat_doc(
-                            civ_version=match.game,
-                            is_seasonal=False,
-                            match_type=match.game_mode,
-                            is_cloud=match.is_cloud,
-                            is_combined=True,
-                            discord_id=did,
-                            doc=doc_combined,
-                            session=session,
-                        )
+                        for pre, delta_value, is_seasonal, is_combined in (
+                            (pre_lifetime[i], delta, False, False),
+                            (pre_season[i], season_delta, True, False),
+                            (pre_combined[i], combined_delta, False, True),
+                        ):
+                            doc = self._build_stat_doc(
+                                discord_id=did,
+                                pre=pre,
+                                player=p,
+                                mu=pre.mu - delta_value,
+                                sigma=pre.sigma + 2,
+                                delta_value=delta_value,
+                                civs=self.revert_existing_stat(match, p, pre.civs),
+                                step=-1,
+                            )
+                            await self.q.upsert_player_stat_doc(
+                                civ_version=match.game,
+                                is_seasonal=is_seasonal,
+                                match_type=match.game_mode,
+                                is_cloud=match.is_cloud,
+                                is_combined=is_combined,
+                                discord_id=did,
+                                doc=doc,
+                                session=session,
+                            )
 
                         if p.is_sub:
                             await self.q.dec_subs_in(did, session=session)
@@ -878,80 +799,31 @@ class MatchService:
 
                             did = str(p.discord_id)
 
-                            # lifetime
-                            civs_life = self.update_existing_stat(match, p, pre_lifetime[i].civs)
-                            doc_life = {
-                                "_id": Int64(did),
-                                "mu": float(post_lifetime[i].mu),
-                                "sigma": float(post_lifetime[i].sigma),
-                                "games": int(pre_lifetime[i].games) + 1,
-                                "wins": int(pre_lifetime[i].wins) + (1 if p.delta > 0 else 0),
-                                "first": int(pre_lifetime[i].first) + (1 if p.placement == 0 else 0),
-                                "subbedIn": int(pre_lifetime[i].subbedIn) + (1 if p.is_sub else 0),
-                                "subbedOut": int(pre_lifetime[i].subbedOut) + (1 if p.subbed_out else 0),
-                                "civs": civs_life,
-                                "lastModified": datetime.now(UTC),
-                            }
-                            await self.q.upsert_player_stat_doc(
-                                civ_version=match.game,
-                                is_seasonal=False,
-                                match_type=match.game_mode,
-                                is_cloud=match.is_cloud,
-                                is_combined=False,
-                                discord_id=did,
-                                doc=doc_life,
-                                session=session,
-                            )
-
-                            # seasonal
-                            civs_season = self.update_existing_stat(match, p, pre_season[i].civs)
-                            doc_season = {
-                                "_id": Int64(did),
-                                "mu": float(post_season[i].mu),
-                                "sigma": float(post_season[i].sigma),
-                                "games": int(pre_season[i].games) + 1,
-                                "wins": int(pre_season[i].wins) + (1 if p.season_delta > 0 else 0),
-                                "first": int(pre_season[i].first) + (1 if p.placement == 0 else 0),
-                                "subbedIn": int(pre_season[i].subbedIn) + (1 if p.is_sub else 0),
-                                "subbedOut": int(pre_season[i].subbedOut) + (1 if p.subbed_out else 0),
-                                "civs": civs_season,
-                                "lastModified": datetime.now(UTC),
-                            }
-                            await self.q.upsert_player_stat_doc(
-                                civ_version=match.game,
-                                is_seasonal=True,
-                                match_type=match.game_mode,
-                                is_cloud=match.is_cloud,
-                                is_combined=False,
-                                discord_id=did,
-                                doc=doc_season,
-                                session=session,
-                            )
-
-                            # combined
-                            civs_combined = self.update_existing_stat(match, p, pre_combined[i].civs)
-                            doc_combined = {
-                                "_id": Int64(did),
-                                "mu": float(post_combined[i].mu),
-                                "sigma": float(post_combined[i].sigma),
-                                "games": int(pre_combined[i].games) + 1,
-                                "wins": int(pre_combined[i].wins) + (1 if p.combined_delta > 0 else 0),
-                                "first": int(pre_combined[i].first) + (1 if p.placement == 0 else 0),
-                                "subbedIn": int(pre_combined[i].subbedIn) + (1 if p.is_sub else 0),
-                                "subbedOut": int(pre_combined[i].subbedOut) + (1 if p.subbed_out else 0),
-                                "civs": civs_combined,
-                                "lastModified": datetime.now(UTC),
-                            }
-                            await self.q.upsert_player_stat_doc(
-                                civ_version=match.game,
-                                is_seasonal=False,
-                                match_type=match.game_mode,
-                                is_cloud=match.is_cloud,
-                                is_combined=True,
-                                discord_id=did,
-                                doc=doc_combined,
-                                session=session,
-                            )
+                            for pre, post, delta_value, is_seasonal, is_combined in (
+                                (pre_lifetime[i], post_lifetime[i], p.delta, False, False),
+                                (pre_season[i], post_season[i], p.season_delta, True, False),
+                                (pre_combined[i], post_combined[i], p.combined_delta, False, True),
+                            ):
+                                doc = self._build_stat_doc(
+                                    discord_id=did,
+                                    pre=pre,
+                                    player=p,
+                                    mu=post.mu,
+                                    sigma=post.sigma,
+                                    delta_value=delta_value,
+                                    civs=self.update_existing_stat(match, p, pre.civs),
+                                    step=1,
+                                )
+                                await self.q.upsert_player_stat_doc(
+                                    civ_version=match.game,
+                                    is_seasonal=is_seasonal,
+                                    match_type=match.game_mode,
+                                    is_cloud=match.is_cloud,
+                                    is_combined=is_combined,
+                                    discord_id=did,
+                                    doc=doc,
+                                    session=session,
+                                )
 
                             if p.is_sub:
                                 await self.q.inc_subs_in(did, session=session)
