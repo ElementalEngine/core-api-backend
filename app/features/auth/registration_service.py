@@ -368,7 +368,7 @@ def _build_registration_role_intents(
     game: SupportedGame,
     platform: RegistrationPlatform,
 ) -> list[RoleIntent]:
-    intents = [
+    return [
         _rank_role_for_game(game),
         RoleIntent.GRANT_NOVICE,
         RoleIntent.GRANT_SERVER_NEWS,
@@ -380,9 +380,6 @@ def _build_registration_role_intents(
         ),
         RoleIntent.REMOVE_NON_VERIFIED,
     ]
-    if game is SupportedGame.CIV6:
-        intents.append(RoleIntent.REMOVE_EPIC)
-    return intents
 
 
 def _to_discord_lookup_response(docs: list[dict[str, Any]]) -> DiscordLookupResponse:

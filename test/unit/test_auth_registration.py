@@ -249,7 +249,6 @@ def test_rank_role_eligibility_requires_steam_api_method(method, linked_platform
     [
         (ManualRegistrationChoice.STEAM, "steam", "admin_staff_attested"),
         (ManualRegistrationChoice.STEAM_FAMILY_SHARE, "steam", "admin_steam_family_share"),
-        (ManualRegistrationChoice.EPIC, "epic", "admin_staff_attested"),
         (ManualRegistrationChoice.TWOK, "2k", "admin_staff_attested"),
     ],
 )
@@ -357,7 +356,6 @@ def test_operation_finalize_persists_registration_method():
                 RoleIntent.GRANT_CIV6_NEWS,
                 RoleIntent.GRANT_PC_STEAM,
                 RoleIntent.REMOVE_NON_VERIFIED,
-                RoleIntent.REMOVE_EPIC,
             ],
         ),
         (
@@ -370,7 +368,6 @@ def test_operation_finalize_persists_registration_method():
                 RoleIntent.GRANT_CIV6_NEWS,
                 RoleIntent.GRANT_2K_CROSSPLATFORM,
                 RoleIntent.REMOVE_NON_VERIFIED,
-                RoleIntent.REMOVE_EPIC,
             ],
         ),
         (

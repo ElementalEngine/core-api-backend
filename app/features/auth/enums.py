@@ -47,7 +47,6 @@ class ManualRegistrationChoice(StrEnum):
 
     STEAM = "steam"
     STEAM_FAMILY_SHARE = "steam_family_share"
-    EPIC = "epic"
     TWOK = "2k"
 
     def resolved(self) -> tuple[RegistrationPlatform, RegistrationMethod]:
@@ -59,10 +58,6 @@ class ManualRegistrationChoice(StrEnum):
             ManualRegistrationChoice.STEAM_FAMILY_SHARE: (
                 RegistrationPlatform.STEAM,
                 RegistrationMethod.ADMIN_STEAM_FAMILY_SHARE,
-            ),
-            ManualRegistrationChoice.EPIC: (
-                RegistrationPlatform.EPIC,
-                RegistrationMethod.ADMIN_STAFF_ATTESTED,
             ),
             ManualRegistrationChoice.TWOK: (
                 RegistrationPlatform.TWOK,
@@ -96,7 +91,6 @@ class RoleIntent(StrEnum):
     GRANT_PC_STEAM = "grant_pc_steam"
     GRANT_2K_CROSSPLATFORM = "grant_2k_crossplatform"
     REMOVE_NON_VERIFIED = "remove_non_verified"
-    REMOVE_EPIC = "remove_epic"
 
 STEAM_API_REGISTRATION_METHODS: frozenset[str] = frozenset(
     {RegistrationMethod.OAUTH_STEAM_API.value, "oauth"}
