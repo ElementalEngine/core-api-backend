@@ -69,7 +69,6 @@ class AccountLookupNotFoundError(AuthError):
         label = {
             "discord_id": f"Discord ID {value}",
             "linked_account_id": f"linked account ID {value}",
-            "steam_id": f"linked account ID {value}",
         }.get(field, value)
         super().__init__(
             code="ACCOUNT_NOT_FOUND",

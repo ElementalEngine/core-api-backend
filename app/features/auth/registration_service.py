@@ -43,15 +43,6 @@ class RegistrationService:
         docs = await self._repository.find_users_by_linked_account_id(linked_account_id)
         return _to_linked_account_lookup_response(docs, linked_account_id) if docs else None
 
-    async def lookup_by_steam_id(self, steam_id: str) -> LinkedAccountLookupResponse | None:
-        return await self.lookup_by_linked_account_id(steam_id)
-
-    async def assert_not_already_registered(self, *, discord_user_id: str, game: str) -> None:
-        existing = await self._repository.get_user_by_discord_id(discord_user_id)
-        regs = (existing or {}).get("registrations") or {}
-        if game in regs:
-            raise AlreadyRegisteredError(game)
-
     async def assert_registration_conflicts(
         self,
         *,
