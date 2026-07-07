@@ -60,6 +60,14 @@ class InvalidIDError(MatchServiceError):
 class ParseError(MatchServiceError):
     pass
 
+
+def _require_int(value: Any, field_name: str) -> int:
+    """Parse a client-supplied numeric field; bad input becomes a 400 instead of a bare 500."""
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        raise MatchServiceError(f"{field_name} must be a whole number, got {value!r}")
+
 class MatchService:
     def __init__(self, client: AsyncIOMotorClient):
         self.q = MatchRepository(client)
@@ -162,6 +170,8 @@ class MatchService:
             games=_as_int(doc.get("games"), 0),
             wins=_as_int(doc.get("wins"), 0),
             first=_as_int(doc.get("first"), 0),
+            subbedIn=_as_int(doc.get("subbedIn"), 0),
+            subbedOut=_as_int(doc.get("subbedOut"), 0),
             civs=dict(doc.get("civs", {})) if isinstance(doc.get("civs", {}), dict) else {},
         )
 
@@ -493,7 +503,11 @@ class MatchService:
             raise MatchServiceError(f"New order length does not match number of players/teams ({num_teams})")
 
         for player in match.players:
-            player.placement = int(new_order_list[player.team]) - 1
+            if player.team < 0 or player.team >= len(new_order_list):
+                raise MatchServiceError(
+                    f"Team {player.team} has no entry in the new order list"
+                )
+            player.placement = _require_int(new_order_list[player.team], "new_order") - 1
 
         players_ranking = await self.get_players_ranking(match)
         players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
@@ -557,7 +571,7 @@ class MatchService:
             raise NotFoundError("Match not found")
 
         match = MatchModel(**res)
-        idx = int(player_id) - 1
+        idx = _require_int(player_id, "player_id") - 1
         if idx < 0 or idx >= len(match.players):
             raise MatchServiceError("Player ID out of range. Must be between 1 and number of players")
 
@@ -632,7 +646,7 @@ class MatchService:
             raise NotFoundError("Match not found")
 
         match = MatchModel(**res)
-        sub_in_idx = int(sub_in_id)
+        sub_in_idx = _require_int(sub_in_id, "sub_in_id")
         if sub_in_idx < 0 or sub_in_idx >= len(match.players):
             raise MatchServiceError("Sub-in slot invalid or already claimed")
 
@@ -674,7 +688,7 @@ class MatchService:
             raise NotFoundError("Match not found")
 
         match = MatchModel(**res)
-        idx = int(sub_out_id)
+        idx = _require_int(sub_out_id, "sub_out_id")
         if idx < 1 or idx >= len(match.players):
             raise MatchServiceError("Player ID out of range. Must be between 2 and number of players")
         if not match.players[idx].subbed_out:
@@ -736,17 +750,23 @@ class MatchService:
 
                         did = str(p.discord_id)
 
+                        # Legacy validated docs may lack the season/combined deltas (None);
+                        # coerce once so the arithmetic below cannot TypeError.
+                        delta = _as_float(p.delta, 0.0)
+                        season_delta = _as_float(p.season_delta, 0.0)
+                        combined_delta = _as_float(p.combined_delta, 0.0)
+
                         # lifetime
                         civs_life = self.revert_existing_stat(match, p, pre_lifetime[i].civs)
                         doc_life = {
                             "_id": Int64(did),
-                            "mu": float(pre_lifetime[i].mu - p.delta),
+                            "mu": float(pre_lifetime[i].mu - delta),
                             "sigma": float(pre_lifetime[i].sigma + 2),
-                            "games": int(pre_lifetime[i].games) - 1,
-                            "wins": int(pre_lifetime[i].wins) - (1 if p.delta > 0 else 0),
-                            "first": int(pre_lifetime[i].first) - (1 if p.placement == 0 else 0),
-                            "subbedIn": int(pre_lifetime[i].subbedIn) - (1 if p.is_sub else 0),
-                            "subbedOut": int(pre_lifetime[i].subbedOut) - (1 if p.subbed_out else 0),
+                            "games": max(0, int(pre_lifetime[i].games) - 1),
+                            "wins": max(0, int(pre_lifetime[i].wins) - (1 if delta > 0 else 0)),
+                            "first": max(0, int(pre_lifetime[i].first) - (1 if p.placement == 0 else 0)),
+                            "subbedIn": max(0, int(pre_lifetime[i].subbedIn) - (1 if p.is_sub else 0)),
+                            "subbedOut": max(0, int(pre_lifetime[i].subbedOut) - (1 if p.subbed_out else 0)),
                             "civs": civs_life,
                             "lastModified": datetime.now(UTC),
                         }
@@ -765,13 +785,13 @@ class MatchService:
                         civs_season = self.revert_existing_stat(match, p, pre_season[i].civs)
                         doc_season = {
                             "_id": Int64(did),
-                            "mu": float(pre_season[i].mu - p.season_delta),
+                            "mu": float(pre_season[i].mu - season_delta),
                             "sigma": float(pre_season[i].sigma + 2),
-                            "games": int(pre_season[i].games) - 1,
-                            "wins": int(pre_season[i].wins) - (1 if p.season_delta > 0 else 0),
-                            "first": int(pre_season[i].first) - (1 if p.placement == 0 else 0),
-                            "subbedIn": int(pre_season[i].subbedIn) - (1 if p.is_sub else 0),
-                            "subbedOut": int(pre_season[i].subbedOut) - (1 if p.subbed_out else 0),
+                            "games": max(0, int(pre_season[i].games) - 1),
+                            "wins": max(0, int(pre_season[i].wins) - (1 if season_delta > 0 else 0)),
+                            "first": max(0, int(pre_season[i].first) - (1 if p.placement == 0 else 0)),
+                            "subbedIn": max(0, int(pre_season[i].subbedIn) - (1 if p.is_sub else 0)),
+                            "subbedOut": max(0, int(pre_season[i].subbedOut) - (1 if p.subbed_out else 0)),
                             "civs": civs_season,
                             "lastModified": datetime.now(UTC),
                         }
@@ -790,13 +810,13 @@ class MatchService:
                         civs_combined = self.revert_existing_stat(match, p, pre_combined[i].civs)
                         doc_combined = {
                             "_id": Int64(did),
-                            "mu": float(pre_combined[i].mu - p.combined_delta),
+                            "mu": float(pre_combined[i].mu - combined_delta),
                             "sigma": float(pre_combined[i].sigma + 2),
-                            "games": int(pre_combined[i].games) - 1,
-                            "wins": int(pre_combined[i].wins) - (1 if p.combined_delta > 0 else 0),
-                            "first": int(pre_combined[i].first) - (1 if p.placement == 0 else 0),
-                            "subbedIn": int(pre_combined[i].subbedIn) - (1 if p.is_sub else 0),
-                            "subbedOut": int(pre_combined[i].subbedOut) - (1 if p.subbed_out else 0),
+                            "games": max(0, int(pre_combined[i].games) - 1),
+                            "wins": max(0, int(pre_combined[i].wins) - (1 if combined_delta > 0 else 0)),
+                            "first": max(0, int(pre_combined[i].first) - (1 if p.placement == 0 else 0)),
+                            "subbedIn": max(0, int(pre_combined[i].subbedIn) - (1 if p.is_sub else 0)),
+                            "subbedOut": max(0, int(pre_combined[i].subbedOut) - (1 if p.subbed_out else 0)),
                             "civs": civs_combined,
                             "lastModified": datetime.now(UTC),
                         }

@@ -88,12 +88,19 @@ async def append_message_id_list(payload: AppendDiscordMessageID = Form(), db=De
         logger.warning("⚠️ Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+MATCH_UPDATE_SETTABLE_FIELDS = frozenset({"players", "confirmed", "flagged", "flagged_by"})
+
 
 @matches_router.put("/update-match/", response_model=MatchResponse)
 async def update_match(payload: MatchUpdate = Form(), db=Depends(get_database)):
     svc = MatchService(db)
+    update_data = {
+        key: value
+        for key, value in payload.dict(exclude_unset=True).items()
+        if key in MATCH_UPDATE_SETTABLE_FIELDS
+    }
     try:
-        return await svc.update_match(payload.match_id, payload.dict(exclude_unset=True))
+        return await svc.update_match(payload.match_id, update_data)
     except InvalidIDError as exc:
         logger.error("🔴 Invalid match ID: %s", payload.match_id)
         raise HTTPException(status_code=400, detail="Invalid match ID") from exc
