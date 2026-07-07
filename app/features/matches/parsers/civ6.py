@@ -328,8 +328,6 @@ def parse(buffer):
 
     while state is not None:
         if state['next4'] == END_UNCOMPRESSED:
-            # if options.get('outputCompressed'):
-            #     compressed = read_compressed_data(buffer, state)
             break
 
         info = parse_entry(buffer, state)
@@ -399,8 +397,6 @@ def parse(buffer):
         if not actor.get('ACTOR_TYPE') or not actor.get('ACTOR_NAME'):
             parsed['ACTORS'].remove(actor)
 
-    # if options.get('simple'):
-    #     parsed = simplify(parsed)
 
     return {
         'parsed': parsed,

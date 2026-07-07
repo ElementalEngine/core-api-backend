@@ -74,10 +74,6 @@ class RemoveTierRequest(BaseModel):
     category: TierCategory
 
 
-class UnsuspendRequest(BaseModel):
-    reason: str | None = None
-
-
 class CreatePendingSuspensionRequest(BaseModel):
     punishment_type: str
     reason: str | None = None
@@ -148,7 +144,6 @@ __all__: Final[list[str]] = [
     "RecordFlatSuspensionRequest",
     "ModifyDaysRequest",
     "RemoveTierRequest",
-    "UnsuspendRequest",
     "CreatePendingSuspensionRequest",
     "TierInfractionResponse",
     "FlatSuspensionResponse",

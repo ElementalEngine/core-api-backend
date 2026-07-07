@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional
 
 from bson import ObjectId
 from bson.int64 import Int64
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorClientSession, AsyncIOMotorCollection
 from pymongo.client_session import ClientSession
 from pymongo import ASCENDING, DESCENDING
+
+
+logger = logging.getLogger(__name__)
 
 
 # ---- DB / collection names (single source of truth) ----
@@ -47,7 +51,7 @@ class MongoQueries:
 
     # -------------------- infra --------------------
 
-    async def start_session(self) -> ClientSession:
+    async def start_session(self) -> AsyncIOMotorClientSession:
         return await self._client.start_session()
 
     async def ping(self) -> bool:
@@ -225,8 +229,7 @@ class MongoQueries:
                                 ).delete_one({"_id": Int64(discord_id)}, session=session)
                     await session.commit_transaction()
                 except Exception as e:
-                    # Abort the transaction in case of an error
-                    print("An error occurred while writing to DB:", e)
+                    logger.exception("Transaction failed while writing to DB; aborting")
                     await session.abort_transaction()
                     raise ValueError(f"An error occured during writing to DB: {e}")
 
@@ -266,34 +269,6 @@ class MongoQueries:
             if did is None:
                 continue
             out[str(int(did))] = d
-        return out
-
-    async def get_lifetime_mu_batch(
-        self,
-        *,
-        civ_version: str,
-        match_type: str,
-        is_cloud: bool,
-        discord_ids: List[str],
-    ) -> Dict[str, float]:
-        """Batch fetch lifetime mu values for a match_type.
-
-        Returns mapping discord_id -> mu for docs that exist.
-        """
-        docs = await self.get_player_stat_docs_batch(
-            civ_version=civ_version,
-            is_seasonal=False,
-            match_type=match_type,
-            is_cloud=is_cloud,
-            is_combined=False,
-            discord_ids=discord_ids,
-        )
-
-        out: Dict[str, float] = {}
-        for did, d in docs.items():
-            mu = d.get("mu")
-            if isinstance(mu, (int, float)):
-                out[did] = float(mu)
         return out
 
     async def upsert_player_stat_doc(

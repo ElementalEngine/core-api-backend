@@ -5,10 +5,6 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
-class CivCount(BaseModel):
-    civ: str
-    count: int
-
 class StatModel(BaseModel):
     """Stat row used for ranking/stats calculations.
 
@@ -116,4 +112,4 @@ class MatchModel(BaseModel):
     reporter_discord_id: str
     contest_report_list: List[ContestReport]
 
-__all__ = ["CivCount", "StatModel", "PlayerModel", "ContestReport", "MatchModel"]
+__all__ = ["StatModel", "PlayerModel", "ContestReport", "MatchModel"]

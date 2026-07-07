@@ -818,8 +818,7 @@ class MatchService:
 
                     await session.commit_transaction()
                 except Exception as e:
-                    # Abort the transaction in case of an error
-                    print("An error occurred while writing to DB:", e)
+                    logger.exception("Transaction failed while writing to DB; aborting")
                     await session.abort_transaction()
                     raise MatchServiceError(f"An error occured during writing to DB: {e}")
         return {"match_id": str(match_id), **match.dict()}
@@ -953,8 +952,7 @@ class MatchService:
 
                         await session.commit_transaction()
                     except Exception as e:
-                        # Abort the transaction in case of an error
-                        print("An error occurred while writing to DB:", e)
+                        logger.exception("Transaction failed while writing to DB; aborting")
                         await session.abort_transaction()
                         raise MatchServiceError(f"An error occured during writing to DB: {e}")
 

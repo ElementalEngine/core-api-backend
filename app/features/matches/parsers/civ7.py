@@ -62,7 +62,6 @@ def parse_chunks(data: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
                     "team_id": team_id
                 })
     players.sort(key=lambda x: 0 if x["team_id"] is None else x["team_id"]["value"])
-    # sorted_players = sorted(players, key=lambda x: x["team_id"])
 
     return {
         "turn": find_marker(data['group1'], GAME_DATA_MARKERS["GAME_TURN"]),
@@ -259,7 +258,6 @@ def extract_player_info(root):
         team = teams_dict[team]
         steam_id = p['user_id']['value'].split('@')[-1] if p['user_id'] != None else None
         user_name = p['user_id']['value'].split('@')[0] if p['user_id'] != None else None
-        # player_alive = bool(p['PLAYER_ALIVE']['data'])
         players.append({
             "steam_id": steam_id,
             "user_name": user_name,
