@@ -342,3 +342,64 @@ def test_operation_finalize_persists_registration_method():
     )
     assert repo.upserts and repo.upserts[0]["method"] == "self_service_2k"
     assert repo.upserts[0]["linked_platform"] == "2k"
+
+
+@pytest.mark.parametrize(
+    "game,platform,expected",
+    [
+        (
+            SupportedGame.CIV6,
+            RegistrationPlatform.STEAM,
+            [
+                RoleIntent.GRANT_CIV6_RANK,
+                RoleIntent.GRANT_NOVICE,
+                RoleIntent.GRANT_SERVER_NEWS,
+                RoleIntent.GRANT_CIV6_NEWS,
+                RoleIntent.GRANT_PC_STEAM,
+                RoleIntent.REMOVE_NON_VERIFIED,
+                RoleIntent.REMOVE_EPIC,
+            ],
+        ),
+        (
+            SupportedGame.CIV6,
+            RegistrationPlatform.TWOK,
+            [
+                RoleIntent.GRANT_CIV6_RANK,
+                RoleIntent.GRANT_NOVICE,
+                RoleIntent.GRANT_SERVER_NEWS,
+                RoleIntent.GRANT_CIV6_NEWS,
+                RoleIntent.GRANT_2K_CROSSPLATFORM,
+                RoleIntent.REMOVE_NON_VERIFIED,
+                RoleIntent.REMOVE_EPIC,
+            ],
+        ),
+        (
+            SupportedGame.CIV7,
+            RegistrationPlatform.STEAM,
+            [
+                RoleIntent.GRANT_CIV7_RANK,
+                RoleIntent.GRANT_NOVICE,
+                RoleIntent.GRANT_SERVER_NEWS,
+                RoleIntent.GRANT_CIV7_NEWS,
+                RoleIntent.GRANT_PC_STEAM,
+                RoleIntent.REMOVE_NON_VERIFIED,
+            ],
+        ),
+        (
+            SupportedGame.CIV7,
+            RegistrationPlatform.TWOK,
+            [
+                RoleIntent.GRANT_CIV7_RANK,
+                RoleIntent.GRANT_NOVICE,
+                RoleIntent.GRANT_SERVER_NEWS,
+                RoleIntent.GRANT_CIV7_NEWS,
+                RoleIntent.GRANT_2K_CROSSPLATFORM,
+                RoleIntent.REMOVE_NON_VERIFIED,
+            ],
+        ),
+    ],
+)
+def test_build_registration_role_intents_matrix(game, platform, expected):
+    from app.features.auth.registration_service import _build_registration_role_intents
+
+    assert _build_registration_role_intents(game, platform) == expected

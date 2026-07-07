@@ -151,7 +151,7 @@ class RegistrationService:
             ),
             game=game,
             registration_method=RegistrationMethod.OAUTH_STEAM_API,
-            role_intents=_build_registration_role_intents(game),
+            role_intents=_build_registration_role_intents(game, RegistrationPlatform.STEAM),
             source_session_id=str(session["session_id"]),
             username_snapshot=(
                 str(session["oauth_username_snapshot"]) if session.get("oauth_username_snapshot") else None
@@ -222,7 +222,7 @@ class RegistrationService:
             steam_name=account_name if platform is RegistrationPlatform.STEAM else None,
             game=game,
             registration_method=method,
-            role_intents=_build_registration_role_intents(game),
+            role_intents=_build_registration_role_intents(game, platform),
             ownership_verified_at=None,
             playtime_minutes=None,
             username_snapshot=username_snapshot,
@@ -255,7 +255,7 @@ class RegistrationService:
             steam_name=None,
             game=game,
             registration_method=method,
-            role_intents=_build_registration_role_intents(game),
+            role_intents=_build_registration_role_intents(game, platform),
             ownership_verified_at=None,
             playtime_minutes=None,
             username_snapshot=username_snapshot,
@@ -364,14 +364,25 @@ def _rank_role_for_game(game: SupportedGame) -> RoleIntent:
     }[game]
 
 
-def _build_registration_role_intents(game: SupportedGame) -> list[RoleIntent]:
+def _build_registration_role_intents(
+    game: SupportedGame,
+    platform: RegistrationPlatform,
+) -> list[RoleIntent]:
+    intents = [
+        _rank_role_for_game(game),
+        RoleIntent.GRANT_NOVICE,
+        RoleIntent.GRANT_SERVER_NEWS,
+        RoleIntent.GRANT_CIV6_NEWS if game is SupportedGame.CIV6 else RoleIntent.GRANT_CIV7_NEWS,
+        (
+            RoleIntent.GRANT_PC_STEAM
+            if platform is RegistrationPlatform.STEAM
+            else RoleIntent.GRANT_2K_CROSSPLATFORM
+        ),
+        RoleIntent.REMOVE_NON_VERIFIED,
+    ]
     if game is SupportedGame.CIV6:
-        return [
-            RoleIntent.GRANT_CIV6_RANK,
-            RoleIntent.GRANT_NOVICE,
-            RoleIntent.REMOVE_NON_VERIFIED,
-        ]
-    return [RoleIntent.GRANT_CIV7_RANK, RoleIntent.REMOVE_NON_VERIFIED]
+        intents.append(RoleIntent.REMOVE_EPIC)
+    return intents
 
 
 def _to_discord_lookup_response(docs: list[dict[str, Any]]) -> DiscordLookupResponse:
