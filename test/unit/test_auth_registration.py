@@ -33,7 +33,6 @@ class FakeRepo:
         self.users_by_linked = {}
         self.operations = {}
         self.sessions = {}
-        self.audit = []
         self.upserts = []
 
     async def get_user_by_discord_id(self, discord_id: str):
@@ -58,9 +57,6 @@ class FakeRepo:
     async def update_registration_session(self, session_id: str, changes):
         self.sessions.setdefault(session_id, {}).update(dict(changes))
         return True
-
-    async def append_audit_event(self, doc):
-        self.audit.append(dict(doc))
 
     async def upsert_registered_user(self, **kwargs):
         self.upserts.append(dict(kwargs))

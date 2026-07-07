@@ -24,7 +24,6 @@ class FakeRepo:
     def __init__(self):
         self.user_doc = None
         self.sessions = {}
-        self.audit = []
 
     async def get_user_by_discord_id(self, discord_id: str):
         return self.user_doc
@@ -38,9 +37,6 @@ class FakeRepo:
     async def insert_registration_session(self, doc):
         self.sessions[doc["session_id"]] = dict(doc)
         self.sessions[f"state:{doc['state_token']}"] = self.sessions[doc["session_id"]]
-
-    async def append_audit_event(self, doc):
-        self.audit.append(dict(doc))
 
     async def get_registration_session(self, session_id: str):
         return self.sessions.get(session_id)
