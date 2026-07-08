@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from app.core.dependencies import get_database
+from app.core.dependencies import get_database, require_mito_token
 from app.features.matches.schemas import (
     AppendDiscordMessageID,
     ApproveMatch,
@@ -33,8 +33,16 @@ from app.features.matches.service import (
 
 logger = logging.getLogger(__name__)
 
-matches_router = APIRouter(prefix="/api/v1", tags=["matches"])
-upload_router = APIRouter(prefix="/api/v1", tags=["upload"])
+matches_router = APIRouter(
+    prefix="/api/v1",
+    tags=["matches"],
+    dependencies=[Depends(require_mito_token)],
+)
+upload_router = APIRouter(
+    prefix="/api/v1",
+    tags=["upload"],
+    dependencies=[Depends(require_mito_token)],
+)
 
 
 @upload_router.post("/upload-game-report/")

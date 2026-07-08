@@ -50,7 +50,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("MONGODB_MIN_POOL_SIZE"),
     )
 
-    api_host: str = Field(default="0.0.0.0", validation_alias=AliasChoices("API_HOST"))
+    api_host: str = Field(default="127.0.0.1", validation_alias=AliasChoices("API_HOST"))
     api_port: int = Field(default=8000, gt=0, lt=65536, validation_alias=AliasChoices("API_PORT"))
 
     # CORS

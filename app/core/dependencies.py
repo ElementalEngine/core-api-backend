@@ -52,3 +52,11 @@ def require_service_token(authorization: str | None = Header(default=None)) -> N
         misconfig_code="AUTH_SERVICE_MISCONFIGURED",
         misconfig_message="Auth service token is not configured on the backend.",
     )
+
+def require_mito_token(authorization: str | None = Header(default=None)) -> None:
+    _require_bearer(
+        authorization,
+        configured=settings.mito_service_token.get_secret_value(),
+        misconfig_code="MITO_SERVICE_MISCONFIGURED",
+        misconfig_message="Mito service token is not configured on the backend.",
+    )

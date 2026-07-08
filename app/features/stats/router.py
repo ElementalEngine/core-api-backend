@@ -5,15 +5,23 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException
 
-from app.core.dependencies import get_database
+from app.core.dependencies import get_database, require_mito_token
 from app.features.stats.errors import InvalidStatsRequestError, StatsNotFoundError
 from app.features.stats.schemas import BatchStatsRequest, BatchStatsResponse, TeamGenRequest, TeamGenResponse, UserStatsResponse
 from app.features.stats.service import StatsService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
-legacy_router = APIRouter(prefix="/api/v1", tags=["stats"])
+router = APIRouter(
+    prefix="/api/v1/stats",
+    tags=["stats"],
+    dependencies=[Depends(require_mito_token)],
+)
+legacy_router = APIRouter(
+    prefix="/api/v1",
+    tags=["stats"],
+    dependencies=[Depends(require_mito_token)],
+)
 
 
 def _pick_civ_version(*, version: Optional[str], civ_version: Optional[str]) -> str:
