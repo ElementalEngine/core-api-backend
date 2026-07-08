@@ -4,9 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
-from starlette.responses import JSONResponse
 
-from app.core.config import settings
 from app.core.dependencies import get_database
 
 logger = logging.getLogger(__name__)
@@ -30,14 +28,4 @@ async def readyz(client: AsyncIOMotorClient = Depends(get_database)):
         return {"status": "ready"}
     except Exception as exc:  # pragma: no cover - exercised in integration, not unit tests
         logger.warning("MongoDB not ready: %s", exc)
-        raise HTTPException(status_code=503, detail=f"DB not ready: {exc!s}") from exc
-
-
-@router.get("/_debug/db-stats")
-async def db_stats(client: AsyncIOMotorClient = Depends(get_database)):
-    try:
-        stats = await client[settings.mongo_db_name].command("dbstats", scale=1)
-        return JSONResponse(stats)
-    except Exception as exc:  # pragma: no cover - exercised in integration, not unit tests
-        logger.warning("MongoDB not ready for dbstats: %s", exc)
         raise HTTPException(status_code=503, detail=f"DB not ready: {exc!s}") from exc
