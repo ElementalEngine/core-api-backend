@@ -63,6 +63,12 @@ class Settings(BaseSettings):
     lj_service_token: SecretStr = Field(
         validation_alias=AliasChoices("LJ_SERVICE_TOKEN"),
     )
+
+    # Mito service token — required; startup fails if unset
+    mito_service_token: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("MITO_SERVICE_TOKEN"),
+    )
     
     # Auth parameters
     auth_service_token: SecretStr = Field(

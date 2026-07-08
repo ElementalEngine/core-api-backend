@@ -4,7 +4,8 @@ import app.__main__ as entrypoint
 from app.core.config import Settings
 
 
-def test_host_default_is_loopback():#
+def test_host_default_is_loopback():
+    # Fail-closed: unset API_HOST must not expose the API off-host.
     assert Settings().api_host == "127.0.0.1"
 
 
