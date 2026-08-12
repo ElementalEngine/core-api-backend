@@ -4,7 +4,7 @@
       "ActiveSuspension": {
         "properties": {
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "ends": {
@@ -23,7 +23,7 @@
       "AffectedPlayerRating": {
         "properties": {
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "rating_mu": {
@@ -238,7 +238,7 @@
             "title": "Civ Version"
           },
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "game_type": {
@@ -494,7 +494,7 @@
             "title": "Discord Display Name"
           },
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "discord_username": {
@@ -536,7 +536,7 @@
             "title": "Discord Display Name"
           },
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "discord_username": {
@@ -688,7 +688,7 @@
             "type": "integer"
           },
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "ends": {
@@ -1191,7 +1191,7 @@
             "type": "integer"
           },
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "new_ends": {
@@ -1211,7 +1211,7 @@
       "PendingSuspensionResponse": {
         "properties": {
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "punishment_type": {
@@ -1241,7 +1241,7 @@
       "PlayerLeaderboard": {
         "properties": {
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "first": {
@@ -1302,7 +1302,7 @@
                 "type": "null"
               }
             ],
-            "title": "Discord Id"
+            "title": "Discord Id BROKEN"
           },
           "is_sub": {
             "default": false,
@@ -1852,7 +1852,7 @@
             "$ref": "#/components/schemas/TierCategory"
           },
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "new_decays": {
@@ -2117,7 +2117,7 @@
             "title": "Active Category"
           },
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "ends": {
@@ -2245,7 +2245,7 @@
             "type": "integer"
           },
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "ends": {
@@ -2321,7 +2321,7 @@
             "type": "string"
           },
           "discord_id": {
-            "title": "Discord Id",
+            "title": "Discord Id BROKEN",
             "type": "string"
           },
           "game_type": {
@@ -2711,7 +2711,7 @@
             "schema": {
               "maxLength": 64,
               "minLength": 1,
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -3845,7 +3845,7 @@
               "maxLength": 20,
               "minLength": 17,
               "pattern": "^\\d+$",
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -3906,7 +3906,7 @@
               "maxLength": 20,
               "minLength": 17,
               "pattern": "^\\d+$",
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -3977,7 +3977,7 @@
               "maxLength": 20,
               "minLength": 17,
               "pattern": "^\\d+$",
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -4056,7 +4056,7 @@
               "maxLength": 20,
               "minLength": 17,
               "pattern": "^\\d+$",
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -4108,7 +4108,7 @@
               "maxLength": 20,
               "minLength": 17,
               "pattern": "^\\d+$",
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -4175,7 +4175,7 @@
               "maxLength": 20,
               "minLength": 17,
               "pattern": "^\\d+$",
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -4244,7 +4244,7 @@
               "maxLength": 20,
               "minLength": 17,
               "pattern": "^\\d+$",
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -4315,7 +4315,7 @@
               "maxLength": 20,
               "minLength": 17,
               "pattern": "^\\d+$",
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -4386,7 +4386,7 @@
               "maxLength": 20,
               "minLength": 17,
               "pattern": "^\\d+$",
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -4465,7 +4465,7 @@
               "maxLength": 20,
               "minLength": 17,
               "pattern": "^\\d+$",
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -4770,7 +4770,7 @@
             "name": "discord_id",
             "required": true,
             "schema": {
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
@@ -4905,7 +4905,7 @@
             "name": "discord_id",
             "required": true,
             "schema": {
-              "title": "Discord Id",
+              "title": "Discord Id BROKEN",
               "type": "string"
             }
           },
