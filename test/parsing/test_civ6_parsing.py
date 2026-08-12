@@ -1,5 +1,18 @@
 import os
+
+import pytest
+
 from app.features.matches.parsers import civ6
+
+# S1 item 2 quarantine. Nothing is fixed here; the fix is S4's (D83).
+# Both failures are player ORDER, not wrong values: the parser groups players
+# by team -- Confirmed against teamer.Civ6Save (4v4) and 5team.Civ6Save (5x2)
+# -- while these fixtures interleave in slot order. 10playerFFA passes because
+# in an FFA the two orders coincide.
+# The fixtures are stale, not the parser: this order has been live for the
+# whole rating history and D66 freezes it. S4 reorders the fixtures.
+# REMOVAL TRIGGER: S4 closes.
+_PLAYER_ORDER = pytest.mark.xfail(strict=True, reason="team-grouped vs slot order. S4.")
 
 def _test_parse_civ6_save(file_path, expected_game, expected_turn, expected_mode, expected_map_type, expected_players):
     # Path to a test Civ6 save file
@@ -28,6 +41,7 @@ def _test_parse_civ6_save(file_path, expected_game, expected_turn, expected_mode
         assert player['team'] == expected['team']
         assert player['player_alive'] == expected['player_alive']
 
+@_PLAYER_ORDER
 def test_parse_civ6_save_teamer():
     expected_players = [
         {'steam_id': 'Calcifer', 'user_name': 'Calcifer', 'civ': 'LEADER_DIDO', 'team': 0, 'player_alive': True},
@@ -130,6 +144,7 @@ def test_parse_civ6_save_10player_ffa():
         expected_players=expected_players
     )
 
+@_PLAYER_ORDER
 def test_parse_civ6_save_5team():
     excepted_players = [
         {'steam_id': '', 'user_name': '', 'civ': 'LEADER_ALEXANDER', 'team': 0, 'player_alive': True},

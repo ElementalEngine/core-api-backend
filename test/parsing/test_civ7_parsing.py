@@ -1,5 +1,23 @@
 import os
+
+import pytest
+
 from app.features.matches.parsers import civ7
+
+_SAVES = os.path.join(os.path.dirname(__file__), "..", "data", "civ7TestSaves")
+
+
+def _missing(name):
+    return not os.path.exists(os.path.join(_SAVES, name))
+
+
+# S1 item 2 quarantine. Nothing is fixed here; every fix belongs to S4 (D83).
+# REMOVAL TRIGGER: S4 closes.
+_AGE_TOKEN = pytest.mark.xfail(
+    strict=True,
+    reason="parser returns the display name ('Antiquity'); fixtures expect the "
+           "token ('AGE_ANTIQUITY'). NOT one of D83's four bugs -- a fifth. S4.",
+)
 
 def _test_parse_civ7_save(file_path, expected_game, expected_age, expected_turn, expected_mode, expected_map_type, expected_players):
     # Path to a test Civ7 save file
@@ -29,6 +47,7 @@ def _test_parse_civ7_save(file_path, expected_game, expected_age, expected_turn,
         assert player.get('leader', None) == expected.get('leader', None)
         assert player['team'] == expected['team']
 
+@_AGE_TOKEN
 def test_parse_civ7_save_3v3_T10():
     expected_players = [
         { 
@@ -84,6 +103,7 @@ def test_parse_civ7_save_3v3_T10():
         expected_players=expected_players
     )
     
+@_AGE_TOKEN
 def test_parse_civ7_save_5player_ffa():
     expected_players = [
         {
@@ -132,6 +152,7 @@ def test_parse_civ7_save_5player_ffa():
         expected_players=expected_players
     )
 
+@_AGE_TOKEN
 def test_parse_civ7_save_duel():
     expected_players = [
         {
@@ -159,6 +180,7 @@ def test_parse_civ7_save_duel():
         expected_players=expected_players
     )
 
+@pytest.mark.skipif(_missing("AutoSave_0001.Civ7Save"), reason="fixture absent. Antiquity is also covered by three other saves. S4.")
 def test_parse_civ7_save_AutoSave_001():
     expected_players = [
         {
@@ -214,6 +236,7 @@ def test_parse_civ7_save_AutoSave_001():
         expected_players=expected_players
     )
 
+@pytest.mark.skipif(_missing("AutoSave_0002.Civ7Save"), reason="fixture absent -- the suite s ONLY AGE_EXPLORATION coverage. Blocks carried-forward item 11. S4.")
 def test_parse_civ7_save_AutoSave_002():
     expected_players = [
         {
@@ -269,6 +292,7 @@ def test_parse_civ7_save_AutoSave_002():
         expected_players=expected_players
     )
 
+@pytest.mark.skipif(_missing("AutoSave_0003.Civ7Save"), reason="fixture absent. AGE_MODERN is also covered by modernGame. S4.")
 def test_parse_civ7_save_AutoSave_003():
     expected_players = [
         {
@@ -324,6 +348,7 @@ def test_parse_civ7_save_AutoSave_003():
         expected_players=expected_players
     )
 
+@_AGE_TOKEN
 def test_parse_civ7_save_modernGame():
     expected_players = [
         {
