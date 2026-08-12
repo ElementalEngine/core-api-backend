@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # Literal, not a repo secret: fork PRs receive no secrets, and nothing
+      # here is sensitive (D60 = no database, D98's check = no network).
+      # config.py requires this one field at import time; MITO_ and AUTH_
+      # tokens are left UNSET so test_mito_token.py keeps exercising the
+      # 503 *_SERVICE_MISCONFIGURED path.
+      LJ_SERVICE_TOKEN: ci-dummy-not-a-secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Install
+        run: pip install -r requirements-dev.txt
+
+      - name: Typecheck
+        run: mypy
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest -q
+
+      # D98 / C12: the app must IMPORT, not run. A route changed without
+      # regenerating the spec is a red build. sort_keys must match the
+      # generator or this comparison is flaky.
+      - name: Contracts — app matches committed spec
+        run: |
+          python - <<'PY'
+          import json, sys
+          from app.main import app
+          live = json.dumps(app.openapi(), indent=2, sort_keys=True) + "\n"
+          committed = open("openapi.json").read()
+          if live != committed:
+              sys.exit("openapi.json is stale. Regenerate and commit it.")
+          print("spec matches")
+          PY
