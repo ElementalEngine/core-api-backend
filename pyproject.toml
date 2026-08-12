@@ -47,6 +47,10 @@ module = [
 ignore_errors = true
 
 [tool.pytest.ini_options]
+# The repo is not installed as a package, so `app` is only importable when
+# the repo root is on sys.path. `python -m pytest` adds CWD; bare `pytest`
+# does not -- which is why this passed locally and failed on the first CI run.
+pythonpath = ["."]
 testpaths = ["test"]
 markers = [
   "unit: unit tests",

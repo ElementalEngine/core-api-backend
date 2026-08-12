@@ -16,9 +16,9 @@ jobs:
       # 503 *_SERVICE_MISCONFIGURED path.
       LJ_SERVICE_TOKEN: ci-dummy-not-a-secret
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.14'
 
