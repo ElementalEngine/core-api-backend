@@ -1,5 +1,4 @@
 import os
-import pytest
 from app.features.matches.parsers import civ6
 
 def _test_parse_civ6_save(file_path, expected_game, expected_turn, expected_mode, expected_map_type, expected_players):

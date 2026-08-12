@@ -1,0 +1,56 @@
+# Tooling configuration only. This project is not packaged or installed;
+# runtime deps are in requirements.txt, dev deps in requirements-dev.txt.
+
+[tool.ruff]
+target-version = "py314"
+
+[tool.ruff.lint]
+# Stated explicitly, never inherited: ruff 0.16 raised the default set from
+# 59 rules to 413, so an unset `select` moves under us on every ruff release.
+# Pre-0.16 default, plus B023 by code -- the rest of `B` is 62 false positives
+# on FastAPI's `Depends()`. Widened in S2.
+select = ["E4", "E7", "E9", "F", "B023"]
+
+[tool.ruff.lint.per-file-ignores]
+# Each entry names its owning sub-phase. Ignoring by file keeps the rule live
+# everywhere else, so no NEW violation can enter across S2-S12.
+"app/features/auth/router.py" = ["F841"]              # unused local. S2.
+"app/features/matches/service.py" = ["E711", "E712"]  # E712:488 is NOT a safe
+                                                      # fix: None == False
+                                                      # differs from not None. S6.
+"app/features/matches/parsers/civ6.py" = ["B023", "F401"]  # D83. S4.
+"app/features/matches/parsers/civ7.py" = ["E711", "F401"]  # D83. S4.
+"test/unit/test_auth_registration.py" = ["E402"]      # 4 imports appended at
+                                                      # L209; suite not yet
+                                                      # green. Item 2.
+
+[tool.mypy]
+python_version = "3.14"
+files = ["app"]
+ignore_missing_imports = true
+# Permissive baseline, deliberately -- D108. Strictness rises per module as
+# each is rewritten.
+
+# Quarantine: 8 of 63 files. Each entry is deleted by the sub-phase that
+# rewrites its file, and that removal is part of that sub-phase's acceptance.
+[[tool.mypy.overrides]]
+module = [
+  "app.core.config",                   # pydantic/mypy limits. S2.
+  "app.main",                          # Starlette handler variance. S2.
+  "app.shared.persistence.mongo_queries",  # 13 Motor/PyMongo session types. S2.
+  "app.features.auth.session_service", # object-typed doc reads. S2.
+  "app.features.matches.service",      # session types + None-unsafety. S2/S3/S6.
+  "app.features.matches.utils",        # tuple-key lookup -- see S5/D63.
+  "app.features.matches.parsers.civ7", # untyped chunks list. S4.
+  "app.features.stats.service",        # object-typed doc reads. S7.
+]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+markers = [
+  "unit: unit tests",
+  "parsing: save-file parser tests",
+  "civ6: Civ6 fixtures",
+  "civ7: Civ7 fixtures",
+]

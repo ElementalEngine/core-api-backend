@@ -1,5 +1,4 @@
 import importlib
-import os
 
 def test_config_loads_env(monkeypatch):
     # minimal required env

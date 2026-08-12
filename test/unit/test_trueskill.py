@@ -23,7 +23,7 @@ def test_trueskill_1v1_winner_gains(monkeypatch):
     mu, sigma = cfg.settings.ts_mu, cfg.settings.ts_sigma
     r1, r2 = Rating(mu, sigma), Rating(mu, sigma)
 
-    (w,), (l,) = env.rate([[r1], [r2]], ranks=[1, 2])
+    (w,), (loser,) = env.rate([[r1], [r2]], ranks=[1, 2])
 
     assert w.mu > r1.mu, "Winner's mu should increase"
-    assert l.mu < r2.mu, "Loser's mu should decrease"
+    assert loser.mu < r2.mu, "Loser's mu should decrease"
