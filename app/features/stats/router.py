@@ -7,7 +7,13 @@ from fastapi import APIRouter, Depends, Form, HTTPException
 
 from app.core.dependencies import get_database, require_mito_token
 from app.features.stats.errors import InvalidStatsRequestError, StatsNotFoundError
-from app.features.stats.schemas import BatchStatsRequest, BatchStatsResponse, TeamGenRequest, TeamGenResponse, UserStatsResponse
+from app.features.stats.schemas import (
+    BatchStatsRequest,
+    BatchStatsResponse,
+    TeamGenRequest,
+    TeamGenResponse,
+    UserStatsResponse,
+)
 from app.features.stats.service import StatsService
 
 logger = logging.getLogger(__name__)
@@ -32,10 +38,14 @@ def _pick_civ_version(*, version: Optional[str], civ_version: Optional[str]) -> 
 
 
 @router.get("/user", response_model=UserStatsResponse)
-async def get_user_stats(civ_version: str, game_type: str, discord_id: str, db=Depends(get_database)):
+async def get_user_stats(
+    civ_version: str, game_type: str, discord_id: str, db=Depends(get_database)
+):
     service = StatsService(db)
     try:
-        return await service.get_user_stats(civ_version=civ_version, game_type=game_type, discord_id=discord_id)
+        return await service.get_user_stats(
+            civ_version=civ_version, game_type=game_type, discord_id=discord_id
+        )
     except InvalidStatsRequestError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except StatsNotFoundError as exc:
@@ -58,20 +68,33 @@ async def get_users_stats_batch(payload: BatchStatsRequest, db=Depends(get_datab
             game_type=payload.game_type,
             discord_ids=ids,
         )
-        normalized_civ_version = results[0].civ_version if results else payload.civ_version.strip().lower()
-        normalized_game_type = results[0].game_type if results else payload.game_type.strip().lower()
-        return BatchStatsResponse(civ_version=normalized_civ_version, game_type=normalized_game_type, results=results)
+        normalized_civ_version = (
+            results[0].civ_version if results else payload.civ_version.strip().lower()
+        )
+        normalized_game_type = (
+            results[0].game_type if results else payload.game_type.strip().lower()
+        )
+        return BatchStatsResponse(
+            civ_version=normalized_civ_version,
+            game_type=normalized_game_type,
+            results=results,
+        )
     except InvalidStatsRequestError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - exercised in integration tests
         logger.exception("Batch stats lookup failed")
         raise HTTPException(status_code=503, detail="Backend unavailable") from exc
 
+
 @router.put("/reset/user", response_model=UserStatsResponse)
-async def reset_user_stats(civ_version: str, game_type: str, discord_id: str, db=Depends(get_database)):
+async def reset_user_stats(
+    civ_version: str, game_type: str, discord_id: str, db=Depends(get_database)
+):
     service = StatsService(db)
     try:
-        return await service.reset_user_stats(civ_version=civ_version, game_type=game_type, discord_id=discord_id)
+        return await service.reset_user_stats(
+            civ_version=civ_version, game_type=game_type, discord_id=discord_id
+        )
     except InvalidStatsRequestError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except StatsNotFoundError as exc:
@@ -79,6 +102,7 @@ async def reset_user_stats(civ_version: str, game_type: str, discord_id: str, db
     except Exception as exc:  # pragma: no cover - exercised in integration tests
         logger.exception("Reset Stats lookup failed")
         raise HTTPException(status_code=503, detail="Backend unavailable") from exc
+
 
 @router.post("/team-gen", response_model=TeamGenResponse)
 async def get_team_gen(payload: TeamGenRequest, db=Depends(get_database)):
@@ -112,7 +136,9 @@ async def put_get_user_stats(
     chosen_version = _pick_civ_version(version=version, civ_version=civ_version)
 
     try:
-        return await service.get_user_stats(civ_version=chosen_version, game_type=game_type, discord_id=discord_id)
+        return await service.get_user_stats(
+            civ_version=chosen_version, game_type=game_type, discord_id=discord_id
+        )
     except InvalidStatsRequestError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except StatsNotFoundError as exc:
@@ -142,9 +168,17 @@ async def put_get_users_stats_batch(
             game_type=game_type,
             discord_ids=discord_id_list,
         )
-        normalized_civ_version = results[0].civ_version if results else chosen_version.strip().lower()
-        normalized_game_type = results[0].game_type if results else game_type.strip().lower()
-        return BatchStatsResponse(civ_version=normalized_civ_version, game_type=normalized_game_type, results=results)
+        normalized_civ_version = (
+            results[0].civ_version if results else chosen_version.strip().lower()
+        )
+        normalized_game_type = (
+            results[0].game_type if results else game_type.strip().lower()
+        )
+        return BatchStatsResponse(
+            civ_version=normalized_civ_version,
+            game_type=normalized_game_type,
+            results=results,
+        )
     except InvalidStatsRequestError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - exercised in integration tests

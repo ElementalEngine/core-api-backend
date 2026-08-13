@@ -177,7 +177,9 @@ def test_approve_match_accumulates_counters_from_stored_doc():
     }
     players = [
         make_player(discord_id="123", team=0, placement=0),
-        make_player(discord_id="456", team=1, placement=1, steam_id="76561190000000002"),
+        make_player(
+            discord_id="456", team=1, placement=1, steam_id="76561190000000002"
+        ),
     ]
     repo = FakeRepo(match_doc=make_match_doc(players), stat_doc=stored)
 
@@ -252,7 +254,9 @@ def test_change_order_rejects_non_numeric_and_unmapped_teams():
 
 
 def test_update_match_whitelist_excludes_match_id():
-    payload = MatchUpdate(match_id="652f1a2b3c4d5e6f7a8b9c0d", confirmed=True, flagged=True)
+    payload = MatchUpdate(
+        match_id="652f1a2b3c4d5e6f7a8b9c0d", confirmed=True, flagged=True
+    )
     update_data = {
         key: value
         for key, value in payload.dict(exclude_unset=True).items()
@@ -277,12 +281,14 @@ def test_revert_doc_math_uses_per_scope_deltas():
 
     asyncio.run(make_service(repo).revert_match(OID))
 
-    docs = {
-        (u["is_seasonal"], u["is_combined"]): u["doc"] for u in repo.upserts
-    }
+    docs = {(u["is_seasonal"], u["is_combined"]): u["doc"] for u in repo.upserts}
     assert docs[(False, False)]["mu"] == pytest.approx(25.0)  # 30 - 5 (lifetime)
-    assert docs[(True, False)]["mu"] == pytest.approx(30.0)  # 30 - 0 (season, legacy None)
-    assert docs[(False, True)]["mu"] == pytest.approx(30.0)  # 30 - 0 (combined, legacy None)
+    assert docs[(True, False)]["mu"] == pytest.approx(
+        30.0
+    )  # 30 - 0 (season, legacy None)
+    assert docs[(False, True)]["mu"] == pytest.approx(
+        30.0
+    )  # 30 - 0 (combined, legacy None)
     for doc in docs.values():
         assert doc["sigma"] == pytest.approx(7.0)  # 5 + 2
         assert doc["games"] == 9

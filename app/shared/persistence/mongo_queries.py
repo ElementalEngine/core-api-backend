@@ -69,11 +69,20 @@ class MongoQueries:
         return await self._users.find_one({"discord_id": discord_id})
 
     async def get_user_by_steam_id(self, steam_id: str) -> Optional[Dict[str, Any]]:
-        return await self._users.find_one({"$or": [{"steam_id": steam_id}, {"linked_platform": "steam", "linked_account_id": steam_id}]})
+        return await self._users.find_one(
+            {
+                "$or": [
+                    {"steam_id": steam_id},
+                    {"linked_platform": "steam", "linked_account_id": steam_id},
+                ]
+            }
+        )
 
     # -------------------- pending matches --------------------
 
-    async def find_pending_by_hash(self, save_file_hash: str) -> Optional[Dict[str, Any]]:
+    async def find_pending_by_hash(
+        self, save_file_hash: str
+    ) -> Optional[Dict[str, Any]]:
         return await self._pending.find_one({"save_file_hash": save_file_hash})
 
     async def find_pending_by_id(self, oid: ObjectId) -> Optional[Dict[str, Any]]:
@@ -95,7 +104,9 @@ class MongoQueries:
         *,
         session: AsyncClientSession | None = None,
     ) -> bool:
-        res = await self._pending.update_one({"_id": oid}, {"$set": dict(changes)}, session=session)
+        res = await self._pending.update_one(
+            {"_id": oid}, {"$set": dict(changes)}, session=session
+        )
         return res.matched_count == 1
 
     async def replace_pending_match(
@@ -105,7 +116,9 @@ class MongoQueries:
         *,
         session: AsyncClientSession | None = None,
     ) -> bool:
-        res = await self._pending.replace_one({"_id": oid}, dict(match_doc), session=session)
+        res = await self._pending.replace_one(
+            {"_id": oid}, dict(match_doc), session=session
+        )
         return res.matched_count == 1
 
     async def delete_pending_match(
@@ -139,7 +152,7 @@ class MongoQueries:
             upsert=True,
             session=session,
         )
-    
+
     async def dec_subs_in(
         self, discord_id: str, *, session: AsyncClientSession | None = None
     ) -> None:
@@ -157,7 +170,9 @@ class MongoQueries:
             return DB_CIV6_SEASON if is_seasonal else DB_CIV6_LIFETIME
         return DB_CIV7_SEASON if is_seasonal else DB_CIV7_LIFETIME
 
-    def _stats_collection_name(self, *, match_type: str, is_cloud: bool, is_combined: bool) -> str:
+    def _stats_collection_name(
+        self, *, match_type: str, is_cloud: bool, is_combined: bool
+    ) -> str:
         prefix = "pbc_" if is_cloud else "rt_"
 
         if is_combined:
@@ -169,16 +184,28 @@ class MongoQueries:
             mt = "teamer"
 
         if mt not in {"ffa", "teamer", "duel"}:
-            raise ValueError(f"Unexpected match_type: {match_type!r} (expected ffa|teamer|duel)")
+            raise ValueError(
+                f"Unexpected match_type: {match_type!r} (expected ffa|teamer|duel)"
+            )
 
         return f"{prefix}{mt}"
 
     def _stats_collection(
-        self, *, civ_version: str, is_seasonal: bool, match_type: str, is_cloud: bool, is_combined: bool
+        self,
+        *,
+        civ_version: str,
+        is_seasonal: bool,
+        match_type: str,
+        is_cloud: bool,
+        is_combined: bool,
     ) -> AsyncCollection:
-        db = self._client[self._stats_db_name(civ_version=civ_version, is_seasonal=is_seasonal)]
+        db = self._client[
+            self._stats_db_name(civ_version=civ_version, is_seasonal=is_seasonal)
+        ]
         return db[
-            self._stats_collection_name(match_type=match_type, is_cloud=is_cloud, is_combined=is_combined)
+            self._stats_collection_name(
+                match_type=match_type, is_cloud=is_cloud, is_combined=is_combined
+            )
         ]
 
     async def get_player_stat_doc(
@@ -199,7 +226,7 @@ class MongoQueries:
             is_combined=is_combined,
         )
         return await col.find_one({"_id": Int64(discord_id)})
-    
+
     # Returns nothing; the annotation is wrong and no caller reads it (S7).
     async def reset_player_stat_doc(  # type: ignore[return]
         self,
@@ -213,10 +240,10 @@ class MongoQueries:
             async with await session.start_transaction():
                 try:
                     stat_reset = {
-                        'civ_version': civ_version,
-                        'is_cloud': is_cloud,
-                        'discord_id': discord_id,
-                        'stat_reset': True,
+                        "civ_version": civ_version,
+                        "is_cloud": is_cloud,
+                        "discord_id": discord_id,
+                        "stat_reset": True,
                     }
                     await self.insert_validated_match(stat_reset, session=session)
                     for match_type in ["ffa", "teamer", "duel"]:
@@ -228,7 +255,9 @@ class MongoQueries:
                                     match_type=match_type,
                                     is_cloud=is_cloud,
                                     is_combined=is_combined,
-                                ).delete_one({"_id": Int64(discord_id)}, session=session)
+                                ).delete_one(
+                                    {"_id": Int64(discord_id)}, session=session
+                                )
                     await session.commit_transaction()
                 except Exception as e:
                     logger.exception("Transaction failed while writing to DB; aborting")
@@ -292,7 +321,9 @@ class MongoQueries:
             is_cloud=is_cloud,
             is_combined=is_combined,
         )
-        await col.replace_one({"_id": Int64(discord_id)}, dict(doc), upsert=True, session=session)
+        await col.replace_one(
+            {"_id": Int64(discord_id)}, dict(doc), upsert=True, session=session
+        )
 
     async def get_leaderboard(
         self,
@@ -313,11 +344,15 @@ class MongoQueries:
             is_combined=is_combined,
         )
 
-        last = await col.find_one({}, sort=[
-            ("lastModified", DESCENDING)
-        ], projection={"lastModified": 1})
+        last = await col.find_one(
+            {}, sort=[("lastModified", DESCENDING)], projection={"lastModified": 1}
+        )
         last_updated = (last or {}).get("lastModified")
 
-        cursor = col.find({"games": {"$gte": min_games}}).sort({"mu": DESCENDING, "sigma": ASCENDING}).limit(limit)
+        cursor = (
+            col.find({"games": {"$gte": min_games}})
+            .sort({"mu": DESCENDING, "sigma": ASCENDING})
+            .limit(limit)
+        )
         rows = await cursor.to_list(length=limit)
         return LeaderboardResult(rows=rows, last_updated=last_updated)

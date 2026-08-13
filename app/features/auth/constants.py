@@ -9,7 +9,9 @@ COL_REGISTRATION_OPERATIONS: Final[str] = "registration_operations"
 DISCORD_OAUTH_AUTHORIZE_URL: Final[str] = "https://discord.com/oauth2/authorize"
 DISCORD_OAUTH_TOKEN_URL: Final[str] = "https://discord.com/api/oauth2/token"
 DISCORD_API_ME_URL: Final[str] = "https://discord.com/api/v10/users/@me"
-DISCORD_API_CONNECTIONS_URL: Final[str] = "https://discord.com/api/v10/users/@me/connections"
+DISCORD_API_CONNECTIONS_URL: Final[str] = (
+    "https://discord.com/api/v10/users/@me/connections"
+)
 DISCORD_OAUTH_SCOPES: Final[tuple[str, ...]] = ("identify", "connections")
 
 DEFAULT_STEAM_APP_IDS: Final[dict[str, int]] = {
@@ -22,4 +24,6 @@ DEFAULT_STEAM_PLAYTIME_MINUTES: Final[dict[str, int]] = {
     "civ7": 120,
 }
 
-STEAM_OWNED_GAMES_URL: Final[str] = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
+STEAM_OWNED_GAMES_URL: Final[str] = (
+    "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
+)

@@ -3,7 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import logging
 
-from app.features.auth.enums import RegistrationOperationStatus, RegistrationSessionStatus
+from app.features.auth.enums import (
+    RegistrationOperationStatus,
+    RegistrationSessionStatus,
+)
 from app.features.auth.errors import OperationNotFoundError, OperationStateConflictError
 from app.features.auth.repository import AuthRepository
 from app.features.auth.schemas import FinalizeRegistrationOperationRequest
@@ -24,9 +27,15 @@ class OperationService:
         if operation is None:
             raise OperationNotFoundError(operation_id)
 
-        status_value = str(operation.get("status", RegistrationOperationStatus.PENDING.value))
+        status_value = str(
+            operation.get("status", RegistrationOperationStatus.PENDING.value)
+        )
         if status_value != RegistrationOperationStatus.PENDING.value:
-            expected = RegistrationOperationStatus.SUCCEEDED.value if payload.result == "succeeded" else RegistrationOperationStatus.FAILED.value
+            expected = (
+                RegistrationOperationStatus.SUCCEEDED.value
+                if payload.result == "succeeded"
+                else RegistrationOperationStatus.FAILED.value
+            )
             if status_value == expected:
                 return
             raise OperationStateConflictError(operation_id, status_value)
@@ -37,21 +46,37 @@ class OperationService:
             if not registration_method:
                 # Back-compat for operations created before registration_method existed.
                 registration_method = (
-                    "manual_admin" if operation.get("type") == "manual_registration" else "oauth"
+                    "manual_admin"
+                    if operation.get("type") == "manual_registration"
+                    else "oauth"
                 )
             await self._repository.upsert_registered_user(
                 discord_user_id=str(operation["discord_user_id"]),
                 linked_platform=str(operation.get("linked_platform") or "steam"),
-                linked_account_id=str(operation.get("linked_account_id") or operation["steam_id"]),
+                linked_account_id=str(
+                    operation.get("linked_account_id") or operation["steam_id"]
+                ),
                 linked_account_name=(
                     str(operation["linked_account_name"])
                     if operation.get("linked_account_name")
-                    else (str(operation["steam_name"]) if operation.get("steam_name") else None)
+                    else (
+                        str(operation["steam_name"])
+                        if operation.get("steam_name")
+                        else None
+                    )
                 ),
                 game=str(operation["game"]),
                 method=str(registration_method),
-                discord_username=(str(operation["username_snapshot"]) if operation.get("username_snapshot") else None),
-                display_name=(str(operation["display_name_snapshot"]) if operation.get("display_name_snapshot") else None),
+                discord_username=(
+                    str(operation["username_snapshot"])
+                    if operation.get("username_snapshot")
+                    else None
+                ),
+                display_name=(
+                    str(operation["display_name_snapshot"])
+                    if operation.get("display_name_snapshot")
+                    else None
+                ),
                 ownership_verified_at=operation.get("ownership_verified_at"),
                 playtime_minutes=operation.get("playtime_minutes"),
             )
@@ -59,7 +84,9 @@ class OperationService:
                 operation_id,
                 {
                     "status": RegistrationOperationStatus.SUCCEEDED.value,
-                    "applied_role_intents": [intent.value for intent in payload.applied_role_intents],
+                    "applied_role_intents": [
+                        intent.value for intent in payload.applied_role_intents
+                    ],
                     "completed_at": now,
                     "updated_at": now,
                 },

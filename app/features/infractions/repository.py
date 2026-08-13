@@ -8,7 +8,11 @@ from pymongo.asynchronous.collection import AsyncCollection
 from pymongo import ASCENDING
 from pymongo.collection import ReturnDocument
 
-from app.features.infractions.models import ActiveSuspension, PendingSuspensionDocument, SuspensionDocument
+from app.features.infractions.models import (
+    ActiveSuspension,
+    PendingSuspensionDocument,
+    SuspensionDocument,
+)
 from app.shared.persistence.mongo_queries import DB_SERVER_MEMBERS
 
 COL_SUSPENSIONS: Final[str] = "suspensions"
@@ -16,6 +20,7 @@ COL_SUSPENSIONS_DUE: Final[str] = "suspensions_due"
 
 
 # ─── Collection accessors ─────────────────────────────────────────────────────
+
 
 def suspensions_col(db: AsyncMongoClient) -> AsyncCollection:  # type: ignore[type-arg]
     return db[DB_SERVER_MEMBERS][COL_SUSPENSIONS]
@@ -26,6 +31,7 @@ def suspensions_due_col(db: AsyncMongoClient) -> AsyncCollection:  # type: ignor
 
 
 # ─── Index creation (called once at startup in lifespan) ─────────────────────
+
 
 async def create_indexes(db: AsyncMongoClient) -> None:
     col = suspensions_col(db)
@@ -42,7 +48,10 @@ async def create_indexes(db: AsyncMongoClient) -> None:
 
 # ─── Core CRUD ────────────────────────────────────────────────────────────────
 
-async def find_suspension(db: AsyncMongoClient, discord_id: str) -> SuspensionDocument | None:
+
+async def find_suspension(
+    db: AsyncMongoClient, discord_id: str
+) -> SuspensionDocument | None:
     col = suspensions_col(db)
     result: dict[str, Any] | None = await col.find_one({"discord_id": discord_id})
     if result is None:
@@ -50,7 +59,9 @@ async def find_suspension(db: AsyncMongoClient, discord_id: str) -> SuspensionDo
     return SuspensionDocument.model_validate(result)
 
 
-async def upsert_suspension(db: AsyncMongoClient, discord_id: str, update: dict[str, Any]) -> None:
+async def upsert_suspension(
+    db: AsyncMongoClient, discord_id: str, update: dict[str, Any]
+) -> None:
     col = suspensions_col(db)
     await col.update_one(
         {"discord_id": discord_id},
@@ -59,7 +70,9 @@ async def upsert_suspension(db: AsyncMongoClient, discord_id: str, update: dict[
     )
 
 
-async def find_or_create_suspension(db: AsyncMongoClient, discord_id: str) -> SuspensionDocument:
+async def find_or_create_suspension(
+    db: AsyncMongoClient, discord_id: str
+) -> SuspensionDocument:
     """Atomic upsert — never a read-then-write race.
 
     $setOnInsert runs only when a new document is created; existing documents
@@ -87,11 +100,14 @@ async def find_or_create_suspension(db: AsyncMongoClient, discord_id: str) -> Su
         return_document=ReturnDocument.AFTER,
     )
     if result is None:
-        raise RuntimeError(f"find_one_and_update with upsert returned None for discord_id={discord_id!r}")
+        raise RuntimeError(
+            f"find_one_and_update with upsert returned None for discord_id={discord_id!r}"
+        )
     return SuspensionDocument.model_validate(result)
 
 
 # ─── Pending suspensions ──────────────────────────────────────────────────────
+
 
 async def find_pending_suspension(
     db: AsyncMongoClient, discord_id: str
@@ -129,6 +145,7 @@ async def delete_pending_suspension(db: AsyncMongoClient, discord_id: str) -> No
 
 
 # ─── Scheduler recovery ───────────────────────────────────────────────────────
+
 
 async def get_active_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]:
     """Query uses compound index { suspended: 1, ends: 1 }."""

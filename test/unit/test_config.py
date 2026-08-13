@@ -1,5 +1,6 @@
 import importlib
 
+
 def test_config_loads_env(monkeypatch):
     # minimal required env
     monkeypatch.setenv("REPORTING_BACKEND_VERSION", "test-1.2.3")
@@ -17,6 +18,7 @@ def test_config_loads_env(monkeypatch):
 
     # reload after setting env
     import app.core.config as cfg
+
     importlib.reload(cfg)
 
     s = cfg.settings

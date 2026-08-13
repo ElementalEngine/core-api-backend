@@ -74,10 +74,18 @@ class AuthRepository:
     async def get_user_by_discord_id(self, discord_id: str) -> dict[str, Any] | None:
         return await self._users.find_one({"discord_id": discord_id})
 
-    async def find_users_by_discord_id(self, discord_id: str, *, limit: int = 25) -> list[dict[str, Any]]:
+    async def find_users_by_discord_id(
+        self, discord_id: str, *, limit: int = 25
+    ) -> list[dict[str, Any]]:
         cursor = (
             self._users.find({"discord_id": discord_id})
-            .sort([("linked_platform", ASCENDING), ("linked_account_id", ASCENDING), ("steam_id", ASCENDING)])
+            .sort(
+                [
+                    ("linked_platform", ASCENDING),
+                    ("linked_account_id", ASCENDING),
+                    ("steam_id", ASCENDING),
+                ]
+            )
             .limit(max(1, limit))
         )
         return await cursor.to_list(length=max(1, limit))
@@ -92,7 +100,9 @@ class AuthRepository:
             }
         )
 
-    async def find_users_by_linked_account_id(self, linked_account_id: str, *, limit: int = 25) -> list[dict[str, Any]]:
+    async def find_users_by_linked_account_id(
+        self, linked_account_id: str, *, limit: int = 25
+    ) -> list[dict[str, Any]]:
         cursor = (
             self._users.find(
                 {
@@ -102,13 +112,23 @@ class AuthRepository:
                     ]
                 }
             )
-            .sort([("discord_id", ASCENDING), ("linked_platform", ASCENDING), ("linked_account_id", ASCENDING)])
+            .sort(
+                [
+                    ("discord_id", ASCENDING),
+                    ("linked_platform", ASCENDING),
+                    ("linked_account_id", ASCENDING),
+                ]
+            )
             .limit(max(1, limit))
         )
         return await cursor.to_list(length=max(1, limit))
 
-    async def get_user_by_linked_account(self, platform: str, account_id: str) -> dict[str, Any] | None:
-        return await self._users.find_one({"linked_platform": platform, "linked_account_id": account_id})
+    async def get_user_by_linked_account(
+        self, platform: str, account_id: str
+    ) -> dict[str, Any] | None:
+        return await self._users.find_one(
+            {"linked_platform": platform, "linked_account_id": account_id}
+        )
 
     async def insert_registration_session(self, doc: Mapping[str, Any]) -> None:
         await self._sessions.insert_one(dict(doc))
@@ -116,21 +136,33 @@ class AuthRepository:
     async def get_registration_session(self, session_id: str) -> dict[str, Any] | None:
         return await self._sessions.find_one({"session_id": session_id})
 
-    async def get_registration_session_by_state(self, state_token: str) -> dict[str, Any] | None:
+    async def get_registration_session_by_state(
+        self, state_token: str
+    ) -> dict[str, Any] | None:
         return await self._sessions.find_one({"state_token": state_token})
 
-    async def update_registration_session(self, session_id: str, changes: Mapping[str, Any]) -> bool:
-        res = await self._sessions.update_one({"session_id": session_id}, {"$set": dict(changes)})
+    async def update_registration_session(
+        self, session_id: str, changes: Mapping[str, Any]
+    ) -> bool:
+        res = await self._sessions.update_one(
+            {"session_id": session_id}, {"$set": dict(changes)}
+        )
         return res.matched_count == 1
 
     async def insert_registration_operation(self, doc: Mapping[str, Any]) -> None:
         await self._operations.insert_one(dict(doc))
 
-    async def get_registration_operation(self, operation_id: str) -> dict[str, Any] | None:
+    async def get_registration_operation(
+        self, operation_id: str
+    ) -> dict[str, Any] | None:
         return await self._operations.find_one({"operation_id": operation_id})
 
-    async def update_registration_operation(self, operation_id: str, changes: Mapping[str, Any]) -> bool:
-        res = await self._operations.update_one({"operation_id": operation_id}, {"$set": dict(changes)})
+    async def update_registration_operation(
+        self, operation_id: str, changes: Mapping[str, Any]
+    ) -> bool:
+        res = await self._operations.update_one(
+            {"operation_id": operation_id}, {"$set": dict(changes)}
+        )
         return res.matched_count == 1
 
     async def upsert_registered_user(
@@ -203,7 +235,6 @@ class AuthRepository:
                 registration_doc=registration_doc,
             ),
         )
-
 
 
 def _build_registration_entry(
@@ -326,7 +357,9 @@ def _build_existing_user_update(
     return update_doc
 
 
-def _resolve_server_registered_at(existing: Mapping[str, Any] | None) -> datetime | None:
+def _resolve_server_registered_at(
+    existing: Mapping[str, Any] | None,
+) -> datetime | None:
     if not existing:
         return None
 

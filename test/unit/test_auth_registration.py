@@ -133,8 +133,12 @@ def test_operation_finalize_success_upserts_user_and_completes_session():
     )
 
     assert repo.upserts and repo.upserts[0]["discord_user_id"] == "123"
-    assert repo.operations["op-1"]["status"] == RegistrationOperationStatus.SUCCEEDED.value
-    assert repo.sessions["sess-1"]["status"] == RegistrationSessionStatus.COMPLETED.value
+    assert (
+        repo.operations["op-1"]["status"] == RegistrationOperationStatus.SUCCEEDED.value
+    )
+    assert (
+        repo.sessions["sess-1"]["status"] == RegistrationSessionStatus.COMPLETED.value
+    )
 
 
 def test_operation_finalize_failure_marks_session_failed():
@@ -172,36 +176,48 @@ def test_steam_validation_private_profile(monkeypatch):
     async def fake_owned_games(*, steam_id: str, app_id: int):
         return {"response": {}}
 
-    object.__setattr__(steam_module.settings, "auth_steam_api_key", SecretStr("test-key"))
+    object.__setattr__(
+        steam_module.settings, "auth_steam_api_key", SecretStr("test-key")
+    )
     service = SteamService()
     monkeypatch.setattr(service, "_get_owned_games", fake_owned_games)
 
     with pytest.raises(SteamProfilePrivateError):
-        asyncio.run(service.validate_linked_account(steam_id="1", game=SupportedGame.CIV6.value))
+        asyncio.run(
+            service.validate_linked_account(steam_id="1", game=SupportedGame.CIV6.value)
+        )
 
 
 def test_steam_validation_missing_game(monkeypatch):
     async def fake_owned_games(*, steam_id: str, app_id: int):
         return {"response": {"games": [{"appid": 1, "playtime_forever": 999}]}}
 
-    object.__setattr__(steam_module.settings, "auth_steam_api_key", SecretStr("test-key"))
+    object.__setattr__(
+        steam_module.settings, "auth_steam_api_key", SecretStr("test-key")
+    )
     service = SteamService()
     monkeypatch.setattr(service, "_get_owned_games", fake_owned_games)
 
     with pytest.raises(SteamOwnershipMissingError):
-        asyncio.run(service.validate_linked_account(steam_id="1", game=SupportedGame.CIV6.value))
+        asyncio.run(
+            service.validate_linked_account(steam_id="1", game=SupportedGame.CIV6.value)
+        )
 
 
 def test_steam_validation_playtime_threshold(monkeypatch):
     async def fake_owned_games(*, steam_id: str, app_id: int):
         return {"response": {"games": [{"appid": app_id, "playtime_forever": 10}]}}
 
-    object.__setattr__(steam_module.settings, "auth_steam_api_key", SecretStr("test-key"))
+    object.__setattr__(
+        steam_module.settings, "auth_steam_api_key", SecretStr("test-key")
+    )
     service = SteamService()
     monkeypatch.setattr(service, "_get_owned_games", fake_owned_games)
 
     with pytest.raises(SteamPlaytimeBelowThresholdError):
-        asyncio.run(service.validate_linked_account(steam_id="1", game=SupportedGame.CIV7.value))
+        asyncio.run(
+            service.validate_linked_account(steam_id="1", game=SupportedGame.CIV7.value)
+        )
 
 
 # --- Method/policy coverage added with the platform-method change set ---
@@ -228,7 +244,9 @@ from app.features.auth.schemas import (
         ("self_service_2k", "2k", False),
     ],
 )
-def test_rank_role_eligibility_requires_steam_api_method(method, linked_platform, eligible):
+def test_rank_role_eligibility_requires_steam_api_method(
+    method, linked_platform, eligible
+):
     repo = FakeRepo()
     repo.users_by_discord["d1"] = {
         "discord_id": "d1",
@@ -248,11 +266,17 @@ def test_rank_role_eligibility_requires_steam_api_method(method, linked_platform
     ("choice", "exp_platform", "exp_method"),
     [
         (ManualRegistrationChoice.STEAM, "steam", "admin_staff_attested"),
-        (ManualRegistrationChoice.STEAM_FAMILY_SHARE, "steam", "admin_steam_family_share"),
+        (
+            ManualRegistrationChoice.STEAM_FAMILY_SHARE,
+            "steam",
+            "admin_steam_family_share",
+        ),
         (ManualRegistrationChoice.TWOK, "2k", "admin_staff_attested"),
     ],
 )
-def test_manual_registration_maps_choice_and_skips_steam(choice, exp_platform, exp_method):
+def test_manual_registration_maps_choice_and_skips_steam(
+    choice, exp_platform, exp_method
+):
     repo = FakeRepo()
     response = asyncio.run(
         ManualRegistrationService(repo).create_manual_registration(
@@ -270,7 +294,9 @@ def test_manual_registration_maps_choice_and_skips_steam(choice, exp_platform, e
     assert op["linked_platform"] == exp_platform
     assert op["registration_method"] == exp_method
     assert op["type"] == "manual_registration"
-    assert op["ownership_verified_at"] is None  # no Steam API validation on manual paths
+    assert (
+        op["ownership_verified_at"] is None
+    )  # no Steam API validation on manual paths
 
 
 def test_self_service_civ7_2k_creates_operation():

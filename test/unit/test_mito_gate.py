@@ -20,7 +20,8 @@ TOKEN = "mito-test-token"
 def test_all_mito_facing_routers_carry_the_gate():
     for router in (matches_router, upload_router, stats_router, stats_legacy_router):
         assert any(
-            dependency.dependency is require_mito_token for dependency in router.dependencies
+            dependency.dependency is require_mito_token
+            for dependency in router.dependencies
         ), f"router {router.prefix!r} is missing require_mito_token"
 
 
@@ -40,7 +41,10 @@ def test_gate_returns_401_without_header_and_admits_with_it(monkeypatch):
     app.include_router(stats_router)
     client = TestClient(app, raise_server_exceptions=False)
 
-    denied = client.get("/api/v1/stats/user", params={"civ_version": "civ6", "game_type": "realtime", "discord_id": "1"})
+    denied = client.get(
+        "/api/v1/stats/user",
+        params={"civ_version": "civ6", "game_type": "realtime", "discord_id": "1"},
+    )
     assert denied.status_code == 401
     assert denied.json()["detail"]["error"]["code"] == "UNAUTHORIZED"
 

@@ -11,7 +11,9 @@ class FakeRepo:
     async def find_users_by_discord_id(self, discord_id: str, *, limit: int = 25):
         return list(self.discord_docs)
 
-    async def find_users_by_linked_account_id(self, linked_account_id: str, *, limit: int = 25):
+    async def find_users_by_linked_account_id(
+        self, linked_account_id: str, *, limit: int = 25
+    ):
         return list(self.linked_docs)
 
 
@@ -36,12 +38,18 @@ def test_lookup_by_discord_id_returns_all_linked_account_hits():
         },
     ]
 
-    response = asyncio.run(RegistrationService(repo).lookup_by_discord_id("111111111111111111"))
+    response = asyncio.run(
+        RegistrationService(repo).lookup_by_discord_id("111111111111111111")
+    )
 
     assert response is not None
     assert response.discord_id == "111111111111111111"
     assert response.discord_username == "primary_test_user"
-    assert [hit.linked_account_id for hit in response.linked_accounts] == ["epic-test-001", "76561190000000001"]
+    assert [hit.linked_account_id for hit in response.linked_accounts] == [
+        "epic-test-001",
+        "76561190000000001",
+    ]
+
 
 def test_lookup_by_linked_account_id_returns_all_discord_hits_with_steam_compatibility():
     repo = FakeRepo()
@@ -63,7 +71,9 @@ def test_lookup_by_linked_account_id_returns_all_discord_hits_with_steam_compati
         },
     ]
 
-    response = asyncio.run(RegistrationService(repo).lookup_by_linked_account_id("76561190000000001"))
+    response = asyncio.run(
+        RegistrationService(repo).lookup_by_linked_account_id("76561190000000001")
+    )
 
     assert response is not None
     assert response.linked_account_id == "76561190000000001"
@@ -72,6 +82,7 @@ def test_lookup_by_linked_account_id_returns_all_discord_hits_with_steam_compati
         "111111111111111111",
         "222222222222222222",
     ]
+
 
 def test_lookup_surfaces_registration_method_and_renders_legacy_xbox():
     repo = FakeRepo()
@@ -93,7 +104,15 @@ def test_lookup_surfaces_registration_method_and_renders_legacy_xbox():
     response = asyncio.run(RegistrationService(repo).lookup_by_discord_id("d-1"))
 
     assert response is not None
-    platforms = {hit.linked_platform.value for hit in response.linked_accounts if hit.linked_platform}
+    platforms = {
+        hit.linked_platform.value
+        for hit in response.linked_accounts
+        if hit.linked_platform
+    }
     assert {"2k", "xbox"} <= platforms  # legacy xbox renders, does not error
-    methods = {summary.method for hit in response.linked_accounts for summary in hit.registrations}
+    methods = {
+        summary.method
+        for hit in response.linked_accounts
+        for summary in hit.registrations
+    }
     assert {"self_service_2k", "admin_staff_attested"} <= methods

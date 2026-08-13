@@ -4,7 +4,15 @@ from functools import lru_cache
 from typing import List
 from urllib.parse import urlsplit
 
-from pydantic import AliasChoices, AnyHttpUrl, Field, SecretStr, TypeAdapter, computed_field, model_validator
+from pydantic import (
+    AliasChoices,
+    AnyHttpUrl,
+    Field,
+    SecretStr,
+    TypeAdapter,
+    computed_field,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -50,8 +58,12 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("MONGODB_MIN_POOL_SIZE"),
     )
 
-    api_host: str = Field(default="127.0.0.1", validation_alias=AliasChoices("API_HOST"))
-    api_port: int = Field(default=8000, gt=0, lt=65536, validation_alias=AliasChoices("API_PORT"))
+    api_host: str = Field(
+        default="127.0.0.1", validation_alias=AliasChoices("API_HOST")
+    )
+    api_port: int = Field(
+        default=8000, gt=0, lt=65536, validation_alias=AliasChoices("API_PORT")
+    )
 
     # CORS
     allowed_origins_raw: str = Field(
@@ -69,7 +81,7 @@ class Settings(BaseSettings):
         default=SecretStr(""),
         validation_alias=AliasChoices("MITO_SERVICE_TOKEN"),
     )
-    
+
     # Auth parameters
     auth_service_token: SecretStr = Field(
         default=SecretStr(""),
@@ -93,11 +105,15 @@ class Settings(BaseSettings):
     )
     auth_discord_client_secret: SecretStr = Field(
         default=SecretStr(""),
-        validation_alias=AliasChoices("AUTH_DISCORD_CLIENT_SECRET", "DISCORD_CLIENT_SECRET"),
+        validation_alias=AliasChoices(
+            "AUTH_DISCORD_CLIENT_SECRET", "DISCORD_CLIENT_SECRET"
+        ),
     )
     auth_discord_redirect_uri: str = Field(
         default="",
-        validation_alias=AliasChoices("AUTH_DISCORD_REDIRECT_URI", "DISCORD_REDIRECT_URI"),
+        validation_alias=AliasChoices(
+            "AUTH_DISCORD_REDIRECT_URI", "DISCORD_REDIRECT_URI"
+        ),
     )
     auth_steam_api_key: SecretStr = Field(
         default=SecretStr(""),
@@ -131,7 +147,9 @@ class Settings(BaseSettings):
     )
 
     # Team gen parameters
-    team_gen_tries: int = Field(default=10, gt=0, validation_alias=AliasChoices("TEAM_GEN_TRIES"))
+    team_gen_tries: int = Field(
+        default=10, gt=0, validation_alias=AliasChoices("TEAM_GEN_TRIES")
+    )
     team_gen_randomness: float = Field(
         default=0.05,
         lt=0.1,
@@ -141,13 +159,23 @@ class Settings(BaseSettings):
 
     # TrueSkill Environment
     ts_mu: float = Field(default=1250.0, gt=0, validation_alias=AliasChoices("TS_MU"))
-    ts_sigma: float = Field(default=150.0, gt=0, validation_alias=AliasChoices("TS_SIGMA"))
+    ts_sigma: float = Field(
+        default=150.0, gt=0, validation_alias=AliasChoices("TS_SIGMA")
+    )
     ts_beta: float = Field(default=70.0, gt=0, validation_alias=AliasChoices("TS_BETA"))
     ts_tau: float = Field(default=1.0, ge=0, validation_alias=AliasChoices("TS_TAU"))
-    ts_draw_prob: float = Field(default=0.0, ge=0, le=1, validation_alias=AliasChoices("TS_DRAW_PROB"))
-    ts_sigma_free: float = Field(default=90.0, ge=0, validation_alias=AliasChoices("TS_SIGMA_FREE"))
-    ts_teamer_boost: float = Field(default=1.0, validation_alias=AliasChoices("TS_TEAMER_BOOST"))
-    min_points_for_subs: int = Field(default=5, ge=0, validation_alias=AliasChoices("MIN_POINTS_FOR_SUBS"))
+    ts_draw_prob: float = Field(
+        default=0.0, ge=0, le=1, validation_alias=AliasChoices("TS_DRAW_PROB")
+    )
+    ts_sigma_free: float = Field(
+        default=90.0, ge=0, validation_alias=AliasChoices("TS_SIGMA_FREE")
+    )
+    ts_teamer_boost: float = Field(
+        default=1.0, validation_alias=AliasChoices("TS_TEAMER_BOOST")
+    )
+    min_points_for_subs: int = Field(
+        default=5, ge=0, validation_alias=AliasChoices("MIN_POINTS_FOR_SUBS")
+    )
     civ_save_parser_version: str = Field(
         default="1.0",
         validation_alias=AliasChoices("CIV_SAVE_PARSER_VERSION"),
@@ -191,7 +219,9 @@ class Settings(BaseSettings):
     def _ensure_mongo_uri_scheme(self) -> "Settings":
         uri = self.mongo_url.get_secret_value()
         if not uri.startswith(("mongodb://", "mongodb+srv://")):
-            raise ValueError("MONGO_URL must start with 'mongodb://' or 'mongodb+srv://'")
+            raise ValueError(
+                "MONGO_URL must start with 'mongodb://' or 'mongodb+srv://'"
+            )
         return self
 
 

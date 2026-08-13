@@ -84,11 +84,15 @@ def test_session_service_creates_pending_session(monkeypatch):
     assert status.status is RegistrationSessionStatus.PENDING_AUTH
 
 
-
-@pytest.mark.parametrize("platform", [RegistrationPlatform.EPIC, RegistrationPlatform.TWOK, RegistrationPlatform.XBOX])
+@pytest.mark.parametrize(
+    "platform",
+    [RegistrationPlatform.EPIC, RegistrationPlatform.TWOK, RegistrationPlatform.XBOX],
+)
 def test_session_service_rejects_non_steam_oauth_sessions(monkeypatch, platform):
     monkeypatch.setenv("AUTH_DISCORD_CLIENT_ID", "123")
-    monkeypatch.setenv("AUTH_DISCORD_REDIRECT_URI", "https://example.com/oauth/discord/callback")
+    monkeypatch.setenv(
+        "AUTH_DISCORD_REDIRECT_URI", "https://example.com/oauth/discord/callback"
+    )
     monkeypatch.setenv("AUTH_SERVICE_TOKEN", "secret")
 
     import app.core.config as cfg
@@ -134,13 +138,16 @@ def test_session_service_coerces_naive_expiry(monkeypatch):
     repo.sessions["sess-1"] = {
         "session_id": "sess-1",
         "status": RegistrationSessionStatus.PENDING_AUTH.value,
-        "expires_at": (datetime.now(timezone.utc) - timedelta(minutes=1)).replace(tzinfo=None),
+        "expires_at": (datetime.now(timezone.utc) - timedelta(minutes=1)).replace(
+            tzinfo=None
+        ),
     }
 
     status = asyncio.run(SessionService(repo).get_registration_session_status("sess-1"))
 
     assert status.status is RegistrationSessionStatus.EXPIRED
     assert repo.sessions["sess-1"]["status"] == RegistrationSessionStatus.EXPIRED.value
+
 
 def test_oauth_service_picks_expected_connection():
     picked = DiscordOAuthService._pick_connection(
@@ -165,9 +172,12 @@ def test_registration_service_manual_required():
             account_name="epic-user",
         )
 
+
 def test_session_status_includes_validated_account_details(monkeypatch):
     monkeypatch.setenv("AUTH_DISCORD_CLIENT_ID", "123")
-    monkeypatch.setenv("AUTH_DISCORD_REDIRECT_URI", "https://example.com/oauth/discord/callback")
+    monkeypatch.setenv(
+        "AUTH_DISCORD_REDIRECT_URI", "https://example.com/oauth/discord/callback"
+    )
     monkeypatch.setenv("AUTH_SERVICE_TOKEN", "secret")
 
     import app.core.config as cfg
@@ -204,7 +214,9 @@ def test_session_status_includes_validated_account_details(monkeypatch):
 
 def test_session_service_coerces_unknown_status_to_failed(monkeypatch):
     monkeypatch.setenv("AUTH_DISCORD_CLIENT_ID", "123")
-    monkeypatch.setenv("AUTH_DISCORD_REDIRECT_URI", "https://example.com/oauth/discord/callback")
+    monkeypatch.setenv(
+        "AUTH_DISCORD_REDIRECT_URI", "https://example.com/oauth/discord/callback"
+    )
     monkeypatch.setenv("AUTH_SERVICE_TOKEN", "secret")
 
     import app.core.config as cfg
@@ -221,7 +233,9 @@ def test_session_service_coerces_unknown_status_to_failed(monkeypatch):
         "expires_at": datetime.now(timezone.utc) + timedelta(minutes=5),
     }
 
-    status = asyncio.run(SessionService(repo).get_registration_session_status("sess-unknown"))
+    status = asyncio.run(
+        SessionService(repo).get_registration_session_status("sess-unknown")
+    )
 
     assert status.status is RegistrationSessionStatus.FAILED
 
@@ -237,7 +251,14 @@ def test_oauth_callback_denial_returns_discord_oauth_failed(monkeypatch):
             self.repository = repository
             self.calls = []
 
-        async def mark_failed(self, session_id: str, *, failure_code: str, failure_message: str, extra=None):
+        async def mark_failed(
+            self,
+            session_id: str,
+            *,
+            failure_code: str,
+            failure_message: str,
+            extra=None,
+        ):
             self.calls.append(
                 {
                     "session_id": session_id,
@@ -251,10 +272,16 @@ def test_oauth_callback_denial_returns_discord_oauth_failed(monkeypatch):
     session_service = CallbackSessionService(repo)
 
     monkeypatch.setattr(auth_router, "_repo", lambda db: repo)
-    monkeypatch.setattr(auth_router, "SessionService", lambda repository: session_service)
+    monkeypatch.setattr(
+        auth_router, "SessionService", lambda repository: session_service
+    )
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(auth_router.discord_oauth_callback(code=None, state="state-1", error="access_denied", db=None))
+        asyncio.run(
+            auth_router.discord_oauth_callback(
+                code=None, state="state-1", error="access_denied", db=None
+            )
+        )
 
     response = exc_info.value
     assert response.status_code == 502

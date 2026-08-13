@@ -8,4 +8,3 @@ class InvalidStatsRequestError(StatsServiceError):
 
 class StatsNotFoundError(StatsServiceError):
     pass
-    

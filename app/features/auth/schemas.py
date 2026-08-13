@@ -3,7 +3,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.features.auth.enums import (
     ManualRegistrationChoice,
@@ -49,10 +56,15 @@ class ManualRegistrationRequest(BaseModel):
     actor_discord_id: str = Field(min_length=1)
     subject_discord_id: str = Field(min_length=1)
     platform: ManualRegistrationChoice
-    platform_account_id: str = Field(min_length=1, validation_alias=AliasChoices("platform_account_id", "account_id"))
+    platform_account_id: str = Field(
+        min_length=1, validation_alias=AliasChoices("platform_account_id", "account_id")
+    )
     game: SupportedGame
     reason: str | None = Field(default=None, max_length=500)
-    platform_account_name: str | None = Field(default=None, validation_alias=AliasChoices("platform_account_name", "account_name"))
+    platform_account_name: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("platform_account_name", "account_name"),
+    )
     discord_username: str | None = None
     discord_display_name: str | None = None
 
@@ -64,7 +76,9 @@ class ManualRegistrationRequest(BaseModel):
             raise ValueError("value must not be blank")
         return normalized
 
-    @field_validator("reason", "platform_account_name", "discord_username", "discord_display_name")
+    @field_validator(
+        "reason", "platform_account_name", "discord_username", "discord_display_name"
+    )
     @classmethod
     def _normalize_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -89,7 +103,8 @@ class SelfServiceRegistrationRequest(BaseModel):
         min_length=1, validation_alias=AliasChoices("platform_account_id", "account_id")
     )
     platform_account_name: str | None = Field(
-        default=None, validation_alias=AliasChoices("platform_account_name", "account_name")
+        default=None,
+        validation_alias=AliasChoices("platform_account_name", "account_name"),
     )
     discord_username: str | None = None
     discord_display_name: str | None = None
@@ -102,7 +117,9 @@ class SelfServiceRegistrationRequest(BaseModel):
             raise ValueError("value must not be blank")
         return normalized
 
-    @field_validator("platform_account_name", "discord_username", "discord_display_name")
+    @field_validator(
+        "platform_account_name", "discord_username", "discord_display_name"
+    )
     @classmethod
     def _normalize_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -121,8 +138,12 @@ class FinalizeRegistrationOperationRequest(BaseModel):
 
     @model_validator(mode="after")
     def _validate_failed_payload(self) -> "FinalizeRegistrationOperationRequest":
-        if self.result == "failed" and (not self.failure_code or not self.failure_message):
-            raise ValueError("failure_code and failure_message are required when result is failed")
+        if self.result == "failed" and (
+            not self.failure_code or not self.failure_message
+        ):
+            raise ValueError(
+                "failure_code and failure_message are required when result is failed"
+            )
         return self
 
 

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
+
 class StatModel(BaseModel):
     """Stat row used for ranking/stats calculations.
 
@@ -60,18 +61,19 @@ class StatModel(BaseModel):
         if raw_id is None and raw_discord_id is not None:
             try:
                 data["id"] = int(str(raw_discord_id))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 data["id"] = None
         elif raw_id is not None:
             try:
                 data["id"] = int(str(raw_id))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 data["id"] = None
 
         # Defaults for older docs.
         data.setdefault("subbedIn", 0)
         data.setdefault("subbedOut", 0)
         return data
+
 
 class PlayerModel(BaseModel):
     steam_id: Optional[str] = None
@@ -89,9 +91,11 @@ class PlayerModel(BaseModel):
     is_sub: bool = False
     subbed_out: bool = False
 
+
 class ContestReport(BaseModel):
     contestor_discord_id: str
     reason: str
+
 
 class MatchModel(BaseModel):
     game: str  # parsers return "civ6" or "civ7"
@@ -111,5 +115,6 @@ class MatchModel(BaseModel):
     save_file_hash: str
     reporter_discord_id: str
     contest_report_list: List[ContestReport]
+
 
 __all__ = ["StatModel", "PlayerModel", "ContestReport", "MatchModel"]

@@ -1,6 +1,7 @@
 import importlib
 from trueskill import Rating
 
+
 def test_trueskill_1v1_winner_gains(monkeypatch):
     # ensure env present for the config used by make_ts_env()
     monkeypatch.setenv("REPORTING_BACKEND_VERSION", "test-1.2.3")
@@ -15,8 +16,10 @@ def test_trueskill_1v1_winner_gains(monkeypatch):
 
     # reload modules to pick up env
     import app.core.config as cfg
+
     importlib.reload(cfg)
     import app.features.ratings.skill as skill
+
     importlib.reload(skill)
 
     env = skill.make_ts_env()

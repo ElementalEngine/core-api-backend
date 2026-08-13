@@ -27,13 +27,16 @@ def connect() -> MongoClient:
     return MongoClient(uri, serverSelectionTimeoutMS=5000)
 
 
-def call(base: str, method: str, path: str, token: str, body: dict | None = None) -> dict:
+def call(
+    base: str, method: str, path: str, token: str, body: dict | None = None
+) -> dict:
     data = json.dumps(body).encode() if body is not None else None
     headers = {"Authorization": f"Bearer {token}"}
     if data:
         headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(base.rstrip("/") + path, data=data,
-                                 method=method, headers=headers)
+    req = urllib.request.Request(
+        base.rstrip("/") + path, data=data, method=method, headers=headers
+    )
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
             raw = r.read().decode()
@@ -53,23 +56,51 @@ def sequence(c: MongoClient, base: str, lj: str, auth: str) -> tuple[list[dict],
     add = steps.append
     disk: dict = {}
 
-    add(call(base, "GET", f"{INFRA}/{UID}", lj))                       # create on miss
-    add(call(base, "POST", f"{INFRA}/{UID}/flat/smurf", lj,
-             {"reason": "c10 differential", "suspended_roles": ROLES}))
-    add(call(base, "GET", f"{INFRA}/{UID}", lj))                       # roles on the wire
-    disk.update(on_disk(c))   # read while suspended; unsuspend clears the field later
+    add(call(base, "GET", f"{INFRA}/{UID}", lj))  # create on miss
+    add(
+        call(
+            base,
+            "POST",
+            f"{INFRA}/{UID}/flat/smurf",
+            lj,
+            {"reason": "c10 differential", "suspended_roles": ROLES},
+        )
+    )
+    add(call(base, "GET", f"{INFRA}/{UID}", lj))  # roles on the wire
+    disk.update(on_disk(c))  # read while suspended; unsuspend clears the field later
     add(call(base, "GET", f"{INFRA}/active", lj))
     add(call(base, "GET", f"{INFRA}/overdue", lj))
-    add(call(base, "POST", f"{INFRA}/{UID}/tier/minor", lj,
-             {"reason": "c10", "suspended_roles": ROLES}))
-    add(call(base, "POST", f"{INFRA}/{UID}/tier/moderate", lj,
-             {"reason": "c10", "suspended_roles": ROLES}))
+    add(
+        call(
+            base,
+            "POST",
+            f"{INFRA}/{UID}/tier/minor",
+            lj,
+            {"reason": "c10", "suspended_roles": ROLES},
+        )
+    )
+    add(
+        call(
+            base,
+            "POST",
+            f"{INFRA}/{UID}/tier/moderate",
+            lj,
+            {"reason": "c10", "suspended_roles": ROLES},
+        )
+    )
     add(call(base, "GET", f"{INFRA}/{UID}", lj))
     add(call(base, "POST", f"{INFRA}/{UID}/add-days", lj, {"days": 3}))
     add(call(base, "POST", f"{INFRA}/{UID}/remove-days", lj, {"days": 1}))
     add(call(base, "POST", f"{INFRA}/{UID}/remove-tier", lj, {"category": "minor"}))
-    add(call(base, "POST", f"{INFRA}/{UID}/pending", lj,
-             {"punishment_type": "smurf", "reason": "c10"}))
+    add(
+        call(
+            base,
+            "POST",
+            f"{INFRA}/{UID}/pending",
+            lj,
+            {"punishment_type": "smurf", "reason": "c10"},
+        )
+    )
     add(call(base, "GET", f"{INFRA}/{UID}/pending", lj))
     add(call(base, "DELETE", f"{INFRA}/{UID}/pending", lj))
     add(call(base, "POST", f"{INFRA}/{UID}/unsuspend", lj))
@@ -101,8 +132,9 @@ def on_disk(c: MongoClient) -> dict:
 
 def cmd_run(label: str, base_url: str) -> None:
     c = connect()
-    steps, disk = sequence(c, base_url, os.environ["LJ_SERVICE_TOKEN"],
-                           os.environ["AUTH_SERVICE_TOKEN"])
+    steps, disk = sequence(
+        c, base_url, os.environ["LJ_SERVICE_TOKEN"], os.environ["AUTH_SERVICE_TOKEN"]
+    )
     payload = {"steps": steps, "disk_after_flat": disk}
     OUT.mkdir(mode=0o700, parents=True, exist_ok=True)
     p = OUT / f"capture-c10-{label}.json"
@@ -142,7 +174,9 @@ def normalise(v, path=""):
 
 def scope_lists(step: dict) -> dict:
     """/active and /overdue return the whole collection; only our fixture is stable."""
-    if step["path"].endswith(("/active", "/overdue")) and isinstance(step["body"], list):
+    if step["path"].endswith(("/active", "/overdue")) and isinstance(
+        step["body"], list
+    ):
         mine = [r for r in step["body"] if r.get("discord_id") == UID]
         return {**step, "body": mine, "_total_rows": len(step["body"])}
     return step
@@ -165,22 +199,36 @@ def cmd_diff(a: str, b: str) -> None:
 
     d = ca["disk_after_flat"]
     print("criterion 3 - suspendedRoles round trip")
-    print(f"  on disk:  camelCase present={d['camel_key_present']} "
-          f"snake_case absent={d['snake_key_absent']} value={d['value']}")
-    wire = next((s["body"] for s in ca["steps"]
-                 if s["method"] == "GET" and s["path"] == f"{INFRA}/{UID}"
-                 and isinstance(s["body"], dict) and s["body"].get("suspended_roles")), None)
+    print(
+        f"  on disk:  camelCase present={d['camel_key_present']} "
+        f"snake_case absent={d['snake_key_absent']} value={d['value']}"
+    )
+    wire = next(
+        (
+            s["body"]
+            for s in ca["steps"]
+            if s["method"] == "GET"
+            and s["path"] == f"{INFRA}/{UID}"
+            and isinstance(s["body"], dict)
+            and s["body"].get("suspended_roles")
+        ),
+        None,
+    )
     print(f"  on wire:  suspended_roles={wire}\n")
 
     if not diffs:
-        print(f"IDENTICAL across {len(ca['steps'])} calls and the stored document "
-              f"({a} vs {b}; datetime values normalised)")
+        print(
+            f"IDENTICAL across {len(ca['steps'])} calls and the stored document "
+            f"({a} vs {b}; datetime values normalised)"
+        )
         print(f"  status codes: {[s['status'] for s in ca['steps']]}")
         return
 
     print(f"{len(diffs)} DIFFERENCE(S)\n")
     for key, va, vb in diffs:
-        print(f"  {key}\n    {a}: {json_util.dumps(va)}\n    {b}: {json_util.dumps(vb)}\n")
+        print(
+            f"  {key}\n    {a}: {json_util.dumps(va)}\n    {b}: {json_util.dumps(vb)}\n"
+        )
     sys.exit(1)
 
 

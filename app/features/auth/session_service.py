@@ -6,8 +6,15 @@ from typing import cast
 from urllib.parse import urlencode
 
 from app.core.config import settings
-from app.features.auth.constants import DISCORD_OAUTH_AUTHORIZE_URL, DISCORD_OAUTH_SCOPES
-from app.features.auth.enums import RegistrationSessionStatus, RegistrationPlatform, SupportedGame
+from app.features.auth.constants import (
+    DISCORD_OAUTH_AUTHORIZE_URL,
+    DISCORD_OAUTH_SCOPES,
+)
+from app.features.auth.enums import (
+    RegistrationSessionStatus,
+    RegistrationPlatform,
+    SupportedGame,
+)
 from app.features.auth.errors import (
     AlreadyRegisteredError,
     AuthConfigurationError,
@@ -37,12 +44,17 @@ class SessionService:
         if payload.platform is not RegistrationPlatform.STEAM:
             raise ManualRegistrationRequiredError(payload.platform.value)
 
-        existing = await self._repository.get_user_by_discord_id(payload.discord_user_id)
+        existing = await self._repository.get_user_by_discord_id(
+            payload.discord_user_id
+        )
         regs = (existing or {}).get("registrations") or {}
         if payload.game.value in regs:
             raise AlreadyRegisteredError(payload.game.value)
 
-        if not settings.auth_discord_client_id or not settings.auth_discord_redirect_uri:
+        if (
+            not settings.auth_discord_client_id
+            or not settings.auth_discord_redirect_uri
+        ):
             raise AuthConfigurationError(
                 "Discord OAuth is not configured for auth registration."
             )
@@ -89,14 +101,46 @@ class SessionService:
             failure_code=cast("str | None", session.get("failure_code")),
             failure_message=cast("str | None", session.get("failure_message")),
             game=(SupportedGame(str(session["game"])) if session.get("game") else None),
-            platform=(RegistrationPlatform(str(session["platform"])) if session.get("platform") else None),
-            linked_account_id=(str(session["validated_account_id"]) if session.get("validated_account_id") else None),
-            linked_account_name=(str(session["validated_account_name"]) if session.get("validated_account_name") else None),
-            discord_username=(str(session["oauth_username_snapshot"]) if session.get("oauth_username_snapshot") else None),
-            discord_display_name=(str(session["oauth_display_name_snapshot"]) if session.get("oauth_display_name_snapshot") else None),
-            discord_locale=(str(session["oauth_locale_snapshot"]) if session.get("oauth_locale_snapshot") else None),
-            discord_verified=(bool(session["oauth_verified_snapshot"]) if isinstance(session.get("oauth_verified_snapshot"), bool) else None),
-            discord_mfa_enabled=(bool(session["oauth_mfa_enabled_snapshot"]) if isinstance(session.get("oauth_mfa_enabled_snapshot"), bool) else None),
+            platform=(
+                RegistrationPlatform(str(session["platform"]))
+                if session.get("platform")
+                else None
+            ),
+            linked_account_id=(
+                str(session["validated_account_id"])
+                if session.get("validated_account_id")
+                else None
+            ),
+            linked_account_name=(
+                str(session["validated_account_name"])
+                if session.get("validated_account_name")
+                else None
+            ),
+            discord_username=(
+                str(session["oauth_username_snapshot"])
+                if session.get("oauth_username_snapshot")
+                else None
+            ),
+            discord_display_name=(
+                str(session["oauth_display_name_snapshot"])
+                if session.get("oauth_display_name_snapshot")
+                else None
+            ),
+            discord_locale=(
+                str(session["oauth_locale_snapshot"])
+                if session.get("oauth_locale_snapshot")
+                else None
+            ),
+            discord_verified=(
+                bool(session["oauth_verified_snapshot"])
+                if isinstance(session.get("oauth_verified_snapshot"), bool)
+                else None
+            ),
+            discord_mfa_enabled=(
+                bool(session["oauth_mfa_enabled_snapshot"])
+                if isinstance(session.get("oauth_mfa_enabled_snapshot"), bool)
+                else None
+            ),
         )
 
     async def load_session_by_state(self, state_token: str) -> dict[str, object]:
@@ -106,14 +150,18 @@ class SessionService:
         session = await self._coerce_expired_session(session, raise_on_expired=True)
 
         session_id = str(session["session_id"])
-        status_value = str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))
+        status_value = str(
+            session.get("status", RegistrationSessionStatus.PENDING_AUTH.value)
+        )
         if status_value in {
             RegistrationSessionStatus.VALIDATED.value,
             RegistrationSessionStatus.FAILED.value,
             RegistrationSessionStatus.EXPIRED.value,
             RegistrationSessionStatus.COMPLETED.value,
         }:
-            raise SessionStateConflictError(session_id=session_id, status_value=status_value)
+            raise SessionStateConflictError(
+                session_id=session_id, status_value=status_value
+            )
 
         return session
 
@@ -134,7 +182,9 @@ class SessionService:
                 request_user_id=discord_user_id,
             )
 
-        status_value = str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))
+        status_value = str(
+            session.get("status", RegistrationSessionStatus.PENDING_AUTH.value)
+        )
         if status_value != RegistrationSessionStatus.VALIDATED.value:
             raise SessionNotValidatedError(session_id, status_value)
         return session
@@ -203,8 +253,14 @@ class SessionService:
     ) -> dict[str, object]:
         session_id = str(session["session_id"])
         expires_at = session.get("expires_at")
-        normalized_expires_at = self._normalize_datetime(expires_at) if isinstance(expires_at, datetime) else None
-        status_value = str(session.get("status", RegistrationSessionStatus.PENDING_AUTH.value))
+        normalized_expires_at = (
+            self._normalize_datetime(expires_at)
+            if isinstance(expires_at, datetime)
+            else None
+        )
+        status_value = str(
+            session.get("status", RegistrationSessionStatus.PENDING_AUTH.value)
+        )
         if (
             normalized_expires_at is not None
             and normalized_expires_at <= datetime.now(timezone.utc)
@@ -238,7 +294,9 @@ class SessionService:
     @staticmethod
     def _coerce_status(value: object) -> RegistrationSessionStatus:
         try:
-            return RegistrationSessionStatus(str(value or RegistrationSessionStatus.PENDING_AUTH.value))
+            return RegistrationSessionStatus(
+                str(value or RegistrationSessionStatus.PENDING_AUTH.value)
+            )
         except ValueError:
             return RegistrationSessionStatus.FAILED
 

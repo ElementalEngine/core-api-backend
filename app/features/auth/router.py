@@ -58,7 +58,9 @@ def _internal_auth_error(code: str, message: str) -> AuthError:
     return AuthError(code=code, message=message, status_code=502, retryable=True)
 
 
-@router.get("/admin/accounts/discord/{discord_id}", response_model=DiscordLookupResponse)
+@router.get(
+    "/admin/accounts/discord/{discord_id}", response_model=DiscordLookupResponse
+)
 async def lookup_account_by_discord(
     discord_id: Annotated[str, Path(min_length=1, max_length=64)],
     db: AsyncMongoClient = Depends(get_database),
@@ -80,20 +82,30 @@ async def lookup_account_by_discord(
         ) from exc
 
 
-@router.get("/admin/accounts/linked-account/{linked_account_id}", response_model=LinkedAccountLookupResponse)
+@router.get(
+    "/admin/accounts/linked-account/{linked_account_id}",
+    response_model=LinkedAccountLookupResponse,
+)
 async def lookup_account_by_linked_account(
     linked_account_id: Annotated[str, Path(min_length=1, max_length=128)],
     db: AsyncMongoClient = Depends(get_database),
 ) -> LinkedAccountLookupResponse:
     try:
-        account = await RegistrationService(_repo(db)).lookup_by_linked_account_id(linked_account_id)
+        account = await RegistrationService(_repo(db)).lookup_by_linked_account_id(
+            linked_account_id
+        )
         if account is None:
-            raise AccountLookupNotFoundError(field="linked_account_id", value=linked_account_id)
+            raise AccountLookupNotFoundError(
+                field="linked_account_id", value=linked_account_id
+            )
         return account
     except AuthError as exc:
         raise to_http_exception(exc) from exc
     except Exception as exc:
-        logger.exception("Unexpected linked-account lookup failure. linked_account_id=%s", linked_account_id)
+        logger.exception(
+            "Unexpected linked-account lookup failure. linked_account_id=%s",
+            linked_account_id,
+        )
         raise to_http_exception(
             _internal_auth_error(
                 "ACCOUNT_LOOKUP_FAILED",
@@ -102,7 +114,9 @@ async def lookup_account_by_linked_account(
         ) from exc
 
 
-@router.get("/admin/accounts/steam/{steam_id}", response_model=LinkedAccountLookupResponse)
+@router.get(
+    "/admin/accounts/steam/{steam_id}", response_model=LinkedAccountLookupResponse
+)
 async def lookup_account_by_steam(
     steam_id: Annotated[str, Path(min_length=1, max_length=64)],
     db: AsyncMongoClient = Depends(get_database),
@@ -120,7 +134,11 @@ async def create_registration_session(
     except AuthError as exc:
         raise to_http_exception(exc) from exc
     except Exception as exc:
-        logger.exception("Unexpected registration-session creation failure. discord_user_id=%s game=%s", payload.discord_user_id, payload.game.value)
+        logger.exception(
+            "Unexpected registration-session creation failure. discord_user_id=%s game=%s",
+            payload.discord_user_id,
+            payload.game.value,
+        )
         raise to_http_exception(
             _internal_auth_error(
                 "REGISTRATION_START_FAILED",
@@ -129,17 +147,24 @@ async def create_registration_session(
         ) from exc
 
 
-@router.get("/registration-sessions/{session_id}", response_model=RegistrationSessionStatusResponse)
+@router.get(
+    "/registration-sessions/{session_id}",
+    response_model=RegistrationSessionStatusResponse,
+)
 async def get_registration_session(
     session_id: Annotated[str, Path(min_length=1, max_length=128)],
     db: AsyncMongoClient = Depends(get_database),
 ) -> RegistrationSessionStatusResponse:
     try:
-        return await SessionService(_repo(db)).get_registration_session_status(session_id)
+        return await SessionService(_repo(db)).get_registration_session_status(
+            session_id
+        )
     except AuthError as exc:
         raise to_http_exception(exc) from exc
     except Exception as exc:
-        logger.exception("Unexpected registration-session status failure. session_id=%s", session_id)
+        logger.exception(
+            "Unexpected registration-session status failure. session_id=%s", session_id
+        )
         raise to_http_exception(
             _internal_auth_error(
                 "REGISTRATION_STATUS_FAILED",
@@ -220,7 +245,9 @@ async def finalize_registration_operation(
     except AuthError as exc:
         raise to_http_exception(exc) from exc
     except Exception as exc:
-        logger.exception("Unexpected finalize registration failure. operation_id=%s", operation_id)
+        logger.exception(
+            "Unexpected finalize registration failure. operation_id=%s", operation_id
+        )
         raise to_http_exception(
             _internal_auth_error(
                 "REGISTRATION_FINALIZE_FAILED",
@@ -254,7 +281,11 @@ async def create_rank_role_request(
     except AuthError as exc:
         raise to_http_exception(exc) from exc
     except Exception as exc:
-        logger.exception("Unexpected rank-role request failure. discord_user_id=%s game=%s", payload.discord_user_id, payload.game.value)
+        logger.exception(
+            "Unexpected rank-role request failure. discord_user_id=%s game=%s",
+            payload.discord_user_id,
+            payload.game.value,
+        )
         raise to_http_exception(
             _internal_auth_error(
                 "RANK_ROLE_REQUEST_FAILED",
@@ -263,13 +294,17 @@ async def create_rank_role_request(
         ) from exc
 
 
-@router.post("/admin/manual-registrations", response_model=RegistrationOperationResponse)
+@router.post(
+    "/admin/manual-registrations", response_model=RegistrationOperationResponse
+)
 async def create_manual_registration(
     payload: ManualRegistrationRequest,
     db: AsyncMongoClient = Depends(get_database),
 ) -> RegistrationOperationResponse:
     try:
-        return await ManualRegistrationService(_repo(db)).create_manual_registration(payload)
+        return await ManualRegistrationService(_repo(db)).create_manual_registration(
+            payload
+        )
     except AuthError as exc:
         logger.warning(
             "Manual registration failed. actor=%s subject=%s code=%s message=%s details=%s",
@@ -297,13 +332,17 @@ async def create_manual_registration(
         ) from exc
 
 
-@router.post("/manual-registration-requests", response_model=RegistrationOperationResponse)
+@router.post(
+    "/manual-registration-requests", response_model=RegistrationOperationResponse
+)
 async def create_self_service_registration(
     payload: SelfServiceRegistrationRequest,
     db: AsyncMongoClient = Depends(get_database),
 ) -> RegistrationOperationResponse:
     try:
-        return await ManualRegistrationService(_repo(db)).create_self_service_registration(payload)
+        return await ManualRegistrationService(
+            _repo(db)
+        ).create_self_service_registration(payload)
     except AuthError as exc:
         logger.warning(
             "Self-service registration failed. discord_user_id=%s game=%s platform=%s code=%s message=%s",
@@ -350,7 +389,9 @@ async def _persist_callback_failure(
     try:
         session = await repository.get_registration_session_by_state(state)
         if session is not None:
-            extra: dict[str, object] = dict(base_details) if isinstance(base_details, dict) else {}
+            extra: dict[str, object] = (
+                dict(base_details) if isinstance(base_details, dict) else {}
+            )
             if linked_account_id:
                 extra.setdefault("validated_account_id", linked_account_id)
             if linked_account_name:
@@ -358,13 +399,17 @@ async def _persist_callback_failure(
             if oauth_username_snapshot:
                 extra.setdefault("oauth_username_snapshot", oauth_username_snapshot)
             if oauth_display_name_snapshot:
-                extra.setdefault("oauth_display_name_snapshot", oauth_display_name_snapshot)
+                extra.setdefault(
+                    "oauth_display_name_snapshot", oauth_display_name_snapshot
+                )
             if oauth_locale_snapshot:
                 extra.setdefault("oauth_locale_snapshot", oauth_locale_snapshot)
             if oauth_verified_snapshot is not None:
                 extra.setdefault("oauth_verified_snapshot", oauth_verified_snapshot)
             if oauth_mfa_enabled_snapshot is not None:
-                extra.setdefault("oauth_mfa_enabled_snapshot", oauth_mfa_enabled_snapshot)
+                extra.setdefault(
+                    "oauth_mfa_enabled_snapshot", oauth_mfa_enabled_snapshot
+                )
             await session_service.mark_failed(
                 str(session["session_id"]),
                 failure_code=failure_code,
@@ -433,10 +478,18 @@ async def discord_oauth_callback(
         linked_account_id = str(connection.get("id") or "").strip()
         linked_account_name = str(connection.get("name") or "").strip() or None
         oauth_username_snapshot = str(user.get("username") or "").strip() or None
-        oauth_display_name_snapshot = str(user.get("global_name") or "").strip() or oauth_username_snapshot
+        oauth_display_name_snapshot = (
+            str(user.get("global_name") or "").strip() or oauth_username_snapshot
+        )
         oauth_locale_snapshot = str(user.get("locale") or "").strip() or None
-        oauth_verified_snapshot = user.get("verified") if isinstance(user.get("verified"), bool) else None
-        oauth_mfa_enabled_snapshot = user.get("mfa_enabled") if isinstance(user.get("mfa_enabled"), bool) else None
+        oauth_verified_snapshot = (
+            user.get("verified") if isinstance(user.get("verified"), bool) else None
+        )
+        oauth_mfa_enabled_snapshot = (
+            user.get("mfa_enabled")
+            if isinstance(user.get("mfa_enabled"), bool)
+            else None
+        )
 
         if user_id and user_id != str(session["discord_user_id"]):
             raise DiscordUserMismatchError(
@@ -444,7 +497,9 @@ async def discord_oauth_callback(
                 request_user_id=user_id,
             )
 
-        RegistrationService.manual_required_for_platform(platform, account_name=linked_account_name)
+        RegistrationService.manual_required_for_platform(
+            platform, account_name=linked_account_name
+        )
 
         if platform is RegistrationPlatform.STEAM:
             await steam_service.validate_linked_account(
@@ -515,7 +570,12 @@ async def discord_oauth_callback(
             oauth_mfa_enabled_snapshot=oauth_mfa_enabled_snapshot,
             log_context="Failed to persist OAuth callback internal error state",
         )
-        logger.exception("Unexpected OAuth callback failure. state=%s session_id=%s platform=%s", state, session_id, platform.value if platform else None)
+        logger.exception(
+            "Unexpected OAuth callback failure. state=%s session_id=%s platform=%s",
+            state,
+            session_id,
+            platform.value if platform else None,
+        )
         raise to_http_exception(
             _internal_auth_error(
                 "AUTH_CALLBACK_INTERNAL_ERROR",

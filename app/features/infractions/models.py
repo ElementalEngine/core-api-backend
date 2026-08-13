@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 # ─── Enums ───────────────────────────────────────────────────────────────────
 
+
 class TierCategory(str, Enum):
     quit = "quit"
     minor = "minor"
@@ -25,6 +26,7 @@ class FlatType(str, Enum):
 
 # ─── Sub-document (matches IInfraction shape in Mongoose exactly) ─────────────
 
+
 class InfractionRecord(BaseModel):
     tier: int = 0
     decays: datetime | None = None
@@ -32,29 +34,34 @@ class InfractionRecord(BaseModel):
 
 # ─── Main suspension document ─────────────────────────────────────────────────
 
+
 class SuspensionDocument(BaseModel):
     discord_id: str
     suspended: bool = False
     ends: datetime | None = None
-    suspendedRoles: list[str] = []          # camelCase — matches live collection
+    suspendedRoles: list[str] = []  # camelCase — matches live collection
     quit: InfractionRecord = Field(default_factory=InfractionRecord)
     minor: InfractionRecord = Field(default_factory=InfractionRecord)
     moderate: InfractionRecord = Field(default_factory=InfractionRecord)
     major: InfractionRecord = Field(default_factory=InfractionRecord)
     extreme: InfractionRecord = Field(default_factory=InfractionRecord)
-    active_category: TierCategory | Literal["flat"] | None = None  # additive — None on old docs is safe
+    active_category: TierCategory | Literal["flat"] | None = (
+        None  # additive — None on old docs is safe
+    )
 
 
 # ─── Pending suspension document ─────────────────────────────────────────────
 
+
 class PendingSuspensionDocument(BaseModel):
-    id: str = Field(alias="_id")            # discord_id stored as _id
-    punishment_type: str                    # tier category name or flat type name
+    id: str = Field(alias="_id")  # discord_id stored as _id
+    punishment_type: str  # tier category name or flat type name
     reason: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ─── Request shapes ───────────────────────────────────────────────────────────
+
 
 class RecordTierInfractionRequest(BaseModel):
     reason: str | None = None
@@ -81,6 +88,7 @@ class CreatePendingSuspensionRequest(BaseModel):
 
 # ─── Response shapes ─────────────────────────────────────────────────────────
 
+
 class TierInfractionResponse(BaseModel):
     discord_id: str
     category: TierCategory
@@ -103,7 +111,7 @@ class FlatSuspensionResponse(BaseModel):
 
 class ModifyDaysResponse(BaseModel):
     discord_id: str
-    days_delta: int         # signed
+    days_delta: int  # signed
     new_ends: datetime
 
 

@@ -35,13 +35,21 @@ class RegistrationService:
     def __init__(self, repository: AuthRepository) -> None:
         self._repository = repository
 
-    async def lookup_by_discord_id(self, discord_id: str) -> DiscordLookupResponse | None:
+    async def lookup_by_discord_id(
+        self, discord_id: str
+    ) -> DiscordLookupResponse | None:
         docs = await self._repository.find_users_by_discord_id(discord_id)
         return _to_discord_lookup_response(docs) if docs else None
 
-    async def lookup_by_linked_account_id(self, linked_account_id: str) -> LinkedAccountLookupResponse | None:
+    async def lookup_by_linked_account_id(
+        self, linked_account_id: str
+    ) -> LinkedAccountLookupResponse | None:
         docs = await self._repository.find_users_by_linked_account_id(linked_account_id)
-        return _to_linked_account_lookup_response(docs, linked_account_id) if docs else None
+        return (
+            _to_linked_account_lookup_response(docs, linked_account_id)
+            if docs
+            else None
+        )
 
     async def assert_registration_conflicts(
         self,
@@ -51,14 +59,21 @@ class RegistrationService:
         account_id: str,
         game: str,
     ) -> None:
-        existing_by_discord = await self._repository.get_user_by_discord_id(discord_user_id)
+        existing_by_discord = await self._repository.get_user_by_discord_id(
+            discord_user_id
+        )
         existing_by_linked = (
             await self._repository.get_user_by_steam_id(account_id)
             if platform is RegistrationPlatform.STEAM
-            else await self._repository.get_user_by_linked_account(platform.value, account_id)
+            else await self._repository.get_user_by_linked_account(
+                platform.value, account_id
+            )
         )
 
-        if existing_by_linked and str(existing_by_linked.get("discord_id")) != discord_user_id:
+        if (
+            existing_by_linked
+            and str(existing_by_linked.get("discord_id")) != discord_user_id
+        ):
             if platform is RegistrationPlatform.STEAM:
                 raise SteamIdConflictError(
                     steam_id=account_id,
@@ -74,13 +89,22 @@ class RegistrationService:
             existing_platform = existing_by_discord.get("linked_platform")
             existing_account = existing_by_discord.get("linked_account_id")
             existing_steam = existing_by_discord.get("steam_id")
-            if platform is RegistrationPlatform.STEAM and existing_steam and str(existing_steam) != account_id:
+            if (
+                platform is RegistrationPlatform.STEAM
+                and existing_steam
+                and str(existing_steam) != account_id
+            ):
                 raise DiscordSteamConflictError(
                     discord_user_id=discord_user_id,
                     existing_steam_id=str(existing_steam),
                 )
-            if existing_platform and existing_account and (
-                str(existing_platform) != platform.value or str(existing_account) != account_id
+            if (
+                existing_platform
+                and existing_account
+                and (
+                    str(existing_platform) != platform.value
+                    or str(existing_account) != account_id
+                )
             ):
                 if str(existing_platform) == RegistrationPlatform.STEAM.value:
                     raise DiscordSteamConflictError(
@@ -102,7 +126,10 @@ class RegistrationService:
             raise RankRoleEligibilityError(discord_user_id)
 
         steam_id = user.get("steam_id")
-        if not steam_id and user.get("linked_platform") == RegistrationPlatform.STEAM.value:
+        if (
+            not steam_id
+            and user.get("linked_platform") == RegistrationPlatform.STEAM.value
+        ):
             steam_id = user.get("linked_account_id")
 
         if not steam_id:
@@ -128,7 +155,9 @@ class RegistrationService:
         # The OAuth/session flow can only validate Steam. Any other platform must be
         # registered through a manual/self-service path.
         if platform is not RegistrationPlatform.STEAM:
-            raise ManualRegistrationRequiredError(platform.value, account_name=account_name)
+            raise ManualRegistrationRequiredError(
+                platform.value, account_name=account_name
+            )
 
     async def create_registration_operation(
         self,
@@ -143,24 +172,36 @@ class RegistrationService:
             linked_platform=RegistrationPlatform.STEAM,
             linked_account_id=str(steam_validation["steam_id"]),
             linked_account_name=(
-                str(session["validated_account_name"]) if session.get("validated_account_name") else None
+                str(session["validated_account_name"])
+                if session.get("validated_account_name")
+                else None
             ),
             steam_id=str(steam_validation["steam_id"]),
             steam_name=(
-                str(session["validated_account_name"]) if session.get("validated_account_name") else None
+                str(session["validated_account_name"])
+                if session.get("validated_account_name")
+                else None
             ),
             game=game,
             registration_method=RegistrationMethod.OAUTH_STEAM_API,
-            role_intents=_build_registration_role_intents(game, RegistrationPlatform.STEAM),
+            role_intents=_build_registration_role_intents(
+                game, RegistrationPlatform.STEAM
+            ),
             source_session_id=str(session["session_id"]),
             username_snapshot=(
-                str(session["oauth_username_snapshot"]) if session.get("oauth_username_snapshot") else None
+                str(session["oauth_username_snapshot"])
+                if session.get("oauth_username_snapshot")
+                else None
             ),
             display_name_snapshot=(
-                str(session["oauth_display_name_snapshot"]) if session.get("oauth_display_name_snapshot") else None
+                str(session["oauth_display_name_snapshot"])
+                if session.get("oauth_display_name_snapshot")
+                else None
             ),
             locale_snapshot=(
-                str(session["oauth_locale_snapshot"]) if session.get("oauth_locale_snapshot") else None
+                str(session["oauth_locale_snapshot"])
+                if session.get("oauth_locale_snapshot")
+                else None
             ),
             verified_snapshot=(
                 bool(session["oauth_verified_snapshot"])
@@ -344,15 +385,22 @@ def _registration_summaries(doc: dict[str, Any]) -> list[RegistrationSummary]:
         if isinstance(entry, dict):
             method = str(entry["method"]) if entry.get("method") else None
             raw_registered_at = entry.get("registered_at")
-            registered_at = raw_registered_at if isinstance(raw_registered_at, datetime) else None
-        summaries.append(RegistrationSummary(game=game, method=method, registered_at=registered_at))
+            registered_at = (
+                raw_registered_at if isinstance(raw_registered_at, datetime) else None
+            )
+        summaries.append(
+            RegistrationSummary(game=game, method=method, registered_at=registered_at)
+        )
     summaries.sort(key=lambda summary: summary.game.value)
     return summaries
 
 
 def _has_steam_api_registration(registrations: dict[str, Any]) -> bool:
     for entry in registrations.values():
-        if isinstance(entry, dict) and str(entry.get("method") or "") in STEAM_API_REGISTRATION_METHODS:
+        if (
+            isinstance(entry, dict)
+            and str(entry.get("method") or "") in STEAM_API_REGISTRATION_METHODS
+        ):
             return True
     return False
 
@@ -372,7 +420,9 @@ def _build_registration_role_intents(
         _rank_role_for_game(game),
         RoleIntent.GRANT_NOVICE,
         RoleIntent.GRANT_SERVER_NEWS,
-        RoleIntent.GRANT_CIV6_NEWS if game is SupportedGame.CIV6 else RoleIntent.GRANT_CIV7_NEWS,
+        RoleIntent.GRANT_CIV6_NEWS
+        if game is SupportedGame.CIV6
+        else RoleIntent.GRANT_CIV7_NEWS,
         (
             RoleIntent.GRANT_PC_STEAM
             if platform is RegistrationPlatform.STEAM
@@ -405,7 +455,12 @@ def _to_discord_lookup_response(docs: list[dict[str, Any]]) -> DiscordLookupResp
             )
         )
 
-    linked_accounts.sort(key=lambda hit: ((hit.linked_platform.value if hit.linked_platform else ""), hit.linked_account_id))
+    linked_accounts.sort(
+        key=lambda hit: (
+            (hit.linked_platform.value if hit.linked_platform else ""),
+            hit.linked_account_id,
+        )
+    )
 
     return DiscordLookupResponse(
         discord_id=str(primary.get("discord_id", "")),
@@ -419,7 +474,10 @@ def _to_linked_account_lookup_response(
     docs: list[dict[str, Any]],
     linked_account_id: str,
 ) -> LinkedAccountLookupResponse:
-    primary_doc = next((doc for doc in docs if _normalize_linked_account_id(doc) == linked_account_id), docs[0])
+    primary_doc = next(
+        (doc for doc in docs if _normalize_linked_account_id(doc) == linked_account_id),
+        docs[0],
+    )
     seen: set[str] = set()
     discord_accounts: list[DiscordAccountLookupHit] = []
 

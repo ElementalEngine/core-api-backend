@@ -7,11 +7,20 @@ from typing import Dict, List, Tuple
 from pymongo import AsyncMongoClient
 
 from app.core.config import settings
-from app.features.stats.constants import ALLOWED_CIV_VERSIONS, ALLOWED_GAME_TYPES, ALLOWED_MATCH_TYPES
+from app.features.stats.constants import (
+    ALLOWED_CIV_VERSIONS,
+    ALLOWED_GAME_TYPES,
+    ALLOWED_MATCH_TYPES,
+)
 from app.features.stats.errors import InvalidStatsRequestError, StatsNotFoundError
 from app.features.stats.repository import StatsRepository
 from app.features.ratings.skill import make_ts_env
-from app.features.stats.schemas import StatRow, StatSet, TeamGenResponse, UserStatsResponse
+from app.features.stats.schemas import (
+    StatRow,
+    StatSet,
+    TeamGenResponse,
+    UserStatsResponse,
+)
 
 
 class StatsService:
@@ -51,7 +60,9 @@ class StatsService:
                 return True
         return False
 
-    async def get_user_stats(self, *, civ_version: str, game_type: str, discord_id: str) -> UserStatsResponse:
+    async def get_user_stats(
+        self, *, civ_version: str, game_type: str, discord_id: str
+    ) -> UserStatsResponse:
         version, is_cloud = self._validate(civ_version, game_type)
         normalized_discord_id = str(discord_id).strip()
         if not normalized_discord_id:
@@ -108,7 +119,9 @@ class StatsService:
         )
 
         if is_cloud:
-            season_map: Dict[str, StatSet] = {discord_id: StatSet() for discord_id in ids}
+            season_map: Dict[str, StatSet] = {
+                discord_id: StatSet() for discord_id in ids
+            }
         else:
             season_map = await self._load_stat_set(
                 civ_version=version,
@@ -127,8 +140,10 @@ class StatsService:
             )
             for discord_id in ids
         ]
-        
-    async def reset_user_stats(self, *, civ_version: str, game_type: str, discord_id: str) -> UserStatsResponse:
+
+    async def reset_user_stats(
+        self, *, civ_version: str, game_type: str, discord_id: str
+    ) -> UserStatsResponse:
         version, is_cloud = self._validate(civ_version, game_type)
         normalized_discord_id = str(discord_id).strip()
         if not normalized_discord_id:
@@ -152,7 +167,7 @@ class StatsService:
                 is_cloud=is_cloud,
                 discord_ids=[normalized_discord_id],
             )
-            
+
         response = UserStatsResponse(
             discord_id=normalized_discord_id,
             civ_version=version,
@@ -175,12 +190,19 @@ class StatsService:
 
         return response
 
-    async def get_team_gen(self, *, civ_version: str, game_type: str, discord_ids: List[str]) -> TeamGenResponse:
+    async def get_team_gen(
+        self, *, civ_version: str, game_type: str, discord_ids: List[str]
+    ) -> TeamGenResponse:
         version, is_cloud = self._validate(civ_version, game_type)
 
         ids = [str(value).strip() for value in discord_ids if str(value).strip()]
         if not ids:
-            return TeamGenResponse(civ_version=version, game_type="cloud" if is_cloud else "realtime", game_quality=0.0, teams=[[], []])
+            return TeamGenResponse(
+                civ_version=version,
+                game_type="cloud" if is_cloud else "realtime",
+                game_quality=0.0,
+                teams=[[], []],
+            )
         if any(not discord_id.isdigit() for discord_id in ids):
             raise InvalidStatsRequestError("Invalid discord_ids")
 
@@ -205,7 +227,13 @@ class StatsService:
                 stat_set = players_ranking.get(discord_id)
                 if stat_set is None or stat_set.teamer is None:
                     ranked_teams[target_team].append(
-                        StatRow(mu=int(settings.ts_mu), sigma=settings.ts_sigma, games=0, wins=0, first=0)
+                        StatRow(
+                            mu=int(settings.ts_mu),
+                            sigma=settings.ts_sigma,
+                            games=0,
+                            wins=0,
+                            first=0,
+                        )
                     )
                     continue
                 ranked_teams[target_team].append(stat_set.teamer)
@@ -239,7 +267,9 @@ class StatsService:
         is_cloud: bool,
         discord_ids: List[str],
     ) -> Dict[str, StatSet]:
-        result: Dict[str, StatSet] = {discord_id: StatSet() for discord_id in discord_ids}
+        result: Dict[str, StatSet] = {
+            discord_id: StatSet() for discord_id in discord_ids
+        }
 
         tasks = [
             self.repository.get_player_stat_docs_batch(
@@ -254,7 +284,9 @@ class StatsService:
         ]
 
         docs_by_match_type = await asyncio.gather(*tasks)
-        for match_type, docs in zip(ALLOWED_MATCH_TYPES, docs_by_match_type, strict=True):
+        for match_type, docs in zip(
+            ALLOWED_MATCH_TYPES, docs_by_match_type, strict=True
+        ):
             for discord_id, doc in docs.items():
                 if discord_id not in result:
                     continue

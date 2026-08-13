@@ -92,6 +92,7 @@ class RoleIntent(StrEnum):
     GRANT_2K_CROSSPLATFORM = "grant_2k_crossplatform"
     REMOVE_NON_VERIFIED = "remove_non_verified"
 
+
 STEAM_API_REGISTRATION_METHODS: frozenset[str] = frozenset(
     {RegistrationMethod.OAUTH_STEAM_API.value, "oauth"}
 )

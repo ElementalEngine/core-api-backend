@@ -69,14 +69,18 @@ class DiscordOAuthService:
                     settings.auth_discord_redirect_uri,
                     response_body[:1000],
                 )
-                raise DiscordOAuthError("Discord rejected the authentication callback. Please try again.") from exc
+                raise DiscordOAuthError(
+                    "Discord rejected the authentication callback. Please try again."
+                ) from exc
             except (URLError, TimeoutError) as exc:
                 logger.warning(
                     "Discord OAuth token exchange network failure. redirect_uri=%s error=%r",
                     settings.auth_discord_redirect_uri,
                     exc,
                 )
-                raise DiscordOAuthError("Discord authentication is temporarily unavailable. Please try again.") from exc
+                raise DiscordOAuthError(
+                    "Discord authentication is temporarily unavailable. Please try again."
+                ) from exc
             token = body.get("access_token")
             if not isinstance(token, str) or not token:
                 logger.warning(
@@ -84,7 +88,9 @@ class DiscordOAuthService:
                     settings.auth_discord_redirect_uri,
                     json.dumps(body)[:1000],
                 )
-                raise DiscordOAuthError("Discord did not return a valid access token. Please try again.")
+                raise DiscordOAuthError(
+                    "Discord did not return a valid access token. Please try again."
+                )
             return token
 
         return await asyncio.to_thread(_exchange)
@@ -96,7 +102,9 @@ class DiscordOAuthService:
         return payload
 
     async def fetch_connections(self, access_token: str) -> list[dict[str, Any]]:
-        payload = await self._get_json(DISCORD_API_CONNECTIONS_URL, access_token=access_token)
+        payload = await self._get_json(
+            DISCORD_API_CONNECTIONS_URL, access_token=access_token
+        )
         if not isinstance(payload, list):
             raise LinkedAccountFetchError()
         return [item for item in payload if isinstance(item, dict)]
@@ -125,7 +133,9 @@ class DiscordOAuthService:
                 return connection
         raise LinkedAccountNotFoundError(platform.value)
 
-    async def _get_json(self, url: str, *, access_token: str) -> dict[str, Any] | list[Any]:
+    async def _get_json(
+        self, url: str, *, access_token: str
+    ) -> dict[str, Any] | list[Any]:
         def _request() -> dict[str, Any] | list[Any]:
             req = Request(
                 url,

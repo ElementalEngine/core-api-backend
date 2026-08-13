@@ -12,7 +12,12 @@ from pymongo import AsyncMongoClient
 from trueskill import Rating
 
 from app.core.config import settings
-from app.features.matches.models import MatchModel, PlayerModel, StatModel, ContestReport
+from app.features.matches.models import (
+    MatchModel,
+    PlayerModel,
+    StatModel,
+    ContestReport,
+)
 from app.features.matches.repository import MatchRepository
 from app.features.matches.parsers import parse_civ6_save, parse_civ7_save
 from app.features.ratings.skill import make_ts_env
@@ -21,7 +26,7 @@ from app.features.matches.utils import get_cpl_name
 logger = logging.getLogger(__name__)
 
 approve_lock = asyncio.Lock()
-RANKING_CONCURRENCY_LIMIT = 8  
+RANKING_CONCURRENCY_LIMIT = 8
 
 
 def _as_float(value: Any, default: float) -> float:
@@ -32,7 +37,7 @@ def _as_float(value: Any, default: float) -> float:
         if hasattr(value, "to_decimal"):
             value = value.to_decimal()
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -46,16 +51,21 @@ def _as_int(value: Any, default: int) -> int:
         if isinstance(value, str):
             return int(float(value))
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
+
+
 class NotFoundError(Exception):
     pass
+
 
 class MatchServiceError(Exception):
     pass
 
+
 class InvalidIDError(MatchServiceError):
     pass
+
 
 class ParseError(MatchServiceError):
     pass
@@ -65,8 +75,9 @@ def _require_int(value: Any, field_name: str) -> int:
     """Parse a client-supplied numeric field; bad input becomes a 400 instead of a bare 500."""
     try:
         return int(str(value).strip())
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise MatchServiceError(f"{field_name} must be a whole number, got {value!r}")
+
 
 class MatchService:
     def __init__(self, client: AsyncMongoClient):
@@ -78,12 +89,14 @@ class MatchService:
         return ObjectId(match_id)
 
     def _parse_save(self, file_bytes: bytes) -> Dict[str, Any]:
-        if file_bytes.startswith(b'CIV6'):
+        if file_bytes.startswith(b"CIV6"):
             parser = parse_civ6_save
-        elif file_bytes.startswith(b'CIV7'):
+        elif file_bytes.startswith(b"CIV7"):
             parser = parse_civ7_save
         else:
-            raise ParseError(f"Unrecognized save file format. starts with {file_bytes[:4]!r}")
+            raise ParseError(
+                f"Unrecognized save file format. starts with {file_bytes[:4]!r}"
+            )
         try:
             data = parser(file_bytes, settings.civ_save_parser_version)
             logger.info(f"✅ 🔍 Parsed as {data.get('game')}")
@@ -100,7 +113,9 @@ class MatchService:
             return str(steam_id)
         if player.get("linked_platform") == "steam" and player.get("linked_account_id"):
             return str(player["linked_account_id"])
-        raise MatchServiceError(f"User {discord_id} does not have a linked Steam account")
+        raise MatchServiceError(
+            f"User {discord_id} does not have a linked Steam account"
+        )
 
     async def steam_to_discord_id(self, steam_id: str) -> str:
         player = await self.q.get_user_by_steam_id(steam_id)
@@ -110,7 +125,11 @@ class MatchService:
 
     async def match_id_to_discord(self, match: MatchModel) -> MatchModel:
         for player in match.players:
-            if player.steam_id and player.steam_id != '-1' and player.steam_id.startswith("-") == False:
+            if (
+                player.steam_id
+                and player.steam_id != "-1"
+                and player.steam_id.startswith("-") == False
+            ):
                 player.discord_id = await self.steam_to_discord_id(player.steam_id)
         return match
 
@@ -172,7 +191,9 @@ class MatchService:
             first=_as_int(doc.get("first"), 0),
             subbedIn=_as_int(doc.get("subbedIn"), 0),
             subbedOut=_as_int(doc.get("subbedOut"), 0),
-            civs=dict(doc.get("civs", {})) if isinstance(doc.get("civs", {}), dict) else {},
+            civs=dict(doc.get("civs", {}))
+            if isinstance(doc.get("civs", {}), dict)
+            else {},
         )
 
     async def get_players_ranking(
@@ -189,7 +210,9 @@ class MatchService:
 
         async def _one(i: int, p: PlayerModel) -> StatModel:
             async with sem:
-                return await self.get_player_ranking(match, p.discord_id, i, is_seasonal, is_combined)
+                return await self.get_player_ranking(
+                    match, p.discord_id, i, is_seasonal, is_combined
+                )
 
         tasks = [asyncio.create_task(_one(i, p)) for i, p in enumerate(match.players)]
         return await asyncio.gather(*tasks)
@@ -208,29 +231,46 @@ class MatchService:
                 teams_wo_subs[p.team].append((i, p))
                 teams_with_sub_ins[p.team].append((i, p))
         team_wo_subs_states: List[List[StatModel]] = [
-            [players_ranking[p_index_tuple[0]] for p_index_tuple in teams_wo_subs[team]] for team in teams_wo_subs
+            [players_ranking[p_index_tuple[0]] for p_index_tuple in teams_wo_subs[team]]
+            for team in teams_wo_subs
         ]
         team_with_sub_ins_states: List[List[StatModel]] = [
-            [players_ranking[p_index_tuple[0]] for p_index_tuple in teams_with_sub_ins[team]] for team in teams_with_sub_ins
+            [
+                players_ranking[p_index_tuple[0]]
+                for p_index_tuple in teams_with_sub_ins[team]
+            ]
+            for team in teams_with_sub_ins
         ]
 
-        ts_teams_wo_subs = [[Rating(p.mu, p.sigma) for p in team] for team in team_wo_subs_states]
-        ts_teams_with_sub_ins = [[Rating(p.mu, p.sigma) for p in team] for team in team_with_sub_ins_states]
-        
-        placements_wo_subs = [teams_wo_subs[team][0][1].placement for team in teams_wo_subs]
-        placements_with_sub_ins = [teams_with_sub_ins[team][0][1].placement for team in teams_with_sub_ins]
+        ts_teams_wo_subs = [
+            [Rating(p.mu, p.sigma) for p in team] for team in team_wo_subs_states
+        ]
+        ts_teams_with_sub_ins = [
+            [Rating(p.mu, p.sigma) for p in team] for team in team_with_sub_ins_states
+        ]
+
+        placements_wo_subs = [
+            teams_wo_subs[team][0][1].placement for team in teams_wo_subs
+        ]
+        placements_with_sub_ins = [
+            teams_with_sub_ins[team][0][1].placement for team in teams_with_sub_ins
+        ]
 
         ts_wo_subs_env = make_ts_env()
         ts_with_sub_ins_env = make_ts_env()
-        
+
         new_ts_wo_subs = ts_wo_subs_env.rate(ts_teams_wo_subs, ranks=placements_wo_subs)
-        new_ts_with_sub_ins = ts_with_sub_ins_env.rate(ts_teams_with_sub_ins, ranks=placements_with_sub_ins)
+        new_ts_with_sub_ins = ts_with_sub_ins_env.rate(
+            ts_teams_with_sub_ins, ranks=placements_with_sub_ins
+        )
 
         post: List[StatModel] = list(range(len(match.players)))
         for team_idx, team in enumerate(team_wo_subs_states):
             for player_index, player in enumerate(team):
                 if match.players[player.index].is_sub:
-                    raise ValueError("This should not happen: player is a sub but being processed in wo_subs team.")
+                    raise ValueError(
+                        "This should not happen: player is a sub but being processed in wo_subs team."
+                    )
                 r = new_ts_wo_subs[team_idx][player_index]
                 post[player.index] = StatModel(
                     discord_id=player.id,
@@ -264,10 +304,14 @@ class MatchService:
                     )
         for i, p in enumerate(match.players):
             p_current_ranking = players_ranking[i]
-            delta = round(post[i].mu - p_current_ranking.mu) if p.discord_id != None else 0
+            delta = (
+                round(post[i].mu - p_current_ranking.mu) if p.discord_id != None else 0
+            )
             if p.is_sub:
                 # Subbed in player
-                p.__setattr__(delta_value_name, max(settings.min_points_for_subs, delta))
+                p.__setattr__(
+                    delta_value_name, max(settings.min_points_for_subs, delta)
+                )
             elif p.subbed_out:
                 # Subbed out Player
                 p.__setattr__(delta_value_name, delta if delta < 0 else 0)
@@ -285,11 +329,17 @@ class MatchService:
         """
         players_ranking = await self.get_players_ranking(match)
         players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
-        players_combined_ranking = await self.get_players_ranking(match, is_combined=True)
+        players_combined_ranking = await self.get_players_ranking(
+            match, is_combined=True
+        )
 
         match, _ = self.update_player_stats(match, players_ranking, "delta")
-        match, _ = self.update_player_stats(match, players_season_ranking, "season_delta")
-        match, _ = self.update_player_stats(match, players_combined_ranking, "combined_delta")
+        match, _ = self.update_player_stats(
+            match, players_season_ranking, "season_delta"
+        )
+        match, _ = self.update_player_stats(
+            match, players_combined_ranking, "combined_delta"
+        )
         return match
 
     def _player_delta_changes(self, match: MatchModel) -> Dict[str, Any]:
@@ -395,7 +445,11 @@ class MatchService:
         }
 
     async def create_from_save(
-        self, file_bytes: bytes, reporter_discord_id: str, is_cloud: bool, discord_message_id: str
+        self,
+        file_bytes: bytes,
+        reporter_discord_id: str,
+        is_cloud: bool,
+        discord_message_id: str,
     ) -> Dict[str, Any]:
         parsed = self._parse_save(file_bytes)
 
@@ -441,7 +495,9 @@ class MatchService:
         current_list = res.get("discord_messages_id_list", [])
         updated_list = current_list + discord_message_id_list
 
-        await self.q.update_pending_match_set(oid, {"discord_messages_id_list": updated_list})
+        await self.q.update_pending_match_set(
+            oid, {"discord_messages_id_list": updated_list}
+        )
         return await self._reload_pending(oid)
 
     async def get_match(self, match_id: str) -> Dict[str, Any]:
@@ -452,7 +508,9 @@ class MatchService:
         doc["match_id"] = str(doc.pop("_id"))
         return doc
 
-    async def update_match(self, match_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_match(
+        self, match_id: str, update_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         if not update_data:
             raise MatchServiceError("Empty update payload")
         oid = self._to_oid(match_id)
@@ -465,15 +523,19 @@ class MatchService:
         logger.info("✅ 🔄 Updated match %s", match_id)
         return await self._reload_pending(oid)
 
-    async def set_player_order(self, match_id: str, player_order: str, discord_message_id: str) -> Dict[str, Any]:
+    async def set_player_order(
+        self, match_id: str, player_order: str, discord_message_id: str
+    ) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.q.find_pending_by_id(oid)
         if not res:
             raise NotFoundError("Match not found")
 
         match = MatchModel(**res)
-        if 'team' in match.game_mode.lower():
-            raise MatchServiceError("Cannot set player order for teamer matches. Use change_order instead.")
+        if "team" in match.game_mode.lower():
+            raise MatchServiceError(
+                "Cannot set player order for teamer matches. Use change_order instead."
+            )
         player_order_list = player_order.split(" ")
         curr_placement = 0
         placement = {}
@@ -486,7 +548,9 @@ class MatchService:
 
         for i, player in enumerate(match.players):
             if player.subbed_out == False and player.discord_id not in placement:
-                raise MatchServiceError(f"Discord ID {player.discord_id} not found in player order list")
+                raise MatchServiceError(
+                    f"Discord ID {player.discord_id} not found in player order list"
+                )
             if player.subbed_out:
                 player.placement = match.players[i - 1].placement
             else:
@@ -495,7 +559,9 @@ class MatchService:
         match = await self._recompute_deltas(match)
 
         changes: Dict[str, Any] = {}
-        changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [discord_message_id]
+        changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [
+            discord_message_id
+        ]
         changes.update(self._player_delta_changes(match))
         for i, player in enumerate(match.players):
             changes[f"players.{i}.placement"] = player.placement
@@ -504,7 +570,9 @@ class MatchService:
         logger.info("✅ 🔄 Changed player order for match %s", match_id)
         return await self._reload_pending(oid)
 
-    async def change_order(self, match_id: str, new_order: str, discord_message_id: str) -> Dict[str, Any]:
+    async def change_order(
+        self, match_id: str, new_order: str, discord_message_id: str
+    ) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.q.find_pending_by_id(oid)
         if not res:
@@ -514,19 +582,25 @@ class MatchService:
         num_teams = len({player.team for player in match.players})
         new_order_list = new_order.split(" ")
         if len(new_order_list) != num_teams:
-            raise MatchServiceError(f"New order length does not match number of players/teams ({num_teams})")
+            raise MatchServiceError(
+                f"New order length does not match number of players/teams ({num_teams})"
+            )
 
         for player in match.players:
             if player.team < 0 or player.team >= len(new_order_list):
                 raise MatchServiceError(
                     f"Team {player.team} has no entry in the new order list"
                 )
-            player.placement = _require_int(new_order_list[player.team], "new_order") - 1
+            player.placement = (
+                _require_int(new_order_list[player.team], "new_order") - 1
+            )
 
         match = await self._recompute_deltas(match)
 
         changes: Dict[str, Any] = {}
-        changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [discord_message_id]
+        changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [
+            discord_message_id
+        ]
         changes.update(self._player_delta_changes(match))
         for i, player in enumerate(match.players):
             changes[f"players.{i}.placement"] = player.placement
@@ -545,7 +619,9 @@ class MatchService:
         logger.info("✅ 🔄 Match %s removed", match_id)
         return res
 
-    async def trigger_quit(self, match_id: str, quitter_discord_id: str, discord_message_id: str) -> Dict[str, Any]:
+    async def trigger_quit(
+        self, match_id: str, quitter_discord_id: str, discord_message_id: str
+    ) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.q.find_pending_by_id(oid)
         if not res:
@@ -561,12 +637,22 @@ class MatchService:
         if not quitter_found:
             raise MatchServiceError("Quitter discord_id not found in match players")
 
-        changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [discord_message_id]
+        changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [
+            discord_message_id
+        ]
         await self.q.update_pending_match_set(oid, changes)
-        logger.info("✅ 🔄 Match %s, player %s quit toggled", match_id, quitter_discord_id)
+        logger.info(
+            "✅ 🔄 Match %s, player %s quit toggled", match_id, quitter_discord_id
+        )
         return await self._reload_pending(oid)
 
-    async def assign_discord_id(self, match_id: str, player_id: str, player_discord_id: str, discord_message_id: str) -> Dict[str, Any]:
+    async def assign_discord_id(
+        self,
+        match_id: str,
+        player_id: str,
+        player_discord_id: str,
+        discord_message_id: str,
+    ) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.q.find_pending_by_id(oid)
         if not res:
@@ -575,7 +661,9 @@ class MatchService:
         match = MatchModel(**res)
         idx = _require_int(player_id, "player_id") - 1
         if idx < 0 or idx >= len(match.players):
-            raise MatchServiceError("Player ID out of range. Must be between 1 and number of players")
+            raise MatchServiceError(
+                "Player ID out of range. Must be between 1 and number of players"
+            )
 
         match.players[idx].discord_id = player_discord_id
         match.players[idx].steam_id = await self.discord_to_steam_id(player_discord_id)
@@ -583,16 +671,22 @@ class MatchService:
         match = await self._recompute_deltas(match)
 
         changes: Dict[str, Any] = {}
-        changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [discord_message_id]
+        changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [
+            discord_message_id
+        ]
         changes[f"players.{idx}.discord_id"] = player_discord_id
         changes[f"players.{idx}.steam_id"] = match.players[idx].steam_id
         changes.update(self._player_delta_changes(match))
 
         await self.q.update_pending_match_set(oid, changes)
-        logger.info("✅ 🔄 Assigned discord_id for match %s (player %s)", match_id, player_id)
+        logger.info(
+            "✅ 🔄 Assigned discord_id for match %s (player %s)", match_id, player_id
+        )
         return await self._reload_pending(oid)
 
-    async def assign_discord_id_all(self, match_id: str, player_discord_id: list[str], discord_message_id: str) -> Dict[str, Any]:
+    async def assign_discord_id_all(
+        self, match_id: str, player_discord_id: list[str], discord_message_id: str
+    ) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.q.find_pending_by_id(oid)
         if not res:
@@ -610,7 +704,9 @@ class MatchService:
         match = await self._recompute_deltas(match)
 
         changes: Dict[str, Any] = {}
-        changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [discord_message_id]
+        changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [
+            discord_message_id
+        ]
         changes.update(self._player_delta_changes(match))
         for i, p in enumerate(match.players):
             changes[f"players.{i}.discord_id"] = p.discord_id
@@ -620,7 +716,13 @@ class MatchService:
         logger.info("✅ 🔄 Assigned all discord_ids for match %s", match_id)
         return await self._reload_pending(oid)
 
-    async def assign_sub(self, match_id: str, sub_in_id: str, sub_out_discord_id: str, discord_message_id: str) -> Dict[str, Any]:
+    async def assign_sub(
+        self,
+        match_id: str,
+        sub_in_id: str,
+        sub_out_discord_id: str,
+        discord_message_id: str,
+    ) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.q.find_pending_by_id(oid)
         if not res:
@@ -633,29 +735,36 @@ class MatchService:
 
         match.players[sub_in_idx].is_sub = True
         sub_out_player_steam_id = await self.discord_to_steam_id(sub_out_discord_id)
-        match.players.insert(sub_in_idx + 1, PlayerModel(
-            steam_id = sub_out_player_steam_id,
-            user_name = None,
-            civ = match.players[sub_in_idx].civ,
-            team = match.players[sub_in_idx].team,
-            leader = match.players[sub_in_idx].leader,
-            player_alive = match.players[sub_in_idx].player_alive,
-            discord_id = sub_out_discord_id,
-            placement = match.players[sub_in_idx].placement,
-            quit = False,
-            delta = 0.0,
-            is_sub = False,
-            subbed_out = True,
-        ))
+        match.players.insert(
+            sub_in_idx + 1,
+            PlayerModel(
+                steam_id=sub_out_player_steam_id,
+                user_name=None,
+                civ=match.players[sub_in_idx].civ,
+                team=match.players[sub_in_idx].team,
+                leader=match.players[sub_in_idx].leader,
+                player_alive=match.players[sub_in_idx].player_alive,
+                discord_id=sub_out_discord_id,
+                placement=match.players[sub_in_idx].placement,
+                quit=False,
+                delta=0.0,
+                is_sub=False,
+                subbed_out=True,
+            ),
+        )
         match = await self._recompute_deltas(match)
 
-        match.discord_messages_id_list = match.discord_messages_id_list + [discord_message_id]
+        match.discord_messages_id_list = match.discord_messages_id_list + [
+            discord_message_id
+        ]
 
         await self.q.replace_pending_match(oid, match.dict())
         logger.info("✅ 🔄 Sub assigned for match %s", match_id)
         return await self._reload_pending(oid)
 
-    async def remove_sub(self, match_id: str, sub_out_id: str, discord_message_id: str) -> Dict[str, Any]:
+    async def remove_sub(
+        self, match_id: str, sub_out_id: str, discord_message_id: str
+    ) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.q.find_pending_by_id(oid)
         if not res:
@@ -664,7 +773,9 @@ class MatchService:
         match = MatchModel(**res)
         idx = _require_int(sub_out_id, "sub_out_id")
         if idx < 1 or idx >= len(match.players):
-            raise MatchServiceError("Player ID out of range. Must be between 2 and number of players")
+            raise MatchServiceError(
+                "Player ID out of range. Must be between 2 and number of players"
+            )
         if not match.players[idx].subbed_out:
             raise MatchServiceError("That player is not marked as a sub")
 
@@ -673,13 +784,21 @@ class MatchService:
 
         # Remove the sub slot correctly (fix: pop wrong index)
         match.players.pop(idx)
-        match.discord_messages_id_list = match.discord_messages_id_list + [discord_message_id]
+        match.discord_messages_id_list = match.discord_messages_id_list + [
+            discord_message_id
+        ]
 
         await self.q.replace_pending_match(oid, match.dict())
         logger.info("✅ 🔄 Sub removed for match %s", match_id)
         return await self._reload_pending(oid)
-    
-    async def contest_report(self, match_id: str, contestor_discord_id: str, reason: str, discord_message_id: str) -> Dict[str, Any]:
+
+    async def contest_report(
+        self,
+        match_id: str,
+        contestor_discord_id: str,
+        reason: str,
+        discord_message_id: str,
+    ) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.q.find_pending_by_id(oid)
         if not res:
@@ -687,15 +806,17 @@ class MatchService:
 
         match = MatchModel(**res)
         contest_report_entry = ContestReport(
-            contestor_discord_id=contestor_discord_id,
-            reason=reason)
+            contestor_discord_id=contestor_discord_id, reason=reason
+        )
         match.contest_report_list.append(contest_report_entry)
-        match.discord_messages_id_list = match.discord_messages_id_list + [discord_message_id]
+        match.discord_messages_id_list = match.discord_messages_id_list + [
+            discord_message_id
+        ]
 
         await self.q.replace_pending_match(oid, match.dict())
         logger.info("✅ 🔄 Match %s contested by %s", match_id, contestor_discord_id)
         return await self._reload_pending(oid)
-    
+
     async def revert_match(self, match_id: str) -> Dict[str, Any]:
         oid = self._to_oid(match_id)
         res = await self.q.find_validated_by_id(oid)
@@ -703,7 +824,7 @@ class MatchService:
             raise NotFoundError("Match not found")
 
         match = MatchModel(**res)
-        
+
         # Pre-states
         pre_lifetime = await self.get_players_ranking(match)
         pre_season = await self.get_players_ranking(match, is_seasonal=True)
@@ -715,7 +836,11 @@ class MatchService:
                 try:
                     # Stats writes
                     for i, p in enumerate(match.players):
-                        if not p.discord_id or p.discord_id in ("-1", "-2") or p.discord_id.startswith("-"):
+                        if (
+                            not p.discord_id
+                            or p.discord_id in ("-1", "-2")
+                            or p.discord_id.startswith("-")
+                        ):
                             continue
 
                         did = str(p.discord_id)
@@ -761,10 +886,14 @@ class MatchService:
                 except Exception as e:
                     logger.exception("Transaction failed while writing to DB; aborting")
                     await session.abort_transaction()
-                    raise MatchServiceError(f"An error occured during writing to DB: {e}")
+                    raise MatchServiceError(
+                        f"An error occured during writing to DB: {e}"
+                    )
         return {"match_id": str(match_id), **match.dict()}
 
-    async def approve_match(self, match_id: str, approver_discord_id: str) -> Dict[str, Any]:
+    async def approve_match(
+        self, match_id: str, approver_discord_id: str
+    ) -> Dict[str, Any]:
         async with approve_lock:
             oid = self._to_oid(match_id)
             res = await self.q.find_pending_by_id(oid)
@@ -776,7 +905,9 @@ class MatchService:
             # Ensure all players have placements set
             for p in match.players:
                 if p.placement is None:
-                    raise MatchServiceError("All players must have a placement before approving")
+                    raise MatchServiceError(
+                        "All players must have a placement before approving"
+                    )
 
             # Pre-states
             pre_lifetime = await self.get_players_ranking(match)
@@ -784,9 +915,15 @@ class MatchService:
             pre_combined = await self.get_players_ranking(match, is_combined=True)
 
             # Rating updates (writes deltas into match players + returns post mu/sigma)
-            match, post_lifetime = self.update_player_stats(match, pre_lifetime, "delta")
-            match, post_season = self.update_player_stats(match, pre_season, "season_delta")
-            match, post_combined = self.update_player_stats(match, pre_combined, "combined_delta")
+            match, post_lifetime = self.update_player_stats(
+                match, pre_lifetime, "delta"
+            )
+            match, post_season = self.update_player_stats(
+                match, pre_season, "season_delta"
+            )
+            match, post_combined = self.update_player_stats(
+                match, pre_combined, "combined_delta"
+            )
 
             session = await self.q.start_session()
             async with session:
@@ -794,15 +931,37 @@ class MatchService:
                     try:
                         # Stats writes
                         for i, p in enumerate(match.players):
-                            if not p.discord_id or p.discord_id in ("-1", "-2") or p.discord_id.startswith("-"):
+                            if (
+                                not p.discord_id
+                                or p.discord_id in ("-1", "-2")
+                                or p.discord_id.startswith("-")
+                            ):
                                 continue
 
                             did = str(p.discord_id)
 
                             for pre, post, delta_value, is_seasonal, is_combined in (
-                                (pre_lifetime[i], post_lifetime[i], p.delta, False, False),
-                                (pre_season[i], post_season[i], p.season_delta, True, False),
-                                (pre_combined[i], post_combined[i], p.combined_delta, False, True),
+                                (
+                                    pre_lifetime[i],
+                                    post_lifetime[i],
+                                    p.delta,
+                                    False,
+                                    False,
+                                ),
+                                (
+                                    pre_season[i],
+                                    post_season[i],
+                                    p.season_delta,
+                                    True,
+                                    False,
+                                ),
+                                (
+                                    pre_combined[i],
+                                    post_combined[i],
+                                    p.combined_delta,
+                                    False,
+                                    True,
+                                ),
                             ):
                                 doc = self._build_stat_doc(
                                     discord_id=did,
@@ -833,30 +992,51 @@ class MatchService:
                         validated_doc = match.dict()
                         validated_doc["created_at"] = res.get("created_at", now)
                         validated_doc["approved_at"] = now
-                        validated_doc["reporter_discord_id"] = res.get("reporter_discord_id")
+                        validated_doc["reporter_discord_id"] = res.get(
+                            "reporter_discord_id"
+                        )
                         validated_doc["approver_discord_id"] = approver_discord_id
-                        validated_doc["discord_messages_id_list"] = res.get("discord_messages_id_list", [])
+                        validated_doc["discord_messages_id_list"] = res.get(
+                            "discord_messages_id_list", []
+                        )
                         validated_doc["save_file_hash"] = res.get("save_file_hash", "")
                         validated_doc["contest_report_list"] = []
 
-                        validated_insert_id = await self.q.insert_validated_match(validated_doc, session=session)
+                        validated_insert_id = await self.q.insert_validated_match(
+                            validated_doc, session=session
+                        )
                         await self.q.delete_pending_match(oid, session=session)
 
                         await session.commit_transaction()
                     except Exception as e:
-                        logger.exception("Transaction failed while writing to DB; aborting")
+                        logger.exception(
+                            "Transaction failed while writing to DB; aborting"
+                        )
                         await session.abort_transaction()
-                        raise MatchServiceError(f"An error occured during writing to DB: {e}")
+                        raise MatchServiceError(
+                            f"An error occured during writing to DB: {e}"
+                        )
 
             logger.info("✅ ✅ Approved match %s", match_id)
             affected_players = []
             if match.game_mode.lower() == "ffa" or match.is_cloud:
                 affected_players = [
-                    {"discord_id": str(player.discord_id), "rating_mu": float(post_combined[index].mu) if match.is_cloud else post_lifetime[index].mu}
+                    {
+                        "discord_id": str(player.discord_id),
+                        "rating_mu": float(post_combined[index].mu)
+                        if match.is_cloud
+                        else post_lifetime[index].mu,
+                    }
                     for index, player in enumerate(match.players)
-                    if player.discord_id and player.discord_id not in ("-1", "-2") and not str(player.discord_id).startswith("-")
+                    if player.discord_id
+                    and player.discord_id not in ("-1", "-2")
+                    and not str(player.discord_id).startswith("-")
                 ]
-            return {"match_id": str(validated_insert_id), **match.dict(), "affected_players": affected_players}
+            return {
+                "match_id": str(validated_insert_id),
+                **match.dict(),
+                "affected_players": affected_players,
+            }
 
     async def get_leaderboard(
         self,
@@ -890,7 +1070,6 @@ class MatchService:
                     "mu": mu,
                     "sigma": _as_float(row.get("sigma"), 0.0),
                     "games": games,
-
                     # Backwards-compatible aliases for older clients.
                     "rating": int(round(mu)),
                     "games_played": games,
@@ -898,8 +1077,18 @@ class MatchService:
                     "first": _as_int(row.get("first"), 0),
                 }
             )
-        last_updated_ts = int(lb.last_updated.timestamp()) if isinstance(lb.last_updated, datetime) else 0
+        last_updated_ts = (
+            int(lb.last_updated.timestamp())
+            if isinstance(lb.last_updated, datetime)
+            else 0
+        )
         return {"rankings": out, "last_updated": last_updated_ts}
 
 
-__all__ = ["InvalidIDError", "MatchService", "MatchServiceError", "NotFoundError", "ParseError"]
+__all__ = [
+    "InvalidIDError",
+    "MatchService",
+    "MatchServiceError",
+    "NotFoundError",
+    "ParseError",
+]

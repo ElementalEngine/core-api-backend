@@ -117,7 +117,9 @@ class ManualRegistrationRequiredError(AuthError):
                 "Your Xbox account is linked to Discord, but automatic Xbox registration "
                 "is not supported. Please contact staff for manual registration or use Steam auth."
             ),
-        }.get(platform, "Automatic registration is not supported for this account type.")
+        }.get(
+            platform, "Automatic registration is not supported for this account type."
+        )
         super().__init__(
             code=f"{platform.upper()}_MANUAL_REQUIRED",
             message=message,
@@ -127,7 +129,9 @@ class ManualRegistrationRequiredError(AuthError):
 
 
 class DiscordOAuthError(AuthError):
-    def __init__(self, message: str = "Failed to complete Discord authentication.") -> None:
+    def __init__(
+        self, message: str = "Failed to complete Discord authentication."
+    ) -> None:
         super().__init__(
             code="DISCORD_OAUTH_FAILED",
             message=message,
@@ -171,7 +175,10 @@ class DiscordUserMismatchError(AuthError):
             code="DISCORD_USER_MISMATCH",
             message="The authenticated Discord account did not match the registration session.",
             status_code=status.HTTP_403_FORBIDDEN,
-            details={"session_user_id": session_user_id, "request_user_id": request_user_id},
+            details={
+                "session_user_id": session_user_id,
+                "request_user_id": request_user_id,
+            },
         )
 
 
@@ -222,7 +229,9 @@ class SteamOwnershipMissingError(AuthError):
 
 
 class SteamPlaytimeBelowThresholdError(AuthError):
-    def __init__(self, *, game: str, required_minutes: int, actual_minutes: int) -> None:
+    def __init__(
+        self, *, game: str, required_minutes: int, actual_minutes: int
+    ) -> None:
         super().__init__(
             code="STEAM_PLAYTIME_BELOW_THRESHOLD",
             message=(
@@ -259,12 +268,18 @@ class SteamIdConflictError(AuthError):
 
 
 class LinkedAccountConflictError(AuthError):
-    def __init__(self, *, platform: str, account_id: str, existing_discord_id: str) -> None:
+    def __init__(
+        self, *, platform: str, account_id: str, existing_discord_id: str
+    ) -> None:
         super().__init__(
             code="LINKED_ACCOUNT_CONFLICT",
             message="This linked account is already connected to another Discord account. Please contact staff if you believe this is a mistake.",
             status_code=status.HTTP_409_CONFLICT,
-            details={"platform": platform, "account_id": account_id, "existing_discord_id": existing_discord_id},
+            details={
+                "platform": platform,
+                "account_id": account_id,
+                "existing_discord_id": existing_discord_id,
+            },
         )
 
 
@@ -274,7 +289,10 @@ class DiscordSteamConflictError(AuthError):
             code="DISCORD_ID_CONFLICT",
             message="Your Discord account is already linked to a different Steam account. Please contact staff to resolve the conflict.",
             status_code=status.HTTP_409_CONFLICT,
-            details={"discord_user_id": discord_user_id, "existing_steam_id": existing_steam_id},
+            details={
+                "discord_user_id": discord_user_id,
+                "existing_steam_id": existing_steam_id,
+            },
         )
 
 

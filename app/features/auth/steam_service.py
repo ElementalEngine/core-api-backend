@@ -28,10 +28,14 @@ STEAM_HTTP_USER_AGENT = "CivPlayersAuth/1.0 (+https://elementalengine.net)"
 
 
 class SteamService:
-    async def validate_linked_account(self, *, steam_id: str, game: str) -> dict[str, object]:
+    async def validate_linked_account(
+        self, *, steam_id: str, game: str
+    ) -> dict[str, object]:
         api_key = settings.auth_steam_api_key.get_secret_value()
         if not api_key:
-            raise AuthConfigurationError("Steam validation is not configured on the backend.")
+            raise AuthConfigurationError(
+                "Steam validation is not configured on the backend."
+            )
 
         normalized_game = SupportedGame(game).value
         app_id = self._app_id_for_game(normalized_game)
@@ -66,7 +70,9 @@ class SteamService:
             )
             raise SteamOwnershipMissingError(normalized_game)
 
-        match = next((item for item in games if int(item.get("appid", 0)) == app_id), None)
+        match = next(
+            (item for item in games if int(item.get("appid", 0)) == app_id), None
+        )
         if not isinstance(match, dict):
             logger.info(
                 "Steam ownership missing. steam_id=%s game=%s app_id=%s",
@@ -100,7 +106,9 @@ class SteamService:
             "ownership_verified_at": datetime.now(timezone.utc),
         }
 
-    async def _get_owned_games(self, *, steam_id: str, app_id: int) -> dict[str, object]:
+    async def _get_owned_games(
+        self, *, steam_id: str, app_id: int
+    ) -> dict[str, object]:
         def _request() -> dict[str, object]:
             api_key = settings.auth_steam_api_key.get_secret_value()
             timeout_seconds = max(1, int(settings.auth_steam_timeout_seconds))

@@ -47,7 +47,11 @@ def test_reset_without_stats_404s_and_never_touches_the_db():
     svc = make_service(repo)
 
     with pytest.raises(StatsNotFoundError):
-        asyncio.run(svc.reset_user_stats(civ_version="civ6", game_type="realtime", discord_id="123"))
+        asyncio.run(
+            svc.reset_user_stats(
+                civ_version="civ6", game_type="realtime", discord_id="123"
+            )
+        )
 
     assert repo.reset_calls == []  # pre-fix: a stat_reset marker was inserted anyway
 
@@ -72,11 +76,23 @@ def test_reset_with_stats_returns_pre_reset_stats_and_resets_once():
 def test_reset_rejects_bad_inputs():
     svc = make_service(FakeStatsRepo())
     with pytest.raises(InvalidStatsRequestError):
-        asyncio.run(svc.reset_user_stats(civ_version="civ9", game_type="realtime", discord_id="123"))
+        asyncio.run(
+            svc.reset_user_stats(
+                civ_version="civ9", game_type="realtime", discord_id="123"
+            )
+        )
     with pytest.raises(InvalidStatsRequestError):
-        asyncio.run(svc.reset_user_stats(civ_version="civ6", game_type="lan-party", discord_id="123"))
+        asyncio.run(
+            svc.reset_user_stats(
+                civ_version="civ6", game_type="lan-party", discord_id="123"
+            )
+        )
     with pytest.raises(InvalidStatsRequestError):
-        asyncio.run(svc.reset_user_stats(civ_version="civ6", game_type="realtime", discord_id="abc"))
+        asyncio.run(
+            svc.reset_user_stats(
+                civ_version="civ6", game_type="realtime", discord_id="abc"
+            )
+        )
 
 
 # --- team generation ---
@@ -88,7 +104,9 @@ def test_team_gen_partitions_all_players_into_two_teams():
     svc = make_service(repo)
 
     response = asyncio.run(
-        svc.get_team_gen(civ_version="civ6", game_type="realtime", discord_ids=list(ids))
+        svc.get_team_gen(
+            civ_version="civ6", game_type="realtime", discord_ids=list(ids)
+        )
     )
 
     assert len(response.teams) == 2
@@ -101,7 +119,9 @@ def test_team_gen_partitions_all_players_into_two_teams():
 def test_team_gen_empty_ids_returns_empty_teams():
     svc = make_service(FakeStatsRepo())
     response = asyncio.run(
-        svc.get_team_gen(civ_version="civ6", game_type="realtime", discord_ids=["", "  "])
+        svc.get_team_gen(
+            civ_version="civ6", game_type="realtime", discord_ids=["", "  "]
+        )
     )
     assert response.teams == [[], []]
     assert response.game_quality == 0.0

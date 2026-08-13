@@ -1,5 +1,4 @@
-"""Unit tests for the Mito service-token dependency
-"""
+"""Unit tests for the Mito service-token dependency"""
 
 from __future__ import annotations
 

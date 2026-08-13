@@ -5,6 +5,7 @@ Order: snapshot -> run motor -> restore -> run pymongo -> diff.
 Restore cannot use revert-match: revert computes sigma + 2 rather than
 restoring the prior value (D66), so the snapshot is the only pre-state.
 """
+
 from __future__ import annotations
 
 import json
@@ -65,8 +66,11 @@ def cmd_snapshot(match_id: str) -> None:
     if match is None:
         sys.exit(f"no pending match {match_id}")
 
-    ids = [int(p["discord_id"]) for p in match["players"]
-           if p.get("discord_id") and not str(p["discord_id"]).startswith("-")]
+    ids = [
+        int(p["discord_id"])
+        for p in match["players"]
+        if p.get("discord_id") and not str(p["discord_id"]).startswith("-")
+    ]
     if len(ids) < 2:
         sys.exit(f"only {len(ids)} non-placeholder players; nothing to rate")
 
@@ -75,30 +79,39 @@ def cmd_snapshot(match_id: str) -> None:
         "game": match["game"],
         "player_ids": ids,
         "pending": match,
-        "validated_ids": [d["_id"] for d in c[MATCH_DB].validated_matches.find({}, {"_id": 1})],
+        "validated_ids": [
+            d["_id"] for d in c[MATCH_DB].validated_matches.find({}, {"_id": 1})
+        ],
         "stats": read_stats(c, match["game"], ids),
         "subs": {str(i): c["server_members"].subs.find_one({"_id": i}) for i in ids},
     }
     existing = sum(1 for v in snap["stats"].values() if v is not None)
     p = write("snapshot.json", snap)
     print(f"snapshot -> {p}")
-    print(f"  {len(ids)} rated players, {len(snap['stats'])} stat slots, "
-          f"{existing} exist, {len(snap["stats"]) - existing} absent")
+    print(
+        f"  {len(ids)} rated players, {len(snap['stats'])} stat slots, "
+        f"{existing} exist, {len(snap['stats']) - existing} absent"
+    )
 
 
 def cmd_run(label: str, base_url: str) -> None:
     snap = read("snapshot.json")
     c = connect()
 
-    body = urllib.parse.urlencode({
-        "match_id": snap["match_id"],
-        "approver_discord_id": os.environ["APPROVER_DISCORD_ID"],
-    }).encode()
+    body = urllib.parse.urlencode(
+        {
+            "match_id": snap["match_id"],
+            "approver_discord_id": os.environ["APPROVER_DISCORD_ID"],
+        }
+    ).encode()
     req = urllib.request.Request(
         f"{base_url.rstrip('/')}/api/v1/approve-match/",
-        data=body, method="PUT",
-        headers={"Authorization": f"Bearer {os.environ['MITO_SERVICE_TOKEN']}",
-                 "Content-Type": "application/x-www-form-urlencoded"},
+        data=body,
+        method="PUT",
+        headers={
+            "Authorization": f"Bearer {os.environ['MITO_SERVICE_TOKEN']}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
@@ -112,17 +125,23 @@ def cmd_run(label: str, base_url: str) -> None:
         sys.exit(f"{label}: approve failed; run restore before retrying")
 
     known = set(snap["validated_ids"])
-    new_validated = [d for d in c[MATCH_DB].validated_matches.find()
-                     if d["_id"] not in known]
+    new_validated = [
+        d for d in c[MATCH_DB].validated_matches.find() if d["_id"] not in known
+    ]
 
-    p = write(f"capture-{label}.json", {
-        "status": status,
-        "response": json.loads(raw),
-        "validated": new_validated,
-        "stats": read_stats(c, snap["game"], snap["player_ids"]),
-        "subs": {str(i): c["server_members"].subs.find_one({"_id": i})
-                 for i in snap["player_ids"]},
-    })
+    p = write(
+        f"capture-{label}.json",
+        {
+            "status": status,
+            "response": json.loads(raw),
+            "validated": new_validated,
+            "stats": read_stats(c, snap["game"], snap["player_ids"]),
+            "subs": {
+                str(i): c["server_members"].subs.find_one({"_id": i})
+                for i in snap["player_ids"]
+            },
+        },
+    )
     print(f"  captured {len(new_validated)} validated doc(s) -> {p}")
 
 
@@ -147,20 +166,30 @@ def cmd_restore() -> None:
             c["server_members"].subs.replace_one({"_id": doc["_id"]}, doc, upsert=True)
 
     known = set(snap["validated_ids"])
-    removed = c[MATCH_DB].validated_matches.delete_many(
-        {"_id": {"$nin": list(known)}}).deleted_count
+    removed = (
+        c[MATCH_DB]
+        .validated_matches.delete_many({"_id": {"$nin": list(known)}})
+        .deleted_count
+    )
 
     pending = snap["pending"]
-    c[MATCH_DB].pending_matches.replace_one({"_id": pending["_id"]}, pending, upsert=True)
+    c[MATCH_DB].pending_matches.replace_one(
+        {"_id": pending["_id"]}, pending, upsert=True
+    )
 
-    print(f"restored: {counts['stat_restored']} stat docs replaced, "
-          f"{counts['stat_deleted']} deleted, {removed} validated removed, pending back")
+    print(
+        f"restored: {counts['stat_restored']} stat docs replaced, "
+        f"{counts['stat_deleted']} deleted, {removed} validated removed, pending back"
+    )
 
 
 def strip(doc, extra=frozenset()):
     if isinstance(doc, dict):
-        return {k: strip(v, extra) for k, v in doc.items()
-                if k not in IGNORED_FIELDS and k not in extra}
+        return {
+            k: strip(v, extra)
+            for k, v in doc.items()
+            if k not in IGNORED_FIELDS and k not in extra
+        }
     if isinstance(doc, list):
         return [strip(v, extra) for v in doc]
     return doc
@@ -182,10 +211,14 @@ def cmd_diff(a: str, b: str) -> None:
 
     if not diffs:
         n = len(ca["stats"])
-        print(f"IDENTICAL across {n} stat slots, subs, the validated document "
-              f"and the response body ({a} vs {b})")
-        print(f"  excluded as non-deterministic: {sorted(IGNORED_FIELDS)} "
-              f"plus {SECTION_IGNORED}")
+        print(
+            f"IDENTICAL across {n} stat slots, subs, the validated document "
+            f"and the response body ({a} vs {b})"
+        )
+        print(
+            f"  excluded as non-deterministic: {sorted(IGNORED_FIELDS)} "
+            f"plus {SECTION_IGNORED}"
+        )
         for lbl, cap in ((a, ca), (b, cb)):
             v = cap["validated"][0]
             print(f"    {lbl}: _id={v['_id']} approved_at={v['approved_at']}")
@@ -193,11 +226,18 @@ def cmd_diff(a: str, b: str) -> None:
 
     print(f"{len(diffs)} DIFFERENCE(S)\n")
     for key, va, vb in diffs:
-        print(f"  {key}\n    {a}: {json_util.dumps(va)}\n    {b}: {json_util.dumps(vb)}\n")
+        print(
+            f"  {key}\n    {a}: {json_util.dumps(va)}\n    {b}: {json_util.dumps(vb)}\n"
+        )
     sys.exit(1)
 
 
-COMMANDS = {"snapshot": cmd_snapshot, "run": cmd_run, "restore": cmd_restore, "diff": cmd_diff}
+COMMANDS = {
+    "snapshot": cmd_snapshot,
+    "run": cmd_run,
+    "restore": cmd_restore,
+    "diff": cmd_diff,
+}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:

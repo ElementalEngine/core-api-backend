@@ -23,6 +23,7 @@ def get_mongo_database(request: Request) -> AsyncDatabase:
         raise AppDependencyError("Mongo database not initialized")
     return database
 
+
 def _require_bearer(
     authorization: str | None,
     *,
@@ -31,12 +32,31 @@ def _require_bearer(
     misconfig_message: str,
 ) -> None:
     if not configured:
-        payload = ErrorResponse(error=ErrorDetail(code=misconfig_code, message=misconfig_message, retryable=False))
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=payload.model_dump())
+        payload = ErrorResponse(
+            error=ErrorDetail(
+                code=misconfig_code, message=misconfig_message, retryable=False
+            )
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=payload.model_dump()
+        )
     scheme, _, token = (authorization or "").partition(" ")
-    if scheme.lower() != "bearer" or not token or not constant_time_equals(token, configured):
-        payload = ErrorResponse(error=ErrorDetail(code="UNAUTHORIZED", message="Missing or invalid service authorization.", retryable=False))
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=payload.model_dump())
+    if (
+        scheme.lower() != "bearer"
+        or not token
+        or not constant_time_equals(token, configured)
+    ):
+        payload = ErrorResponse(
+            error=ErrorDetail(
+                code="UNAUTHORIZED",
+                message="Missing or invalid service authorization.",
+                retryable=False,
+            )
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=payload.model_dump()
+        )
+
 
 def require_lj_token(authorization: str | None = Header(default=None)) -> None:
     _require_bearer(
@@ -46,6 +66,7 @@ def require_lj_token(authorization: str | None = Header(default=None)) -> None:
         misconfig_message="LJ service token is not configured on the backend.",
     )
 
+
 def require_service_token(authorization: str | None = Header(default=None)) -> None:
     _require_bearer(
         authorization,
@@ -53,6 +74,7 @@ def require_service_token(authorization: str | None = Header(default=None)) -> N
         misconfig_code="AUTH_SERVICE_MISCONFIGURED",
         misconfig_message="Auth service token is not configured on the backend.",
     )
+
 
 def require_mito_token(authorization: str | None = Header(default=None)) -> None:
     _require_bearer(
