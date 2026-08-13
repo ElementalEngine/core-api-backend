@@ -14,7 +14,7 @@ select = ["E4", "E7", "E9", "F", "B023"]
 [tool.ruff.lint.per-file-ignores]
 # Each entry names its owning sub-phase. Ignoring by file keeps the rule live
 # everywhere else, so no NEW violation can enter across S2-S12.
-"app/features/matches/service.py" = ["E711", "E712"]  # E712:488 is NOT a safe
+"app/features/matches/service.py" = ["E711", "E712"]  # E712:550 is NOT a safe
                                                       # fix: None == False
                                                       # differs from not None. S6.
 "app/features/matches/parsers/civ6.py" = ["B023", "F401"]  # D83. S4.
