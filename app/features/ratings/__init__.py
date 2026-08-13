@@ -1,1 +1,1 @@
-__all__ = ["skill"]
+__all__ = ["repository", "skill"]

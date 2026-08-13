@@ -13,6 +13,7 @@ from app.features.auth.repository import AuthRepository
 from app.features.infractions.repository import (
     create_indexes as create_infraction_indexes,
 )
+from app.features.ratings.repository import RatingsRepository
 
 configure_logging()
 logger = logging.getLogger("app.db")
@@ -52,6 +53,9 @@ async def db_lifespan(app: FastAPI):
 
         await create_infraction_indexes(client)
         logger.info("🟢 Infraction indexes ensured")
+
+        await RatingsRepository(client).ensure_indexes()
+        logger.info("🟢 Rating event indexes ensured")
 
         yield
     except Exception:

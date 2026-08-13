@@ -12,13 +12,14 @@ from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo import ASCENDING, DESCENDING
 
+from app.core.constants import GAMES_DB
+
 
 logger = logging.getLogger(__name__)
 
 
 # ---- DB / collection names (single source of truth) ----
 
-DB_MATCH_REPORTER = "match_reporter"
 COL_PENDING_MATCHES = "pending_matches"
 COL_VALIDATED_MATCHES = "validated_matches"
 
@@ -42,7 +43,7 @@ class MongoQueries:
     def __init__(self, client: AsyncMongoClient) -> None:
         self._client = client
 
-        mr = client[DB_MATCH_REPORTER]
+        mr = client[GAMES_DB]
         self._pending: AsyncCollection = mr[COL_PENDING_MATCHES]
         self._validated: AsyncCollection = mr[COL_VALIDATED_MATCHES]
 
