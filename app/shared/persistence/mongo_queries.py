@@ -54,7 +54,7 @@ class MongoQueries:
     # -------------------- infra --------------------
 
     async def start_session(self) -> AsyncClientSession:
-        return await self._client.start_session()
+        return self._client.start_session()
 
     async def ping(self) -> bool:
         # Motor returns a dict like {"ok": 1.0}
@@ -210,7 +210,7 @@ class MongoQueries:
     ) -> Optional[Dict[str, Any]]:
         session = await self.start_session()
         async with session:
-            async with session.start_transaction():
+            async with await session.start_transaction():
                 try:
                     stat_reset = {
                         'civ_version': civ_version,

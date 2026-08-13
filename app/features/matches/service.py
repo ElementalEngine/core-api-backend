@@ -711,7 +711,7 @@ class MatchService:
 
         session = await self.q.start_session()
         async with session:
-            async with session.start_transaction():
+            async with await session.start_transaction():
                 try:
                     # Stats writes
                     for i, p in enumerate(match.players):
@@ -790,7 +790,7 @@ class MatchService:
 
             session = await self.q.start_session()
             async with session:
-                async with session.start_transaction():
+                async with await session.start_transaction():
                     try:
                         # Stats writes
                         for i, p in enumerate(match.players):

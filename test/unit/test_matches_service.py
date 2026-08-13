@@ -71,7 +71,7 @@ class FakeSession:
     async def __aexit__(self, *args):
         return False
 
-    def start_transaction(self):
+    async def start_transaction(self):
         return self
 
     async def commit_transaction(self):
