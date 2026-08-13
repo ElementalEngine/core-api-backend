@@ -4,12 +4,14 @@ from typing import Dict, List, Optional
 
 from pymongo import AsyncMongoClient
 
+from app.features.ratings.repository import RatingsRepository
 from app.shared.persistence.mongo_queries import MongoQueries
 
 
 class StatsRepository:
     def __init__(self, client: AsyncMongoClient) -> None:
         self._queries = MongoQueries(client)
+        self._ratings = RatingsRepository(client)
 
     async def get_player_stat_doc(
         self,
@@ -56,8 +58,9 @@ class StatsRepository:
         is_cloud: bool,
         discord_id: str,
     ) -> Optional[Dict[str, object]]:
-        return await self._queries.reset_player_stat_doc(
+        await self._ratings.reset_player_stats(
             civ_version=civ_version,
             is_cloud=is_cloud,
             discord_id=discord_id,
         )
+        return None

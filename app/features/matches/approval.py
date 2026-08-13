@@ -9,7 +9,8 @@ from bson.int64 import Int64
 
 from app.features.matches.errors import MatchServiceError, NotFoundError
 from app.features.matches.models import MatchModel, PlayerModel, StatModel
-from app.features.matches.utils import as_float, as_int, get_cpl_name
+from app.core.coerce import as_float, as_int
+from app.features.matches.utils import get_cpl_name
 from app.features.ratings.events import build_match_event
 from app.shared.persistence.mongo_queries import stat_scope
 

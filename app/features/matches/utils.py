@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 from app.features.matches.parsers.civ6leaders import civ6_leaders_dict
 from app.features.matches.parsers.civ7leaders import civ7_leaders_dict
@@ -24,30 +24,4 @@ def get_cpl_name(game: str, civ: str, leader: Optional[str] = None) -> str:
     raise ValueError("Unsupported game type. Use 'civ6' or 'civ7'.")
 
 
-def as_float(value: Any, default: float) -> float:
-    """Safely coerce Mongo values (None/Decimal128/Int64/str) to float."""
-    if value is None:
-        return default
-    try:
-        if hasattr(value, "to_decimal"):
-            value = value.to_decimal()
-        return float(value)
-    except TypeError, ValueError:
-        return default
-
-
-def as_int(value: Any, default: int) -> int:
-    """Safely coerce Mongo values (None/Decimal128/Int64/str) to int."""
-    if value is None:
-        return default
-    try:
-        if hasattr(value, "to_decimal"):
-            value = value.to_decimal()
-        if isinstance(value, str):
-            return int(float(value))
-        return int(value)
-    except TypeError, ValueError:
-        return default
-
-
-__all__ = ["as_float", "as_int", "get_cpl_name"]
+__all__ = ["get_cpl_name"]

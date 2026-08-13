@@ -248,43 +248,6 @@ class MongoQueries:
         )
         return await col.find_one({"_id": Int64(discord_id)})
 
-    # Returns nothing; the annotation is wrong and no caller reads it (S7).
-    async def reset_player_stat_doc(  # type: ignore[return]
-        self,
-        *,
-        civ_version: str,
-        is_cloud: bool,
-        discord_id: str,
-    ) -> Optional[Dict[str, Any]]:
-        session = await self.start_session()
-        async with session:
-            async with await session.start_transaction():
-                try:
-                    stat_reset = {
-                        "civ_version": civ_version,
-                        "is_cloud": is_cloud,
-                        "discord_id": discord_id,
-                        "stat_reset": True,
-                    }
-                    await self.insert_validated_match(stat_reset, session=session)
-                    for match_type in ["ffa", "teamer", "duel"]:
-                        for is_combined in [False, True]:
-                            for is_seasonal in [False, True]:
-                                await self._stats_collection(
-                                    civ_version=civ_version,
-                                    is_seasonal=is_seasonal,
-                                    match_type=match_type,
-                                    is_cloud=is_cloud,
-                                    is_combined=is_combined,
-                                ).delete_one(
-                                    {"_id": Int64(discord_id)}, session=session
-                                )
-                    await session.commit_transaction()
-                except Exception as e:
-                    logger.exception("Transaction failed while writing to DB; aborting")
-                    await session.abort_transaction()
-                    raise ValueError(f"An error occured during writing to DB: {e}")
-
     async def get_player_stat_docs_batch(
         self,
         *,

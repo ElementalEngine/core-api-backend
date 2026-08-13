@@ -28,7 +28,7 @@ from app.features.matches.errors import (
     NotFoundError,
     ParseError,
 )
-from app.features.matches.utils import as_float, as_int
+from app.core.coerce import as_float, as_int
 
 logger = logging.getLogger(__name__)
 
