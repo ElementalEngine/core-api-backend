@@ -19,6 +19,7 @@ from app.features.matches.models import (
 )
 from app.features.matches.repository import MatchRepository
 from app.features.matches.parsers import parse_civ6_save, parse_civ7_save
+from app.features.ratings.repository import RatingsRepository
 from app.features.ratings.skill import make_ts_env
 from app.features.matches.approval import ApprovalService
 from app.features.matches.errors import (
@@ -45,6 +46,7 @@ def _require_int(value: Any, field_name: str) -> int:
 class MatchService:
     def __init__(self, client: AsyncMongoClient):
         self.q = MatchRepository(client)
+        self.ratings = RatingsRepository(client)
 
     def _to_oid(self, match_id: str) -> ObjectId:
         if not ObjectId.is_valid(match_id):

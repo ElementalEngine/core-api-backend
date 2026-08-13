@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from typing import Any, Dict, Sequence
+
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
+from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.collection import AsyncCollection
 
 from app.core.constants import COL_RATING_EVENTS, GAMES_DB
@@ -33,6 +36,18 @@ class RatingsRepository:
             ],
             name="rating_events_player_history_idx",
         )
+
+    async def insert_events(
+        self,
+        events: Sequence[Dict[str, Any]],
+        *,
+        session: AsyncClientSession,
+    ) -> None:
+        # session is required: a ledger write outside the transaction that
+        # moved the rating is the failure this collection exists to detect.
+        if not events:
+            return
+        await self._events.insert_many(list(events), session=session)
 
 
 __all__ = ["RatingsRepository"]

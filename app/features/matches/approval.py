@@ -3,13 +3,15 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from bson.int64 import Int64
 
 from app.features.matches.errors import MatchServiceError, NotFoundError
 from app.features.matches.models import MatchModel, PlayerModel, StatModel
 from app.features.matches.utils import as_float, as_int, get_cpl_name
+from app.features.ratings.events import build_match_event
+from app.shared.persistence.mongo_queries import stat_scope
 
 if TYPE_CHECKING:
     from app.features.matches.service import MatchService
@@ -134,6 +136,9 @@ class ApprovalService:
         async with session:
             async with await session.start_transaction():
                 try:
+                    occurred_at = datetime.now(UTC)
+                    events: List[Dict[str, Any]] = []
+
                     # Stats writes
                     for i, p in enumerate(match.players):
                         if (
@@ -156,12 +161,14 @@ class ApprovalService:
                             (pre_season[i], season_delta, True, False),
                             (pre_combined[i], combined_delta, False, True),
                         ):
+                            mu_after = pre.mu - delta_value
+                            sigma_after = pre.sigma + 2
                             doc = self._build_stat_doc(
                                 discord_id=did,
                                 pre=pre,
                                 player=p,
-                                mu=pre.mu - delta_value,
-                                sigma=pre.sigma + 2,
+                                mu=mu_after,
+                                sigma=sigma_after,
                                 delta_value=delta_value,
                                 civs=self.revert_existing_stat(match, p, pre.civs),
                                 step=-1,
@@ -176,9 +183,32 @@ class ApprovalService:
                                 doc=doc,
                                 session=session,
                             )
+                            events.append(
+                                build_match_event(
+                                    event_type="revert",
+                                    match_id=oid,
+                                    match_created_at=res.get("created_at"),
+                                    occurred_at=occurred_at,
+                                    discord_id=did,
+                                    scope=stat_scope(
+                                        civ_version=match.game,
+                                        is_seasonal=is_seasonal,
+                                        match_type=match.game_mode,
+                                        is_cloud=match.is_cloud,
+                                        is_combined=is_combined,
+                                    ),
+                                    mu_before=pre.mu,
+                                    mu_after=mu_after,
+                                    sigma_before=pre.sigma,
+                                    sigma_after=sigma_after,
+                                    applied_delta=-delta_value,
+                                )
+                            )
 
                         if p.is_sub:
                             await self._m.q.dec_subs_in(did, session=session)
+
+                    await self._m.ratings.insert_events(events, session=session)
 
                     await self._m.q.delete_validated_match(oid, session=session)
 
@@ -229,6 +259,9 @@ class ApprovalService:
             async with session:
                 async with await session.start_transaction():
                     try:
+                        occurred_at = datetime.now(UTC)
+                        events: List[Dict[str, Any]] = []
+
                         # Stats writes
                         for i, p in enumerate(match.players):
                             if (
@@ -283,13 +316,39 @@ class ApprovalService:
                                     doc=doc,
                                     session=session,
                                 )
+                                events.append(
+                                    build_match_event(
+                                        event_type="approve",
+                                        match_id=oid,
+                                        match_created_at=res.get("created_at"),
+                                        occurred_at=occurred_at,
+                                        discord_id=did,
+                                        scope=stat_scope(
+                                            civ_version=match.game,
+                                            is_seasonal=is_seasonal,
+                                            match_type=match.game_mode,
+                                            is_cloud=match.is_cloud,
+                                            is_combined=is_combined,
+                                        ),
+                                        mu_before=pre.mu,
+                                        mu_after=post.mu,
+                                        sigma_before=pre.sigma,
+                                        sigma_after=post.sigma,
+                                        applied_delta=delta_value,
+                                    )
+                                )
 
                             if p.is_sub:
                                 await self._m.q.inc_subs_in(did, session=session)
 
-                        # Move pending -> validated
+                        await self._m.ratings.insert_events(events, session=session)
+
+                        # Move pending -> validated. D122: the validated
+                        # document keeps the pending _id, so a match holds one
+                        # identity for its life and its events link.
                         now = datetime.now(UTC)
                         validated_doc = match.dict()
+                        validated_doc["_id"] = oid
                         validated_doc["created_at"] = res.get("created_at", now)
                         validated_doc["approved_at"] = now
                         validated_doc["reporter_discord_id"] = res.get(

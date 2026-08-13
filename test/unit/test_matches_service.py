@@ -131,9 +131,18 @@ class FakeRepo:
         self.subs_in_decs.append(discord_id)
 
 
-def make_service(repo) -> MatchService:
+class FakeRatings:
+    def __init__(self):
+        self.events = []
+
+    async def insert_events(self, events, *, session):
+        self.events.extend(events)
+
+
+def make_service(repo, ratings=None) -> MatchService:
     svc = MatchService.__new__(MatchService)
     svc.q = repo
+    svc.ratings = ratings if ratings is not None else FakeRatings()
     return svc
 
 
