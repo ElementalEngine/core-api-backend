@@ -31,7 +31,8 @@ ignore_missing_imports = true
 # rewrites its file, and that removal is part of that sub-phase's acceptance.
 [[tool.mypy.overrides]]
 module = [
-  "app.features.matches.service",      # None-unsafety. S3/S6.
+  "app.features.matches.approval",     # None-unsafety, moved from service. S3.
+  "app.features.matches.service",      # None-unsafety. S6.
   "app.features.matches.utils",        # tuple-key lookup -- see S5/D63.
   "app.features.matches.parsers.civ7", # untyped chunks list. S4.
   "app.features.stats.service",        # object-typed doc reads. S7.

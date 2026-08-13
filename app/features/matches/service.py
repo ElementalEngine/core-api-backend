@@ -3,11 +3,10 @@ import asyncio
 import hashlib
 import logging
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
-from bson.int64 import Int64
 from pymongo import AsyncMongoClient
 from trueskill import Rating
 
@@ -21,54 +20,18 @@ from app.features.matches.models import (
 from app.features.matches.repository import MatchRepository
 from app.features.matches.parsers import parse_civ6_save, parse_civ7_save
 from app.features.ratings.skill import make_ts_env
-from app.features.matches.utils import get_cpl_name
+from app.features.matches.approval import ApprovalService
+from app.features.matches.errors import (
+    InvalidIDError,
+    MatchServiceError,
+    NotFoundError,
+    ParseError,
+)
+from app.features.matches.utils import as_float, as_int
 
 logger = logging.getLogger(__name__)
 
-approve_lock = asyncio.Lock()
 RANKING_CONCURRENCY_LIMIT = 8
-
-
-def _as_float(value: Any, default: float) -> float:
-    """Safely coerce Mongo values (None/Decimal128/Int64/str) to float."""
-    if value is None:
-        return default
-    try:
-        if hasattr(value, "to_decimal"):
-            value = value.to_decimal()
-        return float(value)
-    except TypeError, ValueError:
-        return default
-
-
-def _as_int(value: Any, default: int) -> int:
-    """Safely coerce Mongo values (None/Decimal128/Int64/str) to int."""
-    if value is None:
-        return default
-    try:
-        if hasattr(value, "to_decimal"):
-            value = value.to_decimal()
-        if isinstance(value, str):
-            return int(float(value))
-        return int(value)
-    except TypeError, ValueError:
-        return default
-
-
-class NotFoundError(Exception):
-    pass
-
-
-class MatchServiceError(Exception):
-    pass
-
-
-class InvalidIDError(MatchServiceError):
-    pass
-
-
-class ParseError(MatchServiceError):
-    pass
 
 
 def _require_int(value: Any, field_name: str) -> int:
@@ -184,13 +147,13 @@ class MatchService:
         return StatModel(
             discord_id=discord_id,
             index=player_index,
-            mu=_as_float(doc.get("mu"), settings.ts_mu),
-            sigma=_as_float(doc.get("sigma"), settings.ts_sigma),
-            games=_as_int(doc.get("games"), 0),
-            wins=_as_int(doc.get("wins"), 0),
-            first=_as_int(doc.get("first"), 0),
-            subbedIn=_as_int(doc.get("subbedIn"), 0),
-            subbedOut=_as_int(doc.get("subbedOut"), 0),
+            mu=as_float(doc.get("mu"), settings.ts_mu),
+            sigma=as_float(doc.get("sigma"), settings.ts_sigma),
+            games=as_int(doc.get("games"), 0),
+            wins=as_int(doc.get("wins"), 0),
+            first=as_int(doc.get("first"), 0),
+            subbedIn=as_int(doc.get("subbedIn"), 0),
+            subbedOut=as_int(doc.get("subbedOut"), 0),
             civs=dict(doc.get("civs", {}))
             if isinstance(doc.get("civs", {}), dict)
             else {},
@@ -356,93 +319,6 @@ class MatchService:
         updated = await self.q.find_pending_by_id(oid)
         updated["match_id"] = str(updated.pop("_id"))
         return updated
-
-    def _shift_civ_stat(
-        self,
-        match: MatchModel,
-        player: PlayerModel,
-        existing_civs: Dict[str, Any],
-        step: int,
-    ) -> Dict[str, Any]:
-        # Normalize civ naming
-        civ_name = get_cpl_name(match.game, player.civ, getattr(player, "leader", None))
-
-        civs = dict(existing_civs) if isinstance(existing_civs, dict) else {}
-
-        entry = civs.get(civ_name)
-
-        # Backwards compatibility:
-        # - legacy shape: {"DutchWilhelmina": 3}
-        # - new shape: {"DutchWilhelmina": {"games": 3, "wins": 1}}
-        if isinstance(entry, dict):
-            games = _as_int(entry.get("games", 0), 0)
-            wins = _as_int(entry.get("wins", 0), 0)
-        elif isinstance(entry, int):
-            games = entry
-            wins = 0
-        else:
-            games = 0
-            wins = 0
-
-        games += step
-        if player.delta > 0:
-            wins += step
-        if step < 0:
-            games = max(0, games)
-            wins = max(0, wins)
-
-        civs[civ_name] = {"games": games, "wins": wins}
-        return civs
-
-    def update_existing_stat(
-        self,
-        match: MatchModel,
-        player: PlayerModel,
-        existing_civs: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        return self._shift_civ_stat(match, player, existing_civs, +1)
-
-    def revert_existing_stat(
-        self,
-        match: MatchModel,
-        player: PlayerModel,
-        existing_civs: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        return self._shift_civ_stat(match, player, existing_civs, -1)
-
-    def _build_stat_doc(
-        self,
-        *,
-        discord_id: str,
-        pre: StatModel,
-        player: PlayerModel,
-        mu: float,
-        sigma: float,
-        delta_value: float,
-        civs: Dict[str, Any],
-        step: int,
-    ) -> Dict[str, Any]:
-        """One stats document for approve (step=+1) or revert (step=-1).
-
-        Reverted counters clamp at 0 so a revert can never write negative stats.
-        """
-
-        def shift(current: int, hit: bool) -> int:
-            value = current + (step if hit else 0)
-            return max(0, value) if step < 0 else value
-
-        return {
-            "_id": Int64(discord_id),
-            "mu": float(mu),
-            "sigma": float(sigma),
-            "games": shift(int(pre.games), True),
-            "wins": shift(int(pre.wins), delta_value > 0),
-            "first": shift(int(pre.first), player.placement == 0),
-            "subbedIn": shift(int(pre.subbedIn), player.is_sub),
-            "subbedOut": shift(int(pre.subbedOut), player.subbed_out),
-            "civs": civs,
-            "lastModified": datetime.now(UTC),
-        }
 
     async def create_from_save(
         self,
@@ -818,225 +694,12 @@ class MatchService:
         return await self._reload_pending(oid)
 
     async def revert_match(self, match_id: str) -> Dict[str, Any]:
-        oid = self._to_oid(match_id)
-        res = await self.q.find_validated_by_id(oid)
-        if not res:
-            raise NotFoundError("Match not found")
-
-        match = MatchModel(**res)
-
-        # Pre-states
-        pre_lifetime = await self.get_players_ranking(match)
-        pre_season = await self.get_players_ranking(match, is_seasonal=True)
-        pre_combined = await self.get_players_ranking(match, is_combined=True)
-
-        session = await self.q.start_session()
-        async with session:
-            async with await session.start_transaction():
-                try:
-                    # Stats writes
-                    for i, p in enumerate(match.players):
-                        if (
-                            not p.discord_id
-                            or p.discord_id in ("-1", "-2")
-                            or p.discord_id.startswith("-")
-                        ):
-                            continue
-
-                        did = str(p.discord_id)
-
-                        # Legacy validated docs may lack the season/combined deltas (None);
-                        # coerce once so the arithmetic below cannot TypeError.
-                        delta = _as_float(p.delta, 0.0)
-                        season_delta = _as_float(p.season_delta, 0.0)
-                        combined_delta = _as_float(p.combined_delta, 0.0)
-
-                        for pre, delta_value, is_seasonal, is_combined in (
-                            (pre_lifetime[i], delta, False, False),
-                            (pre_season[i], season_delta, True, False),
-                            (pre_combined[i], combined_delta, False, True),
-                        ):
-                            doc = self._build_stat_doc(
-                                discord_id=did,
-                                pre=pre,
-                                player=p,
-                                mu=pre.mu - delta_value,
-                                sigma=pre.sigma + 2,
-                                delta_value=delta_value,
-                                civs=self.revert_existing_stat(match, p, pre.civs),
-                                step=-1,
-                            )
-                            await self.q.upsert_player_stat_doc(
-                                civ_version=match.game,
-                                is_seasonal=is_seasonal,
-                                match_type=match.game_mode,
-                                is_cloud=match.is_cloud,
-                                is_combined=is_combined,
-                                discord_id=did,
-                                doc=doc,
-                                session=session,
-                            )
-
-                        if p.is_sub:
-                            await self.q.dec_subs_in(did, session=session)
-
-                    await self.q.delete_validated_match(oid, session=session)
-
-                    await session.commit_transaction()
-                except Exception as e:
-                    logger.exception("Transaction failed while writing to DB; aborting")
-                    await session.abort_transaction()
-                    raise MatchServiceError(
-                        f"An error occured during writing to DB: {e}"
-                    )
-        return {"match_id": str(match_id), **match.dict()}
+        return await ApprovalService(self).revert_match(match_id)
 
     async def approve_match(
         self, match_id: str, approver_discord_id: str
     ) -> Dict[str, Any]:
-        async with approve_lock:
-            oid = self._to_oid(match_id)
-            res = await self.q.find_pending_by_id(oid)
-            if not res:
-                raise NotFoundError("Match not found")
-
-            match = MatchModel(**res)
-
-            # Ensure all players have placements set
-            for p in match.players:
-                if p.placement is None:
-                    raise MatchServiceError(
-                        "All players must have a placement before approving"
-                    )
-
-            # Pre-states
-            pre_lifetime = await self.get_players_ranking(match)
-            pre_season = await self.get_players_ranking(match, is_seasonal=True)
-            pre_combined = await self.get_players_ranking(match, is_combined=True)
-
-            # Rating updates (writes deltas into match players + returns post mu/sigma)
-            match, post_lifetime = self.update_player_stats(
-                match, pre_lifetime, "delta"
-            )
-            match, post_season = self.update_player_stats(
-                match, pre_season, "season_delta"
-            )
-            match, post_combined = self.update_player_stats(
-                match, pre_combined, "combined_delta"
-            )
-
-            session = await self.q.start_session()
-            async with session:
-                async with await session.start_transaction():
-                    try:
-                        # Stats writes
-                        for i, p in enumerate(match.players):
-                            if (
-                                not p.discord_id
-                                or p.discord_id in ("-1", "-2")
-                                or p.discord_id.startswith("-")
-                            ):
-                                continue
-
-                            did = str(p.discord_id)
-
-                            for pre, post, delta_value, is_seasonal, is_combined in (
-                                (
-                                    pre_lifetime[i],
-                                    post_lifetime[i],
-                                    p.delta,
-                                    False,
-                                    False,
-                                ),
-                                (
-                                    pre_season[i],
-                                    post_season[i],
-                                    p.season_delta,
-                                    True,
-                                    False,
-                                ),
-                                (
-                                    pre_combined[i],
-                                    post_combined[i],
-                                    p.combined_delta,
-                                    False,
-                                    True,
-                                ),
-                            ):
-                                doc = self._build_stat_doc(
-                                    discord_id=did,
-                                    pre=pre,
-                                    player=p,
-                                    mu=post.mu,
-                                    sigma=post.sigma,
-                                    delta_value=delta_value,
-                                    civs=self.update_existing_stat(match, p, pre.civs),
-                                    step=1,
-                                )
-                                await self.q.upsert_player_stat_doc(
-                                    civ_version=match.game,
-                                    is_seasonal=is_seasonal,
-                                    match_type=match.game_mode,
-                                    is_cloud=match.is_cloud,
-                                    is_combined=is_combined,
-                                    discord_id=did,
-                                    doc=doc,
-                                    session=session,
-                                )
-
-                            if p.is_sub:
-                                await self.q.inc_subs_in(did, session=session)
-
-                        # Move pending -> validated
-                        now = datetime.now(UTC)
-                        validated_doc = match.dict()
-                        validated_doc["created_at"] = res.get("created_at", now)
-                        validated_doc["approved_at"] = now
-                        validated_doc["reporter_discord_id"] = res.get(
-                            "reporter_discord_id"
-                        )
-                        validated_doc["approver_discord_id"] = approver_discord_id
-                        validated_doc["discord_messages_id_list"] = res.get(
-                            "discord_messages_id_list", []
-                        )
-                        validated_doc["save_file_hash"] = res.get("save_file_hash", "")
-                        validated_doc["contest_report_list"] = []
-
-                        validated_insert_id = await self.q.insert_validated_match(
-                            validated_doc, session=session
-                        )
-                        await self.q.delete_pending_match(oid, session=session)
-
-                        await session.commit_transaction()
-                    except Exception as e:
-                        logger.exception(
-                            "Transaction failed while writing to DB; aborting"
-                        )
-                        await session.abort_transaction()
-                        raise MatchServiceError(
-                            f"An error occured during writing to DB: {e}"
-                        )
-
-            logger.info("✅ ✅ Approved match %s", match_id)
-            affected_players = []
-            if match.game_mode.lower() == "ffa" or match.is_cloud:
-                affected_players = [
-                    {
-                        "discord_id": str(player.discord_id),
-                        "rating_mu": float(post_combined[index].mu)
-                        if match.is_cloud
-                        else post_lifetime[index].mu,
-                    }
-                    for index, player in enumerate(match.players)
-                    if player.discord_id
-                    and player.discord_id not in ("-1", "-2")
-                    and not str(player.discord_id).startswith("-")
-                ]
-            return {
-                "match_id": str(validated_insert_id),
-                **match.dict(),
-                "affected_players": affected_players,
-            }
+        return await ApprovalService(self).approve_match(match_id, approver_discord_id)
 
     async def get_leaderboard(
         self,
@@ -1061,20 +724,20 @@ class MatchService:
         out: List[Dict[str, Any]] = []
         for idx, row in enumerate(lb.rows or [], start=1):
             did = str(row.get("_id"))
-            mu = _as_float(row.get("mu"), 0.0)
-            games = _as_int(row.get("games"), 0)
+            mu = as_float(row.get("mu"), 0.0)
+            games = as_int(row.get("games"), 0)
             out.append(
                 {
                     "rank": idx,
                     "discord_id": did,
                     "mu": mu,
-                    "sigma": _as_float(row.get("sigma"), 0.0),
+                    "sigma": as_float(row.get("sigma"), 0.0),
                     "games": games,
                     # Backwards-compatible aliases for older clients.
                     "rating": int(round(mu)),
                     "games_played": games,
-                    "wins": _as_int(row.get("wins"), 0),
-                    "first": _as_int(row.get("first"), 0),
+                    "wins": as_int(row.get("wins"), 0),
+                    "first": as_int(row.get("first"), 0),
                 }
             )
         last_updated_ts = (
