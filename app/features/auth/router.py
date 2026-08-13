@@ -384,7 +384,6 @@ async def discord_oauth_callback(
 ) -> DiscordOAuthCallbackResult:
     repository = _repo(db)
     session_service = SessionService(repository)
-    registration_service = RegistrationService(repository)
     oauth_service = DiscordOAuthService()
     steam_service = SteamService()
 
