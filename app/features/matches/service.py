@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
 from pymongo import AsyncMongoClient
+from pymongo.asynchronous.client_session import AsyncClientSession
 from trueskill import Rating
 
 from app.core.config import settings
@@ -105,6 +106,7 @@ class MatchService:
         player_index: int,
         is_seasonal: bool = False,
         is_combined: bool = False,
+        session: Optional[AsyncClientSession] = None,
     ) -> StatModel:
         # Missing / placeholder IDs
         if not discord_id or discord_id in ("-1", "-2") or discord_id.startswith("-"):
@@ -129,6 +131,7 @@ class MatchService:
             is_cloud=match.is_cloud,
             is_combined=is_combined,
             discord_id=discord_id,
+            session=session,
         )
 
         if not doc:
@@ -166,9 +169,20 @@ class MatchService:
         match: MatchModel,
         is_seasonal: bool = False,
         is_combined: bool = False,
+        session: Optional[AsyncClientSession] = None,
     ) -> List[StatModel]:
         if not match.players:
             return []
+
+        # A session cannot carry concurrent operations, and approve reads its
+        # pre-state inside the transaction (D84).
+        if session is not None:
+            return [
+                await self.get_player_ranking(
+                    match, p.discord_id, i, is_seasonal, is_combined, session
+                )
+                for i, p in enumerate(match.players)
+            ]
 
         # Bounded concurrency, preserve order
         sem = asyncio.Semaphore(min(RANKING_CONCURRENCY_LIMIT, len(match.players)))

@@ -137,6 +137,22 @@ class MongoQueries:
     async def find_validated_by_id(self, oid: ObjectId) -> Optional[Dict[str, Any]]:
         return await self._validated.find_one({"_id": oid})
 
+    async def claim_pending_match(
+        self, oid: ObjectId, *, now: datetime
+    ) -> Optional[Dict[str, Any]]:
+        """Claim a pending match for approval; None means already claimed or gone.
+
+        D84's claim. Pending-ness is which collection the document is in, so
+        the claim is an additive field rather than a status transition.
+        """
+        return await self._pending.find_one_and_update(
+            {"_id": oid, "approving_at": {"$exists": False}},
+            {"$set": {"approving_at": now}},
+        )
+
+    async def release_pending_claim(self, oid: ObjectId) -> None:
+        await self._pending.update_one({"_id": oid}, {"$unset": {"approving_at": ""}})
+
     async def insert_pending_match(
         self, match_doc: Mapping[str, Any], *, session: AsyncClientSession | None = None
     ) -> ObjectId:
@@ -238,6 +254,7 @@ class MongoQueries:
         is_cloud: bool,
         is_combined: bool,
         discord_id: str,
+        session: Optional[AsyncClientSession] = None,
     ) -> Optional[Dict[str, Any]]:
         col = self._stats_collection(
             civ_version=civ_version,
@@ -246,7 +263,7 @@ class MongoQueries:
             is_cloud=is_cloud,
             is_combined=is_combined,
         )
-        return await col.find_one({"_id": Int64(discord_id)})
+        return await col.find_one({"_id": Int64(discord_id)}, session=session)
 
     async def get_player_stat_docs_batch(
         self,

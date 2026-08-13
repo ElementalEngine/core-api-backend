@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Dict, List
@@ -18,8 +17,6 @@ if TYPE_CHECKING:
     from app.features.matches.service import MatchService
 
 logger = logging.getLogger(__name__)
-
-approve_lock = asyncio.Lock()
 
 
 class ApprovalService:
@@ -225,12 +222,14 @@ class ApprovalService:
     async def approve_match(
         self, match_id: str, approver_discord_id: str
     ) -> Dict[str, Any]:
-        async with approve_lock:
-            oid = self._m._to_oid(match_id)
-            res = await self._m.q.find_pending_by_id(oid)
-            if not res:
-                raise NotFoundError("Match not found")
+        oid = self._m._to_oid(match_id)
+        # D84: the conditional claim replaces approve_lock. No match means
+        # gone or already claimed -- both are the 404 the lock produced.
+        res = await self._m.q.claim_pending_match(oid, now=datetime.now(UTC))
+        if res is None:
+            raise NotFoundError("Match not found")
 
+        try:
             match = MatchModel(**res)
 
             # Ensure all players have placements set
@@ -240,26 +239,33 @@ class ApprovalService:
                         "All players must have a placement before approving"
                     )
 
-            # Pre-states
-            pre_lifetime = await self._m.get_players_ranking(match)
-            pre_season = await self._m.get_players_ranking(match, is_seasonal=True)
-            pre_combined = await self._m.get_players_ranking(match, is_combined=True)
-
-            # Rating updates (writes deltas into match players + returns post mu/sigma)
-            match, post_lifetime = self._m.update_player_stats(
-                match, pre_lifetime, "delta"
-            )
-            match, post_season = self._m.update_player_stats(
-                match, pre_season, "season_delta"
-            )
-            match, post_combined = self._m.update_player_stats(
-                match, pre_combined, "combined_delta"
-            )
-
             session = await self._m.q.start_session()
             async with session:
                 async with await session.start_transaction():
                     try:
+                        # D84: pre-state reads inside the transaction. The lock
+                        # was substituting for this, not merely serialising
+                        # approvals, which is why they are one change.
+                        pre_lifetime = await self._m.get_players_ranking(
+                            match, session=session
+                        )
+                        pre_season = await self._m.get_players_ranking(
+                            match, is_seasonal=True, session=session
+                        )
+                        pre_combined = await self._m.get_players_ranking(
+                            match, is_combined=True, session=session
+                        )
+
+                        match, post_lifetime = self._m.update_player_stats(
+                            match, pre_lifetime, "delta"
+                        )
+                        match, post_season = self._m.update_player_stats(
+                            match, pre_season, "season_delta"
+                        )
+                        match, post_combined = self._m.update_player_stats(
+                            match, pre_combined, "combined_delta"
+                        )
+
                         occurred_at = datetime.now(UTC)
                         events: List[Dict[str, Any]] = []
 
@@ -397,6 +403,11 @@ class ApprovalService:
                 **match.dict(),
                 "affected_players": affected_players,
             }
+        except Exception:
+            # A write conflict is an ordinary transaction outcome; leaving the
+            # claim set would make the match permanently unapprovable.
+            await self._m.q.release_pending_claim(oid)
+            raise
 
 
-__all__ = ["ApprovalService", "approve_lock"]
+__all__ = ["ApprovalService"]

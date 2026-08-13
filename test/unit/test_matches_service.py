@@ -99,9 +99,18 @@ class FakeRepo:
         self.deleted_validated = []
         self.subs_in_incs = []
         self.subs_in_decs = []
+        self.claims = []
+        self.releases = []
 
     async def find_pending_by_id(self, oid):
         return dict(self.match_doc) if self.match_doc else None
+
+    async def claim_pending_match(self, oid, *, now=None):
+        self.claims.append(oid)
+        return dict(self.match_doc) if self.match_doc else None
+
+    async def release_pending_claim(self, oid):
+        self.releases.append(oid)
 
     async def find_validated_by_id(self, oid):
         return dict(self.match_doc) if self.match_doc else None
