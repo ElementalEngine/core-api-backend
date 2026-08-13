@@ -164,8 +164,12 @@ class Settings(BaseSettings):
         adapter = TypeAdapter(List[AnyHttpUrl])
         try:
             urls = adapter.validate_python(items)
-        except Exception:
-            return []
+        except Exception as exc:
+            # Raises rather than returning []: a swallowed error here disables CORS
+            # silently, which is indistinguishable from having configured none.
+            raise ValueError(
+                f"ALLOWED_ORIGINS contains an invalid URL: {items!r}"
+            ) from exc
 
         origins: List[str] = []
         seen: set[str] = set()
