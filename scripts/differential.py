@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""Driver-differential for approve-match (D84, S2 acceptance 1).
-
-    snapshot <match_id>      capture pre-state
-    run <label> <base_url>   approve, then capture post-state
-    restore                  put pre-state back
-    diff <label_a> <label_b>
-
-Order: snapshot -> run motor -> restore -> run pymongo -> diff motor pymongo
-
-Restore does not use revert-match: revert computes sigma + 2 rather than
-restoring the prior value (D66 freezes it), so the snapshot is the only
-true pre-state.
-"""
-
 from __future__ import annotations
 
 import json
