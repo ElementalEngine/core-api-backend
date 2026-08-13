@@ -37,7 +37,6 @@ ignore_missing_imports = true
 module = [
   "app.core.config",                   # pydantic/mypy limits. S2.
   "app.main",                          # Starlette handler variance. S2.
-  "app.shared.persistence.mongo_queries",  # 13 Motor/PyMongo session types. S2.
   "app.features.auth.session_service", # object-typed doc reads. S2.
   "app.features.matches.service",      # session types + None-unsafety. S2/S3/S6.
   "app.features.matches.utils",        # tuple-key lookup -- see S5/D63.

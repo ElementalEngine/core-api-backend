@@ -10,7 +10,6 @@ from bson.int64 import Int64
 from pymongo import AsyncMongoClient
 from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.collection import AsyncCollection
-from pymongo.client_session import ClientSession
 from pymongo import ASCENDING, DESCENDING
 
 
@@ -84,7 +83,7 @@ class MongoQueries:
         return await self._validated.find_one({"_id": oid})
 
     async def insert_pending_match(
-        self, match_doc: Mapping[str, Any], *, session: ClientSession | None = None
+        self, match_doc: Mapping[str, Any], *, session: AsyncClientSession | None = None
     ) -> ObjectId:
         res = await self._pending.insert_one(dict(match_doc), session=session)
         return res.inserted_id
@@ -94,7 +93,7 @@ class MongoQueries:
         oid: ObjectId,
         changes: Mapping[str, Any],
         *,
-        session: ClientSession | None = None,
+        session: AsyncClientSession | None = None,
     ) -> bool:
         res = await self._pending.update_one({"_id": oid}, {"$set": dict(changes)}, session=session)
         return res.matched_count == 1
@@ -104,19 +103,19 @@ class MongoQueries:
         oid: ObjectId,
         match_doc: Mapping[str, Any],
         *,
-        session: ClientSession | None = None,
+        session: AsyncClientSession | None = None,
     ) -> bool:
         res = await self._pending.replace_one({"_id": oid}, dict(match_doc), session=session)
         return res.matched_count == 1
 
     async def delete_pending_match(
-        self, oid: ObjectId, *, session: ClientSession | None = None
+        self, oid: ObjectId, *, session: AsyncClientSession | None = None
     ) -> bool:
         res = await self._pending.delete_one({"_id": oid}, session=session)
         return res.deleted_count == 1
 
     async def delete_validated_match(
-        self, oid: ObjectId, *, session: ClientSession | None = None
+        self, oid: ObjectId, *, session: AsyncClientSession | None = None
     ) -> bool:
         res = await self._validated.delete_one({"_id": oid}, session=session)
         return res.deleted_count == 1
@@ -124,7 +123,7 @@ class MongoQueries:
     # -------------------- validated matches --------------------
 
     async def insert_validated_match(
-        self, match_doc: Mapping[str, Any], *, session: ClientSession | None = None
+        self, match_doc: Mapping[str, Any], *, session: AsyncClientSession | None = None
     ) -> ObjectId:
         res = await self._validated.insert_one(dict(match_doc), session=session)
         return res.inserted_id
@@ -132,7 +131,7 @@ class MongoQueries:
     # -------------------- subs --------------------
 
     async def inc_subs_in(
-        self, discord_id: str, *, session: ClientSession | None = None
+        self, discord_id: str, *, session: AsyncClientSession | None = None
     ) -> None:
         await self._subs.update_one(
             {"_id": Int64(discord_id)},
@@ -142,7 +141,7 @@ class MongoQueries:
         )
     
     async def dec_subs_in(
-        self, discord_id: str, *, session: ClientSession | None = None
+        self, discord_id: str, *, session: AsyncClientSession | None = None
     ) -> None:
         await self._subs.update_one(
             {"_id": Int64(discord_id)},
@@ -201,7 +200,8 @@ class MongoQueries:
         )
         return await col.find_one({"_id": Int64(discord_id)})
     
-    async def reset_player_stat_doc(
+    # Returns nothing; the annotation is wrong and no caller reads it (S7).
+    async def reset_player_stat_doc(  # type: ignore[return]
         self,
         *,
         civ_version: str,
@@ -283,7 +283,7 @@ class MongoQueries:
         is_combined: bool,
         discord_id: str,
         doc: Mapping[str, Any],
-        session: ClientSession | None = None,
+        session: AsyncClientSession | None = None,
     ) -> None:
         col = self._stats_collection(
             civ_version=civ_version,
