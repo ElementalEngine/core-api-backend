@@ -35,9 +35,6 @@ ignore_missing_imports = true
 # rewrites its file, and that removal is part of that sub-phase's acceptance.
 [[tool.mypy.overrides]]
 module = [
-  "app.core.config",                   # pydantic/mypy limits. S2.
-  "app.main",                          # Starlette handler variance. S2.
-  "app.features.auth.session_service", # object-typed doc reads. S2.
   "app.features.matches.service",      # session types + None-unsafety. S2/S3/S6.
   "app.features.matches.utils",        # tuple-key lookup -- see S5/D63.
   "app.features.matches.parsers.civ7", # untyped chunks list. S4.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from secrets import token_urlsafe
+from typing import cast
 from urllib.parse import urlencode
 
 from app.core.config import settings
@@ -84,9 +85,9 @@ class SessionService:
         return RegistrationSessionStatusResponse(
             session_id=session_id,
             status=status,
-            expires_at=session.get("expires_at"),
-            failure_code=session.get("failure_code"),
-            failure_message=session.get("failure_message"),
+            expires_at=cast("datetime | None", session.get("expires_at")),
+            failure_code=cast("str | None", session.get("failure_code")),
+            failure_message=cast("str | None", session.get("failure_message")),
             game=(SupportedGame(str(session["game"])) if session.get("game") else None),
             platform=(RegistrationPlatform(str(session["platform"])) if session.get("platform") else None),
             linked_account_id=(str(session["validated_account_id"]) if session.get("validated_account_id") else None),

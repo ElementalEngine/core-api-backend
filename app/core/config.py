@@ -153,7 +153,8 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("CIV_SAVE_PARSER_VERSION"),
     )
 
-    @computed_field(return_type=List[str])
+    # mypy does not support decorators stacked on @property
+    @computed_field(return_type=List[str])  # type: ignore[prop-decorator]
     @property
     def allowed_origins(self) -> List[str]:
         raw = (self.allowed_origins_raw or "").strip()
@@ -196,7 +197,8 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    return Settings()
+    # lj_service_token has no default; pydantic-settings fills it from env
+    return Settings()  # type: ignore[call-arg]
 
 
 settings = get_settings()
