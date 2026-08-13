@@ -24,6 +24,16 @@ from app.features.auth.operation_service import OperationService
 from app.features.auth.registration_service import RegistrationService
 from app.features.auth.schemas import FinalizeRegistrationOperationRequest
 from app.features.auth.steam_service import SteamService
+from app.features.auth.enums import ManualRegistrationChoice
+from app.features.auth.errors import (
+    RankRoleEligibilityError,
+    SelfServiceRegistrationNotAllowedError,
+)
+from app.features.auth.manual_registration_service import ManualRegistrationService
+from app.features.auth.schemas import (
+    ManualRegistrationRequest,
+    SelfServiceRegistrationRequest,
+)
 
 
 class FakeRepo:
@@ -221,17 +231,6 @@ def test_steam_validation_playtime_threshold(monkeypatch):
 
 
 # --- Method/policy coverage added with the platform-method change set ---
-
-from app.features.auth.enums import ManualRegistrationChoice
-from app.features.auth.errors import (
-    RankRoleEligibilityError,
-    SelfServiceRegistrationNotAllowedError,
-)
-from app.features.auth.manual_registration_service import ManualRegistrationService
-from app.features.auth.schemas import (
-    ManualRegistrationRequest,
-    SelfServiceRegistrationRequest,
-)
 
 
 @pytest.mark.parametrize(
