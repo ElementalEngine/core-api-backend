@@ -3,7 +3,7 @@ import importlib
 def test_config_loads_env(monkeypatch):
     # minimal required env
     monkeypatch.setenv("REPORTING_BACKEND_VERSION", "test-1.2.3")
-    monkeypatch.setenv("MONGO_URI", "mongodb://localhost:27017")
+    monkeypatch.setenv("MONGO_URL", "mongodb://localhost:27017")
     # TrueSkill stable profile
     monkeypatch.setenv("TS_MU", "1250")
     monkeypatch.setenv("TS_SIGMA", "150")
@@ -21,7 +21,9 @@ def test_config_loads_env(monkeypatch):
 
     s = cfg.settings
     assert s.reporting_backend_version == "test-1.2.3"
-    assert s.mongodb_uri.get_secret_value().startswith("mongodb://")
+    # not inside the assert -- pytest prints subexpressions on failure
+    uri_scheme_ok = s.mongodb_uri.get_secret_value().startswith("mongodb://")
+    assert uri_scheme_ok
     assert s.ts_mu == 1250
     assert s.ts_sigma == 150
     assert s.ts_beta == 70
