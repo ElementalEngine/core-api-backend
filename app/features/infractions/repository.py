@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Final
 
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
+from pymongo import AsyncMongoClient
+from pymongo.asynchronous.collection import AsyncCollection
 from pymongo import ASCENDING
 from pymongo.collection import ReturnDocument
 
@@ -16,17 +17,17 @@ COL_SUSPENSIONS_DUE: Final[str] = "suspensions_due"
 
 # ─── Collection accessors ─────────────────────────────────────────────────────
 
-def suspensions_col(db: AsyncIOMotorClient) -> AsyncIOMotorCollection:  # type: ignore[type-arg]
+def suspensions_col(db: AsyncMongoClient) -> AsyncCollection:  # type: ignore[type-arg]
     return db[DB_SERVER_MEMBERS][COL_SUSPENSIONS]
 
 
-def suspensions_due_col(db: AsyncIOMotorClient) -> AsyncIOMotorCollection:  # type: ignore[type-arg]
+def suspensions_due_col(db: AsyncMongoClient) -> AsyncCollection:  # type: ignore[type-arg]
     return db[DB_SERVER_MEMBERS][COL_SUSPENSIONS_DUE]
 
 
 # ─── Index creation (called once at startup in lifespan) ─────────────────────
 
-async def create_indexes(db: AsyncIOMotorClient) -> None:
+async def create_indexes(db: AsyncMongoClient) -> None:
     col = suspensions_col(db)
     await col.create_index(
         [("suspended", ASCENDING), ("ends", ASCENDING)],
@@ -41,7 +42,7 @@ async def create_indexes(db: AsyncIOMotorClient) -> None:
 
 # ─── Core CRUD ────────────────────────────────────────────────────────────────
 
-async def find_suspension(db: AsyncIOMotorClient, discord_id: str) -> SuspensionDocument | None:
+async def find_suspension(db: AsyncMongoClient, discord_id: str) -> SuspensionDocument | None:
     col = suspensions_col(db)
     result: dict[str, Any] | None = await col.find_one({"discord_id": discord_id})
     if result is None:
@@ -49,7 +50,7 @@ async def find_suspension(db: AsyncIOMotorClient, discord_id: str) -> Suspension
     return SuspensionDocument.model_validate(result)
 
 
-async def upsert_suspension(db: AsyncIOMotorClient, discord_id: str, update: dict[str, Any]) -> None:
+async def upsert_suspension(db: AsyncMongoClient, discord_id: str, update: dict[str, Any]) -> None:
     col = suspensions_col(db)
     await col.update_one(
         {"discord_id": discord_id},
@@ -58,7 +59,7 @@ async def upsert_suspension(db: AsyncIOMotorClient, discord_id: str, update: dic
     )
 
 
-async def find_or_create_suspension(db: AsyncIOMotorClient, discord_id: str) -> SuspensionDocument:
+async def find_or_create_suspension(db: AsyncMongoClient, discord_id: str) -> SuspensionDocument:
     """Atomic upsert — never a read-then-write race.
 
     $setOnInsert runs only when a new document is created; existing documents
@@ -93,7 +94,7 @@ async def find_or_create_suspension(db: AsyncIOMotorClient, discord_id: str) -> 
 # ─── Pending suspensions ──────────────────────────────────────────────────────
 
 async def find_pending_suspension(
-    db: AsyncIOMotorClient, discord_id: str
+    db: AsyncMongoClient, discord_id: str
 ) -> PendingSuspensionDocument | None:
     col = suspensions_due_col(db)
     result: dict[str, Any] | None = await col.find_one({"_id": discord_id})
@@ -103,7 +104,7 @@ async def find_pending_suspension(
 
 
 async def create_pending_suspension(
-    db: AsyncIOMotorClient,
+    db: AsyncMongoClient,
     discord_id: str,
     punishment_type: str,
     reason: str | None,
@@ -122,14 +123,14 @@ async def create_pending_suspension(
     )
 
 
-async def delete_pending_suspension(db: AsyncIOMotorClient, discord_id: str) -> None:
+async def delete_pending_suspension(db: AsyncMongoClient, discord_id: str) -> None:
     col = suspensions_due_col(db)
     await col.delete_one({"_id": discord_id})
 
 
 # ─── Scheduler recovery ───────────────────────────────────────────────────────
 
-async def get_active_suspensions(db: AsyncIOMotorClient) -> list[ActiveSuspension]:
+async def get_active_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]:
     """Query uses compound index { suspended: 1, ends: 1 }."""
     col = suspensions_col(db)
     now = datetime.now(timezone.utc)
@@ -141,7 +142,7 @@ async def get_active_suspensions(db: AsyncIOMotorClient) -> list[ActiveSuspensio
     return [ActiveSuspension.model_validate(r) for r in results]
 
 
-async def get_overdue_suspensions(db: AsyncIOMotorClient) -> list[ActiveSuspension]:
+async def get_overdue_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]:
     """Suspensions whose `ends` has already passed but the flag was never
     cleared — happens if the bot was offline (crash, restart, redeploy) when
     the in-memory expiry timer should have fired. Mirrors

@@ -4,7 +4,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, status
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.core.dependencies import get_database, require_lj_token
 from app.features.infractions import service as svc
@@ -45,7 +45,7 @@ def _internal_error(code: str, message: str) -> InfractionError:
 
 @router.get("/active", response_model=list[ActiveSuspension])
 async def get_active_suspensions(
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> list[ActiveSuspension]:
     try:
         return await svc.get_active_suspensions(db)
@@ -59,7 +59,7 @@ async def get_active_suspensions(
 
 @router.get("/overdue", response_model=list[ActiveSuspension])
 async def get_overdue_suspensions(
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> list[ActiveSuspension]:
     try:
         return await svc.get_overdue_suspensions(db)
@@ -73,7 +73,7 @@ async def get_overdue_suspensions(
 @router.get("/{discord_id}", response_model=SuspensionRecordResponse)
 async def get_record(
     discord_id: _DiscordId,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> SuspensionRecordResponse:
     try:
         return await svc.get_record(db, discord_id)
@@ -89,7 +89,7 @@ async def record_tier_infraction(
     discord_id: _DiscordId,
     category: TierCategory,
     payload: RecordTierInfractionRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> TierInfractionResponse:
     try:
         return await svc.record_tier_infraction(db, discord_id, category, payload.reason, payload.suspended_roles)
@@ -105,7 +105,7 @@ async def record_flat_suspension(
     discord_id: _DiscordId,
     flat_type: FlatType,
     payload: RecordFlatSuspensionRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> FlatSuspensionResponse:
     try:
         return await svc.record_flat_suspension(db, discord_id, flat_type, payload.reason, payload.suspended_roles)
@@ -120,7 +120,7 @@ async def record_flat_suspension(
 async def add_days(
     discord_id: _DiscordId,
     payload: ModifyDaysRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> ModifyDaysResponse:
     try:
         return await svc.add_days(db, discord_id, payload.days)
@@ -135,7 +135,7 @@ async def add_days(
 async def remove_days(
     discord_id: _DiscordId,
     payload: ModifyDaysRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> ModifyDaysResponse:
     try:
         return await svc.remove_days(db, discord_id, payload.days)
@@ -150,7 +150,7 @@ async def remove_days(
 async def remove_tier(
     discord_id: _DiscordId,
     payload: RemoveTierRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> RemoveTierResponse:
     try:
         return await svc.remove_tier(db, discord_id, payload.category)
@@ -168,7 +168,7 @@ async def remove_tier(
 )
 async def unsuspend(
     discord_id: _DiscordId,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> None:
     try:
         await svc.unsuspend(db, discord_id)
@@ -182,7 +182,7 @@ async def unsuspend(
 @router.get("/{discord_id}/pending", response_model=PendingSuspensionResponse | None)
 async def get_pending_suspension(
     discord_id: _DiscordId,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> PendingSuspensionResponse | None:
     try:
         return await svc.get_pending_suspension(db, discord_id)
@@ -201,7 +201,7 @@ async def get_pending_suspension(
 async def create_pending_suspension(
     discord_id: _DiscordId,
     payload: CreatePendingSuspensionRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> None:
     try:
         await svc.create_pending_suspension(db, discord_id, payload.punishment_type, payload.reason)
@@ -219,7 +219,7 @@ async def create_pending_suspension(
 )
 async def delete_pending_suspension(
     discord_id: _DiscordId,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> None:
     try:
         await svc.delete_pending_suspension(db, discord_id)

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from fastapi import Header, HTTPException, Request, status
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from pymongo import AsyncMongoClient
+from pymongo.asynchronous.database import AsyncDatabase
 
 from app.core.config import settings
 from app.core.errors import AppDependencyError
@@ -9,14 +10,14 @@ from app.core.security import constant_time_equals
 from app.shared.schemas.common import ErrorDetail, ErrorResponse
 
 
-def get_database(request: Request) -> AsyncIOMotorClient:
+def get_database(request: Request) -> AsyncMongoClient:
     client = getattr(request.app.state, "mongodb_client", None)
     if client is None:
         raise AppDependencyError("Mongo client not initialized")
     return client
 
 
-def get_mongo_database(request: Request) -> AsyncIOMotorDatabase:
+def get_mongo_database(request: Request) -> AsyncDatabase:
     database = getattr(request.app.state, "mongodb", None)
     if database is None:
         raise AppDependencyError("Mongo database not initialized")

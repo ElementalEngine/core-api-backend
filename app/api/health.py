@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.core.dependencies import get_database
 
@@ -22,7 +22,7 @@ async def healthz():
 
 
 @router.get("/readyz")
-async def readyz(client: AsyncIOMotorClient = Depends(get_database)):
+async def readyz(client: AsyncMongoClient = Depends(get_database)):
     try:
         await client.admin.command("ping")
         return {"status": "ready"}

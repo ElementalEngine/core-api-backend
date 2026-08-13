@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.shared.persistence.mongo_queries import MongoQueries
 
 
 class StatsRepository:
-    def __init__(self, client: AsyncIOMotorClient) -> None:
+    def __init__(self, client: AsyncMongoClient) -> None:
         self._queries = MongoQueries(client)
 
     async def get_player_stat_doc(

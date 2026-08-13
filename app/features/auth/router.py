@@ -4,7 +4,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, status
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.core.dependencies import get_database, require_service_token
 from app.features.auth.enums import RegistrationPlatform, RegistrationSessionStatus
@@ -50,7 +50,7 @@ router = APIRouter(
 public_router = APIRouter(tags=["auth-public"])
 
 
-def _repo(db: AsyncIOMotorClient) -> AuthRepository:
+def _repo(db: AsyncMongoClient) -> AuthRepository:
     return AuthRepository(db)
 
 
@@ -61,7 +61,7 @@ def _internal_auth_error(code: str, message: str) -> AuthError:
 @router.get("/admin/accounts/discord/{discord_id}", response_model=DiscordLookupResponse)
 async def lookup_account_by_discord(
     discord_id: Annotated[str, Path(min_length=1, max_length=64)],
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> DiscordLookupResponse:
     try:
         account = await RegistrationService(_repo(db)).lookup_by_discord_id(discord_id)
@@ -83,7 +83,7 @@ async def lookup_account_by_discord(
 @router.get("/admin/accounts/linked-account/{linked_account_id}", response_model=LinkedAccountLookupResponse)
 async def lookup_account_by_linked_account(
     linked_account_id: Annotated[str, Path(min_length=1, max_length=128)],
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> LinkedAccountLookupResponse:
     try:
         account = await RegistrationService(_repo(db)).lookup_by_linked_account_id(linked_account_id)
@@ -105,7 +105,7 @@ async def lookup_account_by_linked_account(
 @router.get("/admin/accounts/steam/{steam_id}", response_model=LinkedAccountLookupResponse)
 async def lookup_account_by_steam(
     steam_id: Annotated[str, Path(min_length=1, max_length=64)],
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> LinkedAccountLookupResponse:
     return await lookup_account_by_linked_account(steam_id, db)
 
@@ -113,7 +113,7 @@ async def lookup_account_by_steam(
 @router.post("/registration-sessions", response_model=RegistrationSessionResponse)
 async def create_registration_session(
     payload: CreateRegistrationSessionRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> RegistrationSessionResponse:
     try:
         return await SessionService(_repo(db)).create_registration_session(payload)
@@ -132,7 +132,7 @@ async def create_registration_session(
 @router.get("/registration-sessions/{session_id}", response_model=RegistrationSessionStatusResponse)
 async def get_registration_session(
     session_id: Annotated[str, Path(min_length=1, max_length=128)],
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> RegistrationSessionStatusResponse:
     try:
         return await SessionService(_repo(db)).get_registration_session_status(session_id)
@@ -155,7 +155,7 @@ async def get_registration_session(
 async def complete_registration_session(
     session_id: Annotated[str, Path(min_length=1, max_length=128)],
     payload: CompleteRegistrationSessionRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> RegistrationOperationResponse:
     repository = _repo(db)
     session_service = SessionService(repository)
@@ -213,7 +213,7 @@ async def complete_registration_session(
 async def finalize_registration_operation(
     operation_id: Annotated[str, Path(min_length=1, max_length=128)],
     payload: FinalizeRegistrationOperationRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> None:
     try:
         await OperationService(_repo(db)).finalize_operation(operation_id, payload)
@@ -232,7 +232,7 @@ async def finalize_registration_operation(
 @router.post("/rank-role-requests", response_model=RegistrationOperationResponse)
 async def create_rank_role_request(
     payload: RankRoleRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> RegistrationOperationResponse:
     repository = _repo(db)
     registration_service = RegistrationService(repository)
@@ -266,7 +266,7 @@ async def create_rank_role_request(
 @router.post("/admin/manual-registrations", response_model=RegistrationOperationResponse)
 async def create_manual_registration(
     payload: ManualRegistrationRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> RegistrationOperationResponse:
     try:
         return await ManualRegistrationService(_repo(db)).create_manual_registration(payload)
@@ -300,7 +300,7 @@ async def create_manual_registration(
 @router.post("/manual-registration-requests", response_model=RegistrationOperationResponse)
 async def create_self_service_registration(
     payload: SelfServiceRegistrationRequest,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> RegistrationOperationResponse:
     try:
         return await ManualRegistrationService(_repo(db)).create_self_service_registration(payload)
@@ -380,7 +380,7 @@ async def discord_oauth_callback(
     code: Annotated[str | None, Query()] = None,
     state: Annotated[str | None, Query()] = None,
     error: Annotated[str | None, Query()] = None,
-    db: AsyncIOMotorClient = Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> DiscordOAuthCallbackResult:
     repository = _repo(db)
     session_service = SessionService(repository)

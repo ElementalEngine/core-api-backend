@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
+from pymongo import AsyncMongoClient
+from pymongo.asynchronous.collection import AsyncCollection
 from pymongo import ASCENDING
 
 from app.features.auth.constants import (
@@ -16,12 +17,12 @@ from app.shared.persistence.mongo_queries import COL_USERS, DB_SERVER_MEMBERS
 
 
 class AuthRepository:
-    def __init__(self, client: AsyncIOMotorClient) -> None:
+    def __init__(self, client: AsyncMongoClient) -> None:
         auth_db = client[AUTH_DB_NAME]
         members = client[DB_SERVER_MEMBERS]
-        self._sessions: AsyncIOMotorCollection = auth_db[COL_REGISTRATION_SESSIONS]
-        self._operations: AsyncIOMotorCollection = auth_db[COL_REGISTRATION_OPERATIONS]
-        self._users: AsyncIOMotorCollection = members[COL_USERS]
+        self._sessions: AsyncCollection = auth_db[COL_REGISTRATION_SESSIONS]
+        self._operations: AsyncCollection = auth_db[COL_REGISTRATION_OPERATIONS]
+        self._users: AsyncCollection = members[COL_USERS]
 
     async def ensure_indexes(self) -> None:
         await self._sessions.create_index(

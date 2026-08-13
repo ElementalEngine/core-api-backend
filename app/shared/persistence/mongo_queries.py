@@ -7,7 +7,9 @@ from typing import Any, Dict, List, Mapping, Optional
 
 from bson import ObjectId
 from bson.int64 import Int64
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorClientSession, AsyncIOMotorCollection
+from pymongo import AsyncMongoClient
+from pymongo.asynchronous.client_session import AsyncClientSession
+from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.client_session import ClientSession
 from pymongo import ASCENDING, DESCENDING
 
@@ -38,20 +40,20 @@ class LeaderboardResult:
 
 
 class MongoQueries:
-    def __init__(self, client: AsyncIOMotorClient) -> None:
+    def __init__(self, client: AsyncMongoClient) -> None:
         self._client = client
 
         mr = client[DB_MATCH_REPORTER]
-        self._pending: AsyncIOMotorCollection = mr[COL_PENDING_MATCHES]
-        self._validated: AsyncIOMotorCollection = mr[COL_VALIDATED_MATCHES]
+        self._pending: AsyncCollection = mr[COL_PENDING_MATCHES]
+        self._validated: AsyncCollection = mr[COL_VALIDATED_MATCHES]
 
         sm = client[DB_SERVER_MEMBERS]
-        self._users: AsyncIOMotorCollection = sm[COL_USERS]
-        self._subs: AsyncIOMotorCollection = sm[COL_SUBS]
+        self._users: AsyncCollection = sm[COL_USERS]
+        self._subs: AsyncCollection = sm[COL_SUBS]
 
     # -------------------- infra --------------------
 
-    async def start_session(self) -> AsyncIOMotorClientSession:
+    async def start_session(self) -> AsyncClientSession:
         return await self._client.start_session()
 
     async def ping(self) -> bool:
@@ -174,7 +176,7 @@ class MongoQueries:
 
     def _stats_collection(
         self, *, civ_version: str, is_seasonal: bool, match_type: str, is_cloud: bool, is_combined: bool
-    ) -> AsyncIOMotorCollection:
+    ) -> AsyncCollection:
         db = self._client[self._stats_db_name(civ_version=civ_version, is_seasonal=is_seasonal)]
         return db[
             self._stats_collection_name(match_type=match_type, is_cloud=is_cloud, is_combined=is_combined)

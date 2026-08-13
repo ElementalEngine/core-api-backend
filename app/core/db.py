@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from pymongo import AsyncMongoClient
 
 from app.core.config import settings
 from app.core.logging import configure_logging
@@ -23,9 +23,9 @@ async def db_lifespan(app: FastAPI):
     min_pool = settings.mongodb_min_pool_size
     max_pool = settings.mongodb_max_pool_size
 
-    client: Optional[AsyncIOMotorClient] = None
+    client: Optional[AsyncMongoClient] = None
     try:
-        client = AsyncIOMotorClient(
+        client = AsyncMongoClient(
             uri,
             uuidRepresentation="standard",
             minPoolSize=min_pool,
@@ -40,7 +40,7 @@ async def db_lifespan(app: FastAPI):
 
         await client.admin.command("ping")
 
-        db: AsyncIOMotorDatabase = client[settings.mongo_db_name]
+        db = client[settings.mongo_db_name]
         app.state.mongodb_client = client
         app.state.mongodb = db
         logger.info("🟢 MongoDB connected (db=%s)", db.name)
@@ -55,10 +55,10 @@ async def db_lifespan(app: FastAPI):
     except Exception:
         logger.exception("🔴 Failed to connect to MongoDB")
         if client is not None:
-            client.close()
+            await client.close()
         raise
     finally:
         existing_client = getattr(app.state, "mongodb_client", None)
         if existing_client is not None:
-            existing_client.close()
+            await existing_client.close()
             logger.info("🟠 MongoDB connection closed")

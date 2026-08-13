@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.shared.persistence.mongo_queries import MongoQueries
 
 
 class MatchRepository(MongoQueries):
-    def __init__(self, client: AsyncIOMotorClient) -> None:
+    def __init__(self, client: AsyncMongoClient) -> None:
         super().__init__(client)
 
 

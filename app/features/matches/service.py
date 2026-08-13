@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
 from bson.int64 import Int64
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from trueskill import Rating
 
 from app.core.config import settings
@@ -69,7 +69,7 @@ def _require_int(value: Any, field_name: str) -> int:
         raise MatchServiceError(f"{field_name} must be a whole number, got {value!r}")
 
 class MatchService:
-    def __init__(self, client: AsyncIOMotorClient):
+    def __init__(self, client: AsyncMongoClient):
         self.q = MatchRepository(client)
 
     def _to_oid(self, match_id: str) -> ObjectId:

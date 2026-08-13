@@ -4,7 +4,7 @@ import asyncio
 import random
 from typing import Dict, List, Tuple
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.core.config import settings
 from app.features.stats.constants import ALLOWED_CIV_VERSIONS, ALLOWED_GAME_TYPES, ALLOWED_MATCH_TYPES
@@ -15,7 +15,7 @@ from app.features.stats.schemas import StatRow, StatSet, TeamGenResponse, UserSt
 
 
 class StatsService:
-    def __init__(self, client: AsyncIOMotorClient) -> None:
+    def __init__(self, client: AsyncMongoClient) -> None:
         self.repository = StatsRepository(client)
 
     def _validate(self, civ_version: str, game_type: str) -> Tuple[str, bool]:

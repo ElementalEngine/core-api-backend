@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any, Final
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.features.infractions.errors import NotSuspendedError
 from app.features.infractions.models import (
@@ -82,7 +82,7 @@ def _current_end_or_now(record: SuspensionDocument, now: datetime) -> datetime:
 # ─── Tier infractions ─────────────────────────────────────────────────────────
 
 async def record_tier_infraction(
-    db: AsyncIOMotorClient,
+    db: AsyncMongoClient,
     discord_id: str,
     category: TierCategory,
     reason: str | None,
@@ -137,7 +137,7 @@ async def record_tier_infraction(
 # ─── Flat suspensions ─────────────────────────────────────────────────────────
 
 async def record_flat_suspension(
-    db: AsyncIOMotorClient,
+    db: AsyncMongoClient,
     discord_id: str,
     flat_type: FlatType,
     reason: str | None,
@@ -172,7 +172,7 @@ async def record_flat_suspension(
 
 # ─── Day manipulation ─────────────────────────────────────────────────────────
 
-async def add_days(db: AsyncIOMotorClient, discord_id: str, days: int) -> ModifyDaysResponse:
+async def add_days(db: AsyncMongoClient, discord_id: str, days: int) -> ModifyDaysResponse:
     record = await find_or_create_suspension(db, discord_id)
 
     now = _utcnow()
@@ -187,7 +187,7 @@ async def add_days(db: AsyncIOMotorClient, discord_id: str, days: int) -> Modify
     return ModifyDaysResponse(discord_id=discord_id, days_delta=days, new_ends=new_ends)
 
 
-async def remove_days(db: AsyncIOMotorClient, discord_id: str, days: int) -> ModifyDaysResponse:
+async def remove_days(db: AsyncMongoClient, discord_id: str, days: int) -> ModifyDaysResponse:
     record = await find_suspension(db, discord_id)
     if record is None or record.ends is None:
         raise NotSuspendedError(discord_id)
@@ -202,7 +202,7 @@ async def remove_days(db: AsyncIOMotorClient, discord_id: str, days: int) -> Mod
 # ─── Tier management ─────────────────────────────────────────────────────────
 
 async def remove_tier(
-    db: AsyncIOMotorClient,
+    db: AsyncMongoClient,
     discord_id: str,
     category: TierCategory,
 ) -> RemoveTierResponse:
@@ -240,7 +240,7 @@ async def remove_tier(
 
 # ─── Unsuspend ────────────────────────────────────────────────────────────────
 
-async def unsuspend(db: AsyncIOMotorClient, discord_id: str) -> None:
+async def unsuspend(db: AsyncMongoClient, discord_id: str) -> None:
     await upsert_suspension(db, discord_id, {
         "suspended":       False,
         "ends":            None,
@@ -251,7 +251,7 @@ async def unsuspend(db: AsyncIOMotorClient, discord_id: str) -> None:
 
 # ─── Record retrieval (triggers lazy decay) ───────────────────────────────────
 
-async def get_record(db: AsyncIOMotorClient, discord_id: str) -> SuspensionRecordResponse:
+async def get_record(db: AsyncMongoClient, discord_id: str) -> SuspensionRecordResponse:
     record = await find_or_create_suspension(db, discord_id)
     now = _utcnow()
 
@@ -283,18 +283,18 @@ async def get_record(db: AsyncIOMotorClient, discord_id: str) -> SuspensionRecor
 
 # ─── Scheduler recovery ───────────────────────────────────────────────────────
 
-async def get_active_suspensions(db: AsyncIOMotorClient) -> list[ActiveSuspension]:
+async def get_active_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]:
     return await _repo_get_active_suspensions(db)
 
 
-async def get_overdue_suspensions(db: AsyncIOMotorClient) -> list[ActiveSuspension]:
+async def get_overdue_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]:
     return await _repo_get_overdue_suspensions(db)
 
 
 # ─── Pending suspensions ─────────────────────────────────────────────────────
 
 async def get_pending_suspension(
-    db: AsyncIOMotorClient, discord_id: str
+    db: AsyncMongoClient, discord_id: str
 ) -> PendingSuspensionResponse | None:
     doc = await _repo_find_pending(db, discord_id)
     if doc is None:
@@ -307,7 +307,7 @@ async def get_pending_suspension(
 
 
 async def create_pending_suspension(
-    db: AsyncIOMotorClient,
+    db: AsyncMongoClient,
     discord_id: str,
     punishment_type: str,
     reason: str | None,
@@ -315,5 +315,5 @@ async def create_pending_suspension(
     await _repo_create_pending(db, discord_id, punishment_type, reason)
 
 
-async def delete_pending_suspension(db: AsyncIOMotorClient, discord_id: str) -> None:
+async def delete_pending_suspension(db: AsyncMongoClient, discord_id: str) -> None:
     await _repo_delete_pending(db, discord_id)
