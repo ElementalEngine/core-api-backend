@@ -6,6 +6,11 @@ Covers:
   negative counters;
 - client-supplied numeric fields are validated (MatchServiceError -> 400, not ValueError -> 500);
 - update-match only writes whitelisted fields (match_id never enters the $set).
+
+Scope: logic only. FakeRepo and FakeSession stand in for the driver, so these
+tests assert that approve and revert reach commit -- not that a transaction
+provides atomicity. They do not discharge the Motor -> PyMongo transactional
+risk (D84).
 """
 
 from __future__ import annotations
@@ -60,6 +65,9 @@ def make_match_doc(players):
     }
 
 
+# Tracks the driver's call convention, not its semantics: start_transaction is
+# awaited as PyMongo requires, commit is recorded as a flag. A transaction that
+# never commits atomically still passes every test below.
 class FakeSession:
     def __init__(self):
         self.committed = False
