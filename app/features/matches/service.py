@@ -15,7 +15,7 @@ from app.core.config import settings
 from app.features.matches.models import MatchModel, PlayerModel, StatModel, ContestReport
 from app.features.matches.repository import MatchRepository
 from app.features.matches.parsers import parse_civ6_save, parse_civ7_save
-from app.features.stats.skill import make_ts_env
+from app.features.ratings.skill import make_ts_env
 from app.features.matches.utils import get_cpl_name
 
 logger = logging.getLogger(__name__)

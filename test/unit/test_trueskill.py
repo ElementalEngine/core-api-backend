@@ -16,7 +16,7 @@ def test_trueskill_1v1_winner_gains(monkeypatch):
     # reload modules to pick up env
     import app.core.config as cfg
     importlib.reload(cfg)
-    import app.features.stats.skill as skill
+    import app.features.ratings.skill as skill
     importlib.reload(skill)
 
     env = skill.make_ts_env()

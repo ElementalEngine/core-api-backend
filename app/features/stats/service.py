@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.features.stats.constants import ALLOWED_CIV_VERSIONS, ALLOWED_GAME_TYPES, ALLOWED_MATCH_TYPES
 from app.features.stats.errors import InvalidStatsRequestError, StatsNotFoundError
 from app.features.stats.repository import StatsRepository
-from app.features.stats.skill import make_ts_env
+from app.features.ratings.skill import make_ts_env
 from app.features.stats.schemas import StatRow, StatSet, TeamGenResponse, UserStatsResponse
 
 
