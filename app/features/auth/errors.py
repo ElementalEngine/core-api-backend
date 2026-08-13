@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
-from app.shared.schemas.common import ErrorDetail, ErrorResponse
+from app.core.errors import ErrorDetail, ErrorResponse
 
 
 class AuthError(Exception):

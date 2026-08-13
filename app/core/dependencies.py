@@ -7,7 +7,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 from app.core.config import settings
 from app.core.errors import AppDependencyError
 from app.core.security import constant_time_equals
-from app.shared.schemas.common import ErrorDetail, ErrorResponse
+from app.core.errors import ErrorDetail, ErrorResponse
 
 
 def get_database(request: Request) -> AsyncMongoClient:

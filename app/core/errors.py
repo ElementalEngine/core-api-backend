@@ -8,9 +8,21 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.shared.schemas.common import ErrorDetail, ErrorResponse
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+class ErrorDetail(BaseModel):
+    code: str
+    message: str
+    details: Any | None = None
+    retryable: bool | None = None
+    correlation_id: str | None = None
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorDetail
 
 
 class AppDependencyError(RuntimeError):

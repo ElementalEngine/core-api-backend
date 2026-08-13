@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""snapshot <match_id> | run <label> <url> | restore | diff <a> <b>
+
+Order: snapshot -> run motor -> restore -> run pymongo -> diff.
+Restore cannot use revert-match: revert computes sigma + 2 rather than
+restoring the prior value (D66), so the snapshot is the only pre-state.
+"""
 from __future__ import annotations
 
 import json

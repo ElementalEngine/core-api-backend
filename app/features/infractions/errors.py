@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException, status as http_status
 
-from app.shared.schemas.common import ErrorDetail, ErrorResponse
+from app.core.errors import ErrorDetail, ErrorResponse
 
 
 class InfractionError(Exception):
