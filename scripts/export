@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""export <db>.<collection> [...] [--out DIR]
+
+Writes one JSON document per line, plus a manifest carrying the count taken
+at export time. D61: this is the rollback mechanism for a cluster with no
+PITR, so the count is recorded rather than re-queried later against a
+collection that has moved on.
+
+Default output: /home/cisco/exports/<timestamp>/
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+from bson import json_util
+from pymongo import MongoClient
+
+DEFAULT_ROOT = Path(os.environ.get("EXPORT_ROOT", "/home/cisco/exports"))
+
+
+def connect() -> MongoClient:
+    uri = os.environ["MONGO_URL"]
+    if "MONGO_URL_ALLOW_ANY" not in os.environ and "-dev" not in uri:
+        sys.exit("refusing: MONGO_URL does not look like the dev cluster")
+    return MongoClient(uri, serverSelectionTimeoutMS=5000)
+
+
+def export_one(c: MongoClient, db: str, coll: str, out: Path) -> dict:
+    expected = c[db][coll].count_documents({})
+    path = out / f"{db}.{coll}.jsonl"
+
+    written = 0
+    with path.open("w") as f:
+        for doc in c[db][coll].find():
+            # canonical: preserves $numberLong so a reimport writes the
+            # same BSON types, not just the same values
+            f.write(json_util.dumps(
+                doc, json_options=json_util.CANONICAL_JSON_OPTIONS) + "\n")
+            written += 1
+    path.chmod(0o600)
+
+    with path.open() as f:
+        on_disk = sum(1 for _ in f)
+
+    ok = written == expected == on_disk
+    print(f"  {db}.{coll}: {written} written, {on_disk} lines, "
+          f"{expected} expected -- {'ok' if ok else 'MISMATCH'}")
+    if not ok:
+        sys.exit(f"count mismatch on {db}.{coll}; the export is not trustworthy")
+
+    return {"database": db, "collection": coll, "count": written,
+            "file": path.name}
+
+
+def main(argv: list[str]) -> None:
+    targets, out_dir = [], None
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--out":
+            out_dir = Path(argv[i + 1])
+            i += 2
+            continue
+        if "." not in argv[i]:
+            sys.exit(f"expected <db>.<collection>, got {argv[i]!r}")
+        targets.append(tuple(argv[i].split(".", 1)))
+        i += 1
+
+    if not targets:
+        sys.exit(__doc__)
+
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+    out = out_dir or (DEFAULT_ROOT / stamp)
+    out.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    c = connect()
+    print(f"export -> {out}")
+    entries = [export_one(c, db, coll, out) for db, coll in targets]
+
+    manifest = out / "manifest.json"
+    manifest.write_text(json_util.dumps(
+        {"exported_at": stamp, "collections": entries}, indent=2))
+    manifest.chmod(0o600)
+
+    total = sum(e["count"] for e in entries)
+    print(f"{len(entries)} collection(s), {total} documents")
+    print(f"manifest: {manifest}")
+    print("Copy this directory off-box and record its location.")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
