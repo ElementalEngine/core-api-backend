@@ -279,8 +279,6 @@ def parse_chunk(data: bytes, offset: int) -> Dict[str, Any]:
 def determine_game_mode(players):
     teams = [p["team"] for p in players]
     unique_teams = set(teams)
-    if -1 in unique_teams:
-        return ""
     if len(players) == 2:
         return "duel"
     if len(unique_teams) == len(players):
@@ -294,16 +292,16 @@ def extract_player_info(root):
     for p in root["players"]:
         civ = p["civ"]["value"]
         leader = p["leader"]["value"]
-        team = int(p["team_id"]["value"]) if p["team_id"] != None else 0
+        team = int(p["team_id"]["value"]) if p["team_id"] is not None else 0
         # normalize team ids to 0..n-1 where n is the number of teams
         if team not in teams_dict:
             teams_dict[team] = len(teams_dict)
         team = teams_dict[team]
         steam_id = (
-            p["user_id"]["value"].split("@")[-1] if p["user_id"] != None else None
+            p["user_id"]["value"].split("@")[-1] if p["user_id"] is not None else None
         )
         user_name = (
-            p["user_id"]["value"].split("@")[0] if p["user_id"] != None else None
+            p["user_id"]["value"].split("@")[0] if p["user_id"] is not None else None
         )
         players.append(
             {

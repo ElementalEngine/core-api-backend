@@ -18,7 +18,6 @@ select = ["E4", "E7", "E9", "F", "B023"]
                                                       # fix: None == False
                                                       # differs from not None. S6.
 "app/features/matches/parsers/civ6.py" = ["B023"]  # D83. S4.
-"app/features/matches/parsers/civ7.py" = ["E711"]  # D83. S4.
 
 [tool.mypy]
 python_version = "3.14"
