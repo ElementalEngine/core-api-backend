@@ -327,14 +327,16 @@ def extract_game_age(root):
 
 
 def extract_map_type(root):
-    map_type_with_loc = root["map"]["value"]
-    parsed = json.loads(map_type_with_loc)
-    for entry in parsed:
-        for lang in parsed[entry]:
+    # The fallback is the entry key, never another locale: map_type feeds the
+    # composition hash, so a fr_FR fallback would hash the same game
+    # differently from an en_US one. D83 Bug 1, D134.
+    parsed = json.loads(root["map"]["value"])
+    for entry, langs in parsed.items():
+        for lang in langs:
             if lang["locale"] == "en_US":
-                map_type = lang["text"]
-                break
-    return map_type
+                return lang["text"]
+        return entry
+    raise ValueError("extract_map_type: no map entry in the localisation blob")
 
 
 def parse_civ7_save(file_bytes: bytes, version: str = "1.1"):
