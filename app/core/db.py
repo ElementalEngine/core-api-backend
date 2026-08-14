@@ -13,6 +13,7 @@ from app.features.auth.repository import AuthRepository
 from app.features.infractions.repository import (
     create_indexes as create_infraction_indexes,
 )
+from app.features.matches.repository import MatchRepository
 from app.features.ratings.repository import RatingsRepository
 
 configure_logging()
@@ -56,6 +57,9 @@ async def db_lifespan(app: FastAPI):
 
         await RatingsRepository(client).ensure_indexes()
         logger.info("🟢 Rating event indexes ensured")
+
+        await MatchRepository(client).ensure_indexes()
+        logger.info("🟢 Match dedup indexes ensured")
 
         yield
     except Exception:
