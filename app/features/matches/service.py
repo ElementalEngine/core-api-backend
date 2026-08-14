@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from bson import ObjectId
 from pymongo import AsyncMongoClient
 from pymongo.asynchronous.client_session import AsyncClientSession
+from pymongo.errors import DuplicateKeyError
 from trueskill import Rating
 
 from app.core.config import settings
@@ -336,6 +337,16 @@ class MatchService:
         updated["match_id"] = str(updated.pop("_id"))
         return updated
 
+    @staticmethod
+    def _repeated(doc: Dict[str, Any], repeated_by: str) -> Dict[str, Any]:
+        """One shape for all three duplicate paths. repeated_by discriminates
+        file from composition (D101); Mite reads it in S9."""
+        out = dict(doc)
+        out["match_id"] = str(out.pop("_id"))
+        out["repeated"] = True
+        out["repeated_by"] = repeated_by
+        return out
+
     async def create_from_save(
         self,
         file_bytes: bytes,
@@ -343,9 +354,20 @@ class MatchService:
         is_cloud: bool,
         discord_message_id: str,
     ) -> Dict[str, Any]:
+        # Byte hash first: an exact re-upload is answered without reparsing,
+        # including one that would fail to parse. D83, Entry 12.
+        save_bytes_sha256 = hashlib.sha256(file_bytes).hexdigest()
+
+        for finder in (self.q.find_pending_by_bytes, self.q.find_validated_by_bytes):
+            existing = await finder(save_bytes_sha256)
+            if existing:
+                return self._repeated(existing, "file")
+
         parsed = self._parse_save(file_bytes)
 
-        # Stable hash (preserves current behavior)
+        # Composition hash: same map and lineup, a different file. Kept under
+        # its legacy name -- 35,941 documents carry it and it is not renamed
+        # in Wave 1 (D133).
         m = hashlib.sha256()
         unique_data = ",".join(
             [parsed["game"], parsed["map_type"]]
@@ -356,14 +378,10 @@ class MatchService:
 
         existing = await self.q.find_pending_by_hash(save_file_hash)
         if existing:
-            match_id = str(existing["_id"])
-            del existing["_id"]
-            existing["match_id"] = match_id
-            existing["repeated"] = True
-            return existing
+            return self._repeated(existing, "composition")
 
         parsed["save_file_hash"] = save_file_hash
-        parsed["repeated"] = False
+        parsed["save_bytes_sha256"] = save_bytes_sha256
         parsed["reporter_discord_id"] = reporter_discord_id
         parsed["is_cloud"] = is_cloud
         parsed["discord_messages_id_list"] = [discord_message_id]
@@ -373,8 +391,25 @@ class MatchService:
         match = await self.match_id_to_discord(match)
         match = await self._recompute_deltas(match)
 
-        inserted_id = await self.q.insert_pending_match(match.dict())
-        return {"match_id": str(inserted_id), **match.dict()}
+        doc = match.dict()
+        if not doc.get("save_bytes_sha256"):
+            # Never write the field empty -- see models.py.
+            doc.pop("save_bytes_sha256", None)
+        try:
+            inserted_id = await self.q.insert_pending_match(doc)
+        except DuplicateKeyError:
+            # Two concurrent uploads of the same bytes both passed the lookup.
+            # The index turns that into E11000; re-query and answer with the
+            # winner rather than a 500. Entry 12 check 9.
+            winner = await self.q.find_pending_by_bytes(save_bytes_sha256)
+            if winner is None:
+                raise
+            return self._repeated(winner, "file")
+        # Explicit: MatchModel has no `repeated` field, so parsed["repeated"]
+        # is dropped by the model and the success response has never carried
+        # it. Mite's `res?.repeated === true` reads undefined as false, which
+        # is why it never surfaced. F28.
+        return {"match_id": str(inserted_id), "repeated": False, **match.dict()}
 
     async def append_discord_message_id_list(
         self, match_id: str, discord_message_id_list: list[str]

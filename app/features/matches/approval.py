@@ -366,6 +366,15 @@ class ApprovalService:
                             "discord_messages_id_list", []
                         )
                         validated_doc["save_file_hash"] = res.get("save_file_hash", "")
+                        # Conditional, not defaulted: "" and None both satisfy
+                        # the partial index's {$exists: true}, so a default
+                        # would collide the second approval of any match
+                        # predating Entry 12. D83 Hardening 1.
+                        byte_hash = res.get("save_bytes_sha256")
+                        if byte_hash:
+                            validated_doc["save_bytes_sha256"] = byte_hash
+                        else:
+                            validated_doc.pop("save_bytes_sha256", None)
                         validated_doc["contest_report_list"] = []
 
                         validated_insert_id = await self._m.q.insert_validated_match(

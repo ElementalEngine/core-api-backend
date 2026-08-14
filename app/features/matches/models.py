@@ -113,6 +113,11 @@ class MatchModel(BaseModel):
     flagged: bool = False
     flagged_by: Optional[str] = None
     save_file_hash: str
+    # Entry 12: the byte hash. Optional because 35,941 existing
+    # documents have none -- and it must never be written empty, since
+    # the partial index filters on {$exists: true} and would collide
+    # every such document. D83, D133.
+    save_bytes_sha256: Optional[str] = None
     reporter_discord_id: str
     contest_report_list: List[ContestReport]
 

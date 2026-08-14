@@ -131,6 +131,19 @@ class MongoQueries:
     ) -> Optional[Dict[str, Any]]:
         return await self._pending.find_one({"save_file_hash": save_file_hash})
 
+    async def find_pending_by_bytes(
+        self, save_bytes_sha256: str
+    ) -> Optional[Dict[str, Any]]:
+        return await self._pending.find_one({"save_bytes_sha256": save_bytes_sha256})
+
+    async def find_validated_by_bytes(
+        self, save_bytes_sha256: str
+    ) -> Optional[Dict[str, Any]]:
+        """The cross-collection half of the dedup. The unique indexes are
+        per-collection, so approval moving a document out of pending_matches
+        is what reopened the double-rating path. D83, Entry 12."""
+        return await self._validated.find_one({"save_bytes_sha256": save_bytes_sha256})
+
     async def find_pending_by_id(self, oid: ObjectId) -> Optional[Dict[str, Any]]:
         return await self._pending.find_one({"_id": oid})
 
