@@ -214,7 +214,7 @@ def read_string(buffer, state):
     state["pos"] += 2
     str_info = buffer[state["pos"] : state["pos"] + 6]
     if len(str_info) < 2:
-        return "Error reading string: " + str(orig_state)
+        raise ValueError(f"read_string: truncated at offset {orig_state['pos']}")
     if str_info[1] == 0 or str_info[1] == 0x20:
         state["pos"] += 10
         result = ""
@@ -226,7 +226,10 @@ def read_string(buffer, state):
         )
         state["pos"] += str_len
     if result is None:
-        return "Error reading string: " + str(orig_state)
+        raise ValueError(
+            f"read_string: unexpected type byte {str_info[1]:#04x} "
+            f"at offset {orig_state['pos']}"
+        )
     return result
 
 
@@ -242,7 +245,9 @@ def read_utf_string(buffer, state):
         )
         state["pos"] += str_len
     if result is None:
-        return "Error reading string: " + str(orig_state)
+        raise ValueError(
+            f"read_utf_string: unexpected prefix at offset {orig_state['pos']}"
+        )
     return result
 
 
@@ -269,6 +274,10 @@ def read_array_0a(buffer, state):
     for i in range(array_len):
         index = struct.unpack("<I", buffer[state["pos"] : state["pos"] + 4])[0]
         if index > array_len:
+            # Fires on every valid Civ6 save -- marker cc272701, all four
+            # fixtures. An array sub-format this parser does not decode,
+            # walked past deliberately. Not an error-as-data path: raising
+            # here breaks valid saves. D83 excludes it. Correction 21.
             log("Index outside bounds of array at " + hex(state["pos"]))
             return array_len
         log(f"reading array index {index} at {hex(state['pos'])}")
@@ -291,7 +300,10 @@ def read_array_0b(buffer, state):
     state["pos"] += 4
     for i in range(array_len):
         if buffer[state["pos"]] != 0x0A:
-            return "Error reading array: " + str(orig_state)
+            raise ValueError(
+                f"read_array_0b: element {i} lacks its 0x0a marker "
+                f"at offset {state['pos']} (array began at {orig_state['pos']})"
+            )
         start_pos = state["pos"]
         state["pos"] += 16
         cur_data = {}
