@@ -17,7 +17,9 @@ select = ["E4", "E7", "E9", "F", "B023"]
 "app/features/matches/service.py" = ["E711", "E712"]  # E712:550 is NOT a safe
                                                       # fix: None == False
                                                       # differs from not None. S6.
-"app/features/matches/parsers/civ6.py" = ["B023"]  # D83. S4.
+"app/features/matches/parsers/civ6.py" = ["B023"]  # not firing; the
+                                       # closure is called inside its own
+                                       # iteration. §4 item 58.
 
 [tool.mypy]
 python_version = "3.14"
@@ -26,14 +28,13 @@ ignore_missing_imports = true
 # Permissive baseline, deliberately -- D108. Strictness rises per module as
 # each is rewritten.
 
-# Quarantine: 4 of 59 files. Each entry is deleted by the sub-phase that
+# Quarantine: 4 of 64 files. Each entry is deleted by the sub-phase that
 # rewrites its file, and that removal is part of that sub-phase's acceptance.
 [[tool.mypy.overrides]]
 module = [
   "app.features.matches.approval",     # None-unsafety, moved from service. S3.
   "app.features.matches.service",      # None-unsafety. S6.
   "app.features.matches.utils",        # tuple-key lookup -- see S5/D63.
-  "app.features.matches.parsers.civ7", # untyped chunks list. S4.
   "app.features.stats.service",        # object-typed doc reads. S7.
 ]
 ignore_errors = true

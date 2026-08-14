@@ -145,7 +145,7 @@ def parse_raw(data: bytes) -> Dict[str, List[Dict[str, Any]]]:
 
 
 def read_n_chunks(data: bytes, offset: int, num_chunks: int) -> List[Dict[str, Any]]:
-    chunks = []
+    chunks: List[Dict[str, Any]] = []
     for i in range(num_chunks):
         prev_end = chunks[-1]["endOffset"] if chunks else offset
         result = parse_chunk(data, prev_end)
