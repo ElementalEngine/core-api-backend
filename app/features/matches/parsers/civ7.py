@@ -1,7 +1,7 @@
 import struct
 import sys
 import argparse
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any
 import json
 
 loggingEnabled = False

@@ -1,8 +1,6 @@
 import zlib
-from xml.etree import ElementTree
 import struct
 import argparse
-from app.core.config import settings
 import json
 
 
