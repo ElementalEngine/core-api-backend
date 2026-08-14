@@ -24,12 +24,6 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Metadata
-    reporting_backend_version: str = Field(
-        default="dev",
-        validation_alias=AliasChoices("REPORTING_BACKEND_VERSION"),
-    )
-
     # MongoDB
     mongo_url: SecretStr = Field(
         default=SecretStr("mongodb://localhost:27017"),
@@ -166,12 +160,6 @@ class Settings(BaseSettings):
     ts_tau: float = Field(default=1.0, ge=0, validation_alias=AliasChoices("TS_TAU"))
     ts_draw_prob: float = Field(
         default=0.0, ge=0, le=1, validation_alias=AliasChoices("TS_DRAW_PROB")
-    )
-    ts_sigma_free: float = Field(
-        default=90.0, ge=0, validation_alias=AliasChoices("TS_SIGMA_FREE")
-    )
-    ts_teamer_boost: float = Field(
-        default=1.0, validation_alias=AliasChoices("TS_TEAMER_BOOST")
     )
     min_points_for_subs: int = Field(
         default=5, ge=0, validation_alias=AliasChoices("MIN_POINTS_FOR_SUBS")
