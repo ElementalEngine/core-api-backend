@@ -11,15 +11,6 @@ def _missing(name):
     return not os.path.exists(os.path.join(_SAVES, name))
 
 
-# S1 item 2 quarantine. Nothing is fixed here; every fix belongs to S4 (D83).
-# REMOVAL TRIGGER: S4 closes.
-_AGE_TOKEN = pytest.mark.xfail(
-    strict=True,
-    reason="parser returns the display name ('Antiquity'); fixtures expect the "
-    "token ('AGE_ANTIQUITY'). NOT one of D83's four bugs -- a fifth. S4.",
-)
-
-
 def _test_parse_civ7_save(
     file_path,
     expected_game,
@@ -57,7 +48,6 @@ def _test_parse_civ7_save(
         assert player["team"] == expected["team"]
 
 
-@_AGE_TOKEN
 def test_parse_civ7_save_3v3_T10():
     expected_players = [
         {
@@ -114,7 +104,6 @@ def test_parse_civ7_save_3v3_T10():
     )
 
 
-@_AGE_TOKEN
 def test_parse_civ7_save_5player_ffa():
     expected_players = [
         {
@@ -164,7 +153,6 @@ def test_parse_civ7_save_5player_ffa():
     )
 
 
-@_AGE_TOKEN
 def test_parse_civ7_save_duel():
     expected_players = [
         {
@@ -373,7 +361,6 @@ def test_parse_civ7_save_AutoSave_003():
     )
 
 
-@_AGE_TOKEN
 def test_parse_civ7_save_modernGame():
     expected_players = [
         {
