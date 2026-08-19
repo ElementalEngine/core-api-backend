@@ -309,3 +309,83 @@ def test_parse_civ6_save_5team():
         expected_map_type="Pangaea",
         expected_players=expected_players,
     )
+
+
+def test_parse_civ6_save_realtime_teamer():
+    # The only fixture carrying LEADER_SPECTATOR actors, and the only one with
+    # a BBG civ token. Covers the spectator skip and the mod-civ path.
+    expected_players = [
+        {
+            "steam_id": "76561198126939073",
+            "user_name": "Bourricot",
+            "leader": "LEADER_ELIZABETH",
+            "civ": "CIVILIZATION_ENGLAND",
+            "team": 0,
+            "player_alive": True,
+        },
+        {
+            "steam_id": "76561198413606192",
+            "user_name": "Adrydry",
+            "leader": "LEADER_LIME_THULE_DAVE",
+            "civ": "CIVILIZATION_LIME_THULE",
+            "team": 0,
+            "player_alive": True,
+        },
+        {
+            "steam_id": "76561198314610794",
+            "user_name": "Kerrnel",
+            "leader": "LEADER_NADER_SHAH",
+            "civ": "CIVILIZATION_PERSIA",
+            "team": 0,
+            "player_alive": True,
+        },
+        {
+            "steam_id": "76561198310714452",
+            "user_name": "armandarine",
+            "leader": "LEADER_GILGAMESH",
+            "civ": "CIVILIZATION_SUMERIA",
+            "team": 0,
+            "player_alive": True,
+        },
+        {
+            "steam_id": "76561198136305157",
+            "user_name": "MoMo",
+            "leader": "LEADER_GITARJA",
+            "civ": "CIVILIZATION_INDONESIA",
+            "team": 1,
+            "player_alive": True,
+        },
+        {
+            "steam_id": "76561199035833501",
+            "user_name": "hawkesj13",
+            "leader": "LEADER_VICTORIA",
+            "civ": "CIVILIZATION_ENGLAND",
+            "team": 1,
+            "player_alive": True,
+        },
+        {
+            "steam_id": "76561198089743115",
+            "user_name": "Jano",
+            "leader": "LEADER_LADY_TRIEU",
+            "civ": "CIVILIZATION_VIETNAM",
+            "team": 1,
+            "player_alive": True,
+        },
+        {
+            "steam_id": "76561198055439707",
+            "user_name": "Siiic",
+            "leader": "LEADER_T_ROOSEVELT_ROUGHRIDER",
+            "civ": "CIVILIZATION_AMERICA",
+            "team": 1,
+            "player_alive": True,
+        },
+    ]
+
+    _test_parse_civ6_save(
+        file_path="../data/civ6TestSaves/realtimeTeamer.Civ6Save",
+        expected_game="civ6",
+        expected_turn=54,
+        expected_mode="teamer",
+        expected_map_type="Tilted_Axis",
+        expected_players=expected_players,
+    )
