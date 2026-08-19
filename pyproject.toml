@@ -28,13 +28,12 @@ ignore_missing_imports = true
 # Permissive baseline, deliberately -- D108. Strictness rises per module as
 # each is rewritten.
 
-# Quarantine: 4 of 64 files. Each entry is deleted by the sub-phase that
+# Quarantine: 3 of 61 files. Each entry is deleted by the sub-phase that
 # rewrites its file, and that removal is part of that sub-phase's acceptance.
 [[tool.mypy.overrides]]
 module = [
   "app.features.matches.approval",     # None-unsafety, moved from service. S3.
   "app.features.matches.service",      # None-unsafety. S6.
-  "app.features.matches.utils",        # tuple-key lookup -- see S5/D63.
   "app.features.stats.service",        # object-typed doc reads. S7.
 ]
 ignore_errors = true

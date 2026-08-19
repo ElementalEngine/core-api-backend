@@ -18,9 +18,11 @@ def extract_player_info(root):
     players = []
     teams_dict = {}
     for p in root["parsed"]["CIVS"]:
-        civ = p["LEADER_NAME"]["data"]
-        if civ == "LEADER_SPECTATOR":
+        leader = p["LEADER_NAME"]["data"]
+        if leader == "LEADER_SPECTATOR":
             continue
+        # CIVS membership requires ACTOR_NAME -- see the filter in parse().
+        civ = p["ACTOR_NAME"]["data"]
         team = int(p["TEAM_ID"]["data"]) if "TEAM_ID" in p else 0
         # normalize team ids to 0..n-1 where n is the number of teams
         if team not in teams_dict:
@@ -34,6 +36,7 @@ def extract_player_info(root):
                 "steam_id": steam_id,
                 "user_name": user_name,
                 "civ": civ,
+                "leader": leader,
                 "team": team,
                 "player_alive": player_alive,
                 "placement": team,

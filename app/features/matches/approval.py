@@ -9,7 +9,6 @@ from bson.int64 import Int64
 from app.features.matches.errors import MatchServiceError, NotFoundError
 from app.features.matches.models import MatchModel, PlayerModel, StatModel
 from app.core.coerce import as_float, as_int
-from app.features.matches.utils import get_cpl_name
 from app.features.ratings.events import build_match_event
 from app.shared.persistence.mongo_queries import stat_scope
 
@@ -32,13 +31,12 @@ class ApprovalService:
 
     def _shift_civ_stat(
         self,
-        match: MatchModel,
         player: PlayerModel,
         existing_civs: Dict[str, Any],
         step: int,
     ) -> Dict[str, Any]:
-        # Normalize civ naming
-        civ_name = get_cpl_name(match.game, player.civ, getattr(player, "leader", None))
+        # D44: the tally keys on the raw token; display names resolve on read.
+        civ_name = player.civ
 
         civs = dict(existing_civs) if isinstance(existing_civs, dict) else {}
 
@@ -69,19 +67,17 @@ class ApprovalService:
 
     def update_existing_stat(
         self,
-        match: MatchModel,
         player: PlayerModel,
         existing_civs: Dict[str, Any],
     ) -> Dict[str, Any]:
-        return self._shift_civ_stat(match, player, existing_civs, +1)
+        return self._shift_civ_stat(player, existing_civs, +1)
 
     def revert_existing_stat(
         self,
-        match: MatchModel,
         player: PlayerModel,
         existing_civs: Dict[str, Any],
     ) -> Dict[str, Any]:
-        return self._shift_civ_stat(match, player, existing_civs, -1)
+        return self._shift_civ_stat(player, existing_civs, -1)
 
     def _build_stat_doc(
         self,
@@ -168,7 +164,7 @@ class ApprovalService:
                                 mu=mu_after,
                                 sigma=sigma_after,
                                 delta_value=delta_value,
-                                civs=self.revert_existing_stat(match, p, pre.civs),
+                                civs=self.revert_existing_stat(p, pre.civs),
                                 step=-1,
                             )
                             await self._m.q.upsert_player_stat_doc(
@@ -310,7 +306,7 @@ class ApprovalService:
                                     mu=post.mu,
                                     sigma=post.sigma,
                                     delta_value=delta_value,
-                                    civs=self.update_existing_stat(match, p, pre.civs),
+                                    civs=self.update_existing_stat(p, pre.civs),
                                     step=1,
                                 )
                                 await self._m.q.upsert_player_stat_doc(
