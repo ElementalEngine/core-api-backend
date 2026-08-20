@@ -4,7 +4,7 @@ D49 puts this test with the data rather than in a bot-side copy -- a test that
 passes while the source is broken is worse than no test. Pure, per D59/D60.
 """
 
-from app.features.civdata.seeds import EDITIONS, load_seed
+from app.features.civdata.seeds import EDITIONS, load_seed, to_documents
 
 AGE_POOLS = {"AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"}
 CIV_SOURCES = {"observed", "inferred", "unmapped"}
@@ -73,3 +73,16 @@ def test_no_token_collides_within_an_edition():
         tokens = [row["token"] for row in seed["leaders"]]
         tokens += [row["token"] for row in seed.get("civs", [])]
         assert len(set(tokens)) == len(tokens)
+
+
+def test_to_documents_shape():
+    docs = to_documents("civ6") + to_documents("civ7")
+    assert len(docs) == 89 + 33 + 44
+    for doc in docs:
+        assert doc["edition"] in EDITIONS
+        assert doc["kind"] in {"leader", "civ"}
+        assert doc["leader_data_version"] == 1
+        assert doc["token"]
+    # {edition, token} is the collection's unique index.
+    keys = [(doc["edition"], doc["token"]) for doc in docs]
+    assert len(set(keys)) == len(keys)

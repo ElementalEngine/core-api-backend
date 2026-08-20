@@ -10,6 +10,7 @@ from pymongo import AsyncMongoClient
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.features.auth.repository import AuthRepository
+from app.features.civdata.repository import CivDataRepository
 from app.features.infractions.repository import (
     create_indexes as create_infraction_indexes,
 )
@@ -60,6 +61,9 @@ async def db_lifespan(app: FastAPI):
 
         await MatchRepository(client).ensure_indexes()
         logger.info("🟢 Match dedup indexes ensured")
+
+        await CivDataRepository(client).ensure_indexes()
+        logger.info("🟢 Civ data indexes ensured")
 
         yield
     except Exception:

@@ -5,6 +5,7 @@ from __future__ import annotations
 # edits this line.
 GAMES_DB = "match_reporter"
 
+COL_CIV_DATA = "civ_data"
 COL_RATING_EVENTS = "rating_events"
 
-__all__ = ["COL_RATING_EVENTS", "GAMES_DB"]
+__all__ = ["COL_CIV_DATA", "COL_RATING_EVENTS", "GAMES_DB"]
