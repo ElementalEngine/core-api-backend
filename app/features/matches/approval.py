@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from bson.int64 import Int64
 
 from app.features.matches.errors import MatchServiceError, NotFoundError
 from app.features.matches.models import MatchModel, PlayerModel, StatModel
-from app.core.coerce import as_float, as_int
+from app.features.matches.tallies import bump
+from app.core.coerce import as_float
 from app.features.ratings.events import build_match_event
 from app.shared.persistence.mongo_queries import stat_scope
 
@@ -29,55 +30,58 @@ class ApprovalService:
     def __init__(self, matches: MatchService) -> None:
         self._m = matches
 
-    def _shift_civ_stat(
+    def _shift_tally(
         self,
-        player: PlayerModel,
-        existing_civs: Dict[str, Any],
+        existing: Any,
+        key: Optional[str],
+        *,
+        won: bool,
         step: int,
     ) -> Dict[str, Any]:
-        # D44: the tally keys on the raw token; display names resolve on read.
-        civ_name = player.civ
-
-        civs = dict(existing_civs) if isinstance(existing_civs, dict) else {}
-
-        entry = civs.get(civ_name)
-
-        # Backwards compatibility:
-        # - legacy shape: {"DutchWilhelmina": 3}
-        # - new shape: {"DutchWilhelmina": {"games": 3, "wins": 1}}
-        if isinstance(entry, dict):
-            games = as_int(entry.get("games", 0), 0)
-            wins = as_int(entry.get("wins", 0), 0)
-        elif isinstance(entry, int):
-            games = entry
-            wins = 0
-        else:
-            games = 0
-            wins = 0
-
-        games += step
-        if player.delta > 0:
-            wins += step
-        if step < 0:
-            games = max(0, games)
-            wins = max(0, wins)
-
-        civs[civ_name] = {"games": games, "wins": wins}
-        return civs
+        """The rebuild uses the same bump(), so the two cannot drift."""
+        tally = dict(existing) if isinstance(existing, dict) else {}
+        if not key:
+            return tally
+        return bump(tally, key, won=won, step=step)
 
     def update_existing_stat(
         self,
         player: PlayerModel,
         existing_civs: Dict[str, Any],
     ) -> Dict[str, Any]:
-        return self._shift_civ_stat(player, existing_civs, +1)
+        # D44: the tally keys on the raw token; display names resolve on read.
+        return self._shift_tally(
+            existing_civs, player.civ, won=player.delta > 0, step=+1
+        )
 
     def revert_existing_stat(
         self,
         player: PlayerModel,
         existing_civs: Dict[str, Any],
     ) -> Dict[str, Any]:
-        return self._shift_civ_stat(player, existing_civs, -1)
+        return self._shift_tally(
+            existing_civs, player.civ, won=player.delta > 0, step=-1
+        )
+
+    def update_existing_leaders(
+        self,
+        player: PlayerModel,
+        existing_leaders: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        # Civ6 records written before Entry 10 have no leader; they are left
+        # out rather than bucketed under a placeholder key.
+        return self._shift_tally(
+            existing_leaders, player.leader, won=player.delta > 0, step=+1
+        )
+
+    def revert_existing_leaders(
+        self,
+        player: PlayerModel,
+        existing_leaders: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return self._shift_tally(
+            existing_leaders, player.leader, won=player.delta > 0, step=-1
+        )
 
     def _build_stat_doc(
         self,
@@ -89,6 +93,7 @@ class ApprovalService:
         sigma: float,
         delta_value: float,
         civs: Dict[str, Any],
+        leaders: Dict[str, Any],
         step: int,
     ) -> Dict[str, Any]:
         """One stats document for approve (step=+1) or revert (step=-1).
@@ -110,6 +115,7 @@ class ApprovalService:
             "subbedIn": shift(int(pre.subbedIn), player.is_sub),
             "subbedOut": shift(int(pre.subbedOut), player.subbed_out),
             "civs": civs,
+            "leaders": leaders,
             "lastModified": datetime.now(UTC),
         }
 
@@ -165,6 +171,7 @@ class ApprovalService:
                                 sigma=sigma_after,
                                 delta_value=delta_value,
                                 civs=self.revert_existing_stat(p, pre.civs),
+                                leaders=self.revert_existing_leaders(p, pre.leaders),
                                 step=-1,
                             )
                             await self._m.q.upsert_player_stat_doc(
@@ -307,6 +314,9 @@ class ApprovalService:
                                     sigma=post.sigma,
                                     delta_value=delta_value,
                                     civs=self.update_existing_stat(p, pre.civs),
+                                    leaders=self.update_existing_leaders(
+                                        p, pre.leaders
+                                    ),
                                     step=1,
                                 )
                                 await self._m.q.upsert_player_stat_doc(

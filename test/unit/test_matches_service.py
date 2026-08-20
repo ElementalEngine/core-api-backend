@@ -212,6 +212,7 @@ def test_approve_match_accumulates_counters_from_stored_doc():
         assert doc["games"] == 11  # 10 + 1, not 0 + 1
         assert doc["subbedIn"] == 3  # preserved, not clobbered to 0
         assert doc["subbedOut"] == 1
+        assert "civs" in doc and "leaders" in doc
 
 
 # --- revert_match: legacy None deltas + negative-counter clamp ---

@@ -36,6 +36,10 @@ class StatModel(BaseModel):
     # Civs map is historically {"CivName": <int games>}.
     civs: Optional[Dict[str, Any]] = None
 
+    # Same shape, keyed on the leader token. Civ7 picks a leader and a civ
+    # independently, so the two tallies are different questions.
+    leaders: Optional[Dict[str, Any]] = None
+
     lastModified: datetime = Field(default_factory=datetime.utcnow)
 
     @model_validator(mode="before")

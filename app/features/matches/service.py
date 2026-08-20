@@ -123,6 +123,7 @@ class MatchService:
                 subbedIn=0,
                 subbedOut=0,
                 civs={},
+                leaders={},
             )
 
         doc = await self.q.get_player_stat_doc(
@@ -148,6 +149,7 @@ class MatchService:
                 subbedIn=0,
                 subbedOut=0,
                 civs={},
+                leaders={},
             )
 
         return StatModel(
@@ -162,6 +164,9 @@ class MatchService:
             subbedOut=as_int(doc.get("subbedOut"), 0),
             civs=dict(doc.get("civs", {}))
             if isinstance(doc.get("civs", {}), dict)
+            else {},
+            leaders=dict(doc.get("leaders", {}))
+            if isinstance(doc.get("leaders", {}), dict)
             else {},
         )
 
@@ -264,6 +269,7 @@ class MatchService:
                     subbedIn=player.subbedIn,
                     subbedOut=player.subbedOut,
                     civs=player.civs,
+                    leaders=player.leaders,
                 )
         for team_idx, team in enumerate(team_with_sub_ins_states):
             for player_index, player in enumerate(team):
@@ -281,6 +287,7 @@ class MatchService:
                         subbedIn=player.subbedIn,
                         subbedOut=player.subbedOut,
                         civs=player.civs,
+                        leaders=player.leaders,
                     )
         for i, p in enumerate(match.players):
             p_current_ranking = players_ranking[i]
