@@ -7,6 +7,11 @@ from typing import Any, Dict, List
 SEED_DIR = Path(__file__).resolve().parent / "seed"
 EDITIONS = ("civ6", "civ7")
 
+# Provenance and the unfilled type placeholder are the authoring record. They
+# stay in the file and out of the documents: no consumer reads them, and a
+# served field nobody uses still lands in Mite's generated types (D49, D68).
+AUTHORING_ONLY = frozenset({"civ_source", "age_pool_source", "type"})
+
 
 def load_seed(edition: str) -> Dict[str, Any]:
     """Read one edition's authored civ-data file. No I/O beyond the file."""
@@ -29,15 +34,12 @@ def to_documents(edition: str) -> List[Dict[str, Any]]:
     docs: List[Dict[str, Any]] = []
     for kind, key in (("leader", "leaders"), ("civ", "civs")):
         for row in seed.get(key, []):
-            docs.append(
-                {
-                    **row,
-                    "edition": edition,
-                    "kind": kind,
-                    "leader_data_version": version,
-                }
-            )
+            doc = {k: v for k, v in row.items() if k not in AUTHORING_ONLY}
+            doc["edition"] = edition
+            doc["kind"] = kind
+            doc["leader_data_version"] = version
+            docs.append(doc)
     return docs
 
 
-__all__ = ["EDITIONS", "SEED_DIR", "load_seed", "to_documents"]
+__all__ = ["AUTHORING_ONLY", "EDITIONS", "load_seed", "to_documents"]

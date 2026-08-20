@@ -4,7 +4,12 @@ D49 puts this test with the data rather than in a bot-side copy -- a test that
 passes while the source is broken is worse than no test. Pure, per D59/D60.
 """
 
-from app.features.civdata.seeds import EDITIONS, load_seed, to_documents
+from app.features.civdata.seeds import (
+    AUTHORING_ONLY,
+    EDITIONS,
+    load_seed,
+    to_documents,
+)
 
 AGE_POOLS = {"AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"}
 CIV_SOURCES = {"observed", "inferred", "unmapped"}
@@ -86,3 +91,13 @@ def test_to_documents_shape():
     # {edition, token} is the collection's unique index.
     keys = [(doc["edition"], doc["token"]) for doc in docs]
     assert len(set(keys)) == len(keys)
+
+
+def test_documents_carry_no_authoring_fields():
+    # Provenance stays in the file. A served field nobody reads still lands
+    # in Mite's generated types.
+    docs = to_documents("civ6") + to_documents("civ7")
+    leaked = {key for doc in docs for key in doc if key in AUTHORING_ONLY}
+    assert leaked == set()
+    # ...and it is still in the file, which is the record.
+    assert all("civ_source" in row for row in load_seed("civ6")["leaders"])

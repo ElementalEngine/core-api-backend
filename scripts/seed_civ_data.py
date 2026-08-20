@@ -27,6 +27,10 @@ from app.features.civdata.seeds import EDITIONS, to_documents  # noqa: E402
 
 
 async def main(argv: list[str]) -> int:
+    unknown = [a for a in argv if a != "--dry-run"]
+    if unknown:
+        print(f"unknown argument(s): {unknown}. only --dry-run is accepted.")
+        return 2
     dry_run = "--dry-run" in argv
 
     for edition in EDITIONS:

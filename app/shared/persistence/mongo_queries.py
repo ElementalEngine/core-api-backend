@@ -106,9 +106,6 @@ class MongoQueries:
         res = await self._client.admin.command("ping")
         return bool(res.get("ok"))
 
-    async def db_stats(self) -> Dict[str, Any]:
-        return await self._client.admin.command("dbstats")
-
     # -------------------- users --------------------
 
     async def get_user_by_discord_id(self, discord_id: str) -> Optional[Dict[str, Any]]:

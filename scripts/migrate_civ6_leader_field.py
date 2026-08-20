@@ -34,6 +34,10 @@ FILTER = {"game": "civ6", "players.civ": {"$regex": "^LEADER_"}}
 
 
 def main(argv: list[str]) -> int:
+    unknown = [a for a in argv if a != "--apply"]
+    if unknown:
+        print(f"unknown argument(s): {unknown}. only --apply is accepted.")
+        return 2
     apply = "--apply" in argv
     client = MongoClient(settings.mongodb_uri.get_secret_value())
     try:

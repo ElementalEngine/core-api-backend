@@ -25,18 +25,20 @@ class CivDataRepository:
         """One edition's payload, sorted by token so it is byte-stable."""
         leaders: List[Dict[str, Any]] = []
         civs: List[Dict[str, Any]] = []
-        version: int | None = None
+        versions: set[int] = set()
         cursor = self._civ_data.find({"edition": edition}, {"_id": 0}).sort(
             "token", ASCENDING
         )
         async for doc in cursor:
-            version = doc.pop("leader_data_version", None)
+            versions.add(doc.pop("leader_data_version", None))
             kind = doc.pop("kind", None)
             doc.pop("edition", None)
             (leaders if kind == "leader" else civs).append(doc)
+        # More than one means a seed run died partway. Mite caches on this
+        # number, so reporting either value would pin it to a stale table.
         return {
             "edition": edition,
-            "leader_data_version": version,
+            "leader_data_version": versions.pop() if len(versions) == 1 else None,
             "leaders": leaders,
             "civs": civs,
         }
@@ -49,6 +51,9 @@ class CivDataRepository:
         Upsert rather than drop-and-insert: the collection is never empty
         mid-run, so a deployed route cannot serve a half-seeded payload.
         """
+        if not documents:
+            # $nin against an empty list matches everything.
+            raise ValueError(f"refusing to seed {edition} with no documents")
         upserted = 0
         modified = 0
         for doc in documents:

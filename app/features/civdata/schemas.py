@@ -8,17 +8,14 @@ from pydantic import BaseModel
 class LeaderRow(BaseModel):
     token: str
     name: str
-    type: str
     # civ6 only: many-to-one, and null where no save has shown the pair yet.
     civ: Optional[str] = None
-    civ_source: Optional[str] = None
 
 
 class CivRow(BaseModel):
     token: str
     name: str
     age_pool: str
-    age_pool_source: str
 
 
 class CivDataResponse(BaseModel):

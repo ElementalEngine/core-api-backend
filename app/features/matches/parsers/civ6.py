@@ -1,4 +1,3 @@
-import zlib
 import struct
 import argparse
 import json
@@ -321,19 +320,6 @@ def read_array_0b(buffer, state):
                 break
         result["chunks"].append(buffer[start_pos : state["pos"]])
     return result
-
-
-def read_compressed_data(buffer, state):
-    idx = buffer.find(COMPRESSED_DATA_END, state["pos"])
-    data = buffer[state["pos"] + 4 : idx + 4]
-    chunk_size = 64 * 1024
-    chunks = []
-    pos = 0
-    while pos < len(data):
-        chunks.append(data[pos : pos + chunk_size])
-        pos += chunk_size + 4
-    compressed_data = b"".join(chunks)
-    return zlib.decompress(compressed_data)
 
 
 def parse(buffer):

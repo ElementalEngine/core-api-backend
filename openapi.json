@@ -399,10 +399,6 @@
             "title": "Age Pool",
             "type": "string"
           },
-          "age_pool_source": {
-            "title": "Age Pool Source",
-            "type": "string"
-          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -415,8 +411,7 @@
         "required": [
           "token",
           "name",
-          "age_pool",
-          "age_pool_source"
+          "age_pool"
         ],
         "title": "CivRow",
         "type": "object"
@@ -844,17 +839,6 @@
             ],
             "title": "Civ"
           },
-          "civ_source": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Civ Source"
-          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -862,16 +846,11 @@
           "token": {
             "title": "Token",
             "type": "string"
-          },
-          "type": {
-            "title": "Type",
-            "type": "string"
           }
         },
         "required": [
           "token",
-          "name",
-          "type"
+          "name"
         ],
         "title": "LeaderRow",
         "type": "object"
