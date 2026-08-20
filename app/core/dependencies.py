@@ -83,3 +83,43 @@ def require_mito_token(authorization: str | None = Header(default=None)) -> None
         misconfig_code="MITO_SERVICE_MISCONFIGURED",
         misconfig_message="Mito service token is not configured on the backend.",
     )
+
+
+def require_any_service_token(authorization: str | None = Header(default=None)) -> None:
+    """Accept any configured service token.
+
+    Read-only reference data every consumer needs identically, so there is no
+    authority to leak by widening the gate (D96). Naming one bot's token here
+    would mean re-editing it for each consumer that legitimately reads it.
+    """
+    configured = [
+        settings.mito_service_token.get_secret_value(),
+        settings.lj_service_token.get_secret_value(),
+        settings.auth_service_token.get_secret_value(),
+    ]
+    scheme, _, token = (authorization or "").partition(" ")
+    if scheme.lower() == "bearer" and token:
+        for candidate in configured:
+            if candidate and constant_time_equals(token, candidate):
+                return
+    if not any(configured):
+        payload = ErrorResponse(
+            error=ErrorDetail(
+                code="SERVICE_TOKENS_MISCONFIGURED",
+                message="No service token is configured on the backend.",
+                retryable=False,
+            )
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=payload.model_dump()
+        )
+    payload = ErrorResponse(
+        error=ErrorDetail(
+            code="UNAUTHORIZED",
+            message="Missing or invalid service authorization.",
+            retryable=False,
+        )
+    )
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, detail=payload.model_dump()
+    )

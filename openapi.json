@@ -359,6 +359,68 @@
         "title": "ChangeOrder",
         "type": "object"
       },
+      "CivDataResponse": {
+        "properties": {
+          "civs": {
+            "items": {
+              "$ref": "#/components/schemas/CivRow"
+            },
+            "title": "Civs",
+            "type": "array"
+          },
+          "edition": {
+            "title": "Edition",
+            "type": "string"
+          },
+          "leader_data_version": {
+            "title": "Leader Data Version",
+            "type": "integer"
+          },
+          "leaders": {
+            "items": {
+              "$ref": "#/components/schemas/LeaderRow"
+            },
+            "title": "Leaders",
+            "type": "array"
+          }
+        },
+        "required": [
+          "edition",
+          "leader_data_version",
+          "leaders",
+          "civs"
+        ],
+        "title": "CivDataResponse",
+        "type": "object"
+      },
+      "CivRow": {
+        "properties": {
+          "age_pool": {
+            "title": "Age Pool",
+            "type": "string"
+          },
+          "age_pool_source": {
+            "title": "Age Pool Source",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "name",
+          "age_pool",
+          "age_pool_source"
+        ],
+        "title": "CivRow",
+        "type": "object"
+      },
       "CompleteRegistrationSessionRequest": {
         "additionalProperties": false,
         "properties": {
@@ -767,6 +829,51 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LeaderRow": {
+        "properties": {
+          "civ": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Civ"
+          },
+          "civ_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Civ Source"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "name",
+          "type"
+        ],
+        "title": "LeaderRow",
         "type": "object"
       },
       "LeaderboardRankingResponse": {
@@ -5126,6 +5233,68 @@
         "summary": "Upload Game Report",
         "tags": [
           "upload"
+        ]
+      }
+    },
+    "/api/v2/civ-data/{edition}": {
+      "get": {
+        "operationId": "get_civ_data_api_v2_civ_data__edition__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edition",
+            "required": true,
+            "schema": {
+              "enum": [
+                "civ6",
+                "civ7"
+              ],
+              "title": "Edition",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CivDataResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Civ Data",
+        "tags": [
+          "civ-data"
         ]
       }
     },

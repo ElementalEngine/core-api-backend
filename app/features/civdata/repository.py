@@ -21,6 +21,26 @@ class CivDataRepository:
             name="civ_data_edition_token_uq",
         )
 
+    async def fetch(self, edition: str) -> Dict[str, Any]:
+        """One edition's payload, sorted by token so it is byte-stable."""
+        leaders: List[Dict[str, Any]] = []
+        civs: List[Dict[str, Any]] = []
+        version: int | None = None
+        cursor = self._civ_data.find({"edition": edition}, {"_id": 0}).sort(
+            "token", ASCENDING
+        )
+        async for doc in cursor:
+            version = doc.pop("leader_data_version", None)
+            kind = doc.pop("kind", None)
+            doc.pop("edition", None)
+            (leaders if kind == "leader" else civs).append(doc)
+        return {
+            "edition": edition,
+            "leader_data_version": version,
+            "leaders": leaders,
+            "civs": civs,
+        }
+
     async def seed(
         self, edition: str, documents: List[Dict[str, Any]]
     ) -> Dict[str, int]:

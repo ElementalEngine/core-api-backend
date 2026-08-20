@@ -28,7 +28,7 @@ ignore_missing_imports = true
 # Permissive baseline, deliberately -- D108. Strictness rises per module as
 # each is rewritten.
 
-# Quarantine: 3 of 64 files. Each entry is deleted by the sub-phase that
+# Quarantine: three entries. Each entry is deleted by the sub-phase that
 # rewrites its file, and that removal is part of that sub-phase's acceptance.
 [[tool.mypy.overrides]]
 module = [
