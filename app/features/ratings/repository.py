@@ -11,9 +11,9 @@ from pymongo.asynchronous.collection import AsyncCollection
 
 from app.core.coerce import as_float
 from app.core.config import settings
-from app.core.constants import COL_RATING_EVENTS, GAMES_DB
+from app.core.constants import COL_RATING_EVENTS, COL_STAT_RESETS, GAMES_DB
 from app.features.ratings.events import build_reset_event
-from app.shared.persistence.mongo_queries import COL_VALIDATED_MATCHES, stat_scope
+from app.shared.persistence.mongo_queries import stat_scope
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class RatingsRepository:
     def __init__(self, client: AsyncMongoClient) -> None:
         self._client = client
         self._events: AsyncCollection = client[GAMES_DB][COL_RATING_EVENTS]
-        self._validated: AsyncCollection = client[GAMES_DB][COL_VALIDATED_MATCHES]
+        self._resets: AsyncCollection = client[GAMES_DB][COL_STAT_RESETS]
 
     async def ensure_indexes(self) -> None:
         # Reset events carry no match_id. Without the partial filter a unique
@@ -88,12 +88,14 @@ class RatingsRepository:
         async with session:
             async with await session.start_transaction():
                 try:
-                    await self._validated.insert_one(
+                    # Its own collection since Entry 6, so no marker flag
+                    # and a real date rather than one hidden in the ObjectId.
+                    await self._resets.insert_one(
                         {
+                            "occurred_at": occurred_at,
                             "civ_version": civ_version,
                             "is_cloud": is_cloud,
                             "discord_id": discord_id,
-                            "stat_reset": True,
                         },
                         session=session,
                     )
