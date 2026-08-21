@@ -8,7 +8,7 @@ from bson.int64 import Int64
 
 from app.features.matches.errors import MatchServiceError, NotFoundError
 from app.features.matches.models import MatchModel, PlayerModel, StatModel
-from app.features.matches.tallies import bump
+from app.features.matches.tallies import bump, stat_legs
 from app.core.coerce import as_float
 from app.features.ratings.events import build_match_event
 from app.shared.persistence.mongo_queries import stat_scope
@@ -156,11 +156,14 @@ class ApprovalService:
                         season_delta = as_float(p.season_delta, 0.0)
                         combined_delta = as_float(p.combined_delta, 0.0)
 
+                        legs = stat_legs(is_cloud=match.is_cloud)
                         for pre, delta_value, is_seasonal, is_combined in (
                             (pre_lifetime[i], delta, False, False),
                             (pre_season[i], season_delta, True, False),
                             (pre_combined[i], combined_delta, False, True),
                         ):
+                            if (is_seasonal, is_combined) not in legs:
+                                continue
                             mu_after = pre.mu - delta_value
                             sigma_after = pre.sigma + 2
                             doc = self._build_stat_doc(
@@ -283,6 +286,7 @@ class ApprovalService:
 
                             did = str(p.discord_id)
 
+                            legs = stat_legs(is_cloud=match.is_cloud)
                             for pre, post, delta_value, is_seasonal, is_combined in (
                                 (
                                     pre_lifetime[i],
@@ -306,6 +310,8 @@ class ApprovalService:
                                     True,
                                 ),
                             ):
+                                if (is_seasonal, is_combined) not in legs:
+                                    continue
                                 doc = self._build_stat_doc(
                                     discord_id=did,
                                     pre=pre,

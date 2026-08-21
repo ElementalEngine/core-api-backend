@@ -48,14 +48,14 @@ def make_player(**overrides):
     return player
 
 
-def make_match_doc(players):
+def make_match_doc(players, *, is_cloud=False):
     return {
         "game": "civ6",
         "turn": 100,
         "age": None,
         "map_type": "Pangaea",
         "game_mode": "FFA",
-        "is_cloud": False,
+        "is_cloud": is_cloud,
         "players": players,
         "parser_version": "1",
         "discord_messages_id_list": ["m0"],
@@ -315,3 +315,48 @@ def test_revert_doc_math_uses_per_scope_deltas():
     assert docs[(False, False)]["wins"] == 3
     assert docs[(True, False)]["wins"] == 4
     assert docs[(False, True)]["wins"] == 4
+
+
+# --- cloud games have no season row (Entry 1) ---
+
+
+def _approve_and_collect_scopes(is_cloud):
+    stored = {
+        "_id": 123,
+        "mu": 30.0,
+        "sigma": 5.0,
+        "games": 10,
+        "wins": 4,
+        "first": 2,
+        "subbedIn": 3,
+        "subbedOut": 1,
+        "civs": {},
+    }
+    players = [
+        make_player(discord_id="123", team=0, placement=0),
+        make_player(
+            discord_id="456", team=1, placement=1, steam_id="76561190000000002"
+        ),
+    ]
+    repo = FakeRepo(
+        match_doc=make_match_doc(players, is_cloud=is_cloud), stat_doc=stored
+    )
+    asyncio.run(make_service(repo).approve_match(OID, "approver-1"))
+    return repo.upserts
+
+
+def test_realtime_approve_writes_lifetime_season_and_combined():
+    upserts = _approve_and_collect_scopes(is_cloud=False)
+    legs = {(u["is_seasonal"], u["is_combined"]) for u in upserts}
+    assert legs == {(False, False), (True, False), (False, True)}
+    assert len(upserts) == 6  # two players, three legs each
+
+
+def test_cloud_approve_skips_the_season_row():
+    upserts = _approve_and_collect_scopes(is_cloud=True)
+    legs = {(u["is_seasonal"], u["is_combined"]) for u in upserts}
+    assert legs == {(False, False), (False, True)}
+    assert not any(u["is_seasonal"] for u in upserts)
+    assert len(upserts) == 4  # two players, lifetime and combined only
+    # "cloud is never seasonal" must not become "cloud is never written"
+    assert all(u["is_cloud"] for u in upserts)
