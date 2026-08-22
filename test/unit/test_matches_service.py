@@ -387,3 +387,26 @@ def test_approving_a_sub_writes_one_dated_row():
     assert discord_id == "123"
     assert str(match_id) == OID  # the service converts it to an ObjectId
     assert repo.sub_events_removed == []
+
+
+def test_paired_duel_with_one_sub_approves():
+    # D155: §4 item 76's "a duel with one sub is the everyday case" is
+    # disproved. Pairing keeps both rating passes at two groups, so this
+    # must approve without TrueSkill's "Need multiple rating groups".
+    players = [
+        make_player(discord_id="111", team=0, placement=0, is_sub=True),
+        make_player(
+            discord_id="222",
+            team=0,
+            placement=0,
+            steam_id="76561190000000009",
+            subbed_out=True,
+        ),
+        make_player(
+            discord_id="333", team=1, placement=1, steam_id="76561190000000002"
+        ),
+    ]
+    repo = FakeRepo(match_doc=make_match_doc(players))
+    result = asyncio.run(make_service(repo).approve_match(OID, "approver-1"))
+    assert result["match_id"]
+    assert [d for d, _ in repo.sub_events_written] == ["111"]
