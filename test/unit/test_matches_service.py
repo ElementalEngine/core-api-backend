@@ -97,8 +97,8 @@ class FakeRepo:
         self.session = FakeSession()
         self.deleted_pending = []
         self.deleted_validated = []
-        self.subs_in_incs = []
-        self.subs_in_decs = []
+        self.sub_events_written = []
+        self.sub_events_removed = []
         self.claims = []
         self.releases = []
 
@@ -133,11 +133,11 @@ class FakeRepo:
     async def delete_validated_match(self, oid, session=None):
         self.deleted_validated.append(oid)
 
-    async def inc_subs_in(self, discord_id, session=None):
-        self.subs_in_incs.append(discord_id)
+    async def record_sub_in(self, discord_id, match_id, session=None):
+        self.sub_events_written.append((discord_id, match_id))
 
-    async def dec_subs_in(self, discord_id, session=None):
-        self.subs_in_decs.append(discord_id)
+    async def remove_sub_in(self, discord_id, match_id, session=None):
+        self.sub_events_removed.append((discord_id, match_id))
 
 
 class FakeRatings:
@@ -360,3 +360,27 @@ def test_cloud_approve_skips_the_season_row():
     assert len(upserts) == 4  # two players, lifetime and combined only
     # "cloud is never seasonal" must not become "cloud is never written"
     assert all(u["is_cloud"] for u in upserts)
+
+
+# --- subs are dated rows, not a counter (Entry 4b) ---
+
+
+def test_approving_a_sub_writes_one_dated_row():
+    # Three players, one of them a sub: TrueSkill rates the non-subs
+    # separately and needs two groups to do it (see §4 item 76).
+    players = [
+        make_player(discord_id="123", team=0, placement=0, is_sub=True),
+        make_player(
+            discord_id="456", team=1, placement=1, steam_id="76561190000000002"
+        ),
+        make_player(
+            discord_id="789", team=2, placement=2, steam_id="76561190000000003"
+        ),
+    ]
+    repo = FakeRepo(match_doc=make_match_doc(players))
+
+    asyncio.run(make_service(repo).approve_match(OID, "approver-1"))
+
+    # Only the sub, and the row carries the match so a revert can find it.
+    assert repo.sub_events_written == [("123", OID)]
+    assert repo.sub_events_removed == []

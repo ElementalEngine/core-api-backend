@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Dict, List, Mapping, Optional
 
 from bson import ObjectId
@@ -12,7 +12,7 @@ from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo import ASCENDING, DESCENDING
 
-from app.core.constants import GAMES_DB
+from app.core.constants import COL_SUB_EVENTS, GAMES_DB
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,6 @@ COL_VALIDATED_MATCHES = "validated_matches"
 
 DB_SERVER_MEMBERS = "server_members"
 COL_USERS = "users"
-COL_SUBS = "subs"
 
 DB_CIV6_LIFETIME = "civ6_lifetime_stats"
 DB_CIV7_LIFETIME = "civ7_lifetime_stats"
@@ -94,7 +93,7 @@ class MongoQueries:
 
         sm = client[DB_SERVER_MEMBERS]
         self._users: AsyncCollection = sm[COL_USERS]
-        self._subs: AsyncCollection = sm[COL_SUBS]
+        self._sub_events: AsyncCollection = mr[COL_SUB_EVENTS]
 
     # -------------------- infra --------------------
 
@@ -215,23 +214,35 @@ class MongoQueries:
 
     # -------------------- subs --------------------
 
-    async def inc_subs_in(
-        self, discord_id: str, *, session: AsyncClientSession | None = None
+    async def record_sub_in(
+        self,
+        discord_id: str,
+        match_id: ObjectId,
+        *,
+        session: AsyncClientSession | None = None,
     ) -> None:
-        await self._subs.update_one(
-            {"_id": Int64(discord_id)},
-            {"$inc": {"subs_in": 1}},
-            upsert=True,
+        # One dated row per sub-in, not a counter. A TTL on occurred_at is
+        # what makes the 30-day quota roll; a counter only ever went up.
+        await self._sub_events.insert_one(
+            {
+                "discord_id": Int64(discord_id),
+                "match_id": match_id,
+                "occurred_at": datetime.now(UTC),
+            },
             session=session,
         )
 
-    async def dec_subs_in(
-        self, discord_id: str, *, session: AsyncClientSession | None = None
+    async def remove_sub_in(
+        self,
+        discord_id: str,
+        match_id: ObjectId,
+        *,
+        session: AsyncClientSession | None = None,
     ) -> None:
-        await self._subs.update_one(
-            {"_id": Int64(discord_id)},
-            {"$inc": {"subs_in": -1}},
-            upsert=True,
+        # Reverting deletes that match's row. The counter it replaces could
+        # be driven below zero by a repeated revert; this cannot.
+        await self._sub_events.delete_one(
+            {"discord_id": Int64(discord_id), "match_id": match_id},
             session=session,
         )
 

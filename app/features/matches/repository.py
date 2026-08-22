@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pymongo import ASCENDING, AsyncMongoClient
+from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
 
 from app.shared.persistence.mongo_queries import MongoQueries
 
@@ -27,6 +27,19 @@ class MatchRepository(MongoQueries):
         await self._pending.create_index(
             [("save_file_hash", ASCENDING)],
             name="pending_matches_save_file_hash_idx",
+        )
+        # 30 days. The TTL is storage hygiene, not the rule -- the quota
+        # query has to be time-bounded anyway, because the monitor can lag.
+        await self._sub_events.create_index(
+            [("occurred_at", ASCENDING)],
+            expireAfterSeconds=2592000,
+            name="sub_events_ttl_idx",
+        )
+        # The TTL index is on occurred_at alone and cannot serve the quota
+        # query, which filters on discord_id first.
+        await self._sub_events.create_index(
+            [("discord_id", ASCENDING), ("occurred_at", DESCENDING)],
+            name="sub_events_player_recent_idx",
         )
 
 

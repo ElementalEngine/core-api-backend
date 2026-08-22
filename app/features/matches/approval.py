@@ -210,7 +210,7 @@ class ApprovalService:
                             )
 
                         if p.is_sub:
-                            await self._m.q.dec_subs_in(did, session=session)
+                            await self._m.q.remove_sub_in(did, oid, session=session)
 
                     await self._m.ratings.insert_events(events, session=session)
 
@@ -358,7 +358,7 @@ class ApprovalService:
                                 )
 
                             if p.is_sub:
-                                await self._m.q.inc_subs_in(did, session=session)
+                                await self._m.q.record_sub_in(did, oid, session=session)
 
                         await self._m.ratings.insert_events(events, session=session)
 
