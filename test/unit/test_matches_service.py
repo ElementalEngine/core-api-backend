@@ -382,5 +382,8 @@ def test_approving_a_sub_writes_one_dated_row():
     asyncio.run(make_service(repo).approve_match(OID, "approver-1"))
 
     # Only the sub, and the row carries the match so a revert can find it.
-    assert repo.sub_events_written == [("123", OID)]
+    assert len(repo.sub_events_written) == 1
+    discord_id, match_id = repo.sub_events_written[0]
+    assert discord_id == "123"
+    assert str(match_id) == OID  # the service converts it to an ObjectId
     assert repo.sub_events_removed == []

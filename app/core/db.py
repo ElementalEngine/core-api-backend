@@ -60,7 +60,7 @@ async def db_lifespan(app: FastAPI):
         logger.info("🟢 Rating event indexes ensured")
 
         await MatchRepository(client).ensure_indexes()
-        logger.info("🟢 Match dedup indexes ensured")
+        logger.info("🟢 Match indexes ensured")
 
         await CivDataRepository(client).ensure_indexes()
         logger.info("🟢 Civ data indexes ensured")
