@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional
 
-from bson import ObjectId
 from bson.int64 import Int64
 from pymongo import AsyncMongoClient
 from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo import ASCENDING, DESCENDING
-
-from app.core.constants import COL_SUB_EVENTS, GAMES_DB
 
 
 logger = logging.getLogger(__name__)
@@ -20,8 +17,6 @@ logger = logging.getLogger(__name__)
 
 # ---- DB / collection names (single source of truth) ----
 
-COL_PENDING_MATCHES = "pending_matches"
-COL_VALIDATED_MATCHES = "validated_matches"
 
 DB_SERVER_MEMBERS = "server_members"
 COL_USERS = "users"
@@ -87,13 +82,8 @@ class MongoQueries:
     def __init__(self, client: AsyncMongoClient) -> None:
         self._client = client
 
-        mr = client[GAMES_DB]
-        self._pending: AsyncCollection = mr[COL_PENDING_MATCHES]
-        self._validated: AsyncCollection = mr[COL_VALIDATED_MATCHES]
-
         sm = client[DB_SERVER_MEMBERS]
         self._users: AsyncCollection = sm[COL_USERS]
-        self._sub_events: AsyncCollection = mr[COL_SUB_EVENTS]
 
     # -------------------- infra --------------------
 
@@ -118,132 +108,6 @@ class MongoQueries:
                     {"linked_platform": "steam", "linked_account_id": steam_id},
                 ]
             }
-        )
-
-    # -------------------- pending matches --------------------
-
-    async def find_pending_by_hash(
-        self, save_file_hash: str
-    ) -> Optional[Dict[str, Any]]:
-        return await self._pending.find_one({"save_file_hash": save_file_hash})
-
-    async def find_pending_by_bytes(
-        self, save_bytes_sha256: str
-    ) -> Optional[Dict[str, Any]]:
-        return await self._pending.find_one({"save_bytes_sha256": save_bytes_sha256})
-
-    async def find_validated_by_bytes(
-        self, save_bytes_sha256: str
-    ) -> Optional[Dict[str, Any]]:
-        """The cross-collection half of the dedup. The unique indexes are
-        per-collection, so approval moving a document out of pending_matches
-        is what reopened the double-rating path. D83, Entry 12."""
-        return await self._validated.find_one({"save_bytes_sha256": save_bytes_sha256})
-
-    async def find_pending_by_id(self, oid: ObjectId) -> Optional[Dict[str, Any]]:
-        return await self._pending.find_one({"_id": oid})
-
-    async def find_validated_by_id(self, oid: ObjectId) -> Optional[Dict[str, Any]]:
-        return await self._validated.find_one({"_id": oid})
-
-    async def claim_pending_match(
-        self, oid: ObjectId, *, now: datetime
-    ) -> Optional[Dict[str, Any]]:
-        """Claim a pending match for approval; None means already claimed or gone.
-
-        D84's claim. Pending-ness is which collection the document is in, so
-        the claim is an additive field rather than a status transition.
-        """
-        return await self._pending.find_one_and_update(
-            {"_id": oid, "approving_at": {"$exists": False}},
-            {"$set": {"approving_at": now}},
-        )
-
-    async def release_pending_claim(self, oid: ObjectId) -> None:
-        await self._pending.update_one({"_id": oid}, {"$unset": {"approving_at": ""}})
-
-    async def insert_pending_match(
-        self, match_doc: Mapping[str, Any], *, session: AsyncClientSession | None = None
-    ) -> ObjectId:
-        res = await self._pending.insert_one(dict(match_doc), session=session)
-        return res.inserted_id
-
-    async def update_pending_match_set(
-        self,
-        oid: ObjectId,
-        changes: Mapping[str, Any],
-        *,
-        session: AsyncClientSession | None = None,
-    ) -> bool:
-        res = await self._pending.update_one(
-            {"_id": oid}, {"$set": dict(changes)}, session=session
-        )
-        return res.matched_count == 1
-
-    async def replace_pending_match(
-        self,
-        oid: ObjectId,
-        match_doc: Mapping[str, Any],
-        *,
-        session: AsyncClientSession | None = None,
-    ) -> bool:
-        res = await self._pending.replace_one(
-            {"_id": oid}, dict(match_doc), session=session
-        )
-        return res.matched_count == 1
-
-    async def delete_pending_match(
-        self, oid: ObjectId, *, session: AsyncClientSession | None = None
-    ) -> bool:
-        res = await self._pending.delete_one({"_id": oid}, session=session)
-        return res.deleted_count == 1
-
-    async def delete_validated_match(
-        self, oid: ObjectId, *, session: AsyncClientSession | None = None
-    ) -> bool:
-        res = await self._validated.delete_one({"_id": oid}, session=session)
-        return res.deleted_count == 1
-
-    # -------------------- validated matches --------------------
-
-    async def insert_validated_match(
-        self, match_doc: Mapping[str, Any], *, session: AsyncClientSession | None = None
-    ) -> ObjectId:
-        res = await self._validated.insert_one(dict(match_doc), session=session)
-        return res.inserted_id
-
-    # -------------------- subs --------------------
-
-    async def record_sub_in(
-        self,
-        discord_id: str,
-        match_id: ObjectId,
-        *,
-        session: AsyncClientSession | None = None,
-    ) -> None:
-        # One dated row per sub-in, not a counter. A TTL on occurred_at is
-        # what makes the 30-day quota roll; a counter only ever went up.
-        await self._sub_events.insert_one(
-            {
-                "discord_id": Int64(discord_id),
-                "match_id": match_id,
-                "occurred_at": datetime.now(UTC),
-            },
-            session=session,
-        )
-
-    async def remove_sub_in(
-        self,
-        discord_id: str,
-        match_id: ObjectId,
-        *,
-        session: AsyncClientSession | None = None,
-    ) -> None:
-        # Reverting deletes that match's row. The counter it replaces could
-        # be driven below zero by a repeated revert; this cannot.
-        await self._sub_events.delete_one(
-            {"discord_id": Int64(discord_id), "match_id": match_id},
-            session=session,
         )
 
     # -------------------- stats tables --------------------
