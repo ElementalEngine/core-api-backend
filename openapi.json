@@ -336,6 +336,30 @@
         "title": "Body_upload_game_report_api_v1_upload_game_report__post",
         "type": "object"
       },
+      "Body_upload_match_api_v2_matches_post": {
+        "properties": {
+          "discord_message_id": {
+            "title": "Discord Message Id",
+            "type": "string"
+          },
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          },
+          "is_cloud": {
+            "title": "Is Cloud",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "is_cloud",
+          "discord_message_id"
+        ],
+        "title": "Body_upload_match_api_v2_matches_post",
+        "type": "object"
+      },
       "ChangeOrder": {
         "properties": {
           "discord_message_id": {
@@ -429,6 +453,19 @@
           "discord_user_id"
         ],
         "title": "CompleteRegistrationSessionRequest",
+        "type": "object"
+      },
+      "ContestBody": {
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ContestBody",
         "type": "object"
       },
       "ContestReport": {
@@ -1483,6 +1520,19 @@
         "title": "PlayerSchema",
         "type": "object"
       },
+      "PlayersPatch": {
+        "properties": {
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/SeatPatchIn"
+            },
+            "title": "Players",
+            "type": "array"
+          }
+        },
+        "title": "PlayersPatch",
+        "type": "object"
+      },
       "RankRoleRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1999,6 +2049,64 @@
         ],
         "title": "RoleIntent",
         "type": "string"
+      },
+      "SeatPatchIn": {
+        "description": "One seat's requested changes. Absent means unchanged (D89, D154).\n\n`sub_out` is three-state: absent leaves the pairing alone, a discord id\ncreates or repoints it, null clears it. Nothing else is nullable -- a\nnull placement would otherwise read as \"unchanged\" on one path and as a\nvalue on another, which is the kind of silence this route exists to\nremove.",
+        "properties": {
+          "discord_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discord Id"
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placement"
+          },
+          "quit": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quit"
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "integer"
+          },
+          "sub_out": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Out"
+          }
+        },
+        "required": [
+          "seat"
+        ],
+        "title": "SeatPatchIn",
+        "type": "object"
       },
       "SelfServiceRegistrationRequest": {
         "additionalProperties": false,
@@ -5274,6 +5382,602 @@
         "summary": "Get Civ Data",
         "tags": [
           "civ-data"
+        ]
+      }
+    },
+    "/api/v2/matches": {
+      "post": {
+        "operationId": "upload_match_api_v2_matches_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_match_api_v2_matches_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Match",
+        "tags": [
+          "matches-v2"
+        ]
+      }
+    },
+    "/api/v2/matches/leaderboard": {
+      "get": {
+        "operationId": "get_leaderboard_api_v2_matches_leaderboard_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "game",
+            "required": true,
+            "schema": {
+              "title": "Game",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "game_type",
+            "required": true,
+            "schema": {
+              "title": "Game Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "game_mode",
+            "required": true,
+            "schema": {
+              "title": "Game Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "is_seasonal",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Is Seasonal",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "is_combined",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Is Combined",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaderboardRankingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Leaderboard",
+        "tags": [
+          "matches-v2"
+        ]
+      }
+    },
+    "/api/v2/matches/{match_id}": {
+      "delete": {
+        "operationId": "delete_match_api_v2_matches__match_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-is-staff",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "X-Actor-Is-Staff",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Match",
+        "tags": [
+          "matches-v2"
+        ]
+      },
+      "get": {
+        "operationId": "get_match_api_v2_matches__match_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Match",
+        "tags": [
+          "matches-v2"
+        ]
+      }
+    },
+    "/api/v2/matches/{match_id}/approve": {
+      "post": {
+        "operationId": "approve_match_api_v2_matches__match_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Match",
+        "tags": [
+          "matches-v2"
+        ]
+      }
+    },
+    "/api/v2/matches/{match_id}/contest": {
+      "post": {
+        "operationId": "contest_match_api_v2_matches__match_id__contest_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-is-staff",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "X-Actor-Is-Staff",
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Contest Match",
+        "tags": [
+          "matches-v2"
+        ]
+      }
+    },
+    "/api/v2/matches/{match_id}/players": {
+      "patch": {
+        "operationId": "patch_players_api_v2_matches__match_id__players_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-is-staff",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "X-Actor-Is-Staff",
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayersPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Players",
+        "tags": [
+          "matches-v2"
+        ]
+      }
+    },
+    "/api/v2/matches/{match_id}/revert": {
+      "post": {
+        "operationId": "revert_match_api_v2_matches__match_id__revert_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert Match",
+        "tags": [
+          "matches-v2"
         ]
       }
     },
