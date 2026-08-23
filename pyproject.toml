@@ -17,6 +17,8 @@ select = ["E4", "E7", "E9", "F", "B023"]
 "app/features/matches/service.py" = ["E711", "E712"]  # E712:550 is NOT a safe
                                                       # fix: None == False
                                                       # differs from not None. S6.
+"app/features/matches/editing.py" = ["E712"]  # the same set_player_order
+                                              # site, moved verbatim in S6.
 "app/features/matches/parsers/civ6.py" = ["B023"]  # not firing; the
                                        # closure is called inside its own
                                        # iteration. §4 item 58.
@@ -33,7 +35,8 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = [
   "app.features.matches.approval",     # None-unsafety, moved from service. S3.
-  "app.features.matches.service",      # None-unsafety. S6.
+  "app.features.matches.service",  # slimmed S6; re-measure when the applier opens it (item 66)
+    "app.features.matches.editing",  # v1 bodies moved verbatim from service (S6, D114); items 18/19 sites die with the declarative rewrite      # None-unsafety. S6.
   "app.features.stats.service",        # object-typed doc reads. S7.
 ]
 ignore_errors = true
