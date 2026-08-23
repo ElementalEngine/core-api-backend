@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, TYPE_CHECKING
+from typing import Any, Dict, Mapping, Optional, Sequence, TYPE_CHECKING
 
 from bson import ObjectId
 
 from app.features.matches.errors import MatchServiceError, NotFoundError
 from app.features.matches.models import ContestReport, MatchModel, PlayerModel
+from app.features.matches.validation import (
+    SeatPatch,
+    UnsetType,
+    validate_players_patch,
+)
 
 if TYPE_CHECKING:
     from app.features.matches.service import MatchService
@@ -374,3 +379,152 @@ class EditingService:
         await self._m.q.replace_pending_match(oid, match.dict())
         logger.info("✅ 🔄 Match %s contested by %s", match_id, contestor_discord_id)
         return await self._reload_pending(oid)
+
+    async def patch_players(
+        self,
+        match_id: str,
+        patch: Sequence[SeatPatch],
+        *,
+        actor_is_staff: bool,
+    ) -> Dict[str, Any]:
+        """C1's declarative PATCH: one request, one judgement, one recompute.
+
+        The whole patch is judged before any write, so a rejection leaves
+        the document untouched -- partial application is impossible by
+        construction rather than by care (D89, D151).
+        """
+        oid = self._m._to_oid(match_id)
+        res = await self._m.q.find_pending_by_id(oid)
+        if not res:
+            raise NotFoundError("Match not found")
+
+        match = MatchModel(**res)
+        violations = validate_players_patch(match, patch, actor_is_staff=actor_is_staff)
+        if violations:
+            raise MatchServiceError(" ".join(v.message for v in violations))
+
+        wanted = sorted(
+            {
+                value
+                for entry in patch
+                for value in (entry.discord_id, entry.sub_out)
+                if isinstance(value, str)
+            }
+        )
+        steam_ids = {
+            discord_id: await self._m.discord_to_steam_id(discord_id)
+            for discord_id in wanted
+        }
+
+        apply_players_patch(match, patch, steam_ids)
+        match = await self._m._recompute_deltas(match)
+
+        await self._m.q.replace_pending_match(oid, match.dict())
+        logger.info(
+            "PATCH applied to %d seat(s) on match %s",
+            len({e.seat for e in patch}),
+            match_id,
+        )
+        return await self._reload_pending(oid)
+
+
+def apply_players_patch(
+    match: MatchModel,
+    patch: Sequence[SeatPatch],
+    steam_ids: Mapping[str, Optional[str]],
+) -> None:
+    """Apply a validated patch in place (D154).
+
+    A seat is a position in the pre-patch array, so field mutations run
+    first and structural substitution operations last, in descending seat
+    order. Descending means each insert or pop only disturbs positions
+    above itself. Ascending substitutes the wrong player: after an insert
+    at a low seat, every higher seat names the row below the one the
+    client meant, and the result is well formed -- pairing intact,
+    adjacency intact -- so nothing downstream catches it.
+
+    Assumes validate_players_patch returned no violations.
+    """
+    last: Dict[int, SeatPatch] = {}
+    for entry in patch:
+        last[entry.seat] = entry
+
+    for seat, entry in sorted(last.items()):
+        row = match.players[seat]
+        if not isinstance(entry.discord_id, UnsetType):
+            row.discord_id = entry.discord_id
+            row.steam_id = steam_ids.get(entry.discord_id, row.steam_id)
+        if not isinstance(entry.quit, UnsetType):
+            row.quit = entry.quit
+        if not isinstance(entry.placement, UnsetType):
+            row.placement = entry.placement
+            leaver = _leaver_index(match, seat)
+            if leaver is not None:
+                match.players[leaver].placement = entry.placement
+
+    structural = [
+        (seat, entry.sub_out)
+        for seat, entry in last.items()
+        if not isinstance(entry.sub_out, UnsetType)
+    ]
+    for seat, sub_out in sorted(structural, key=lambda p: p[0], reverse=True):
+        _apply_sub(match, seat, sub_out, steam_ids)
+
+
+def _leaver_index(match: MatchModel, seat: int) -> Optional[int]:
+    """The synthetic row paired with a seat, by the adjacency v1 builds.
+
+    assign_sub inserts the leaver at sub_in_idx + 1, remove_sub reads
+    idx - 1 and set_player_order copies the placement from the row above.
+    Three sites depend on it and one has already been wrong once
+    (`fix: pop wrong index`), so it is read here, never assumed.
+    """
+    nxt = seat + 1
+    if nxt < len(match.players) and match.players[nxt].subbed_out:
+        return nxt
+    return None
+
+
+def _apply_sub(
+    match: MatchModel,
+    seat: int,
+    sub_out: Optional[str],
+    steam_ids: Mapping[str, Optional[str]],
+) -> None:
+    row = match.players[seat]
+    leaver = _leaver_index(match, seat)
+
+    if sub_out is None:
+        if leaver is None:
+            return
+        row.is_sub = False
+        match.players.pop(leaver)
+        return
+
+    if leaver is not None:
+        # Repoint rather than insert a second row. This is item 79's guard:
+        # v1's assign_sub checks only the range, so subbing one seat twice
+        # strands two leavers on one team and rates a duel as 2v1. The
+        # declarative shape makes the guard structural, not a check.
+        match.players[leaver].discord_id = sub_out
+        match.players[leaver].steam_id = steam_ids.get(sub_out)
+        return
+
+    row.is_sub = True
+    match.players.insert(
+        seat + 1,
+        PlayerModel(
+            steam_id=steam_ids.get(sub_out),
+            user_name=None,
+            civ=row.civ,
+            team=row.team,
+            leader=row.leader,
+            player_alive=row.player_alive,
+            discord_id=sub_out,
+            placement=row.placement,
+            quit=False,
+            delta=0.0,
+            is_sub=False,
+            subbed_out=True,
+        ),
+    )
