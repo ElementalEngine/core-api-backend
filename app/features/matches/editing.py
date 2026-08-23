@@ -360,7 +360,7 @@ class EditingService:
         match_id: str,
         contestor_discord_id: str,
         reason: str,
-        discord_message_id: str,
+        discord_message_id: str | None = None,
     ) -> Dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
@@ -372,9 +372,11 @@ class EditingService:
             contestor_discord_id=contestor_discord_id, reason=reason
         )
         match.contest_report_list.append(contest_report_entry)
-        match.discord_messages_id_list = match.discord_messages_id_list + [
-            discord_message_id
-        ]
+        # v2 contests are ephemeral (D102), so there is no message to record.
+        if discord_message_id is not None:
+            match.discord_messages_id_list = match.discord_messages_id_list + [
+                discord_message_id
+            ]
 
         await self._m.q.replace_pending_match(oid, match.dict())
         logger.info("✅ 🔄 Match %s contested by %s", match_id, contestor_discord_id)

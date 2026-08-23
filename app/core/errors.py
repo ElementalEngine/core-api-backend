@@ -57,6 +57,19 @@ def _error_envelope(
     return {"detail": payload.model_dump()}
 
 
+def api_error(
+    *, code: str, message: str, status_code: int, retryable: bool = False
+) -> HTTPException:
+    """Raise through D92's envelope. S6 uses three codes on /api/v2/matches;
+    S7 adds the closed enum, the INTERNAL catch-all and correlation_id."""
+    return HTTPException(
+        status_code=status_code,
+        detail=_error_envelope(code=code, message=message, retryable=retryable)[
+            "detail"
+        ],
+    )
+
+
 async def request_validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
