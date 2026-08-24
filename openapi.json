@@ -211,6 +211,32 @@
         "title": "BatchStatsResponse",
         "type": "object"
       },
+      "BatchStatsResponseV2": {
+        "properties": {
+          "civ_version": {
+            "title": "Civ Version",
+            "type": "string"
+          },
+          "game_type": {
+            "title": "Game Type",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/UserStatsResponseV2"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "civ_version",
+          "game_type",
+          "results"
+        ],
+        "title": "BatchStatsResponseV2",
+        "type": "object"
+      },
       "Body_get_match_api_v1_get_match__put": {
         "properties": {
           "match_id": {
@@ -222,89 +248,6 @@
           "match_id"
         ],
         "title": "Body_get_match_api_v1_get_match__put",
-        "type": "object"
-      },
-      "Body_put_get_user_stats_api_v1_get_user_stats__put": {
-        "properties": {
-          "civ_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Civ Version"
-          },
-          "discord_id": {
-            "title": "Discord Id",
-            "type": "string"
-          },
-          "game_type": {
-            "title": "Game Type",
-            "type": "string"
-          },
-          "version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Version"
-          }
-        },
-        "required": [
-          "game_type",
-          "discord_id"
-        ],
-        "title": "Body_put_get_user_stats_api_v1_get_user_stats__put",
-        "type": "object"
-      },
-      "Body_put_get_users_stats_batch_api_v1_get_user_stats_batch__put": {
-        "properties": {
-          "civ_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Civ Version"
-          },
-          "discord_id_list": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Discord Id List",
-            "type": "array"
-          },
-          "game_type": {
-            "title": "Game Type",
-            "type": "string"
-          },
-          "version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Version"
-          }
-        },
-        "required": [
-          "game_type",
-          "discord_id_list"
-        ],
-        "title": "Body_put_get_users_stats_batch_api_v1_get_user_stats_batch__put",
         "type": "object"
       },
       "Body_upload_game_report_api_v1_upload_game_report__post": {
@@ -2249,6 +2192,61 @@
         "title": "StatRow",
         "type": "object"
       },
+      "StatRowV2": {
+        "properties": {
+          "first": {
+            "title": "First",
+            "type": "integer"
+          },
+          "games": {
+            "title": "Games",
+            "type": "integer"
+          },
+          "lastModified": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastmodified"
+          },
+          "mu": {
+            "title": "Mu",
+            "type": "integer"
+          },
+          "rating_gains": {
+            "title": "Rating Gains",
+            "type": "integer"
+          },
+          "sigma": {
+            "title": "Sigma",
+            "type": "number"
+          },
+          "subbedIn": {
+            "default": 0,
+            "title": "Subbedin",
+            "type": "integer"
+          },
+          "subbedOut": {
+            "default": 0,
+            "title": "Subbedout",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "mu",
+          "sigma",
+          "games",
+          "first",
+          "rating_gains"
+        ],
+        "title": "StatRowV2",
+        "type": "object"
+      },
       "StatSet": {
         "properties": {
           "duel": {
@@ -2283,6 +2281,42 @@
           }
         },
         "title": "StatSet",
+        "type": "object"
+      },
+      "StatSetV2": {
+        "properties": {
+          "duel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatRowV2"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ffa": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatRowV2"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "teamer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatRowV2"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "StatSetV2",
         "type": "object"
       },
       "SupportedGame": {
@@ -2537,6 +2571,37 @@
           "season"
         ],
         "title": "UserStatsResponse",
+        "type": "object"
+      },
+      "UserStatsResponseV2": {
+        "properties": {
+          "civ_version": {
+            "title": "Civ Version",
+            "type": "string"
+          },
+          "discord_id": {
+            "title": "Discord Id",
+            "type": "string"
+          },
+          "game_type": {
+            "title": "Game Type",
+            "type": "string"
+          },
+          "lifetime": {
+            "$ref": "#/components/schemas/StatSetV2"
+          },
+          "season": {
+            "$ref": "#/components/schemas/StatSetV2"
+          }
+        },
+        "required": [
+          "discord_id",
+          "civ_version",
+          "game_type",
+          "lifetime",
+          "season"
+        ],
+        "title": "UserStatsResponseV2",
         "type": "object"
       },
       "ValidationError": {
@@ -3800,124 +3865,6 @@
         "summary": "Get Match",
         "tags": [
           "matches"
-        ]
-      }
-    },
-    "/api/v1/get-user-stats-batch/": {
-      "put": {
-        "operationId": "put_get_users_stats_batch_api_v1_get_user_stats_batch__put",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_put_get_users_stats_batch_api_v1_get_user_stats_batch__put"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BatchStatsResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Put Get Users Stats Batch",
-        "tags": [
-          "stats"
-        ]
-      }
-    },
-    "/api/v1/get-user-stats/": {
-      "put": {
-        "operationId": "put_get_user_stats_api_v1_get_user_stats__put",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_put_get_user_stats_api_v1_get_user_stats__put"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserStatsResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Put Get User Stats",
-        "tags": [
-          "stats"
         ]
       }
     },
@@ -5978,6 +5925,276 @@
         "summary": "Revert Match",
         "tags": [
           "matches-v2"
+        ]
+      }
+    },
+    "/api/v2/stats/batch": {
+      "post": {
+        "operationId": "get_users_stats_batch_api_v2_stats_batch_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchStatsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchStatsResponseV2"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Users Stats Batch",
+        "tags": [
+          "stats-v2"
+        ]
+      }
+    },
+    "/api/v2/stats/reset/user": {
+      "put": {
+        "operationId": "reset_user_stats_api_v2_stats_reset_user_put",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "civ_version",
+            "required": true,
+            "schema": {
+              "title": "Civ Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "game_type",
+            "required": true,
+            "schema": {
+              "title": "Game Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "discord_id",
+            "required": true,
+            "schema": {
+              "title": "Discord Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserStatsResponseV2"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset User Stats",
+        "tags": [
+          "stats-v2"
+        ]
+      }
+    },
+    "/api/v2/stats/team-gen": {
+      "post": {
+        "operationId": "get_team_gen_api_v2_stats_team_gen_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamGenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamGenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Team Gen",
+        "tags": [
+          "stats-v2"
+        ]
+      }
+    },
+    "/api/v2/stats/user": {
+      "get": {
+        "operationId": "get_user_stats_api_v2_stats_user_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "civ_version",
+            "required": true,
+            "schema": {
+              "title": "Civ Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "game_type",
+            "required": true,
+            "schema": {
+              "title": "Game Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "discord_id",
+            "required": true,
+            "schema": {
+              "title": "Discord Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserStatsResponseV2"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get User Stats",
+        "tags": [
+          "stats-v2"
         ]
       }
     },

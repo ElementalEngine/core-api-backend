@@ -11,14 +11,14 @@ from pydantic import SecretStr
 
 from app.core.dependencies import require_mito_token
 from app.features.matches.router import matches_router, upload_router
-from app.features.stats.router import legacy_router as stats_legacy_router
 from app.features.stats.router import router as stats_router
+from app.features.stats.router_v2 import router as stats_v2_router
 
 TOKEN = "mito-test-token"
 
 
 def test_all_mito_facing_routers_carry_the_gate():
-    for router in (matches_router, upload_router, stats_router, stats_legacy_router):
+    for router in (matches_router, upload_router, stats_router, stats_v2_router):
         assert any(
             dependency.dependency is require_mito_token
             for dependency in router.dependencies
