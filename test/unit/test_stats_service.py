@@ -26,13 +26,13 @@ class FakeStatsRepo:
     async def get_player_stat_docs_batch(self, *, discord_ids, **kwargs):
         return {did: dict(doc) for did, doc in self.docs.items() if did in discord_ids}
 
-    async def reset_player_stat_doc(self, **kwargs):
+    async def reset_player_stats(self, **kwargs):
         self.reset_calls.append(kwargs)
 
 
 def make_service(repo) -> StatsService:
     svc = StatsService.__new__(StatsService)
-    svc.repository = repo
+    svc.ratings = repo
     return svc
 
 

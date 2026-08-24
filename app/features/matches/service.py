@@ -117,7 +117,7 @@ class MatchService:
                 leaders={},
             )
 
-        doc = await self.q.get_player_stat_doc(
+        doc = await self.ratings.get_player_stat_doc(
             civ_version=match.game,
             is_seasonal=is_seasonal,
             match_type=match.game_mode,
@@ -440,7 +440,7 @@ class MatchService:
     ) -> Dict[str, Any]:
         is_cloud_game = str(is_cloud).strip().lower() in {"pbc", "cloud", "true", "1"}
 
-        lb = await self.q.get_leaderboard(
+        lb = await self.ratings.get_leaderboard(
             civ_version=civ_version,
             is_seasonal=is_seasonal,
             match_type=match_type,

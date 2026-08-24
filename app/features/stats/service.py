@@ -15,7 +15,7 @@ from app.features.stats.constants import (
     ALLOWED_MATCH_TYPES,
 )
 from app.features.stats.errors import InvalidStatsRequestError, StatsNotFoundError
-from app.features.stats.repository import StatsRepository
+from app.features.ratings.repository import RatingsRepository
 from app.features.ratings.skill import make_ts_env
 from app.features.stats.schemas import (
     StatRow,
@@ -27,7 +27,7 @@ from app.features.stats.schemas import (
 
 class StatsService:
     def __init__(self, client: AsyncMongoClient) -> None:
-        self.repository = StatsRepository(client)
+        self.ratings = RatingsRepository(client)
 
     def _validate(self, civ_version: str, game_type: str) -> Tuple[str, bool]:
         version = (civ_version or "").strip().lower()
@@ -276,7 +276,7 @@ class StatsService:
         }
 
         tasks = [
-            self.repository.get_player_stat_docs_batch(
+            self.ratings.get_player_stat_docs_batch(
                 civ_version=civ_version,
                 is_seasonal=is_seasonal,
                 match_type=match_type,
@@ -313,7 +313,7 @@ class StatsService:
         discord_id: str,
     ):
 
-        await self.repository.reset_player_stat_doc(
+        await self.ratings.reset_player_stats(
             civ_version=civ_version,
             is_cloud=is_cloud,
             discord_id=discord_id,

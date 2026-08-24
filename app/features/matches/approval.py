@@ -177,7 +177,7 @@ class ApprovalService:
                                 leaders=self.revert_existing_leaders(p, pre.leaders),
                                 step=-1,
                             )
-                            await self._m.q.upsert_player_stat_doc(
+                            await self._m.ratings.upsert_player_stat_doc(
                                 civ_version=match.game,
                                 is_seasonal=is_seasonal,
                                 match_type=match.game_mode,
@@ -325,7 +325,7 @@ class ApprovalService:
                                     ),
                                     step=1,
                                 )
-                                await self._m.q.upsert_player_stat_doc(
+                                await self._m.ratings.upsert_player_stat_doc(
                                     civ_version=match.game,
                                     is_seasonal=is_seasonal,
                                     match_type=match.game_mode,

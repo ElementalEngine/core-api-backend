@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from bson.int64 import Int64
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
@@ -13,9 +14,19 @@ from app.core.coerce import as_float
 from app.core.config import settings
 from app.core.constants import COL_RATING_EVENTS, COL_STAT_RESETS, GAMES_DB
 from app.features.ratings.events import build_reset_event
-from app.features.ratings.scope import stat_scope
+from app.features.ratings.scope import (
+    stat_scope,
+    stats_collection_name,
+    stats_db_name,
+)
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class LeaderboardResult:
+    rows: List[Dict[str, Any]]
+    last_updated: Optional[datetime]
 
 
 class RatingsRepository:
@@ -59,6 +70,107 @@ class RatingsRepository:
         if not events:
             return
         await self._events.insert_many(list(events), session=session)
+
+    # -------------------- stat documents --------------------
+
+    def _stats_collection(
+        self,
+        *,
+        civ_version: str,
+        is_seasonal: bool,
+        match_type: str,
+        is_cloud: bool,
+        is_combined: bool,
+    ) -> AsyncCollection:
+        db = self._client[
+            stats_db_name(civ_version=civ_version, is_seasonal=is_seasonal)
+        ]
+        return db[
+            stats_collection_name(
+                match_type=match_type, is_cloud=is_cloud, is_combined=is_combined
+            )
+        ]
+
+    async def get_player_stat_doc(
+        self,
+        *,
+        civ_version: str,
+        is_seasonal: bool,
+        match_type: str,
+        is_cloud: bool,
+        is_combined: bool,
+        discord_id: str,
+        session: Optional[AsyncClientSession] = None,
+    ) -> Optional[Dict[str, Any]]:
+        col = self._stats_collection(
+            civ_version=civ_version,
+            is_seasonal=is_seasonal,
+            match_type=match_type,
+            is_cloud=is_cloud,
+            is_combined=is_combined,
+        )
+        return await col.find_one({"_id": Int64(discord_id)}, session=session)
+
+    async def get_player_stat_docs_batch(
+        self,
+        *,
+        civ_version: str,
+        is_seasonal: bool,
+        match_type: str,
+        is_cloud: bool,
+        is_combined: bool,
+        discord_ids: List[str],
+    ) -> Dict[str, Dict[str, Any]]:
+        """Batch fetch stat docs by discord id.
+
+        Returns mapping: discord_id -> doc for ids that exist.
+        Missing ids are simply absent.
+        """
+        if not discord_ids:
+            return {}
+
+        col = self._stats_collection(
+            civ_version=civ_version,
+            is_seasonal=is_seasonal,
+            match_type=match_type,
+            is_cloud=is_cloud,
+            is_combined=is_combined,
+        )
+
+        ids = [Int64(did) for did in discord_ids]
+        cursor = col.find({"_id": {"$in": ids}})
+        docs = await cursor.to_list(length=len(ids))
+
+        out: Dict[str, Dict[str, Any]] = {}
+        for d in docs:
+            did = d.get("_id")
+            if did is None:
+                continue
+            out[str(int(did))] = d
+        return out
+
+    async def upsert_player_stat_doc(
+        self,
+        *,
+        civ_version: str,
+        is_seasonal: bool,
+        match_type: str,
+        is_cloud: bool,
+        is_combined: bool,
+        discord_id: str,
+        doc: Mapping[str, Any],
+        session: AsyncClientSession | None = None,
+    ) -> None:
+        col = self._stats_collection(
+            civ_version=civ_version,
+            is_seasonal=is_seasonal,
+            match_type=match_type,
+            is_cloud=is_cloud,
+            is_combined=is_combined,
+        )
+        await col.replace_one(
+            {"_id": Int64(discord_id)}, dict(doc), upsert=True, session=session
+        )
 
     async def reset_player_stats(
         self, *, civ_version: str, is_cloud: bool, discord_id: str
@@ -132,5 +244,37 @@ class RatingsRepository:
                     await session.abort_transaction()
                     raise
 
+    async def get_leaderboard(
+        self,
+        *,
+        civ_version: str,
+        is_seasonal: bool,
+        match_type: str,
+        is_cloud: bool,
+        is_combined: bool,
+        min_games: int = 3,
+        limit: int = 100,
+    ) -> LeaderboardResult:
+        col = self._stats_collection(
+            civ_version=civ_version,
+            is_seasonal=is_seasonal,
+            match_type=match_type,
+            is_cloud=is_cloud,
+            is_combined=is_combined,
+        )
 
-__all__ = ["RatingsRepository"]
+        last = await col.find_one(
+            {}, sort=[("lastModified", DESCENDING)], projection={"lastModified": 1}
+        )
+        last_updated = (last or {}).get("lastModified")
+
+        cursor = (
+            col.find({"games": {"$gte": min_games}})
+            .sort({"mu": DESCENDING, "sigma": ASCENDING})
+            .limit(limit)
+        )
+        rows = await cursor.to_list(length=limit)
+        return LeaderboardResult(rows=rows, last_updated=last_updated)
+
+
+__all__ = ["LeaderboardResult", "RatingsRepository"]

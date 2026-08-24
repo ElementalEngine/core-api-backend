@@ -94,6 +94,7 @@ class FakeRepo:
         self.match_doc = match_doc
         self.stat_doc = stat_doc
         self.upserts = []
+        self.events = []
         self.session = FakeSession()
         self.deleted_pending = []
         self.deleted_validated = []
@@ -139,11 +140,6 @@ class FakeRepo:
     async def remove_sub_in(self, discord_id, match_id, session=None):
         self.sub_events_removed.append((discord_id, match_id))
 
-
-class FakeRatings:
-    def __init__(self):
-        self.events = []
-
     async def insert_events(self, events, *, session):
         self.events.extend(events)
 
@@ -151,7 +147,9 @@ class FakeRatings:
 def make_service(repo, ratings=None) -> MatchService:
     svc = MatchService.__new__(MatchService)
     svc.q = repo
-    svc.ratings = ratings if ratings is not None else FakeRatings()
+    # One fake for both: the stat reads and writes moved to RatingsRepository,
+    # so the upsert assertions below still read from the same object.
+    svc.ratings = ratings if ratings is not None else repo
     return svc
 
 
