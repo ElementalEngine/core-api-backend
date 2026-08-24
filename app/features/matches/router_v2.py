@@ -6,7 +6,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, File, Form, Header, UploadFile
 
 from app.core.dependencies import get_database, require_mito_token
-from app.core.errors import api_error
+from app.core.errors import forbidden, invalid_request, not_found
 from app.features.matches.editing import EditingService
 from app.features.matches.errors import (
     InvalidIDError,
@@ -44,25 +44,13 @@ def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:
     return x_actor_is_staff
 
 
-def _not_found(message: str = "Match not found") -> Exception:
-    return api_error(code="NOT_FOUND", message=message, status_code=404)
-
-
-def _forbidden(message: str) -> Exception:
-    return api_error(code="FORBIDDEN", message=message, status_code=403)
-
-
-def _invalid(message: str) -> Exception:
-    return api_error(code="INVALID_REQUEST", message=message, status_code=400)
-
-
 async def _load(svc: MatchService, match_id: str) -> Dict[str, Any]:
     try:
         return await svc.get_match(match_id)
     except NotFoundError as exc:
-        raise _not_found() from exc
+        raise not_found("Match not found") from exc
     except InvalidIDError as exc:
-        raise _invalid(str(exc)) from exc
+        raise invalid_request(str(exc)) from exc
 
 
 def _require_reporter(doc: Dict[str, Any], actor: str, is_staff: bool) -> None:
@@ -70,7 +58,7 @@ def _require_reporter(doc: Dict[str, Any], actor: str, is_staff: bool) -> None:
     if is_staff:
         return
     if doc.get("reporter_discord_id") != actor:
-        raise _forbidden("Only the reporter or staff may edit this match.")
+        raise forbidden("Only the reporter or staff may edit this match.")
 
 
 def _require_player(doc: Dict[str, Any], actor: str, is_staff: bool) -> None:
@@ -82,7 +70,7 @@ def _require_player(doc: Dict[str, Any], actor: str, is_staff: bool) -> None:
     if is_staff:
         return
     if not any(p.get("discord_id") == actor for p in doc.get("players", [])):
-        raise _forbidden("Only a player in this match, or staff, may contest it.")
+        raise forbidden("Only a player in this match, or staff, may contest it.")
 
 
 @router.post("/matches", response_model=MatchResponse)
@@ -100,7 +88,7 @@ async def upload_match(
             raw, actor, is_cloud == "1", discord_message_id
         )
     except ParseError as exc:
-        raise _invalid(f"Unrecognized save file format: {exc}") from exc
+        raise invalid_request(f"Unrecognized save file format: {exc}") from exc
     logger.info("Stored match %s", created["match_id"])
     return created
 
@@ -126,9 +114,9 @@ async def get_leaderboard(
             civ_version=game,
         )
     except NotFoundError as exc:
-        raise _not_found(str(exc)) from exc
+        raise not_found(str(exc)) from exc
     except MatchServiceError as exc:
-        raise _invalid(str(exc)) from exc
+        raise invalid_request(str(exc)) from exc
 
 
 @router.get("/matches/{match_id}", response_model=MatchResponse)
@@ -151,9 +139,9 @@ async def patch_players(
             match_id, body.to_seat_patches(), actor_is_staff=is_staff
         )
     except NotFoundError as exc:
-        raise _not_found() from exc
+        raise not_found("Match not found") from exc
     except MatchServiceError as exc:
-        raise _invalid(str(exc)) from exc
+        raise invalid_request(str(exc)) from exc
 
 
 @router.post("/matches/{match_id}/approve", response_model=MatchResponse)
@@ -168,9 +156,9 @@ async def approve_match(
     try:
         return await svc.approve_match(match_id, actor)
     except NotFoundError as exc:
-        raise _not_found() from exc
+        raise not_found("Match not found") from exc
     except (InvalidIDError, MatchServiceError) as exc:
-        raise _invalid(str(exc)) from exc
+        raise invalid_request(str(exc)) from exc
 
 
 @router.post("/matches/{match_id}/contest", response_model=MatchResponse)
@@ -186,9 +174,9 @@ async def contest_match(
     try:
         return await EditingService(svc).contest_report(match_id, actor, body.reason)
     except NotFoundError as exc:
-        raise _not_found() from exc
+        raise not_found("Match not found") from exc
     except MatchServiceError as exc:
-        raise _invalid(str(exc)) from exc
+        raise invalid_request(str(exc)) from exc
 
 
 @router.post("/matches/{match_id}/revert", response_model=MatchResponse)
@@ -198,9 +186,9 @@ async def revert_match(match_id: str, db=Depends(get_database)) -> Dict[str, Any
     try:
         return await svc.revert_match(match_id)
     except NotFoundError as exc:
-        raise _not_found() from exc
+        raise not_found("Match not found") from exc
     except (InvalidIDError, MatchServiceError) as exc:
-        raise _invalid(str(exc)) from exc
+        raise invalid_request(str(exc)) from exc
 
 
 @router.delete("/matches/{match_id}", response_model=MatchResponse)
@@ -215,6 +203,6 @@ async def delete_match(
     try:
         return await EditingService(svc).delete_pending_match(match_id)
     except NotFoundError as exc:
-        raise _not_found() from exc
+        raise not_found("Match not found") from exc
     except MatchServiceError as exc:
-        raise _invalid(str(exc)) from exc
+        raise invalid_request(str(exc)) from exc

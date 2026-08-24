@@ -69,6 +69,18 @@ def api_error(
     )
 
 
+def invalid_request(message: str) -> HTTPException:
+    return api_error(code="INVALID_REQUEST", message=message, status_code=400)
+
+
+def forbidden(message: str) -> HTTPException:
+    return api_error(code="FORBIDDEN", message=message, status_code=403)
+
+
+def not_found(message: str) -> HTTPException:
+    return api_error(code="NOT_FOUND", message=message, status_code=404)
+
+
 async def request_validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
