@@ -28,7 +28,7 @@ from pymongo import MongoClient  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
 from app.core.constants import COL_STAT_RESETS, GAMES_DB  # noqa: E402
-from app.shared.persistence.mongo_queries import COL_VALIDATED_MATCHES  # noqa: E402
+from app.features.matches.repository import COL_VALIDATED_MATCHES  # noqa: E402
 
 MARKER = {"stat_reset": {"$exists": True}}
 

@@ -9,8 +9,7 @@ from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
 from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.collection import AsyncCollection
 
-from app.core.constants import COL_SUB_EVENTS, GAMES_DB
-from app.shared.persistence.mongo_queries import MongoQueries
+from app.core.constants import COL_SUB_EVENTS, COL_USERS, DB_SERVER_MEMBERS, GAMES_DB
 
 # ---- match collection names (single source of truth, D157) ----
 
@@ -18,20 +17,40 @@ COL_PENDING_MATCHES = "pending_matches"
 COL_VALIDATED_MATCHES = "validated_matches"
 
 
-class MatchRepository(MongoQueries):
+class MatchRepository:
     """Every read and write against the match collections (D157, S6).
 
-    The three handles live here rather than on MongoQueries because nothing
-    else uses them and ensure_indexes below already declares their indexes.
-    The subclass stays until S7 gives MatchService a stats collaborator.
+    The three handles live here because nothing else uses them and
+    ensure_indexes below already declares their indexes.
     """
 
     def __init__(self, client: AsyncMongoClient) -> None:
-        super().__init__(client)
+        self._client = client
         mr = client[GAMES_DB]
         self._pending: AsyncCollection = mr[COL_PENDING_MATCHES]
         self._validated: AsyncCollection = mr[COL_VALIDATED_MATCHES]
         self._sub_events: AsyncCollection = mr[COL_SUB_EVENTS]
+        self._users: AsyncCollection = client[DB_SERVER_MEMBERS][COL_USERS]
+
+    # -------------------- session and user lookups --------------------
+    # From MongoQueries, which S7 deleted. MatchService is the only caller
+    # of the lookups; auth keeps its own against the same collection.
+
+    async def start_session(self) -> AsyncClientSession:
+        return self._client.start_session()
+
+    async def get_user_by_discord_id(self, discord_id: str) -> Optional[Dict[str, Any]]:
+        return await self._users.find_one({"discord_id": discord_id})
+
+    async def get_user_by_steam_id(self, steam_id: str) -> Optional[Dict[str, Any]]:
+        return await self._users.find_one(
+            {
+                "$or": [
+                    {"steam_id": steam_id},
+                    {"linked_platform": "steam", "linked_account_id": steam_id},
+                ]
+            }
+        )
 
     async def find_pending_by_hash(
         self, save_file_hash: str
