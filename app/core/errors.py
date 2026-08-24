@@ -29,12 +29,20 @@ class AppDependencyError(RuntimeError):
     """Raised when core app state is unavailable."""
 
 
+# Fixed, and never str(exc): an unhandled error must not leak its own text
+# to a client. The correlation id is how it is traced instead.
+INTERNAL_MESSAGE = (
+    "Something went wrong on our side. Quote the correlation id if you report this."
+)
+
+
 def _error_envelope(
     *,
     code: str,
     message: str,
     details: Any | None = None,
     retryable: bool,
+    correlation_id: str | None = None,
 ) -> dict[str, Any]:
     payload = ErrorResponse(
         error=ErrorDetail(
@@ -42,7 +50,7 @@ def _error_envelope(
             message=message,
             details=details,
             retryable=retryable,
-            correlation_id=None,
+            correlation_id=correlation_id,
         )
     )
     return {"detail": payload.model_dump()}
@@ -85,5 +93,30 @@ async def app_dependency_exception_handler(
             code="DEPENDENCY_UNAVAILABLE",
             message="A backend dependency is unavailable right now. Please try again.",
             retryable=True,
+        ),
+    )
+
+
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """D92's catch-all: INTERNAL / 500 / retryable false, never 503.
+
+    503 is reserved for Mongo unreachable and the dependency gate. A bug is
+    not a transient fault, and dressing one as a retryable outage invites the
+    client to retry it forever.
+    """
+    correlation_id = str(getattr(request.state, "correlation_id", "") or "")
+    logger.exception(
+        "Unhandled error correlation_id=%s method=%s path=%s",
+        correlation_id,
+        request.method,
+        request.url.path,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=_error_envelope(
+            code="INTERNAL",
+            message=INTERNAL_MESSAGE,
+            retryable=False,
+            correlation_id=correlation_id,
         ),
     )
