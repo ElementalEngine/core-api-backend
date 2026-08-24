@@ -11,7 +11,7 @@ from app.features.matches.models import MatchModel, PlayerModel, StatModel
 from app.features.matches.tallies import bump, stat_legs
 from app.core.coerce import as_float
 from app.features.ratings.events import build_match_event
-from app.shared.persistence.mongo_queries import stat_scope
+from app.features.ratings.scope import stat_scope
 
 if TYPE_CHECKING:
     from app.features.matches.service import MatchService

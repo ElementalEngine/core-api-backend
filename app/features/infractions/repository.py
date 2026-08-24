@@ -13,7 +13,7 @@ from app.features.infractions.models import (
     PendingSuspensionDocument,
     SuspensionDocument,
 )
-from app.shared.persistence.mongo_queries import DB_SERVER_MEMBERS
+from app.core.constants import DB_SERVER_MEMBERS
 
 COL_SUSPENSIONS: Final[str] = "suspensions"
 COL_SUSPENSIONS_DUE: Final[str] = "suspensions_due"

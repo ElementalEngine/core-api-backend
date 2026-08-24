@@ -13,7 +13,7 @@ from app.features.auth.constants import (
     COL_REGISTRATION_OPERATIONS,
     COL_REGISTRATION_SESSIONS,
 )
-from app.shared.persistence.mongo_queries import COL_USERS, DB_SERVER_MEMBERS
+from app.core.constants import COL_USERS, DB_SERVER_MEMBERS
 
 
 class AuthRepository:

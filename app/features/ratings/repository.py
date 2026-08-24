@@ -13,7 +13,7 @@ from app.core.coerce import as_float
 from app.core.config import settings
 from app.core.constants import COL_RATING_EVENTS, COL_STAT_RESETS, GAMES_DB
 from app.features.ratings.events import build_reset_event
-from app.shared.persistence.mongo_queries import stat_scope
+from app.features.ratings.scope import stat_scope
 
 logger = logging.getLogger(__name__)
 

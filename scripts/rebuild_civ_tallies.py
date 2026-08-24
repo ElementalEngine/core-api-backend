@@ -36,7 +36,7 @@ from pymongo import MongoClient, UpdateOne  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.core.constants import GAMES_DB  # noqa: E402
 from app.features.matches.tallies import bump, is_rated, stat_legs  # noqa: E402
-from app.shared.persistence.mongo_queries import stat_scope  # noqa: E402
+from app.features.ratings.scope import stat_scope  # noqa: E402
 
 EDITIONS = ("civ6", "civ7")
 MODES = ("ffa", "teamer", "duel")
