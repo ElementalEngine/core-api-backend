@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import random
+from datetime import datetime
 from typing import Dict, List, Tuple
 
 from pymongo import AsyncMongoClient
 
+from app.core.coerce import as_float, as_int
 from app.core.config import settings
 from app.features.stats.constants import (
     ALLOWED_CIV_VERSIONS,
@@ -39,18 +41,20 @@ class StatsService:
         return version, normalized_game_type == "cloud"
 
     def _doc_to_row(self, doc: Dict[str, object]) -> StatRow:
-        mu_raw = float(doc.get("mu", settings.ts_mu))
-        sigma_raw = float(doc.get("sigma", settings.ts_sigma))
+        mu_raw = as_float(doc.get("mu"), settings.ts_mu)
+        sigma_raw = as_float(doc.get("sigma"), settings.ts_sigma)
+        raw_modified = doc.get("lastModified")
+        last_modified = raw_modified if isinstance(raw_modified, datetime) else None
 
         return StatRow(
             mu=int(round(mu_raw)),
             sigma=sigma_raw,
-            games=int(doc.get("games", 0)),
-            wins=int(doc.get("wins", 0)),
-            first=int(doc.get("first", 0)),
-            subbedIn=int(doc.get("subbedIn", doc.get("subbed_in", 0))),
-            subbedOut=int(doc.get("subbedOut", doc.get("subbed_out", 0))),
-            lastModified=doc.get("lastModified"),
+            games=as_int(doc.get("games"), 0),
+            wins=as_int(doc.get("wins"), 0),
+            first=as_int(doc.get("first"), 0),
+            subbedIn=as_int(doc.get("subbedIn", doc.get("subbed_in")), 0),
+            subbedOut=as_int(doc.get("subbedOut", doc.get("subbed_out")), 0),
+            lastModified=last_modified,
         )
 
     @staticmethod

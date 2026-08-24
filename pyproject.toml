@@ -34,10 +34,9 @@ ignore_missing_imports = true
 # rewrites its file, and that removal is part of that sub-phase's acceptance.
 [[tool.mypy.overrides]]
 module = [
-  "app.features.matches.approval",     # None-unsafety, moved from service. S3.
-  "app.features.matches.service",  # slimmed S6; re-measure when the applier opens it (item 66)
-    "app.features.matches.editing",  # v1 bodies moved verbatim from service (S6, D114); items 18/19 sites die with the declarative rewrite      # None-unsafety. S6.
-  "app.features.stats.service",        # object-typed doc reads. S7.
+  "app.features.matches.approval",  # None-unsafety, moved from service. S3.
+  "app.features.matches.service",   # slimmed S6; re-measure when the applier opens it (item 66)
+  "app.features.matches.editing",   # v1 bodies moved verbatim from service (S6, D114); items 18/19 sites die with the declarative rewrite
 ]
 ignore_errors = true
 
