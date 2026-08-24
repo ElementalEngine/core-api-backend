@@ -90,11 +90,6 @@ class MongoQueries:
     async def start_session(self) -> AsyncClientSession:
         return self._client.start_session()
 
-    async def ping(self) -> bool:
-        # Motor returns a dict like {"ok": 1.0}
-        res = await self._client.admin.command("ping")
-        return bool(res.get("ok"))
-
     # -------------------- users --------------------
 
     async def get_user_by_discord_id(self, discord_id: str) -> Optional[Dict[str, Any]]:
