@@ -23,6 +23,7 @@ from app.features.matches.schemas import (
     SetPlayerOrder,
     TriggerQuit,
 )
+from app.features.matches.leaderboard import LeaderboardService
 from app.features.matches.service import (
     InvalidIDError,
     MatchService,
@@ -384,7 +385,7 @@ async def revert_match(payload: RevertMatchRequest = Form(), db=Depends(get_data
 async def get_leaderboard_ranking(
     payload: GetLeaderboardRequest = Form(), db=Depends(get_database)
 ):
-    svc = MatchService(db)
+    svc = LeaderboardService(db)
     try:
         # NOTE: parameter order matters here.
         # - game: civ_version (civ6|civ7)

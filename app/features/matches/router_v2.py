@@ -18,6 +18,7 @@ from app.features.matches.ingest import IngestService
 from app.features.matches.router import _read_capped
 from app.features.matches.schemas import LeaderboardRankingResponse, MatchResponse
 from app.features.matches.schemas_v2 import ContestBody, PlayersPatch
+from app.features.matches.leaderboard import LeaderboardService
 from app.features.matches.service import MatchService
 
 logger = logging.getLogger(__name__)
@@ -115,7 +116,7 @@ async def get_leaderboard(
     is_combined: bool = False,
     db=Depends(get_database),
 ) -> Any:
-    svc = MatchService(db)
+    svc = LeaderboardService(db)
     try:
         return await svc.get_leaderboard(
             match_type=game_mode,

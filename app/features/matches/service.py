@@ -2,7 +2,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
@@ -429,52 +428,6 @@ class MatchService:
         self, match_id: str, approver_discord_id: str
     ) -> Dict[str, Any]:
         return await ApprovalService(self).approve_match(match_id, approver_discord_id)
-
-    async def get_leaderboard(
-        self,
-        match_type: str,
-        is_cloud: str,
-        is_seasonal: bool,
-        is_combined: bool,
-        civ_version: str,
-    ) -> Dict[str, Any]:
-        is_cloud_game = str(is_cloud).strip().lower() in {"pbc", "cloud", "true", "1"}
-
-        lb = await self.ratings.get_leaderboard(
-            civ_version=civ_version,
-            is_seasonal=is_seasonal,
-            match_type=match_type,
-            is_cloud=is_cloud_game,
-            is_combined=is_combined,
-            min_games=3,
-            limit=100,
-        )
-
-        out: List[Dict[str, Any]] = []
-        for idx, row in enumerate(lb.rows or [], start=1):
-            did = str(row.get("_id"))
-            mu = as_float(row.get("mu"), 0.0)
-            games = as_int(row.get("games"), 0)
-            out.append(
-                {
-                    "rank": idx,
-                    "discord_id": did,
-                    "mu": mu,
-                    "sigma": as_float(row.get("sigma"), 0.0),
-                    "games": games,
-                    # Backwards-compatible aliases for older clients.
-                    "rating": int(round(mu)),
-                    "games_played": games,
-                    "wins": as_int(row.get("wins"), 0),
-                    "first": as_int(row.get("first"), 0),
-                }
-            )
-        last_updated_ts = (
-            int(lb.last_updated.timestamp())
-            if isinstance(lb.last_updated, datetime)
-            else 0
-        )
-        return {"rankings": out, "last_updated": last_updated_ts}
 
 
 __all__ = [
