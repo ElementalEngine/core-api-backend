@@ -87,7 +87,7 @@ async def request_validation_exception_handler(
     return JSONResponse(
         status_code=422,
         content=_error_envelope(
-            code="VALIDATION_ERROR",
+            code="INVALID_REQUEST",
             message="The request failed validation.",
             details={"errors": jsonable_encoder(exc.errors())},
             retryable=False,
@@ -102,7 +102,7 @@ async def app_dependency_exception_handler(
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content=_error_envelope(
-            code="DEPENDENCY_UNAVAILABLE",
+            code="UNAVAILABLE",
             message="A backend dependency is unavailable right now. Please try again.",
             retryable=True,
         ),

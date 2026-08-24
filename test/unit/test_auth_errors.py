@@ -37,7 +37,7 @@ def test_request_validation_handler_returns_enveloped_error():
     body = json.loads(response.body)
 
     assert response.status_code == 422
-    assert body["detail"]["error"]["code"] == "VALIDATION_ERROR"
+    assert body["detail"]["error"]["code"] == "INVALID_REQUEST"
     assert body["detail"]["error"]["retryable"] is False
     assert body["detail"]["error"]["correlation_id"] is None
     errors = body["detail"]["error"]["details"]["errors"]
@@ -52,6 +52,6 @@ def test_app_dependency_handler_returns_enveloped_error():
     body = json.loads(response.body)
 
     assert response.status_code == 503
-    assert body["detail"]["error"]["code"] == "DEPENDENCY_UNAVAILABLE"
+    assert body["detail"]["error"]["code"] == "UNAVAILABLE"
     assert body["detail"]["error"]["retryable"] is True
     assert body["detail"]["error"]["correlation_id"] is None
