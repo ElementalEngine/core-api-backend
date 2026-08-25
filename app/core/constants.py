@@ -7,6 +7,7 @@ GAMES_DB = "match_reporter"
 
 COL_CIV_DATA = "civ_data"
 COL_RATING_EVENTS = "rating_events"
+COL_SEASONS = "seasons"
 COL_STAT_RESETS = "stat_resets"
 COL_SUB_EVENTS = "sub_events"
 
@@ -18,6 +19,7 @@ COL_USERS = "users"
 __all__ = [
     "COL_CIV_DATA",
     "COL_RATING_EVENTS",
+    "COL_SEASONS",
     "COL_STAT_RESETS",
     "COL_SUB_EVENTS",
     "COL_USERS",

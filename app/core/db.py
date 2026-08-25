@@ -16,6 +16,7 @@ from app.features.infractions.repository import (
 )
 from app.features.matches.repository import MatchRepository
 from app.features.ratings.repository import RatingsRepository
+from app.features.seasons.repository import SeasonsRepository
 
 configure_logging()
 logger = logging.getLogger("app.db")
@@ -64,6 +65,9 @@ async def db_lifespan(app: FastAPI):
 
         await CivDataRepository(client).ensure_indexes()
         logger.info("🟢 Civ data indexes ensured")
+
+        await SeasonsRepository(client).ensure_indexes()
+        logger.info("🟢 Season indexes ensured")
 
         yield
     except Exception:
