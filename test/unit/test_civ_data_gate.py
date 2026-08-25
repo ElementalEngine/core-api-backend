@@ -19,15 +19,19 @@ from app.features.civdata.router import router as civ_data_router
 MITO = "mito-test-token"
 LJ = "lj-test-token"
 AUTH = "auth-test-token"
+ACTIVITY = "activity-test-token"
 
 
-def _set_tokens(monkeypatch, mito=MITO, lj=LJ, auth=AUTH) -> None:
+def _set_tokens(monkeypatch, mito=MITO, lj=LJ, auth=AUTH, activity=ACTIVITY) -> None:
     monkeypatch.setattr(dependencies.settings, "mito_service_token", SecretStr(mito))
     monkeypatch.setattr(dependencies.settings, "lj_service_token", SecretStr(lj))
     monkeypatch.setattr(dependencies.settings, "auth_service_token", SecretStr(auth))
+    monkeypatch.setattr(
+        dependencies.settings, "activity_service_token", SecretStr(activity)
+    )
 
 
-@pytest.mark.parametrize("token", [MITO, LJ, AUTH])
+@pytest.mark.parametrize("token", [MITO, LJ, AUTH, ACTIVITY])
 def test_every_configured_service_token_is_admitted(monkeypatch, token):
     _set_tokens(monkeypatch)
     assert require_any_service_token(authorization=f"Bearer {token}") is None
@@ -54,7 +58,7 @@ def test_missing_or_invalid_bearer_answers_401(monkeypatch, authorization):
 
 
 def test_no_token_configured_answers_503(monkeypatch):
-    _set_tokens(monkeypatch, mito="", lj="", auth="")
+    _set_tokens(monkeypatch, mito="", lj="", auth="", activity="")
     with pytest.raises(HTTPException) as exc_info:
         require_any_service_token(authorization=f"Bearer {MITO}")
     assert exc_info.value.status_code == 503

@@ -91,11 +91,16 @@ def require_any_service_token(authorization: str | None = Header(default=None)) 
     Read-only reference data every consumer needs identically, so there is no
     authority to leak by widening the gate (D96). Naming one bot's token here
     would mean re-editing it for each consumer that legitimately reads it.
+
+    The Activity is admitted here (C8) because it drafts from the leader and
+    civ tables. That is the whole of what widening buys it -- the lobby routes
+    take their own gate, per D94.
     """
     configured = [
         settings.mito_service_token.get_secret_value(),
         settings.lj_service_token.get_secret_value(),
         settings.auth_service_token.get_secret_value(),
+        settings.activity_service_token.get_secret_value(),
     ]
     scheme, _, token = (authorization or "").partition(" ")
     if scheme.lower() == "bearer" and token:

@@ -1,7 +1,11 @@
-"""Batch 8.3 — the matches/stats routers are gated behind require_mito_token.
+"""The mito gate, end to end: 401 without the header, admitted with it.
 
-The structural test always runs; the functional test needs httpx (FastAPI's
-TestClient transport) and skips cleanly where it isn't installed.
+The structural half -- "every router carries a gate" -- moved to
+test_route_gates.py in S8 CP3. It looped a hand-maintained tuple that had
+already fallen behind by one router (Correction 65, D169); the replacement
+derives from the app's own route table.
+
+Needs httpx (FastAPI's TestClient transport) and skips cleanly without it.
 """
 
 from __future__ import annotations
@@ -9,20 +13,9 @@ from __future__ import annotations
 import pytest
 from pydantic import SecretStr
 
-from app.core.dependencies import require_mito_token
-from app.features.matches.router import matches_router, upload_router
 from app.features.stats.router import router as stats_router
-from app.features.stats.router_v2 import router as stats_v2_router
 
 TOKEN = "mito-test-token"
-
-
-def test_all_mito_facing_routers_carry_the_gate():
-    for router in (matches_router, upload_router, stats_router, stats_v2_router):
-        assert any(
-            dependency.dependency is require_mito_token
-            for dependency in router.dependencies
-        ), f"router {router.prefix!r} is missing require_mito_token"
 
 
 def test_gate_returns_401_without_header_and_admits_with_it(monkeypatch):

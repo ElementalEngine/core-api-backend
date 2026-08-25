@@ -76,6 +76,15 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("MITO_SERVICE_TOKEN"),
     )
 
+    # Activity service token -- separate from Mito's by D94: the seven
+    # activity routes can submit picks, cancel a draft, and read any lobby as
+    # any actor through D73's per-caller censoring. Empty until S10 provisions
+    # the credential; the routes answer 503 rather than admitting Mito's token.
+    activity_service_token: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("ACTIVITY_SERVICE_TOKEN"),
+    )
+
     # Auth parameters
     auth_service_token: SecretStr = Field(
         default=SecretStr(""),
