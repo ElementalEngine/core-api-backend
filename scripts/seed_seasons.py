@@ -25,10 +25,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from pymongo import AsyncMongoClient  # noqa: E402
-from pymongo.errors import DuplicateKeyError  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
 from app.features.seasons.repository import (  # noqa: E402
+    SeasonsAlreadySeededError,
     SeasonsRepository,
     seed_documents,
 )
@@ -56,8 +56,8 @@ async def main(argv: list[str]) -> int:
         await repo.ensure_indexes()
         try:
             inserted = await repo.seed(documents)
-        except DuplicateKeyError:
-            print("E11000 -- already seeded, nothing written")
+        except SeasonsAlreadySeededError:
+            print("already seeded (E11000) -- nothing written")
             return 1
         print(f"inserted {inserted}")
         for edition in ("civ6", "civ7"):

@@ -19,9 +19,12 @@ from datetime import datetime, timezone
 
 import pytest
 
+from pymongo.errors import BulkWriteError
+
 from app.core.constants import COL_SEASONS, GAMES_DB
 from app.features.seasons.repository import (
     SeasonNotSeededError,
+    SeasonsAlreadySeededError,
     SeasonsRepository,
     clear_cache,
     seed_documents,
@@ -152,6 +155,60 @@ def test_ensure_indexes_declares_the_lookup_and_the_unique_label():
         ("label", 1),
     ]
     assert by_name["unique_label_per_edition"]["unique"] is True
+
+
+class _InsertResult:
+    def __init__(self, ids):
+        self.inserted_ids = ids
+
+
+class SeedingCollection(FakeCollection):
+    """insert_many, with the failure mode chosen by the caller."""
+
+    def __init__(self, raise_codes=None):
+        super().__init__([])
+        self.raise_codes = raise_codes
+        self.inserted = None
+
+    async def insert_many(self, documents):
+        if self.raise_codes is not None:
+            raise BulkWriteError(
+                {
+                    "writeErrors": [
+                        {"index": i, "code": c} for i, c in enumerate(self.raise_codes)
+                    ]
+                }
+            )
+        self.inserted = documents
+        return _InsertResult(list(range(len(documents))))
+
+
+def _seed_repo(collection):
+    return SeasonsRepository({GAMES_DB: {COL_SEASONS: collection}})
+
+
+def test_seed_inserts_every_document_and_returns_the_count():
+    collection = SeedingCollection()
+    docs = seed_documents(NOW)
+    assert asyncio.run(_seed_repo(collection).seed(docs)) == 2
+    assert collection.inserted == docs
+
+
+def test_reseeding_raises_already_seeded_not_a_driver_error():
+    # insert_many raises BulkWriteError; DuplicateKeyError comes only from
+    # insert_one. Catching the wrong one made a re-seed traceback instead of
+    # reporting cleanly -- Entry 11 check 6 found it on the cluster.
+    collection = SeedingCollection(raise_codes=[11000])
+    with pytest.raises(SeasonsAlreadySeededError):
+        asyncio.run(_seed_repo(collection).seed(seed_documents(NOW)))
+
+
+def test_a_non_duplicate_bulk_error_is_not_swallowed():
+    # The case that stops the translation becoming a blanket except: a write
+    # that failed for any other reason must keep its own type.
+    collection = SeedingCollection(raise_codes=[66])
+    with pytest.raises(BulkWriteError):
+        asyncio.run(_seed_repo(collection).seed(seed_documents(NOW)))
 
 
 def test_missing_row_raises_rather_than_returning_none():

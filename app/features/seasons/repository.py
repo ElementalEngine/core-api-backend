@@ -16,6 +16,7 @@ from typing import Any, Dict, List
 
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
 from pymongo.asynchronous.collection import AsyncCollection
+from pymongo.errors import BulkWriteError
 
 from app.core.constants import COL_SEASONS, GAMES_DB
 
@@ -24,12 +25,23 @@ from app.core.constants import COL_SEASONS, GAMES_DB
 # needs no EDITIONS tuple of its own beside civdata's.
 SEED_LABELS: Dict[str, str] = {"civ6": "Season 6", "civ7": "Season 1"}
 
+DUPLICATE_KEY = 11000
+
 
 class SeasonNotSeededError(RuntimeError):
     """No season row exists for an edition.
 
     Returning None instead would surface as an AttributeError where the lobby
     stamps season_id, one layer away from the actual cause.
+    """
+
+
+class SeasonsAlreadySeededError(RuntimeError):
+    """A seed run was rejected by unique_label_per_edition.
+
+    Not a fault: it is the protection that stops a seed -- and later the
+    rollover script -- running twice (D106), named rather than left as a
+    driver traceback.
     """
 
 
@@ -75,9 +87,24 @@ class SeasonsRepository:
 
     async def seed(self, documents: List[Dict[str, Any]]) -> int:
         """Insert the seed rows. Deliberately not an upsert: a second run must
-        raise E11000 against unique_label_per_edition (Entry 11 checks 5, 6).
+        be rejected by unique_label_per_edition (Entry 11 checks 5, 6).
+
+        insert_many raises BulkWriteError; DuplicateKeyError comes only from
+        insert_one. Translated here rather than in the caller because
+        scripts/ sits outside both `mypy files` and `testpaths`, so logic
+        left there is checked by nothing (item 87).
         """
-        result = await self._seasons.insert_many(documents)
+        try:
+            result = await self._seasons.insert_many(documents)
+        except BulkWriteError as exc:
+            write_errors = (exc.details or {}).get("writeErrors") or []
+            if write_errors and all(
+                e.get("code") == DUPLICATE_KEY for e in write_errors
+            ):
+                raise SeasonsAlreadySeededError(
+                    "seasons already holds a row for one of these labels"
+                ) from exc
+            raise
         return len(result.inserted_ids)
 
     async def get_current_season(self, edition: str) -> Dict[str, Any]:
@@ -97,8 +124,10 @@ class SeasonsRepository:
 
 
 __all__ = [
+    "DUPLICATE_KEY",
     "SEED_LABELS",
     "SeasonNotSeededError",
+    "SeasonsAlreadySeededError",
     "SeasonsRepository",
     "clear_cache",
     "seed_documents",
