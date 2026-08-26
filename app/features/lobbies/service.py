@@ -7,8 +7,9 @@ unique indexes do the rest.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from bson import ObjectId
@@ -24,9 +25,17 @@ from app.features.lobbies.schemas import (
 PHASE_LOBBY = "lobby"
 SOURCE_COMMAND = "command"
 
+# D177's staleness threshold. A whole draft is roughly fifteen minutes of
+# timers (spec section 7); an hour untouched is abandoned by any reading,
+# and every seat change bumps `updated_at`, so a lobby with people in it
+# never reaches this.
+STALE_AFTER = timedelta(hours=1)
+
 # The ids Mongo owns. Everything else on a lobby document is already a JSON
 # primitive, a datetime, or a list of them.
 OBJECT_ID_FIELDS = ("_id", "season_id")
+
+logger = logging.getLogger(__name__)
 
 
 class InvalidLobbyId(ValueError):
@@ -203,7 +212,27 @@ class LobbyService:
             request.game_type, request.number_teams, request.team_size
         )
         season = await self._seasons.get_current_season(request.edition)
-        document = build_lobby_document(request, shape, season, datetime.now(UTC))
+        now = datetime.now(UTC)
+
+        # ⚠ D177. `one_active_seat_per_player` turns a stuck lobby into a
+        # stuck player: D74's timers are lazy, and an ABANDONED lobby gets
+        # no read to evaluate them, so the seat is held indefinitely and the
+        # only symptom is a bare E11000 with no route out. The read that
+        # triggers evaluation has to be the NEW lobby's creation -- the one
+        # event guaranteed to happen when the lockout matters to somebody.
+        roster = [player for player in dict.fromkeys(request.roster) if player]
+        if roster:
+            for evicted in await self._repository.evict_stale(
+                roster, now - STALE_AFTER, now
+            ):
+                logger.info(
+                    "evicted stale lobby. lobby=%s channel=%s updated_at=%s",
+                    evicted["_id"],
+                    evicted.get("channel_id"),
+                    evicted.get("updated_at"),
+                )
+
+        document = build_lobby_document(request, shape, season, now)
         # Mite holds no seat, so the create response is the observer view.
         # A `lobby`-phase document has neither censored surface, so that is
         # the whole document -- and it still crosses the one boundary.
@@ -348,6 +377,7 @@ def rearranged(
 
 
 __all__ = [
+    "STALE_AFTER",
     "InvalidLobbyId",
     "LobbyNotFound",
     "LobbyService",

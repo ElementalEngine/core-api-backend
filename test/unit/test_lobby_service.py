@@ -22,6 +22,7 @@ from app.features.lobbies.modes import (
 from app.features.lobbies.projection import BALLOT, PICK, POOL, POOL_APPEARANCES
 from app.features.lobbies.schemas import ChangeSeatRequest, CreateLobbyRequest
 from app.features.lobbies.service import (
+    STALE_AFTER,
     InvalidLobbyId,
     LobbyNotFound,
     LobbyService,
@@ -60,19 +61,27 @@ class FakeSeasons:
 
 
 class FakeRepo:
-    def __init__(self, open_lobbies=None, lobby=None, written=None, reread=None):
+    def __init__(
+        self, open_lobbies=None, lobby=None, written=None, reread=None, stale=None
+    ):
         self.inserted = None
         self.queries = []
         self.asked_for = []
         self.writes = []
+        self.evictions = []
         self._open = open_lobbies or []
         self._lobby = lobby
         self._written = written
         self._reread = reread
+        self._stale = stale or []
 
     async def insert_lobby(self, document):
         self.inserted = document
         return {**document, "_id": "L1"}
+
+    async def evict_stale(self, players, cutoff, now):
+        self.evictions.append((sorted(players), cutoff))
+        return self._stale
 
     async def find_open(self, guild_id, channel_id=None, edition=None, game_type=None):
         self.queries.append((guild_id, channel_id, edition, game_type))
@@ -656,3 +665,42 @@ def test_a_lost_race_at_the_same_revision_names_the_seat_not_the_revision():
         change(repo, actor="bob", seat_index=4)
     assert (exc.value.expected, exc.value.current) == (3, 3)
     assert "already holds a seat" in str(exc.value)
+
+
+# --- D177's eviction ----------------------------------------------------
+
+
+def test_creation_evicts_stale_lobbies_holding_the_roster():
+    # ⚠ D74's timers are lazy and an abandoned lobby gets no read to
+    # evaluate them, so one_active_seat_per_player holds the seat forever
+    # and the only symptom is a bare E11000. The read that triggers
+    # evaluation has to be the NEW lobby's creation.
+    repo = FakeRepo(stale=[{"_id": "OLD", "channel_id": "c9", "updated_at": NOW}])
+    asyncio.run(
+        LobbyService(repo, FakeSeasons()).create(request(roster=["alice", "bob"]))
+    )
+    assert repo.evictions[0][0] == ["alice", "bob"]
+    assert repo.inserted is not None, "creation proceeds after the eviction"
+
+
+def test_the_cutoff_is_an_hour_behind_the_creation():
+    repo = FakeRepo()
+    asyncio.run(LobbyService(repo, FakeSeasons()).create(request(roster=["alice"])))
+    _, cutoff = repo.evictions[0]
+    assert repo.inserted["created_at"] - cutoff == STALE_AFTER
+
+
+def test_an_empty_roster_evicts_nothing():
+    # Nobody is being seated, so no seat can be held elsewhere -- and a
+    # query per empty create would be a round trip for no reason.
+    repo = FakeRepo()
+    asyncio.run(LobbyService(repo, FakeSeasons()).create(request()))
+    assert repo.evictions == []
+
+
+def test_eviction_asks_about_deduplicated_players_only():
+    repo = FakeRepo()
+    asyncio.run(
+        LobbyService(repo, FakeSeasons()).create(request(roster=["a", "a", "", "b"]))
+    )
+    assert repo.evictions[0][0] == ["a", "b"]

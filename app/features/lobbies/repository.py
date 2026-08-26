@@ -36,6 +36,11 @@ OPEN_LOBBY = {"closed_at": None}
 # Filtering on the indexed path itself is Entry 12's proven idiom.
 SEATED_OPEN_LOBBY = {**OPEN_LOBBY, "seats.discord_id": {"$exists": True}}
 
+# Spec section 3: `cancelled` is a phase and the reason is a field. An
+# eviction is not a host cancelling, so it carries its own reason.
+PHASE_CANCELLED = "cancelled"
+CANCEL_ABANDONED = "abandoned"
+
 
 class LobbyInsertRefused(RuntimeError):
     """A unique index refused an insert. `index` names which one."""
@@ -160,6 +165,35 @@ class LobbyRepository:
         result screen the Activity renders once a draft ends.
         """
         return await self._lobbies.find_one({"_id": lobby_id})
+
+    async def evict_stale(
+        self, players: list[str], cutoff: datetime, now: datetime
+    ) -> list[dict[str, Any]]:
+        """Close open lobbies holding any of `players` and untouched since
+        `cutoff`. Returns the ones closed.
+
+        ⚠ `updated_at` repeats on the update filter, not only the find. A
+        lobby touched between the two would otherwise be closed on the
+        strength of a reading that is no longer true.
+        """
+        stale = {**OPEN_LOBBY, "updated_at": {"$lt": cutoff}}
+        found = await self._lobbies.find(
+            {**stale, "seats.discord_id": {"$in": players}}
+        ).to_list(None)
+        if not found:
+            return []
+        await self._lobbies.update_many(
+            {**stale, "_id": {"$in": [lobby["_id"] for lobby in found]}},
+            {
+                "$set": {
+                    "closed_at": now,
+                    "phase": PHASE_CANCELLED,
+                    "cancel_reason": CANCEL_ABANDONED,
+                },
+                "$inc": {"revision": 1},
+            },
+        )
+        return found
 
     async def find_open(
         self,
