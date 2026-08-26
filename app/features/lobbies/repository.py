@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from bson import ObjectId
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import DuplicateKeyError
@@ -111,6 +112,15 @@ class LobbyRepository:
         except DuplicateKeyError as exc:
             raise LobbyInsertRefused(_refusing_index(exc)) from exc
         return {**document, "_id": result.inserted_id}
+
+    async def find_by_id(self, lobby_id: ObjectId) -> dict[str, Any] | None:
+        """One lobby by id, open or closed.
+
+        ⚠ No `closed_at` clause, unlike `find_open`. A completed lobby stays
+        readable: D73's `complete` row shows everything, and that is the
+        result screen the Activity renders once a draft ends.
+        """
+        return await self._lobbies.find_one({"_id": lobby_id})
 
     async def find_open(
         self,

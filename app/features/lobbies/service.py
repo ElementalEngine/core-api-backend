@@ -11,6 +11,8 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
+from bson import ObjectId
+
 from app.features.lobbies.modes import LobbyShape, resolve_shape
 from app.features.lobbies.projection import project_lobby
 from app.features.lobbies.schemas import CreateLobbyRequest
@@ -21,6 +23,32 @@ SOURCE_COMMAND = "command"
 # The ids Mongo owns. Everything else on a lobby document is already a JSON
 # primitive, a datetime, or a list of them.
 OBJECT_ID_FIELDS = ("_id", "season_id")
+
+
+class InvalidLobbyId(ValueError):
+    """The path id is not a well-formed ObjectId.
+
+    Kept distinct from LobbyNotFound on purpose: a malformed id is a caller
+    defect (400) and a well-formed id with no document is an ordinary miss
+    (404). One answer for both would return 404 for a typo and hide the bug.
+    """
+
+
+class LobbyNotFound(LookupError):
+    """No lobby carries that id."""
+
+
+def as_lobby_id(lobby_id: str) -> ObjectId:
+    """The path string as an ObjectId, or InvalidLobbyId.
+
+    ⚠ `ObjectId("nope")` raises `bson.errors.InvalidId`, which no handler
+    names, so it would reach D92's catch-all as a 500 -- C5 section 6b's own
+    "malformed-ObjectId 500". Tested rather than caught, following
+    `MatchService._to_oid`.
+    """
+    if not ObjectId.is_valid(lobby_id):
+        raise InvalidLobbyId("Invalid lobby id")
+    return ObjectId(lobby_id)
 
 
 def for_the_wire(
@@ -145,6 +173,26 @@ class LobbyService:
         found = await self._repository.find_open(guild_id, channel_id=channel_id)
         return for_the_wire(found[0], viewer_discord_id) if found else None
 
+    async def read(
+        self, lobby_id: str, viewer_discord_id: str, since: int | None = None
+    ) -> dict[str, Any] | None:
+        """The censored snapshot, or None when `since` already holds its revision.
+
+        D77's revision gate: a polling caller sends the revision it has, and
+        None means nothing has moved -- 204 at the route, never 304, which
+        would invite cache and proxy semantics into the polling path.
+
+        Raises InvalidLobbyId for a malformed id, LobbyNotFound for a miss.
+        """
+        found = await self._repository.find_by_id(as_lobby_id(lobby_id))
+        if found is None:
+            raise LobbyNotFound(lobby_id)
+        # Subscript, not .get(): a lobby with no revision is corrupt, and a
+        # None here would compare unequal forever and never answer 204.
+        if since is not None and found["revision"] == since:
+            return None
+        return for_the_wire(found, viewer_discord_id)
+
     async def browse(
         self,
         guild_id: str,
@@ -165,7 +213,10 @@ class LobbyService:
 
 
 __all__ = [
+    "InvalidLobbyId",
+    "LobbyNotFound",
     "LobbyService",
+    "as_lobby_id",
     "build_lobby_document",
     "for_the_wire",
     "seat_the_roster",

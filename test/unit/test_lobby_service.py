@@ -17,7 +17,10 @@ import pytest
 from app.features.lobbies.modes import InvalidLobbyShape, resolve_shape
 from app.features.lobbies.schemas import CreateLobbyRequest
 from app.features.lobbies.service import (
+    InvalidLobbyId,
+    LobbyNotFound,
     LobbyService,
+    as_lobby_id,
     build_lobby_document,
     for_the_wire,
     seat_the_roster,
@@ -49,10 +52,12 @@ class FakeSeasons:
 
 
 class FakeRepo:
-    def __init__(self, open_lobbies=None):
+    def __init__(self, open_lobbies=None, lobby=None):
         self.inserted = None
         self.queries = []
+        self.asked_for = []
         self._open = open_lobbies or []
+        self._lobby = lobby
 
     async def insert_lobby(self, document):
         self.inserted = document
@@ -61,6 +66,10 @@ class FakeRepo:
     async def find_open(self, guild_id, channel_id=None, edition=None, game_type=None):
         self.queries.append((guild_id, channel_id, edition, game_type))
         return list(self._open)
+
+    async def find_by_id(self, lobby_id):
+        self.asked_for.append(str(lobby_id))
+        return self._lobby
 
 
 # --- seating ------------------------------------------------------------
@@ -307,3 +316,61 @@ def test_the_create_response_is_unchanged_by_the_projection():
     repo, seasons = FakeRepo(), FakeSeasons()
     result = asyncio.run(LobbyService(repo, seasons).create(request()))
     assert result == {**repo.inserted, "_id": "L1"}
+
+
+# --- reading one lobby (C5 GET /{id}, D77) ------------------------------
+
+HEX_ID = "652f1a2b3c4d5e6f7a8b9c0d"
+READ_LOBBY = {**SETTINGS_LOBBY, "revision": 4}
+
+
+def read(repo, **kwargs):
+    return asyncio.run(LobbyService(repo, FakeSeasons()).read(**kwargs))
+
+
+def test_read_censors_for_the_caller():
+    repo = FakeRepo(lobby=READ_LOBBY)
+    seats = seats_by_id(read(repo, lobby_id=HEX_ID, viewer_discord_id="bob"))
+    assert repo.asked_for == [HEX_ID]
+    assert seats["bob"]["ballot"] == {"map": "continents"}
+    assert "ballot" not in seats["alice"]
+
+
+def test_read_withholds_only_when_the_revision_has_not_moved():
+    # Both legs together (D77). The first alone would pass on a read that
+    # returns None unconditionally.
+    repo = FakeRepo(lobby=READ_LOBBY)
+    assert read(repo, lobby_id=HEX_ID, viewer_discord_id="bob", since=4) is None
+    moved = read(repo, lobby_id=HEX_ID, viewer_discord_id="bob", since=3)
+    assert moved["revision"] == 4
+    # No `since` is an unconditional read and can never answer 204.
+    assert read(repo, lobby_id=HEX_ID, viewer_discord_id="bob")["revision"] == 4
+
+
+def test_a_since_ahead_of_the_document_still_serves_the_truth():
+    # Only reachable from a client that invented a revision. Answering 204
+    # would freeze it on a lobby it has never actually seen.
+    repo = FakeRepo(lobby=READ_LOBBY)
+    lobby = read(repo, lobby_id=HEX_ID, viewer_discord_id="bob", since=9)
+    assert lobby["revision"] == 4
+
+
+def test_a_malformed_id_is_refused_before_the_database():
+    repo = FakeRepo(lobby=READ_LOBBY)
+    with pytest.raises(InvalidLobbyId):
+        read(repo, lobby_id="nope", viewer_discord_id="bob")
+    # C5 section 6b names the malformed-ObjectId 500. The check sits before
+    # the round trip, not around it.
+    assert repo.asked_for == []
+
+
+def test_a_missing_lobby_raises_rather_than_returning_none():
+    # None means 204 on this path. A miss returning None would tell a poller
+    # "nothing has changed" about a lobby that does not exist.
+    repo = FakeRepo(lobby=None)
+    with pytest.raises(LobbyNotFound):
+        read(repo, lobby_id=HEX_ID, viewer_discord_id="bob")
+
+
+def test_a_well_formed_id_round_trips_to_the_same_hex():
+    assert str(as_lobby_id(HEX_ID)) == HEX_ID

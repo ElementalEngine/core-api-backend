@@ -5672,6 +5672,89 @@
         ]
       }
     },
+    "/api/v2/lobbies/{lobby_id}": {
+      "get": {
+        "description": "One lobby, censored for the caller (D73), revision-gated (D77).\n\n204 when `since` already holds the current revision -- not 304, which\nwould invite cache and proxy semantics into the polling path. A lobby\nwith no `since` is read unconditionally.\n\n\u26a0 `revision` starts at 1, so `since=0` is refused rather than treated as\n\"send me everything\": no lobby has ever held it, and a client sending it\nhas a bug worth surfacing.",
+        "operationId": "read_lobby_api_v2_lobbies__lobby_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Lobby",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
     "/api/v2/matches": {
       "post": {
         "operationId": "upload_match_api_v2_matches_post",

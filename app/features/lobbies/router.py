@@ -4,10 +4,10 @@
 route table, so registration order decides which gate a path meets.
 `mite_router` is included first in `app/api/router.py` -- C5 section 6b.
 
-⚠ Within `activity_router`, the literal `/active` is declared BEFORE the
-browse route: a parameterised path registered first would swallow it. There
-is no `/{id}` route yet -- it arrives at CP5, and this ordering already
-accommodates it.
+⚠ Within `activity_router`, the literal `/active` is declared BEFORE
+`/{lobby_id}`, which is declared last: a parameterised path registered first
+would swallow it. `test_route_gates.py` asserts the resolution rather than
+trusting declaration order (section 6b).
 
 ⚠ Every `activity_router` route stamps `X-Actor-Discord-Id` (C5 invariant 2,
 D90/D94) and hands it to the service, which is what `for_the_wire` censors
@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from pymongo import AsyncMongoClient
 
 from app.core.dependencies import (
@@ -30,11 +30,15 @@ from app.core.dependencies import (
     require_activity_token,
     require_mito_token,
 )
-from app.core.errors import conflict, invalid_request
+from app.core.errors import conflict, invalid_request, not_found
 from app.features.lobbies.modes import InvalidLobbyShape
 from app.features.lobbies.repository import LobbyInsertRefused, LobbyRepository
 from app.features.lobbies.schemas import CreateLobbyRequest
-from app.features.lobbies.service import LobbyService
+from app.features.lobbies.service import (
+    InvalidLobbyId,
+    LobbyNotFound,
+    LobbyService,
+)
 from app.features.seasons.repository import SeasonsRepository
 
 REFUSAL_MESSAGES = {
@@ -104,6 +108,37 @@ async def browse_lobbies(
     lobby on the deployment to any holder of it.
     """
     return await _service(db).browse(guild_id, actor, edition, game_type)
+
+
+# Declared last: `/active` is a literal at the same depth and would be
+# captured as an id by a parameterised route registered before it (C5
+# section 6b).
+@activity_router.get("/{lobby_id}", response_model=None)
+async def read_lobby(
+    lobby_id: str,
+    since: int | None = Query(default=None, ge=1),
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any] | Response:
+    """One lobby, censored for the caller (D73), revision-gated (D77).
+
+    204 when `since` already holds the current revision -- not 304, which
+    would invite cache and proxy semantics into the polling path. A lobby
+    with no `since` is read unconditionally.
+
+    ⚠ `revision` starts at 1, so `since=0` is refused rather than treated as
+    "send me everything": no lobby has ever held it, and a client sending it
+    has a bug worth surfacing.
+    """
+    try:
+        snapshot = await _service(db).read(lobby_id, actor, since)
+    except InvalidLobbyId as exc:
+        raise invalid_request(str(exc)) from exc
+    except LobbyNotFound as exc:
+        raise not_found("Lobby not found") from exc
+    if snapshot is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return snapshot
 
 
 __all__ = ["activity_router", "mite_router"]
