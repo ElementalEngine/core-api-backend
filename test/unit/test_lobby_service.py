@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 import pytest
 
 from app.features.lobbies.modes import InvalidLobbyShape, resolve_shape
+from app.features.lobbies.projection import BALLOT, PICK, POOL, POOL_APPEARANCES
 from app.features.lobbies.schemas import CreateLobbyRequest
 from app.features.lobbies.service import (
     InvalidLobbyId,
@@ -426,3 +427,82 @@ def test_no_datetime_survives_the_boundary_at_any_depth():
     }
     assert has_datetime(stored), "fixture must contain what the test looks for"
     assert not has_datetime(for_the_wire(stored, None))
+
+
+# --- D179's classification guard ----------------------------------------
+#
+# D179 refused the built-view shape in the projection: enumerating 26 public
+# fields to protect one conditional one is ceremony, and an allowlist catches
+# a DERIVED leak like pool_appearances no better than a denylist. What it
+# accepted instead was this -- the enumeration lives in the check, where its
+# only job is to make adding a field a decision.
+#
+# The censored names are imported from projection.py rather than retyped, so
+# a new censored surface cannot be added there and forgotten here.
+
+CENSORED_LOBBY_FIELDS = {POOL_APPEARANCES}
+CENSORED_SEAT_FIELDS = {BALLOT, POOL, PICK}
+
+PUBLIC_LOBBY_FIELDS = {
+    "guild_id",
+    "channel_id",
+    "host_discord_id",
+    "instance_id",
+    "source",
+    "season_id",
+    "season_label",
+    "edition",
+    "game_type",
+    "number_teams",
+    "team_size",
+    "seat_count",
+    "min_seats",
+    "seats",
+    "phase",
+    "revision",
+    "created_at",
+    "updated_at",
+}
+PUBLIC_SEAT_FIELDS = {"seat_index", "discord_id", "team"}
+
+
+def built_document():
+    return build_lobby_document(
+        request(
+            game_type="teamer",
+            number_teams=3,
+            team_size=3,
+            instance_id="i9",
+            roster=["alice", "bob", "carol"],
+        ),
+        resolve_shape("teamer", 3, 3),
+        SEASON,
+        NOW,
+    )
+
+
+def unclassified(document):
+    stray = set(document) - PUBLIC_LOBBY_FIELDS - CENSORED_LOBBY_FIELDS
+    for seat in document.get("seats") or []:
+        stray |= set(seat) - PUBLIC_SEAT_FIELDS - CENSORED_SEAT_FIELDS
+    return stray
+
+
+def test_every_field_the_builder_writes_is_classified():
+    # ⚠ The projection STRIPS rather than builds, so a field added to the
+    # document is exposed by default. That is how pool_appearances was nearly
+    # missed -- found by reading section 8 against section 6, not because
+    # anything forced the question. This forces it.
+    document = built_document()
+    assert document["seats"], "the fixture must seat someone or the seat leg is vacuous"
+    assert not unclassified(document), sorted(unclassified(document))
+
+
+def test_the_guard_reports_a_field_that_is_neither_public_nor_censored():
+    # D86 Rule 1: the check has to be able to fail for the reason it exists.
+    # Without this, the test above passes on a guard that returns nothing.
+    smuggled = {**built_document(), "unlisted_field": "x"}
+    assert unclassified(smuggled) == {"unlisted_field"}
+    seated = built_document()
+    seated["seats"][0]["unlisted_seat_field"] = "x"
+    assert unclassified(seated) == {"unlisted_seat_field"}

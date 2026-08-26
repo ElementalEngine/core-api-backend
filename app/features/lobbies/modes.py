@@ -12,7 +12,9 @@ distinct game_type because the rating scopes are per-mode (`rt_duel`).
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 # Civ6's player limit, not a mode rule -- named once so no mode carries a
 # copy of it.
@@ -36,6 +38,19 @@ class InvalidLobbyShape(ValueError):
 
     Carries the offending field so the route can answer INVALID_REQUEST with
     something a host can act on, rather than a bare 400.
+    """
+
+    def __init__(self, field: str, message: str) -> None:
+        super().__init__(message)
+        self.field = field
+
+
+class InvalidSeating(ValueError):
+    """The seats do not describe an arrangement that can exist.
+
+    Distinct from InvalidLobbyShape: there the mode fields are wrong, here
+    the shape is fine and the seating is not. Carries the offending field for
+    the same reason -- a host can act on "seat 3 is taken", not on a 400.
     """
 
     def __init__(self, field: str, message: str) -> None:
@@ -112,6 +127,66 @@ def legal_teamer_shapes() -> tuple[tuple[int, int], ...]:
     )
 
 
+def validate_seats(seats: Sequence[Mapping[str, Any]], shape: LobbyShape) -> None:
+    """The seating rules, including the two no index can enforce.
+
+    ⚠ Neither of the first two has a Mongo leg left, and both were measured:
+
+    **No duplicate player.** MongoDB de-duplicates multikey keys per
+    document, so one lobby's seat array cannot collide with itself (D176).
+    The `$ne` predicate on the write is the guarantee; this is the second
+    line, and the readable refusal before the round trip.
+
+    **No seat without a player.** D175's partial filter excludes a lobby
+    whose only seat lacks `discord_id`, so Mongo ACCEPTS the bad document and
+    it breaks a later join instead -- symptom far from cause (Correction 74).
+    This is now the only thing between a null seat and a lobby that
+    mysteriously refuses joins.
+
+    ⚠ `seat_index` is absolute and gaps are legal. civup's
+    `arrangeTeamLobbySlots` compacts before chunking, so closing a hole
+    mid-lobby silently moves a player across a team boundary (O-19b).
+
+    Raises InvalidSeating naming the offending field; returns None otherwise.
+    """
+    players: set[str] = set()
+    indexes: set[int] = set()
+    per_team: dict[int, int] = {}
+
+    for seat in seats:
+        player = seat.get("discord_id")
+        if not player:
+            raise InvalidSeating("discord_id", "a seat with no player cannot exist")
+        if player in players:
+            raise InvalidSeating("discord_id", f"{player} already holds a seat")
+        players.add(player)
+
+        index = seat.get("seat_index")
+        if index is None or not 0 <= index < shape.seat_count:
+            raise InvalidSeating(
+                "seat_index",
+                f"seat_index must be between 0 and {shape.seat_count - 1}",
+            )
+        if index in indexes:
+            raise InvalidSeating("seat_index", f"seat {index} is already taken")
+        indexes.add(index)
+
+        # A seated player with no side is legal everywhere: seating means
+        # "you are in this lobby", never "you are on red" (spec section 4).
+        team = seat.get("team")
+        if team is None:
+            continue
+        if shape.number_teams is None or shape.team_size is None:
+            raise InvalidSeating("team", f"{shape.game_type} has no teams")
+        if not 0 <= team < shape.number_teams:
+            raise InvalidSeating(
+                "team", f"team must be between 0 and {shape.number_teams - 1}"
+            )
+        per_team[team] = per_team.get(team, 0) + 1
+        if per_team[team] > shape.team_size:
+            raise InvalidSeating("team", f"team {team} already holds {shape.team_size}")
+
+
 __all__ = [
     "DUEL",
     "FFA",
@@ -119,7 +194,9 @@ __all__ = [
     "MAX_SEATS",
     "TEAMER",
     "InvalidLobbyShape",
+    "InvalidSeating",
     "LobbyShape",
     "legal_teamer_shapes",
     "resolve_shape",
+    "validate_seats",
 ]

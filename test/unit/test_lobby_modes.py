@@ -13,8 +13,10 @@ import pytest
 from app.features.lobbies.modes import (
     MAX_SEATS,
     InvalidLobbyShape,
+    InvalidSeating,
     legal_teamer_shapes,
     resolve_shape,
+    validate_seats,
 )
 
 
@@ -114,3 +116,89 @@ def test_shapes_are_frozen():
     shape = resolve_shape("teamer", 3, 3)
     with pytest.raises(Exception):
         shape.seat_count = 99  # type: ignore[misc]
+
+
+# --- seating (D176, Correction 74, O-19b) -------------------------------
+
+FFA_SHAPE = resolve_shape("ffa")
+TEAMER_SHAPE = resolve_shape("teamer", 3, 3)
+
+
+def seat(index, player, team=None):
+    return {"seat_index": index, "discord_id": player, "team": team}
+
+
+def test_a_legal_seating_is_accepted():
+    # The partner every rejection below needs: a validator that refused
+    # everything would satisfy all of them for the wrong reason.
+    validate_seats([seat(0, "a"), seat(4, "b"), seat(11, "c")], FFA_SHAPE)
+    validate_seats([seat(0, "a", 0), seat(1, "b", 1), seat(8, "c", 2)], TEAMER_SHAPE)
+    validate_seats([], FFA_SHAPE)
+
+
+@pytest.mark.parametrize("player", [None, ""])
+def test_a_seat_with_no_player_is_refused(player):
+    # ⚠ Correction 74: D175's partial filter EXCLUDES a lobby whose only seat
+    # lacks discord_id, so Mongo accepts the document and it breaks a later
+    # join instead. Nothing else checks this any more.
+    with pytest.raises(InvalidSeating) as exc:
+        validate_seats(
+            [{"seat_index": 0, "discord_id": player, "team": None}], FFA_SHAPE
+        )
+    assert exc.value.field == "discord_id"
+
+
+def test_one_player_cannot_hold_two_seats():
+    # ⚠ D176: MongoDB de-duplicates multikey keys per document, so the unique
+    # index cannot collide a lobby with itself. The $ne on the write is the
+    # guarantee; this is the refusal a host can read.
+    with pytest.raises(InvalidSeating) as exc:
+        validate_seats([seat(0, "a"), seat(1, "a")], FFA_SHAPE)
+    assert exc.value.field == "discord_id"
+
+
+@pytest.mark.parametrize("index", [-1, 12])
+def test_a_seat_index_outside_the_lobby_is_refused(index):
+    with pytest.raises(InvalidSeating) as exc:
+        validate_seats([seat(index, "a")], FFA_SHAPE)
+    assert exc.value.field == "seat_index"
+
+
+def test_two_seats_cannot_claim_one_index():
+    with pytest.raises(InvalidSeating) as exc:
+        validate_seats([seat(3, "a"), seat(3, "b")], FFA_SHAPE)
+    assert exc.value.field == "seat_index"
+
+
+def test_a_gap_is_legal_and_is_never_closed():
+    # ⚠ O-19b: civup's arrangeTeamLobbySlots compacts before chunking, so
+    # closing a hole mid-lobby silently moves a player across a team
+    # boundary. Indexes are absolute; empty positions are gaps (section 8).
+    validate_seats([seat(0, "a"), seat(7, "b")], FFA_SHAPE)
+
+
+def test_an_ffa_seat_cannot_carry_a_team():
+    with pytest.raises(InvalidSeating) as exc:
+        validate_seats([seat(0, "a", 0)], FFA_SHAPE)
+    assert exc.value.field == "team"
+
+
+@pytest.mark.parametrize("team", [-1, 3])
+def test_a_team_outside_the_number_of_teams_is_refused(team):
+    with pytest.raises(InvalidSeating) as exc:
+        validate_seats([seat(0, "a", team)], TEAMER_SHAPE)
+    assert exc.value.field == "team"
+
+
+def test_a_team_cannot_hold_more_than_its_size():
+    full = [seat(i, f"p{i}", 0) for i in range(3)]
+    validate_seats(full, TEAMER_SHAPE)
+    with pytest.raises(InvalidSeating) as exc:
+        validate_seats([*full, seat(3, "p3", 0)], TEAMER_SHAPE)
+    assert exc.value.field == "team"
+
+
+def test_a_seated_player_with_no_side_is_legal_in_a_teamer():
+    # Sides are chosen, not assigned -- which is what seat_the_roster writes
+    # at creation, so a teamer lobby is in this state the moment it opens.
+    validate_seats([seat(0, "a"), seat(1, "b", 0)], TEAMER_SHAPE)
