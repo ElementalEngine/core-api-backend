@@ -223,7 +223,7 @@ class ApprovalService:
                     raise MatchServiceError(
                         f"An error occured during writing to DB: {e}"
                     )
-        return {"match_id": str(match_id), **match.dict()}
+        return {"match_id": str(match_id), **match.model_dump()}
 
     async def approve_match(
         self, match_id: str, approver_discord_id: str
@@ -366,7 +366,7 @@ class ApprovalService:
                         # document keeps the pending _id, so a match holds one
                         # identity for its life and its events link.
                         now = datetime.now(UTC)
-                        validated_doc = match.dict()
+                        validated_doc = match.model_dump()
                         validated_doc["_id"] = oid
                         validated_doc["created_at"] = res.get("created_at", now)
                         validated_doc["approved_at"] = now
@@ -421,7 +421,7 @@ class ApprovalService:
                 ]
             return {
                 "match_id": str(validated_insert_id),
-                **match.dict(),
+                **match.model_dump(),
                 "affected_players": affected_players,
             }
         except Exception:

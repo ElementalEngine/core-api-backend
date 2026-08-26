@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
@@ -40,7 +40,7 @@ class StatModel(BaseModel):
     # independently, so the two tallies are different questions.
     leaders: dict[str, Any] | None = None
 
-    lastModified: datetime = Field(default_factory=datetime.utcnow)
+    lastModified: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @model_validator(mode="before")
     @classmethod
@@ -111,7 +111,7 @@ class MatchModel(BaseModel):
     players: list[PlayerModel]
     parser_version: str
     discord_messages_id_list: list[str]
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     approved_at: datetime | None = None
     approver_discord_id: str | None = None
     flagged: bool = False

@@ -322,7 +322,7 @@ class EditingService:
             discord_message_id
         ]
 
-        await self._m.q.replace_pending_match(oid, match.dict())
+        await self._m.q.replace_pending_match(oid, match.model_dump())
         logger.info("✅ 🔄 Sub assigned for match %s", match_id)
         return await self._reload_pending(oid)
 
@@ -352,7 +352,7 @@ class EditingService:
             discord_message_id
         ]
 
-        await self._m.q.replace_pending_match(oid, match.dict())
+        await self._m.q.replace_pending_match(oid, match.model_dump())
         logger.info("✅ 🔄 Sub removed for match %s", match_id)
         return await self._reload_pending(oid)
 
@@ -379,7 +379,7 @@ class EditingService:
                 discord_message_id
             ]
 
-        await self._m.q.replace_pending_match(oid, match.dict())
+        await self._m.q.replace_pending_match(oid, match.model_dump())
         logger.info("✅ 🔄 Match %s contested by %s", match_id, contestor_discord_id)
         return await self._reload_pending(oid)
 
@@ -422,7 +422,7 @@ class EditingService:
         apply_players_patch(match, patch, steam_ids)
         match = await self._m._recompute_deltas(match)
 
-        await self._m.q.replace_pending_match(oid, match.dict())
+        await self._m.q.replace_pending_match(oid, match.model_dump())
         logger.info(
             "PATCH applied to %d seat(s) on match %s",
             len({e.seat for e in patch}),

@@ -79,7 +79,7 @@ class IngestService:
         match = await self._m.match_id_to_discord(match)
         match = await self._m._recompute_deltas(match)
 
-        doc = match.dict()
+        doc = match.model_dump()
         if not doc.get("save_bytes_sha256"):
             # Never write the field empty -- see models.py.
             doc.pop("save_bytes_sha256", None)
@@ -97,4 +97,4 @@ class IngestService:
         # is dropped by the model and the success response has never carried
         # it. Mite's `res?.repeated === true` reads undefined as false, which
         # is why it never surfaced. F28.
-        return {"match_id": str(inserted_id), "repeated": False, **match.dict()}
+        return {"match_id": str(inserted_id), "repeated": False, **match.model_dump()}
