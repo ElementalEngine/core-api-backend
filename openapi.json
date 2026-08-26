@@ -326,6 +326,63 @@
         "title": "ChangeOrder",
         "type": "object"
       },
+      "ChangeSeatRequest": {
+        "additionalProperties": false,
+        "description": "One seat change. `place` covers self-place, move and host rearrange.\n\n\u26a0 Two actions rather than four. Moving IS placing at a different index,\nand a host rearrange is placing aimed at somebody else -- so one action\nplus an optional target covers all four of C5's verbs with one code path\nand one call to `validate_seats`.\n\n\u26a0 `place` states the WHOLE desired position. Omitting `team` means no\nside, not \"keep the side you had\": distinguishing the two would need a\nsentinel, and a seat move that silently retains a team is the kind of\nquiet action O-19b's compaction bug was made of.",
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/SeatAction"
+          },
+          "discord_id": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discord Id"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "seat_index": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seat Index"
+          },
+          "team": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "action"
+        ],
+        "title": "ChangeSeatRequest",
+        "type": "object"
+      },
       "CivDataResponse": {
         "properties": {
           "civs": {
@@ -2078,6 +2135,14 @@
           "remove_non_verified"
         ],
         "title": "RoleIntent",
+        "type": "string"
+      },
+      "SeatAction": {
+        "enum": [
+          "place",
+          "leave"
+        ],
+        "title": "SeatAction",
         "type": "string"
       },
       "SeatPatchIn": {
@@ -5750,6 +5815,82 @@
           }
         },
         "summary": "Read Lobby",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
+    "/api/v2/lobbies/{lobby_id}/seats": {
+      "patch": {
+        "description": "Self-place, leave, move and host rearrange (C5), returning the\nupdated censored snapshot so the caller never waits for a poll tick.\n\nBoth revisions reach journald on every outcome (C5 invariant 4): when a\n409 is disputed the log answers who held which revision, with no event\nmachinery.",
+        "operationId": "change_seat_api_v2_lobbies__lobby_id__seats_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeSeatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Seat",
         "tags": [
           "lobbies"
         ]

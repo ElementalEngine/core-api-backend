@@ -19,9 +19,10 @@ what D92's catch-all exists to replace.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Body, Depends, Query, Response, status
 from pymongo import AsyncMongoClient
 
 from app.core.dependencies import (
@@ -30,14 +31,16 @@ from app.core.dependencies import (
     require_activity_token,
     require_mito_token,
 )
-from app.core.errors import conflict, invalid_request, not_found
-from app.features.lobbies.modes import InvalidLobbyShape
+from app.core.errors import conflict, forbidden, invalid_request, not_found
+from app.features.lobbies.modes import InvalidLobbyShape, InvalidSeating
 from app.features.lobbies.repository import LobbyInsertRefused, LobbyRepository
-from app.features.lobbies.schemas import CreateLobbyRequest
+from app.features.lobbies.schemas import ChangeSeatRequest, CreateLobbyRequest
 from app.features.lobbies.service import (
     InvalidLobbyId,
     LobbyNotFound,
     LobbyService,
+    NotTheHost,
+    SeatChangeRefused,
 )
 from app.features.seasons.repository import SeasonsRepository
 
@@ -49,6 +52,8 @@ REFUSAL_MESSAGES = {
         "Someone in the roster is already seated in another open lobby."
     ),
 }
+
+logger = logging.getLogger(__name__)
 
 mite_router = APIRouter(
     prefix="/api/v2/lobbies",
@@ -139,6 +144,55 @@ async def read_lobby(
     if snapshot is None:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     return snapshot
+
+
+@activity_router.patch("/{lobby_id}/seats", response_model=None)
+async def change_seat(
+    lobby_id: str,
+    request: ChangeSeatRequest = Body(),
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """Self-place, leave, move and host rearrange (C5), returning the
+    updated censored snapshot so the caller never waits for a poll tick.
+
+    Both revisions reach journald on every outcome (C5 invariant 4): when a
+    409 is disputed the log answers who held which revision, with no event
+    machinery.
+    """
+    try:
+        lobby = await _service(db).change_seat(lobby_id, actor, request)
+    except InvalidLobbyId as exc:
+        raise invalid_request(str(exc)) from exc
+    except LobbyNotFound as exc:
+        raise not_found("Lobby not found") from exc
+    except NotTheHost as exc:
+        raise forbidden(str(exc)) from exc
+    except InvalidSeating as exc:
+        raise invalid_request(str(exc)) from exc
+    except SeatChangeRefused as exc:
+        logger.warning(
+            "seat change refused. lobby=%s actor=%s expected=%s current=%s",
+            lobby_id,
+            actor,
+            exc.expected,
+            exc.current,
+        )
+        raise conflict(
+            str(exc),
+            details={
+                "expected_revision": exc.expected,
+                "current_revision": exc.current,
+            },
+        ) from exc
+    logger.info(
+        "seat changed. lobby=%s actor=%s expected=%s current=%s",
+        lobby_id,
+        actor,
+        request.expected_revision,
+        lobby["revision"],
+    )
+    return lobby
 
 
 __all__ = ["activity_router", "mite_router"]
