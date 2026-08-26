@@ -17,21 +17,21 @@ from __future__ import annotations
 
 from fastapi.routing import APIRoute
 
+from app.core import dependencies
 from app.core.dependencies import (
     require_any_service_token,
-    require_lj_token,
     require_mito_token,
-    require_service_token,
 )
 from app.main import app
 
+# Derived, not listed. CP3 wrote this as a frozenset of four callables and
+# `require_activity_token` was invisible to it the moment CP4b added it --
+# the same enumeration problem D169 removed one level up, where a hardcoded
+# tuple of ROUTERS had already fallen behind by one (Correction 65).
 GATES = frozenset(
-    {
-        require_mito_token,
-        require_lj_token,
-        require_service_token,
-        require_any_service_token,
-    }
+    value
+    for name, value in vars(dependencies).items()
+    if name.startswith("require_") and callable(value)
 )
 
 # Public by design. `/oauth/discord/callback` is auth's `public_router` --

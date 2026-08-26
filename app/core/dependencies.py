@@ -84,6 +84,26 @@ def require_mito_token(authorization: str | None = Header(default=None)) -> None
     )
 
 
+def require_activity_token(authorization: str | None = Header(default=None)) -> None:
+    """The Activity server's own credential, separate from Mito's by D94.
+
+    These seven routes submit picks, cancel a draft, and read any lobby AS ANY
+    ACTOR through D73's per-caller censoring. A shared gate would hand Mite
+    that reach and the Activity the ability to claim posts -- strictly wider
+    than D17 locked. Not the same case as `require_any_service_token`, which
+    widens only over read-only reference data (D96).
+
+    Unset until S10 provisions the credential, in which case these routes
+    answer 503 rather than admitting anyone else's token.
+    """
+    _require_bearer(
+        authorization,
+        configured=settings.activity_service_token.get_secret_value(),
+        misconfig_code="ACTIVITY_SERVICE_MISCONFIGURED",
+        misconfig_message="Activity service token is not configured on the backend.",
+    )
+
+
 def require_any_service_token(authorization: str | None = Header(default=None)) -> None:
     """Accept any configured service token.
 

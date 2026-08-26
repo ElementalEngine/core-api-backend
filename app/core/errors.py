@@ -80,6 +80,20 @@ def not_found(message: str) -> HTTPException:
     return api_error(code="NOT_FOUND", message=message, status_code=404)
 
 
+def conflict(message: str) -> HTTPException:
+    """C5 invariant 5: 409 with code CONFLICT.
+
+    The CODE stays generic and the MESSAGE names which invariant refused --
+    auth's six *_CONFLICT codes are per-feature because its callers branch on
+    them; C5's contract fixes one code for every lobby conflict, so the
+    distinction lives where a host can read it.
+
+    Mutations extend this with both revision numbers at CP5, when there is a
+    revision to carry (D77).
+    """
+    return api_error(code="CONFLICT", message=message, status_code=409)
+
+
 async def request_validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:

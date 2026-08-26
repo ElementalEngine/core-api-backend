@@ -11,8 +11,11 @@ second consumer yet (D13) -- so it is not its own feature.
 
 from __future__ import annotations
 
-from pymongo import ASCENDING, AsyncMongoClient
+from typing import Any
+
+from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
 from pymongo.asynchronous.collection import AsyncCollection
+from pymongo.errors import DuplicateKeyError
 
 from app.core.constants import COL_LOBBIES, COL_LOBBY_STATS, GAMES_DB
 
@@ -30,6 +33,28 @@ OPEN_LOBBY = {"closed_at": None}
 # -- the state of every lobby in the instant after creation (Correction 73b).
 # Filtering on the indexed path itself is Entry 12's proven idiom.
 SEATED_OPEN_LOBBY = {**OPEN_LOBBY, "seats.discord_id": {"$exists": True}}
+
+
+class LobbyInsertRefused(RuntimeError):
+    """A unique index refused an insert. `index` names which one."""
+
+    def __init__(self, index: str) -> None:
+        super().__init__(f"refused by {index}")
+        self.index = index
+
+
+def _refusing_index(exc: DuplicateKeyError) -> str:
+    """The index Mongo refused on, read from `keyPattern`.
+
+    Not parsed out of the message: the wording is not a contract, the key
+    pattern is.
+    """
+    pattern = (exc.details or {}).get("keyPattern") or {}
+    if "seats.discord_id" in pattern:
+        return "one_active_seat_per_player"
+    if "channel_id" in pattern:
+        return "one_active_lobby_per_channel"
+    return "unknown"
 
 
 class LobbyRepository:
@@ -74,5 +99,54 @@ class LobbyRepository:
             name="aggregate_key",
         )
 
+    async def insert_lobby(self, document: dict[str, Any]) -> dict[str, Any]:
+        """Insert and return the stored document, `_id` included.
 
-__all__ = ["OPEN_LOBBY", "SEATED_OPEN_LOBBY", "LobbyRepository"]
+        A refusal is one of D71's two invariants: the channel already holds an
+        open lobby, or a seated player is seated elsewhere. The index name is
+        carried out so the caller can say which.
+        """
+        try:
+            result = await self._lobbies.insert_one(document)
+        except DuplicateKeyError as exc:
+            raise LobbyInsertRefused(_refusing_index(exc)) from exc
+        return {**document, "_id": result.inserted_id}
+
+    async def find_open(
+        self,
+        guild_id: str,
+        channel_id: str | None = None,
+        edition: str | None = None,
+        game_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Open lobbies for a guild, newest first.
+
+        One query behind both reads: `/active` passes a channel and takes the
+        first, browse passes the optional filters. Two queries would drift --
+        civup has six near-identical ones (D180).
+
+        ⚠ `guild_id` is required and never defaulted. A service token is
+        per-service, not per-guild, so an unfiltered read would expose every
+        lobby on the deployment to any holder of it.
+
+        The predicate repeats OPEN_LOBBY exactly, which is what lets
+        `one_active_lobby_per_channel` serve it: a partial index is eligible
+        only when the query implies its filter.
+        """
+        query: dict[str, Any] = {"guild_id": guild_id, **OPEN_LOBBY}
+        if channel_id is not None:
+            query["channel_id"] = channel_id
+        if edition is not None:
+            query["edition"] = edition
+        if game_type is not None:
+            query["game_type"] = game_type
+        cursor = self._lobbies.find(query).sort("created_at", DESCENDING)
+        return await cursor.to_list(None)
+
+
+__all__ = [
+    "OPEN_LOBBY",
+    "SEATED_OPEN_LOBBY",
+    "LobbyInsertRefused",
+    "LobbyRepository",
+]
