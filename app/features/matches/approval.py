@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from bson.int64 import Int64
 
+from app.core.coerce import as_float
 from app.features.matches.errors import MatchServiceError, NotFoundError
 from app.features.matches.models import MatchModel, PlayerModel, StatModel
 from app.features.matches.tallies import bump, stat_legs
-from app.core.coerce import as_float
 from app.features.ratings.events import build_match_event
 from app.features.ratings.scope import stat_scope
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, TYPE_CHECKING
 from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 from bson import ObjectId
 

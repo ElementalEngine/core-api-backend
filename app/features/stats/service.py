@@ -8,14 +8,14 @@ from pymongo import AsyncMongoClient
 
 from app.core.coerce import as_float, as_int
 from app.core.config import settings
+from app.features.ratings.repository import RatingsRepository
+from app.features.ratings.skill import make_ts_env
 from app.features.stats.constants import (
     ALLOWED_CIV_VERSIONS,
     ALLOWED_GAME_TYPES,
     ALLOWED_MATCH_TYPES,
 )
 from app.features.stats.errors import InvalidStatsRequestError, StatsNotFoundError
-from app.features.ratings.repository import RatingsRepository
-from app.features.ratings.skill import make_ts_env
 from app.features.stats.schemas import (
     StatRow,
     StatSet,

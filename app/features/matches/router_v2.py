@@ -15,10 +15,10 @@ from app.features.matches.errors import (
     ParseError,
 )
 from app.features.matches.ingest import IngestService
+from app.features.matches.leaderboard import LeaderboardService
 from app.features.matches.router import _read_capped
 from app.features.matches.schemas import LeaderboardRankingResponse, MatchResponse
 from app.features.matches.schemas_v2 import ContestBody, PlayersPatch
-from app.features.matches.leaderboard import LeaderboardService
 from app.features.matches.service import MatchService
 
 logger = logging.getLogger(__name__)

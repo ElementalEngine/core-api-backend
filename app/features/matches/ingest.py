@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pymongo.errors import DuplicateKeyError
 

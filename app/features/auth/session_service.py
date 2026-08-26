@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from secrets import token_urlsafe
 from typing import cast
 from urllib.parse import urlencode
@@ -11,8 +11,8 @@ from app.features.auth.constants import (
     DISCORD_OAUTH_SCOPES,
 )
 from app.features.auth.enums import (
-    RegistrationSessionStatus,
     RegistrationPlatform,
+    RegistrationSessionStatus,
     SupportedGame,
 )
 from app.features.auth.errors import (

@@ -1,8 +1,8 @@
+import argparse
+import json
 import struct
 import sys
-import argparse
 from typing import Any
-import json
 
 loggingEnabled = False
 

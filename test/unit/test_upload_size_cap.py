@@ -24,11 +24,11 @@ def _client(monkeypatch):
     from fastapi.testclient import TestClient
 
     from app.core import dependencies
-    from app.features.matches.router import upload_router
 
     # Patch the settings object the dependency closes over, not the module --
     # test_config.py reloads it. Same reason as test_mito_gate.py.
     from app.core.dependencies import get_database
+    from app.features.matches.router import upload_router
 
     monkeypatch.setattr(dependencies.settings, "mito_service_token", SecretStr(TOKEN))
     app = FastAPI()

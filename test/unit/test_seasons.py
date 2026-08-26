@@ -15,10 +15,9 @@ the test green having run nothing (D86 Rule 1).
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
-
 from pymongo.errors import BulkWriteError
 
 from app.core.constants import COL_SEASONS, GAMES_DB

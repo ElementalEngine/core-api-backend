@@ -1,6 +1,6 @@
-import struct
 import argparse
 import json
+import struct
 
 
 def determine_game_mode(players):

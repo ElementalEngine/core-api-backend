@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, UTC
 import logging
+from datetime import UTC, datetime
 
 from app.features.auth.enums import (
     RegistrationOperationStatus,

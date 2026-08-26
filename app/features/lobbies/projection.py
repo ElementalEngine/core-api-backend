@@ -21,8 +21,8 @@ adversarial.
 
 from __future__ import annotations
 
-from typing import Any
 from collections.abc import Mapping
+from typing import Any
 
 PHASE_SETTINGS = "settings"
 PHASE_DRAFT = "draft"

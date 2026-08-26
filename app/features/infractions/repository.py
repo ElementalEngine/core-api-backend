@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any, Final
 
-from pymongo import AsyncMongoClient
+from pymongo import ASCENDING, AsyncMongoClient
 from pymongo.asynchronous.collection import AsyncCollection
-from pymongo import ASCENDING
 from pymongo.collection import ReturnDocument
 
+from app.core.constants import DB_SERVER_MEMBERS
 from app.features.infractions.models import (
     ActiveSuspension,
     PendingSuspensionDocument,
     SuspensionDocument,
 )
-from app.core.constants import DB_SERVER_MEMBERS
 
 COL_SUSPENSIONS: Final[str] = "suspensions"
 COL_SUSPENSIONS_DUE: Final[str] = "suspensions_due"

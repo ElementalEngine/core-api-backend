@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
-from collections.abc import Mapping
 
 from bson import ObjectId
 from bson.int64 import Int64

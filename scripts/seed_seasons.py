@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 # The repo is not installed as a package, so `app` is importable only with

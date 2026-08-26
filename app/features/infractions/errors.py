@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from fastapi import HTTPException, status as http_status
+from fastapi import HTTPException
+from fastapi import status as http_status
 
 from app.core.errors import ErrorDetail, ErrorResponse
 

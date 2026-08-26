@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.core.dependencies import get_database, require_mito_token
+from app.features.matches.leaderboard import LeaderboardService
 from app.features.matches.schemas import (
     AppendDiscordMessageID,
     ApproveMatch,
@@ -23,7 +24,6 @@ from app.features.matches.schemas import (
     SetPlayerOrder,
     TriggerQuit,
 )
-from app.features.matches.leaderboard import LeaderboardService
 from app.features.matches.service import (
     InvalidIDError,
     MatchService,

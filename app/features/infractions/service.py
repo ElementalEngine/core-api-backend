@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Any, Final
 
 from pymongo import AsyncMongoClient
@@ -20,13 +20,23 @@ from app.features.infractions.models import (
 )
 from app.features.infractions.repository import (
     create_pending_suspension as _repo_create_pending,
+)
+from app.features.infractions.repository import (
     delete_pending_suspension as _repo_delete_pending,
+)
+from app.features.infractions.repository import (
     find_or_create_suspension,
-    find_pending_suspension as _repo_find_pending,
     find_suspension,
-    get_active_suspensions as _repo_get_active_suspensions,
-    get_overdue_suspensions as _repo_get_overdue_suspensions,
     upsert_suspension,
+)
+from app.features.infractions.repository import (
+    find_pending_suspension as _repo_find_pending,
+)
+from app.features.infractions.repository import (
+    get_active_suspensions as _repo_get_active_suspensions,
+)
+from app.features.infractions.repository import (
+    get_overdue_suspensions as _repo_get_overdue_suspensions,
 )
 
 # ─── Domain constants ─────────────────────────────────────────────────────────

@@ -1,10 +1,11 @@
 import asyncio
 import importlib
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
 
+import app.features.auth.router as auth_router
 from app.features.auth.enums import (
     RegistrationPlatform,
     RegistrationSessionStatus,
@@ -15,7 +16,6 @@ from app.features.auth.errors import (
     ManualRegistrationRequiredError,
 )
 from app.features.auth.oauth_service import DiscordOAuthService
-import app.features.auth.router as auth_router
 from app.features.auth.registration_service import RegistrationService
 from app.features.auth.schemas import CreateRegistrationSessionRequest
 

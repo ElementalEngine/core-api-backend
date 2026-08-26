@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Final
-from collections.abc import Sequence
 
 from app.features.matches.models import MatchModel
 

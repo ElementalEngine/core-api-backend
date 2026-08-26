@@ -1,11 +1,12 @@
 import asyncio
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import SecretStr
 
 import app.features.auth.steam_service as steam_module
 from app.features.auth.enums import (
+    ManualRegistrationChoice,
     RegistrationOperationStatus,
     RegistrationPlatform,
     RegistrationSessionStatus,
@@ -15,25 +16,22 @@ from app.features.auth.enums import (
 from app.features.auth.errors import (
     AlreadyRegisteredError,
     DiscordSteamConflictError,
+    RankRoleEligibilityError,
+    SelfServiceRegistrationNotAllowedError,
     SteamIdConflictError,
     SteamOwnershipMissingError,
     SteamPlaytimeBelowThresholdError,
     SteamProfilePrivateError,
 )
+from app.features.auth.manual_registration_service import ManualRegistrationService
 from app.features.auth.operation_service import OperationService
 from app.features.auth.registration_service import RegistrationService
-from app.features.auth.schemas import FinalizeRegistrationOperationRequest
-from app.features.auth.steam_service import SteamService
-from app.features.auth.enums import ManualRegistrationChoice
-from app.features.auth.errors import (
-    RankRoleEligibilityError,
-    SelfServiceRegistrationNotAllowedError,
-)
-from app.features.auth.manual_registration_service import ManualRegistrationService
 from app.features.auth.schemas import (
+    FinalizeRegistrationOperationRequest,
     ManualRegistrationRequest,
     SelfServiceRegistrationRequest,
 )
+from app.features.auth.steam_service import SteamService
 
 
 class FakeRepo:

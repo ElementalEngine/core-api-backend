@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime, UTC
-from typing import Any
 from collections.abc import Mapping
+from datetime import UTC, datetime
+from typing import Any
 
 from bson import ObjectId
-from pymongo import AsyncMongoClient
+from pymongo import ASCENDING, AsyncMongoClient
 from pymongo.asynchronous.collection import AsyncCollection
-from pymongo import ASCENDING
 
+from app.core.constants import COL_USERS, DB_SERVER_MEMBERS
 from app.features.auth.constants import (
     AUTH_DB_NAME,
     COL_REGISTRATION_OPERATIONS,
     COL_REGISTRATION_SESSIONS,
 )
-from app.core.constants import COL_USERS, DB_SERVER_MEMBERS
 
 
 class AuthRepository:
