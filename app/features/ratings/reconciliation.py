@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Mapping, Optional, Tuple
+from typing import Any
+from collections.abc import Iterable, Mapping
 
 # Set by fixture 8, not chosen: 4.547e-13 was the largest accumulation over
 # 3,600 trials up to 1,000 events, so this carries ~2,200x headroom.
@@ -23,11 +24,11 @@ class Divergence:
 
 def reconcile(
     events: Iterable[Mapping[str, Any]],
-    actual_mu: Mapping[Tuple[int, str], Optional[float]],
+    actual_mu: Mapping[tuple[int, str], float | None],
     *,
     initial_mu: float,
     epsilon: float = EPSILON,
-) -> List[Divergence]:
+) -> list[Divergence]:
     """Sum ledger deltas per (player_id, scope); assert they equal stat movement.
 
     The ledger starts at go-live (D39), so both sides anchor on the ledger's
@@ -44,14 +45,14 @@ def reconcile(
     No stat_reset marker filter is needed. This reads rating_events and stat
     documents and never touches validated_matches.
     """
-    grouped: dict[Tuple[int, str], List[Mapping[str, Any]]] = {}
+    grouped: dict[tuple[int, str], list[Mapping[str, Any]]] = {}
     for e in sorted(events, key=lambda e: e["occurred_at"]):
         pid = int(e["player_id"])
         if pid < 0:  # placeholder ids, skipped by the ledger writes too
             continue
         grouped.setdefault((pid, str(e["scope"])), []).append(e)
 
-    out: List[Divergence] = []
+    out: list[Divergence] = []
     for (pid, scope), group in grouped.items():
         baseline = float(group[0]["mu_before"])
         delta_sum = sum(float(e["mu_after"]) - float(e["mu_before"]) for e in group)

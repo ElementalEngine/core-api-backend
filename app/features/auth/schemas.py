@@ -137,7 +137,7 @@ class FinalizeRegistrationOperationRequest(BaseModel):
     failure_message: str | None = None
 
     @model_validator(mode="after")
-    def _validate_failed_payload(self) -> "FinalizeRegistrationOperationRequest":
+    def _validate_failed_payload(self) -> FinalizeRegistrationOperationRequest:
         if self.result == "failed" and (
             not self.failure_code or not self.failure_message
         ):

@@ -12,7 +12,7 @@ N+1's start, one value rather than two that must agree (D106).
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
 from pymongo.asynchronous.collection import AsyncCollection
@@ -23,7 +23,7 @@ from app.core.constants import COL_SEASONS, GAMES_DB
 # Lowercase in the database and on the wire; Mite's CivEdition is CIV6/CIV7
 # at the TypeScript layer only (D87). The keys are the editions -- seasons
 # needs no EDITIONS tuple of its own beside civdata's.
-SEED_LABELS: Dict[str, str] = {"civ6": "Season 6", "civ7": "Season 1"}
+SEED_LABELS: dict[str, str] = {"civ6": "Season 6", "civ7": "Season 1"}
 
 DUPLICATE_KEY = 11000
 
@@ -49,14 +49,14 @@ class SeasonsAlreadySeededError(RuntimeError):
 # so an instance cache would never see a second call. Two entries, keyed by
 # edition (D95, D105). clear_cache() exists because a process-global dict
 # leaks between tests, and Entry 11 check 8 has to be able to fail.
-_CACHE: Dict[str, Dict[str, Any]] = {}
+_CACHE: dict[str, dict[str, Any]] = {}
 
 
 def clear_cache() -> None:
     _CACHE.clear()
 
 
-def seed_documents(now: datetime) -> List[Dict[str, Any]]:
+def seed_documents(now: datetime) -> list[dict[str, Any]]:
     """One row per edition. `now` is the tracking start, not the true start of
     either season -- the only boundary that will ever be guessed (D104).
     """
@@ -85,7 +85,7 @@ class SeasonsRepository:
             name="unique_label_per_edition",
         )
 
-    async def seed(self, documents: List[Dict[str, Any]]) -> int:
+    async def seed(self, documents: list[dict[str, Any]]) -> int:
         """Insert the seed rows. Deliberately not an upsert: a second run must
         be rejected by unique_label_per_edition (Entry 11 checks 5, 6).
 
@@ -107,7 +107,7 @@ class SeasonsRepository:
             raise
         return len(result.inserted_ids)
 
-    async def get_current_season(self, edition: str) -> Dict[str, Any]:
+    async def get_current_season(self, edition: str) -> dict[str, Any]:
         cached = _CACHE.get(edition)
         if cached is None:
             doc = await self._seasons.find_one(

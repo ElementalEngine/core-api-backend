@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 # The repo is not installed as a package, so `app` is importable only with
@@ -41,7 +41,7 @@ async def main(argv: list[str]) -> int:
         return 2
     dry_run = "--dry-run" in argv
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     documents = seed_documents(now)
     for doc in documents:
         print(f"{doc['edition']}: {doc['label']} started_at={doc['started_at']}")

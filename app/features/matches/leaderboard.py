@@ -9,7 +9,7 @@ delegates through MatchService to reach it.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 from pymongo import AsyncMongoClient
 
@@ -32,7 +32,7 @@ class LeaderboardService:
         is_seasonal: bool,
         is_combined: bool,
         civ_version: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         is_cloud_game = str(is_cloud).strip().lower() in CLOUD_VALUES
 
         lb = await self.ratings.get_leaderboard(
@@ -45,7 +45,7 @@ class LeaderboardService:
             limit=LIMIT,
         )
 
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for idx, row in enumerate(lb.rows or [], start=1):
             did = str(row.get("_id"))
             mu = as_float(row.get("mu"), 0.0)

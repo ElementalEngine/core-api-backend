@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import logging
 
 from app.features.auth.enums import (
@@ -40,7 +40,7 @@ class OperationService:
                 return
             raise OperationStateConflictError(operation_id, status_value)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if payload.result == "succeeded":
             registration_method = operation.get("registration_method")
             if not registration_method:

@@ -21,7 +21,8 @@ adversarial.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Optional
+from typing import Any
+from collections.abc import Mapping
 
 PHASE_SETTINGS = "settings"
 PHASE_DRAFT = "draft"
@@ -58,8 +59,8 @@ def pools_are_secret(lobby: Mapping[str, Any]) -> bool:
 
 
 def project_lobby(
-    lobby: Mapping[str, Any], viewer_discord_id: Optional[str]
-) -> Dict[str, Any]:
+    lobby: Mapping[str, Any], viewer_discord_id: str | None
+) -> dict[str, Any]:
     """The lobby as `viewer_discord_id` may see it.
 
     An observer -- anyone not holding a seat, including `None` -- matches no

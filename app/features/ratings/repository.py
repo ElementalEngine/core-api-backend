@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any
+from collections.abc import Mapping, Sequence
 
 from bson.int64 import Int64
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
@@ -25,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class LeaderboardResult:
-    rows: List[Dict[str, Any]]
-    last_updated: Optional[datetime]
+    rows: list[dict[str, Any]]
+    last_updated: datetime | None
 
 
 class RatingsRepository:
@@ -61,7 +62,7 @@ class RatingsRepository:
 
     async def insert_events(
         self,
-        events: Sequence[Dict[str, Any]],
+        events: Sequence[dict[str, Any]],
         *,
         session: AsyncClientSession,
     ) -> None:
@@ -100,8 +101,8 @@ class RatingsRepository:
         is_cloud: bool,
         is_combined: bool,
         discord_id: str,
-        session: Optional[AsyncClientSession] = None,
-    ) -> Optional[Dict[str, Any]]:
+        session: AsyncClientSession | None = None,
+    ) -> dict[str, Any] | None:
         col = self._stats_collection(
             civ_version=civ_version,
             is_seasonal=is_seasonal,
@@ -119,8 +120,8 @@ class RatingsRepository:
         match_type: str,
         is_cloud: bool,
         is_combined: bool,
-        discord_ids: List[str],
-    ) -> Dict[str, Dict[str, Any]]:
+        discord_ids: list[str],
+    ) -> dict[str, dict[str, Any]]:
         """Batch fetch stat docs by discord id.
 
         Returns mapping: discord_id -> doc for ids that exist.
@@ -141,7 +142,7 @@ class RatingsRepository:
         cursor = col.find({"_id": {"$in": ids}})
         docs = await cursor.to_list(length=len(ids))
 
-        out: Dict[str, Dict[str, Any]] = {}
+        out: dict[str, dict[str, Any]] = {}
         for d in docs:
             did = d.get("_id")
             if did is None:

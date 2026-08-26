@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Optional
 
 from fastapi import FastAPI
 from pymongo import AsyncMongoClient
@@ -30,7 +29,7 @@ async def db_lifespan(app: FastAPI):
     min_pool = settings.mongodb_min_pool_size
     max_pool = settings.mongodb_max_pool_size
 
-    client: Optional[AsyncMongoClient] = None
+    client: AsyncMongoClient | None = None
     try:
         client = AsyncMongoClient(
             uri,

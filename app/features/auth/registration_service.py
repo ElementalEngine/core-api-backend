@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from secrets import token_urlsafe
 from typing import Any
 
@@ -327,7 +327,7 @@ class RegistrationService:
         extra_operation_fields: dict[str, Any] | None = None,
     ) -> RegistrationOperationResponse:
         operation_id = token_urlsafe(24)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         operation_doc: dict[str, Any] = {
             "operation_id": operation_id,
             "type": operation_type,

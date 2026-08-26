@@ -9,7 +9,11 @@ target-version = "py314"
 # 59 rules to 413, so an unset `select` moves under us on every ruff release.
 # Pre-0.16 default, plus B023 by code -- the rest of `B` is 62 false positives
 # on FastAPI's `Depends()`.
-select = ["E4", "E7", "E9", "F", "B023"]
+# `UP` whole: all six rules it currently raises are wanted -- PEP 585
+# builtins, PEP 604 unions, datetime.UTC, unquoted annotations and StrEnum.
+# Taking the prefix rather than six codes means a deliberate ruff upgrade
+# reports new modernisations instead of skipping them silently.
+select = ["E4", "E7", "E9", "F", "B023", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
 # Each entry names its owning sub-phase. Ignoring by file keeps the rule live

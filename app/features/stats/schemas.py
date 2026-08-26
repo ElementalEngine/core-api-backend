@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -14,13 +13,13 @@ class StatRow(BaseModel):
     first: int
     subbedIn: int = 0
     subbedOut: int = 0
-    lastModified: Optional[datetime] = None
+    lastModified: datetime | None = None
 
 
 class StatSet(BaseModel):
-    ffa: Optional[StatRow] = None
-    teamer: Optional[StatRow] = None
-    duel: Optional[StatRow] = None
+    ffa: StatRow | None = None
+    teamer: StatRow | None = None
+    duel: StatRow | None = None
 
 
 class UserStatsResponse(BaseModel):
@@ -34,26 +33,26 @@ class UserStatsResponse(BaseModel):
 class BatchStatsRequest(BaseModel):
     civ_version: str
     game_type: str
-    discord_ids: List[str]
+    discord_ids: list[str]
 
 
 class BatchStatsResponse(BaseModel):
     civ_version: str
     game_type: str
-    results: List[UserStatsResponse]
+    results: list[UserStatsResponse]
 
 
 class TeamGenRequest(BaseModel):
     civ_version: str
     game_type: str
-    discord_ids: List[str]
+    discord_ids: list[str]
 
 
 class TeamGenResponse(BaseModel):
     civ_version: str
     game_type: str
     game_quality: float
-    teams: List[List[str]]
+    teams: list[list[str]]
 
 
 __all__ = [

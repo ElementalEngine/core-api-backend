@@ -15,7 +15,7 @@ the test green having run nothing (D86 Rule 1).
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import pytest
 
@@ -30,7 +30,7 @@ from app.features.seasons.repository import (
     seed_documents,
 )
 
-NOW = datetime(2026, 8, 25, 12, 0, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 25, 12, 0, 0, tzinfo=UTC)
 
 
 class FakeCollection:
@@ -104,7 +104,7 @@ def test_cache_holds_one_entry_per_edition():
 
 
 def test_latest_started_at_wins_per_edition():
-    later = datetime(2026, 12, 1, tzinfo=timezone.utc)
+    later = datetime(2026, 12, 1, tzinfo=UTC)
     docs = seed_documents(NOW) + [
         {"edition": "civ6", "label": "Season 7", "started_at": later}
     ]

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -103,7 +103,7 @@ class SteamService:
             "game": normalized_game,
             "app_id": app_id,
             "playtime_minutes": playtime_minutes,
-            "ownership_verified_at": datetime.now(timezone.utc),
+            "ownership_verified_at": datetime.now(UTC),
         }
 
     async def _get_owned_games(

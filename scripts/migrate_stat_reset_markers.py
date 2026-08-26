@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -33,7 +33,7 @@ from app.features.matches.repository import COL_VALIDATED_MATCHES  # noqa: E402
 MARKER = {"stat_reset": {"$exists": True}}
 
 
-def to_reset(marker: Dict[str, Any]) -> Dict[str, Any]:
+def to_reset(marker: dict[str, Any]) -> dict[str, Any]:
     """The marker as a stat_resets document: dated, and without the flag."""
     return {
         "_id": marker["_id"],
@@ -44,7 +44,7 @@ def to_reset(marker: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def main(argv: List[str]) -> int:
+def main(argv: list[str]) -> int:
     apply = "--apply" in argv
     rest = [a for a in argv if a != "--apply"]
     if rest:

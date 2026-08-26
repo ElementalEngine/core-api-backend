@@ -17,7 +17,6 @@ precision that is already gone (section 4 item 95).
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -32,21 +31,21 @@ class StatRowV2(BaseModel):
     rating_gains: int
     subbedIn: int = 0
     subbedOut: int = 0
-    lastModified: Optional[datetime] = None
+    lastModified: datetime | None = None
 
     @classmethod
-    def from_v1(cls, row: StatRow) -> "StatRowV2":
+    def from_v1(cls, row: StatRow) -> StatRowV2:
         fields = row.model_dump()
         return cls(rating_gains=fields.pop("wins"), **fields)
 
 
 class StatSetV2(BaseModel):
-    ffa: Optional[StatRowV2] = None
-    teamer: Optional[StatRowV2] = None
-    duel: Optional[StatRowV2] = None
+    ffa: StatRowV2 | None = None
+    teamer: StatRowV2 | None = None
+    duel: StatRowV2 | None = None
 
     @classmethod
-    def from_v1(cls, stats: StatSet) -> "StatSetV2":
+    def from_v1(cls, stats: StatSet) -> StatSetV2:
         return cls(
             ffa=StatRowV2.from_v1(stats.ffa) if stats.ffa else None,
             teamer=StatRowV2.from_v1(stats.teamer) if stats.teamer else None,
@@ -62,7 +61,7 @@ class UserStatsResponseV2(BaseModel):
     season: StatSetV2
 
     @classmethod
-    def from_v1(cls, response: UserStatsResponse) -> "UserStatsResponseV2":
+    def from_v1(cls, response: UserStatsResponse) -> UserStatsResponseV2:
         return cls(
             discord_id=response.discord_id,
             civ_version=response.civ_version,
@@ -75,7 +74,7 @@ class UserStatsResponseV2(BaseModel):
 class BatchStatsResponseV2(BaseModel):
     civ_version: str
     game_type: str
-    results: List[UserStatsResponseV2]
+    results: list[UserStatsResponseV2]
 
 
 __all__ = [

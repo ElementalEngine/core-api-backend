@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, Dict, Mapping, Optional
+from typing import Any
+from collections.abc import Mapping
 
 from bson import ObjectId
 from bson.int64 import Int64
@@ -39,10 +40,10 @@ class MatchRepository:
     async def start_session(self) -> AsyncClientSession:
         return self._client.start_session()
 
-    async def get_user_by_discord_id(self, discord_id: str) -> Optional[Dict[str, Any]]:
+    async def get_user_by_discord_id(self, discord_id: str) -> dict[str, Any] | None:
         return await self._users.find_one({"discord_id": discord_id})
 
-    async def get_user_by_steam_id(self, steam_id: str) -> Optional[Dict[str, Any]]:
+    async def get_user_by_steam_id(self, steam_id: str) -> dict[str, Any] | None:
         return await self._users.find_one(
             {
                 "$or": [
@@ -52,33 +53,31 @@ class MatchRepository:
             }
         )
 
-    async def find_pending_by_hash(
-        self, save_file_hash: str
-    ) -> Optional[Dict[str, Any]]:
+    async def find_pending_by_hash(self, save_file_hash: str) -> dict[str, Any] | None:
         return await self._pending.find_one({"save_file_hash": save_file_hash})
 
     async def find_pending_by_bytes(
         self, save_bytes_sha256: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         return await self._pending.find_one({"save_bytes_sha256": save_bytes_sha256})
 
     async def find_validated_by_bytes(
         self, save_bytes_sha256: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """The cross-collection half of the dedup. The unique indexes are
         per-collection, so approval moving a document out of pending_matches
         is what reopened the double-rating path. D83, Entry 12."""
         return await self._validated.find_one({"save_bytes_sha256": save_bytes_sha256})
 
-    async def find_pending_by_id(self, oid: ObjectId) -> Optional[Dict[str, Any]]:
+    async def find_pending_by_id(self, oid: ObjectId) -> dict[str, Any] | None:
         return await self._pending.find_one({"_id": oid})
 
-    async def find_validated_by_id(self, oid: ObjectId) -> Optional[Dict[str, Any]]:
+    async def find_validated_by_id(self, oid: ObjectId) -> dict[str, Any] | None:
         return await self._validated.find_one({"_id": oid})
 
     async def claim_pending_match(
         self, oid: ObjectId, *, now: datetime
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Claim a pending match for approval; None means already claimed or gone.
 
         D84's claim. Pending-ness is which collection the document is in, so

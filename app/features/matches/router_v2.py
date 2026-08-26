@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Header, UploadFile
 
@@ -44,7 +44,7 @@ def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:
     return x_actor_is_staff
 
 
-async def _load(svc: MatchService, match_id: str) -> Dict[str, Any]:
+async def _load(svc: MatchService, match_id: str) -> dict[str, Any]:
     try:
         return await svc.get_match(match_id)
     except NotFoundError as exc:
@@ -53,7 +53,7 @@ async def _load(svc: MatchService, match_id: str) -> Dict[str, Any]:
         raise invalid_request(str(exc)) from exc
 
 
-def _require_reporter(doc: Dict[str, Any], actor: str, is_staff: bool) -> None:
+def _require_reporter(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
     """D91: reporter -> core-api, staff -> Mite. Two guard clauses, no policy layer."""
     if is_staff:
         return
@@ -61,7 +61,7 @@ def _require_reporter(doc: Dict[str, Any], actor: str, is_staff: bool) -> None:
         raise forbidden("Only the reporter or staff may edit this match.")
 
 
-def _require_player(doc: Dict[str, Any], actor: str, is_staff: bool) -> None:
+def _require_player(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
     """D91: a player in the match, or staff.
 
     Unassigned seats hold placeholder ids, so those players cannot be matched
@@ -80,7 +80,7 @@ async def upload_match(
     discord_message_id: str = Form(...),
     actor: str = Depends(actor_discord_id),
     db=Depends(get_database),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     raw = await _read_capped(file)
     svc = MatchService(db)
     try:
@@ -120,7 +120,7 @@ async def get_leaderboard(
 
 
 @router.get("/matches/{match_id}", response_model=MatchResponse)
-async def get_match(match_id: str, db=Depends(get_database)) -> Dict[str, Any]:
+async def get_match(match_id: str, db=Depends(get_database)) -> dict[str, Any]:
     return await _load(MatchService(db), match_id)
 
 
@@ -131,7 +131,7 @@ async def patch_players(
     actor: str = Depends(actor_discord_id),
     is_staff: bool = Depends(actor_is_staff),
     db=Depends(get_database),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     svc = MatchService(db)
     _require_reporter(await _load(svc, match_id), actor, is_staff)
     try:
@@ -149,7 +149,7 @@ async def approve_match(
     match_id: str,
     actor: str = Depends(actor_discord_id),
     db=Depends(get_database),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     # Staff-only, enforced Mite-side (D91): staff is a guild property
     # core-api cannot see.
     svc = MatchService(db)
@@ -168,7 +168,7 @@ async def contest_match(
     actor: str = Depends(actor_discord_id),
     is_staff: bool = Depends(actor_is_staff),
     db=Depends(get_database),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     svc = MatchService(db)
     _require_player(await _load(svc, match_id), actor, is_staff)
     try:
@@ -180,7 +180,7 @@ async def contest_match(
 
 
 @router.post("/matches/{match_id}/revert", response_model=MatchResponse)
-async def revert_match(match_id: str, db=Depends(get_database)) -> Dict[str, Any]:
+async def revert_match(match_id: str, db=Depends(get_database)) -> dict[str, Any]:
     # Staff-only, enforced Mite-side (D91).
     svc = MatchService(db)
     try:
@@ -197,7 +197,7 @@ async def delete_match(
     actor: str = Depends(actor_discord_id),
     is_staff: bool = Depends(actor_is_staff),
     db=Depends(get_database),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     svc = MatchService(db)
     _require_reporter(await _load(svc, match_id), actor, is_staff)
     try:

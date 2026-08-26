@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from bson import ObjectId
 from pymongo import AsyncMongoClient
@@ -45,7 +45,7 @@ class MatchService:
             raise InvalidIDError("Invalid match id")
         return ObjectId(match_id)
 
-    def _parse_save(self, file_bytes: bytes) -> Dict[str, Any]:
+    def _parse_save(self, file_bytes: bytes) -> dict[str, Any]:
         if file_bytes.startswith(b"CIV6"):
             parser = parse_civ6_save
         elif file_bytes.startswith(b"CIV7"):
@@ -93,11 +93,11 @@ class MatchService:
     async def get_player_ranking(
         self,
         match: MatchModel,
-        discord_id: Optional[str],
+        discord_id: str | None,
         player_index: int,
         is_seasonal: bool = False,
         is_combined: bool = False,
-        session: Optional[AsyncClientSession] = None,
+        session: AsyncClientSession | None = None,
     ) -> StatModel:
         # Missing / placeholder IDs
         if not discord_id or discord_id in ("-1", "-2") or discord_id.startswith("-"):
@@ -165,8 +165,8 @@ class MatchService:
         match: MatchModel,
         is_seasonal: bool = False,
         is_combined: bool = False,
-        session: Optional[AsyncClientSession] = None,
-    ) -> List[StatModel]:
+        session: AsyncClientSession | None = None,
+    ) -> list[StatModel]:
         if not match.players:
             return []
 
@@ -193,8 +193,8 @@ class MatchService:
         return await asyncio.gather(*tasks)
 
     def update_player_stats(
-        self, match: MatchModel, players_ranking: List[StatModel], delta_value_name: str
-    ) -> tuple[MatchModel, List[StatModel]]:
+        self, match: MatchModel, players_ranking: list[StatModel], delta_value_name: str
+    ) -> tuple[MatchModel, list[StatModel]]:
         teams_wo_subs = defaultdict(list)
         teams_with_sub_ins = defaultdict(list)
         for i, p in enumerate(match.players):
@@ -205,11 +205,11 @@ class MatchService:
             else:
                 teams_wo_subs[p.team].append((i, p))
                 teams_with_sub_ins[p.team].append((i, p))
-        team_wo_subs_states: List[List[StatModel]] = [
+        team_wo_subs_states: list[list[StatModel]] = [
             [players_ranking[p_index_tuple[0]] for p_index_tuple in teams_wo_subs[team]]
             for team in teams_wo_subs
         ]
-        team_with_sub_ins_states: List[List[StatModel]] = [
+        team_with_sub_ins_states: list[list[StatModel]] = [
             [
                 players_ranking[p_index_tuple[0]]
                 for p_index_tuple in teams_with_sub_ins[team]
@@ -239,7 +239,7 @@ class MatchService:
             ts_teams_with_sub_ins, ranks=placements_with_sub_ins
         )
 
-        post: List[StatModel] = list(range(len(match.players)))
+        post: list[StatModel] = list(range(len(match.players)))
         for team_idx, team in enumerate(team_wo_subs_states):
             for player_index, player in enumerate(team):
                 if match.players[player.index].is_sub:
@@ -319,7 +319,7 @@ class MatchService:
         )
         return match
 
-    async def get_match(self, match_id: str) -> Dict[str, Any]:
+    async def get_match(self, match_id: str) -> dict[str, Any]:
         oid = self._to_oid(match_id)
         doc = await self.q.find_pending_by_id(oid)
         if not doc:
@@ -333,43 +333,43 @@ class MatchService:
         reporter_discord_id: str,
         is_cloud: bool,
         discord_message_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return await IngestService(self).create_from_save(
             file_bytes, reporter_discord_id, is_cloud, discord_message_id
         )
 
     async def append_discord_message_id_list(
         self, match_id: str, discord_message_id_list: list[str]
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return await EditingService(self).append_discord_message_id_list(
             match_id, discord_message_id_list
         )
 
     async def update_match(
-        self, match_id: str, update_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, match_id: str, update_data: dict[str, Any]
+    ) -> dict[str, Any]:
         return await EditingService(self).update_match(match_id, update_data)
 
     async def set_player_order(
         self, match_id: str, player_order: str, discord_message_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return await EditingService(self).set_player_order(
             match_id, player_order, discord_message_id
         )
 
     async def change_order(
         self, match_id: str, new_order: str, discord_message_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return await EditingService(self).change_order(
             match_id, new_order, discord_message_id
         )
 
-    async def delete_pending_match(self, match_id: str) -> Dict[str, Any]:
+    async def delete_pending_match(self, match_id: str) -> dict[str, Any]:
         return await EditingService(self).delete_pending_match(match_id)
 
     async def trigger_quit(
         self, match_id: str, quitter_discord_id: str, discord_message_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return await EditingService(self).trigger_quit(
             match_id, quitter_discord_id, discord_message_id
         )
@@ -380,14 +380,14 @@ class MatchService:
         player_id: str,
         player_discord_id: str,
         discord_message_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return await EditingService(self).assign_discord_id(
             match_id, player_id, player_discord_id, discord_message_id
         )
 
     async def assign_discord_id_all(
         self, match_id: str, player_discord_id: list[str], discord_message_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return await EditingService(self).assign_discord_id_all(
             match_id, player_discord_id, discord_message_id
         )
@@ -398,14 +398,14 @@ class MatchService:
         sub_in_id: str,
         sub_out_discord_id: str,
         discord_message_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return await EditingService(self).assign_sub(
             match_id, sub_in_id, sub_out_discord_id, discord_message_id
         )
 
     async def remove_sub(
         self, match_id: str, sub_out_id: str, discord_message_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return await EditingService(self).remove_sub(
             match_id, sub_out_id, discord_message_id
         )
@@ -416,17 +416,17 @@ class MatchService:
         contestor_discord_id: str,
         reason: str,
         discord_message_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return await EditingService(self).contest_report(
             match_id, contestor_discord_id, reason, discord_message_id
         )
 
-    async def revert_match(self, match_id: str) -> Dict[str, Any]:
+    async def revert_match(self, match_id: str) -> dict[str, Any]:
         return await ApprovalService(self).revert_match(match_id)
 
     async def approve_match(
         self, match_id: str, approver_discord_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return await ApprovalService(self).approve_match(match_id, approver_discord_id)
 
 

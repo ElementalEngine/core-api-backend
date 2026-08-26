@@ -2,16 +2,17 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass, replace
-from enum import Enum
-from typing import Final, List, Optional, Sequence
+from enum import StrEnum
+from typing import Final
+from collections.abc import Sequence
 
 from app.features.matches.models import MatchModel
 
 
 class UnsetType:
-    _instance: Optional["UnsetType"] = None
+    _instance: UnsetType | None = None
 
-    def __new__(cls) -> "UnsetType":
+    def __new__(cls) -> UnsetType:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -23,7 +24,7 @@ class UnsetType:
 UNSET: Final[UnsetType] = UnsetType()
 
 
-class Rule(str, Enum):
+class Rule(StrEnum):
     EMPTY_PATCH = "empty_patch"
     DUPLICATE_SEAT = "duplicate_seat"
     UNKNOWN_SEAT = "unknown_seat"
@@ -39,7 +40,7 @@ class Rule(str, Enum):
 @dataclass(frozen=True, slots=True)
 class Violation:
     rule: Rule
-    seat: Optional[int]
+    seat: int | None
     message: str
 
 
@@ -61,7 +62,7 @@ class SeatPatch:
         )
 
 
-def is_placeholder(discord_id: Optional[str]) -> bool:
+def is_placeholder(discord_id: str | None) -> bool:
     """The one placeholder predicate (§4 item 20; reconciliation-query §4.2)."""
     return not discord_id or discord_id.startswith("-")
 
@@ -69,20 +70,20 @@ def is_placeholder(discord_id: Optional[str]) -> bool:
 @dataclass(slots=True)
 class _Seat:
     team: int
-    placement: Optional[int]
-    discord_id: Optional[str]
+    placement: int | None
+    discord_id: str | None
     is_sub: bool
-    leaver: Optional[str]  # discord_id of the paired synthetic row, if any
+    leaver: str | None  # discord_id of the paired synthetic row, if any
 
 
-def _seats(match: MatchModel) -> List[_Seat]:
+def _seats(match: MatchModel) -> list[_Seat]:
     """Project the players array onto editable seats.
 
     Synthetic subbed_out rows are not seats: their fields are derived from the
     sub-in row above them (service.py:672-686), so every check runs over this
     projection and a patch may never address them.
     """
-    seats: List[_Seat] = []
+    seats: list[_Seat] = []
     for i, p in enumerate(match.players):
         if p.subbed_out:
             continue
@@ -125,7 +126,7 @@ def _split_teams(seats: Sequence[_Seat]) -> set[int]:
 
 def validate_players_patch(
     match: MatchModel, patch: Sequence[SeatPatch], *, actor_is_staff: bool
-) -> List[Violation]:
+) -> list[Violation]:
     """Judge the whole patch as one atomic decision (D151).
 
     Returns every violation, deterministically ordered; [] is the only legal
@@ -133,7 +134,7 @@ def validate_players_patch(
     sub, a split team — fire only on what the patch introduces, so legacy
     documents stay editable (D91's "introduces", generalised).
     """
-    out: List[Violation] = []
+    out: list[Violation] = []
 
     if not patch or all(e.is_empty() for e in patch):
         return [Violation(Rule.EMPTY_PATCH, None, "The patch changes nothing.")]

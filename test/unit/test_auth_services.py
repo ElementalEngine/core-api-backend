@@ -1,6 +1,6 @@
 import asyncio
 import importlib
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 import pytest
 from fastapi import HTTPException
@@ -138,9 +138,7 @@ def test_session_service_coerces_naive_expiry(monkeypatch):
     repo.sessions["sess-1"] = {
         "session_id": "sess-1",
         "status": RegistrationSessionStatus.PENDING_AUTH.value,
-        "expires_at": (datetime.now(timezone.utc) - timedelta(minutes=1)).replace(
-            tzinfo=None
-        ),
+        "expires_at": (datetime.now(UTC) - timedelta(minutes=1)).replace(tzinfo=None),
     }
 
     status = asyncio.run(SessionService(repo).get_registration_session_status("sess-1"))
@@ -193,7 +191,7 @@ def test_session_status_includes_validated_account_details(monkeypatch):
         "status": RegistrationSessionStatus.VALIDATED.value,
         "game": SupportedGame.CIV6.value,
         "platform": RegistrationPlatform.STEAM.value,
-        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "expires_at": datetime.now(UTC) + timedelta(minutes=5),
         "validated_account_id": "76561198000000000",
         "validated_account_name": "Project Cisco",
         "oauth_username_snapshot": "cisco",
@@ -230,7 +228,7 @@ def test_session_service_coerces_unknown_status_to_failed(monkeypatch):
     repo.sessions["sess-unknown"] = {
         "session_id": "sess-unknown",
         "status": "not_a_real_status",
-        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "expires_at": datetime.now(UTC) + timedelta(minutes=5),
     }
 
     status = asyncio.run(

@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import pytest
 from pydantic import SecretStr
@@ -126,7 +126,7 @@ def test_operation_finalize_success_upserts_user_and_completes_session():
         "type": "registration",
         "username_snapshot": "user",
         "display_name_snapshot": "User",
-        "ownership_verified_at": datetime.now(timezone.utc),
+        "ownership_verified_at": datetime.now(UTC),
         "playtime_minutes": 333,
     }
 

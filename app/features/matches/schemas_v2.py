@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -18,13 +18,13 @@ class SeatPatchIn(BaseModel):
     """
 
     seat: int
-    placement: Optional[int] = None
-    discord_id: Optional[str] = None
-    quit: Optional[bool] = None
-    sub_out: Optional[str] = None
+    placement: int | None = None
+    discord_id: str | None = None
+    quit: bool | None = None
+    sub_out: str | None = None
 
     @model_validator(mode="after")
-    def _only_sub_out_is_nullable(self) -> "SeatPatchIn":
+    def _only_sub_out_is_nullable(self) -> SeatPatchIn:
         for name in ("placement", "discord_id", "quit"):
             if name in self.model_fields_set and getattr(self, name) is None:
                 raise ValueError(
@@ -34,18 +34,18 @@ class SeatPatchIn(BaseModel):
 
 
 class PlayersPatch(BaseModel):
-    players: List[SeatPatchIn] = Field(default_factory=list)
+    players: list[SeatPatchIn] = Field(default_factory=list)
 
-    def to_seat_patches(self) -> List[SeatPatch]:
+    def to_seat_patches(self) -> list[SeatPatch]:
         """Wire model to domain patch.
 
         Reads model_fields_set, never the values: exclude_none would collapse
         `sub_out: null` -- clear the pairing -- into "field absent".
         """
-        out: List[SeatPatch] = []
+        out: list[SeatPatch] = []
         for entry in self.players:
             declared = entry.model_fields_set
-            fields: Dict[str, Any] = {"seat": entry.seat}
+            fields: dict[str, Any] = {"seat": entry.seat}
             for name in ("placement", "discord_id", "quit", "sub_out"):
                 if name in declared:
                     fields[name] = getattr(entry, name)

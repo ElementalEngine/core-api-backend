@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from app.core.coerce import as_int
 
@@ -11,14 +11,14 @@ SEASON = (True, False)
 COMBINED = (False, True)
 
 
-def stat_legs(*, is_cloud: bool) -> Tuple[Tuple[bool, bool], ...]:
+def stat_legs(*, is_cloud: bool) -> tuple[tuple[bool, bool], ...]:
     """(is_seasonal, is_combined) for every stat document a match writes."""
     if is_cloud:
         return (LIFETIME, COMBINED)
     return (LIFETIME, SEASON, COMBINED)
 
 
-def read_entry(entry: Any) -> Tuple[int, int]:
+def read_entry(entry: Any) -> tuple[int, int]:
     """games and wins out of either stored shape: 3, or {games: 3, wins: 1}."""
     if isinstance(entry, dict):
         return as_int(entry.get("games", 0), 0), as_int(entry.get("wins", 0), 0)
@@ -27,7 +27,7 @@ def read_entry(entry: Any) -> Tuple[int, int]:
     return 0, 0
 
 
-def bump(tally: Dict[str, Any], key: str, *, won: bool, step: int) -> Dict[str, Any]:
+def bump(tally: dict[str, Any], key: str, *, won: bool, step: int) -> dict[str, Any]:
     """Move one key by step, normalising whatever shape was there.
 
     Reverts clamp at zero so a revert can never write a negative count.

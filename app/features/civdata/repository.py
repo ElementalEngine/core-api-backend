@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 from pymongo import ASCENDING, AsyncMongoClient
 from pymongo.asynchronous.collection import AsyncCollection
@@ -21,10 +21,10 @@ class CivDataRepository:
             name="civ_data_edition_token_uq",
         )
 
-    async def fetch(self, edition: str) -> Dict[str, Any]:
+    async def fetch(self, edition: str) -> dict[str, Any]:
         """One edition's payload, sorted by token so it is byte-stable."""
-        leaders: List[Dict[str, Any]] = []
-        civs: List[Dict[str, Any]] = []
+        leaders: list[dict[str, Any]] = []
+        civs: list[dict[str, Any]] = []
         versions: set[int] = set()
         cursor = self._civ_data.find({"edition": edition}, {"_id": 0}).sort(
             "token", ASCENDING
@@ -44,8 +44,8 @@ class CivDataRepository:
         }
 
     async def seed(
-        self, edition: str, documents: List[Dict[str, Any]]
-    ) -> Dict[str, int]:
+        self, edition: str, documents: list[dict[str, Any]]
+    ) -> dict[str, int]:
         """Upsert one edition's documents, then drop tokens the file dropped.
 
         Upsert rather than drop-and-insert: the collection is never empty

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Mapping
+from datetime import datetime, UTC
+from typing import Any
+from collections.abc import Mapping
 
 from bson import ObjectId
 from pymongo import AsyncMongoClient
@@ -179,7 +180,7 @@ class AuthRepository:
         ownership_verified_at: datetime | None,
         playtime_minutes: int | None,
     ) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         existing = await self._users.find_one(
             {"discord_id": discord_user_id},
             {

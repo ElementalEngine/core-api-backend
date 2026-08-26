@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import List
 from urllib.parse import urlsplit
 
 from pydantic import (
@@ -179,15 +178,15 @@ class Settings(BaseSettings):
     )
 
     # mypy does not support decorators stacked on @property
-    @computed_field(return_type=List[str])  # type: ignore[prop-decorator]
+    @computed_field(return_type=list[str])  # type: ignore[prop-decorator]
     @property
-    def allowed_origins(self) -> List[str]:
+    def allowed_origins(self) -> list[str]:
         raw = (self.allowed_origins_raw or "").strip()
         items = [u.strip() for u in raw.split(",") if u.strip()] if raw else []
         if not items:
             return []
 
-        adapter = TypeAdapter(List[AnyHttpUrl])
+        adapter = TypeAdapter(list[AnyHttpUrl])
         try:
             urls = adapter.validate_python(items)
         except Exception as exc:
@@ -197,7 +196,7 @@ class Settings(BaseSettings):
                 f"ALLOWED_ORIGINS contains an invalid URL: {items!r}"
             ) from exc
 
-        origins: List[str] = []
+        origins: list[str] = []
         seen: set[str] = set()
         for url in urls:
             parts = urlsplit(str(url))
@@ -213,7 +212,7 @@ class Settings(BaseSettings):
         return self.mongo_url
 
     @model_validator(mode="after")
-    def _ensure_mongo_uri_scheme(self) -> "Settings":
+    def _ensure_mongo_uri_scheme(self) -> Settings:
         uri = self.mongo_url.get_secret_value()
         if not uri.startswith(("mongodb://", "mongodb+srv://")):
             raise ValueError(

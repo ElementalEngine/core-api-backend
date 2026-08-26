@@ -1,24 +1,23 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel
 
 
 class PlayerSchema(BaseModel):
-    steam_id: Optional[str] = None
-    user_name: Optional[str] = None
+    steam_id: str | None = None
+    user_name: str | None = None
     civ: str
     team: int
-    leader: Optional[str] = None
-    player_alive: Optional[bool] = None
-    discord_id: Optional[str] = None
-    placement: Optional[int] = None
+    leader: str | None = None
+    player_alive: bool | None = None
+    discord_id: str | None = None
+    placement: int | None = None
     quit: bool
     delta: float = 0.0
-    season_delta: Optional[float] = None
-    combined_delta: Optional[float] = None
+    season_delta: float | None = None
+    combined_delta: float | None = None
     is_sub: bool = False
     subbed_out: bool = False
 
@@ -37,30 +36,30 @@ class MatchResponse(BaseModel):
     match_id: str
     game: str
     turn: int
-    age: Optional[str] = None
+    age: str | None = None
     map_type: str
     game_mode: str
     is_cloud: bool
-    players: List[PlayerSchema]
+    players: list[PlayerSchema]
     parser_version: str
-    discord_messages_id_list: List[str]
+    discord_messages_id_list: list[str]
     created_at: datetime
-    approved_at: Optional[datetime] = None
-    approver_discord_id: Optional[str] = None
+    approved_at: datetime | None = None
+    approver_discord_id: str | None = None
     flagged: bool
-    flagged_by: Optional[str] = None
+    flagged_by: str | None = None
     save_file_hash: str
     reporter_discord_id: str
-    contest_report_list: List[ContestReport]
-    affected_players: Optional[List[AffectedPlayerRating]] = None
+    contest_report_list: list[ContestReport]
+    affected_players: list[AffectedPlayerRating] | None = None
 
 
 class MatchUpdate(BaseModel):
     match_id: str
-    players: Optional[List[PlayerSchema]] = None
-    confirmed: Optional[bool] = None
-    flagged: Optional[bool] = None
-    flagged_by: Optional[str] = None
+    players: list[PlayerSchema] | None = None
+    confirmed: bool | None = None
+    flagged: bool | None = None
+    flagged_by: str | None = None
 
 
 class SetPlayerOrder(BaseModel):
@@ -87,7 +86,7 @@ class TriggerQuit(BaseModel):
 
 class AppendDiscordMessageID(BaseModel):
     match_id: str
-    discord_message_id: List[str]
+    discord_message_id: list[str]
 
 
 class AssignDiscordId(BaseModel):
@@ -99,7 +98,7 @@ class AssignDiscordId(BaseModel):
 
 class AssignDiscordIdAll(BaseModel):
     match_id: str
-    discord_id_list: List[str]
+    discord_id_list: list[str]
     discord_message_id: str
 
 
@@ -149,7 +148,7 @@ class PlayerLeaderboard(BaseModel):
 
 
 class LeaderboardRankingResponse(BaseModel):
-    rankings: List[PlayerLeaderboard]
+    rankings: list[PlayerLeaderboard]
     last_updated: int
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from typing import Any, Final
 
 from pymongo import AsyncMongoClient
@@ -68,7 +68,7 @@ FLAT_DAYS: Final[dict[str, int]] = {
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _get_infraction(record: SuspensionDocument, category: TierCategory) -> Any:

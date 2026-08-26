@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Dict, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from pymongo.errors import DuplicateKeyError
 
@@ -23,7 +23,7 @@ class IngestService:
         self._m = matches
 
     @staticmethod
-    def _repeated(doc: Dict[str, Any], repeated_by: str) -> Dict[str, Any]:
+    def _repeated(doc: dict[str, Any], repeated_by: str) -> dict[str, Any]:
         """One shape for all three duplicate paths. repeated_by discriminates
         file from composition (D101); Mite reads it in S9."""
         out = dict(doc)
@@ -38,7 +38,7 @@ class IngestService:
         reporter_discord_id: str,
         is_cloud: bool,
         discord_message_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         # Byte hash first: an exact re-upload is answered without reparsing,
         # including one that would fail to parse. D83, Entry 12.
         save_bytes_sha256 = hashlib.sha256(file_bytes).hexdigest()

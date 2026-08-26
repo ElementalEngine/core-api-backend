@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Literal
+from typing import Any, Literal
 
 from bson import ObjectId
 from bson.int64 import Int64
@@ -22,7 +22,7 @@ def build_match_event(
     sigma_before: float,
     sigma_after: float,
     applied_delta: float,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """One ledger event, for one player, in one scope.
 
     No clock and no database: the caller passes a single occurred_at for the
@@ -55,7 +55,7 @@ def build_reset_event(
     mu_after: float,
     sigma_before: float,
     sigma_after: float,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """A stat reset, for one player, in one scope.
 
     No match_id and no match_created_at: a reset attaches to no match, which

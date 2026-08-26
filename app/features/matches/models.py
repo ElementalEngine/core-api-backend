@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -21,7 +21,7 @@ class StatModel(BaseModel):
 
     # Back-compat: some call sites / docs refer to the stats document id.
     # We keep it optional and derive from discord_id where possible.
-    id: Optional[int] = None
+    id: int | None = None
 
     mu: float
     sigma: float
@@ -34,11 +34,11 @@ class StatModel(BaseModel):
     subbedOut: int = 0
 
     # Civs map is historically {"CivName": <int games>}.
-    civs: Optional[Dict[str, Any]] = None
+    civs: dict[str, Any] | None = None
 
     # Same shape, keyed on the leader token. Civ7 picks a leader and a civ
     # independently, so the two tallies are different questions.
-    leaders: Optional[Dict[str, Any]] = None
+    leaders: dict[str, Any] | None = None
 
     lastModified: datetime = Field(default_factory=datetime.utcnow)
 
@@ -80,18 +80,18 @@ class StatModel(BaseModel):
 
 
 class PlayerModel(BaseModel):
-    steam_id: Optional[str] = None
-    user_name: Optional[str] = None
+    steam_id: str | None = None
+    user_name: str | None = None
     civ: str
     team: int
-    leader: Optional[str] = None
-    player_alive: Optional[bool] = None
-    discord_id: Optional[str] = None
-    placement: Optional[int] = None
+    leader: str | None = None
+    player_alive: bool | None = None
+    discord_id: str | None = None
+    placement: int | None = None
     quit: bool = False
     delta: float = 0.0
-    season_delta: Optional[float] = None
-    combined_delta: Optional[float] = None
+    season_delta: float | None = None
+    combined_delta: float | None = None
     is_sub: bool = False
     subbed_out: bool = False
 
@@ -104,26 +104,26 @@ class ContestReport(BaseModel):
 class MatchModel(BaseModel):
     game: str  # parsers return "civ6" or "civ7"
     turn: int
-    age: Optional[str] = None
+    age: str | None = None
     map_type: str
     game_mode: str  # allow "", "FFA", "Teamer", "Duel"
     is_cloud: bool
-    players: List[PlayerModel]
+    players: list[PlayerModel]
     parser_version: str
-    discord_messages_id_list: List[str]
+    discord_messages_id_list: list[str]
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    approved_at: Optional[datetime] = None
-    approver_discord_id: Optional[str] = None
+    approved_at: datetime | None = None
+    approver_discord_id: str | None = None
     flagged: bool = False
-    flagged_by: Optional[str] = None
+    flagged_by: str | None = None
     save_file_hash: str
     # Entry 12: the byte hash. Optional because 35,941 existing
     # documents have none -- and it must never be written empty, since
     # the partial index filters on {$exists: true} and would collide
     # every such document. D83, D133.
-    save_bytes_sha256: Optional[str] = None
+    save_bytes_sha256: str | None = None
     reporter_discord_id: str
-    contest_report_list: List[ContestReport]
+    contest_report_list: list[ContestReport]
 
 
 __all__ = ["StatModel", "PlayerModel", "ContestReport", "MatchModel"]

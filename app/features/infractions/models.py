@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import datetime, UTC
+from enum import StrEnum
 from typing import Final, Literal
 
 from pydantic import BaseModel, Field
@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 # ─── Enums ───────────────────────────────────────────────────────────────────
 
 
-class TierCategory(str, Enum):
+class TierCategory(StrEnum):
     quit = "quit"
     minor = "minor"
     moderate = "moderate"
@@ -18,7 +18,7 @@ class TierCategory(str, Enum):
     extreme = "extreme"
 
 
-class FlatType(str, Enum):
+class FlatType(StrEnum):
     smurf = "smurf"
     oversub = "oversub"
     comp = "comp"
@@ -57,7 +57,7 @@ class PendingSuspensionDocument(BaseModel):
     id: str = Field(alias="_id")  # discord_id stored as _id
     punishment_type: str  # tier category name or flat type name
     reason: str | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # ─── Request shapes ───────────────────────────────────────────────────────────

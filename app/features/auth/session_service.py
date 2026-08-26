@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from secrets import token_urlsafe
 from typing import cast
 from urllib.parse import urlencode
@@ -59,7 +59,7 @@ class SessionService:
                 "Discord OAuth is not configured for auth registration."
             )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expires_at = now + timedelta(minutes=settings.auth_session_ttl_minutes)
         session_id = token_urlsafe(24)
         state_token = token_urlsafe(32)
@@ -194,7 +194,7 @@ class SessionService:
             session_id,
             {
                 "status": RegistrationSessionStatus.VALIDATING.value,
-                "updated_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(UTC),
             },
         )
 
@@ -223,7 +223,7 @@ class SessionService:
                 "oauth_mfa_enabled_snapshot": oauth_mfa_enabled_snapshot,
                 "failure_code": None,
                 "failure_message": None,
-                "updated_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(UTC),
             },
         )
 
@@ -239,7 +239,7 @@ class SessionService:
             "status": RegistrationSessionStatus.FAILED.value,
             "failure_code": failure_code,
             "failure_message": failure_message,
-            "updated_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(UTC),
         }
         if extra:
             changes.update(extra)
@@ -263,7 +263,7 @@ class SessionService:
         )
         if (
             normalized_expires_at is not None
-            and normalized_expires_at <= datetime.now(timezone.utc)
+            and normalized_expires_at <= datetime.now(UTC)
             and status_value
             not in {
                 RegistrationSessionStatus.EXPIRED.value,
@@ -278,7 +278,7 @@ class SessionService:
                     "status": status_value,
                     "failure_code": "REGISTRATION_SESSION_EXPIRED",
                     "failure_message": "Registration session expired. Please start again.",
-                    "updated_at": datetime.now(timezone.utc),
+                    "updated_at": datetime.now(UTC),
                 },
             )
             session = {
@@ -303,8 +303,8 @@ class SessionService:
     @staticmethod
     def _normalize_datetime(value: datetime) -> datetime:
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
     @staticmethod
     def _build_authorize_url(state_token: str) -> str:

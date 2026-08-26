@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import random
 from datetime import datetime
-from typing import Dict, List, Tuple
 
 from pymongo import AsyncMongoClient
 
@@ -29,7 +28,7 @@ class StatsService:
     def __init__(self, client: AsyncMongoClient) -> None:
         self.ratings = RatingsRepository(client)
 
-    def _validate(self, civ_version: str, game_type: str) -> Tuple[str, bool]:
+    def _validate(self, civ_version: str, game_type: str) -> tuple[str, bool]:
         version = (civ_version or "").strip().lower()
         normalized_game_type = (game_type or "").strip().lower()
 
@@ -40,7 +39,7 @@ class StatsService:
 
         return version, normalized_game_type == "cloud"
 
-    def _doc_to_row(self, doc: Dict[str, object]) -> StatRow:
+    def _doc_to_row(self, doc: dict[str, object]) -> StatRow:
         mu_raw = as_float(doc.get("mu"), settings.ts_mu)
         sigma_raw = as_float(doc.get("sigma"), settings.ts_sigma)
         raw_modified = doc.get("lastModified")
@@ -82,7 +81,7 @@ class StatsService:
         )
 
         if is_cloud:
-            season_map: Dict[str, StatSet] = {normalized_discord_id: StatSet()}
+            season_map: dict[str, StatSet] = {normalized_discord_id: StatSet()}
         else:
             season_map = await self._load_stat_set(
                 civ_version=version,
@@ -105,8 +104,8 @@ class StatsService:
         return response
 
     async def get_users_stats_batch(
-        self, *, civ_version: str, game_type: str, discord_ids: List[str]
-    ) -> List[UserStatsResponse]:
+        self, *, civ_version: str, game_type: str, discord_ids: list[str]
+    ) -> list[UserStatsResponse]:
         version, is_cloud = self._validate(civ_version, game_type)
 
         ids = [str(value).strip() for value in discord_ids if str(value).strip()]
@@ -123,7 +122,7 @@ class StatsService:
         )
 
         if is_cloud:
-            season_map: Dict[str, StatSet] = {
+            season_map: dict[str, StatSet] = {
                 discord_id: StatSet() for discord_id in ids
             }
         else:
@@ -163,7 +162,7 @@ class StatsService:
         )
 
         if is_cloud:
-            season_map: Dict[str, StatSet] = {normalized_discord_id: StatSet()}
+            season_map: dict[str, StatSet] = {normalized_discord_id: StatSet()}
         else:
             season_map = await self._load_stat_set(
                 civ_version=version,
@@ -195,7 +194,7 @@ class StatsService:
         return response
 
     async def get_team_gen(
-        self, *, civ_version: str, game_type: str, discord_ids: List[str]
+        self, *, civ_version: str, game_type: str, discord_ids: list[str]
     ) -> TeamGenResponse:
         version, is_cloud = self._validate(civ_version, game_type)
 
@@ -218,7 +217,7 @@ class StatsService:
         )
 
         ts_env = make_ts_env()
-        ranked_teams: List[List[StatRow]] = [[], []]
+        ranked_teams: list[list[StatRow]] = [[], []]
         best_quality = 0.0
         best_ids = ids.copy()
 
@@ -252,7 +251,7 @@ class StatsService:
             best_quality = game_quality
             best_ids = ids.copy()
 
-        result: List[List[str]] = [[], []]
+        result: list[list[str]] = [[], []]
         for index, discord_id in enumerate(best_ids):
             result[int(index * 2 / len(best_ids))].append(discord_id)
 
@@ -269,9 +268,9 @@ class StatsService:
         civ_version: str,
         is_seasonal: bool,
         is_cloud: bool,
-        discord_ids: List[str],
-    ) -> Dict[str, StatSet]:
-        result: Dict[str, StatSet] = {
+        discord_ids: list[str],
+    ) -> dict[str, StatSet]:
+        result: dict[str, StatSet] = {
             discord_id: StatSet() for discord_id in discord_ids
         }
 

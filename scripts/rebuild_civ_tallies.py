@@ -27,7 +27,7 @@ import sys
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -48,7 +48,7 @@ def game_mode(raw: Any) -> str:
     return "teamer" if mode == "team" else mode
 
 
-def all_scopes(edition: str) -> List[str]:
+def all_scopes(edition: str) -> list[str]:
     """Every scope this edition can write, from the rules rather than the data."""
     scopes = set()
     for is_cloud in (False, True):
@@ -66,7 +66,7 @@ def all_scopes(edition: str) -> List[str]:
     return sorted(scopes)
 
 
-def read_tokens(player: Dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
+def read_tokens(player: dict[str, Any]) -> tuple[str | None, str | None]:
     """civ and leader for one player entry, or None where a token is unknown."""
     civ = player.get("civ") or None
     leader = player.get("leader") or None
@@ -75,9 +75,9 @@ def read_tokens(player: Dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
     return civ, leader
 
 
-def collect(db: Any, edition: str) -> Dict[str, Dict[int, Dict[str, Any]]]:
+def collect(db: Any, edition: str) -> dict[str, dict[int, dict[str, Any]]]:
     """One pass over an edition's matches, bucketed into every scope."""
-    scopes: Dict[str, Dict[int, Dict[str, Any]]] = defaultdict(
+    scopes: dict[str, dict[int, dict[str, Any]]] = defaultdict(
         lambda: defaultdict(lambda: {"civs": {}, "leaders": {}})
     )
     matches = 0
@@ -113,7 +113,7 @@ def collect(db: Any, edition: str) -> Dict[str, Dict[int, Dict[str, Any]]]:
     return scopes
 
 
-def write(client: MongoClient, scope: str, tallies: Dict[int, Dict[str, Any]]) -> None:
+def write(client: MongoClient, scope: str, tallies: dict[int, dict[str, Any]]) -> None:
     db_name, col_name = scope.split(".", 1)
     col = client[db_name][col_name]
     started = time.monotonic()

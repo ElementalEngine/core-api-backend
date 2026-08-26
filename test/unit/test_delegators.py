@@ -16,9 +16,8 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import List, Tuple
 
-Finding = Tuple[str, str, str]
+Finding = tuple[str, str, str]
 
 # Two wrong delegators and one correct one. Without a case the check can
 # fail on, the suite passes on a checker that finds nothing at all -- D86
@@ -52,8 +51,8 @@ def _forwarded_call(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> ast.Call | No
     return value if value.func.attr == fn.name else None
 
 
-def _check(name: str, source: str) -> List[Finding]:
-    out: List[Finding] = []
+def _check(name: str, source: str) -> list[Finding]:
+    out: list[Finding] = []
     for cls in ast.walk(ast.parse(source)):
         if not isinstance(cls, ast.ClassDef):
             continue

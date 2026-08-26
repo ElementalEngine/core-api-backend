@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Any, Final
 
 from pymongo import AsyncMongoClient
@@ -126,7 +126,7 @@ async def create_pending_suspension(
     reason: str | None,
 ) -> None:
     col = suspensions_due_col(db)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await col.replace_one(
         {"_id": discord_id},
         {
@@ -150,7 +150,7 @@ async def delete_pending_suspension(db: AsyncMongoClient, discord_id: str) -> No
 async def get_active_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]:
     """Query uses compound index { suspended: 1, ends: 1 }."""
     col = suspensions_col(db)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cursor = col.find(
         {"suspended": True, "ends": {"$gt": now}},
         {"discord_id": 1, "ends": 1, "_id": 0},
@@ -167,7 +167,7 @@ async def get_overdue_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension
     same compound index.
     """
     col = suspensions_col(db)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cursor = col.find(
         {"suspended": True, "ends": {"$lte": now}},
         {"discord_id": 1, "ends": 1, "_id": 0},

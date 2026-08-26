@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Mapping, Optional, Sequence, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
+from collections.abc import Mapping, Sequence
 
 from bson import ObjectId
 
@@ -38,16 +39,16 @@ class EditingService:
     def __init__(self, matches: MatchService) -> None:
         self._m = matches
 
-    def _player_delta_changes(self, match: MatchModel) -> Dict[str, Any]:
+    def _player_delta_changes(self, match: MatchModel) -> dict[str, Any]:
         """$set keys for every player's recomputed deltas."""
-        changes: Dict[str, Any] = {}
+        changes: dict[str, Any] = {}
         for i, player in enumerate(match.players):
             changes[f"players.{i}.delta"] = player.delta
             changes[f"players.{i}.season_delta"] = player.season_delta
             changes[f"players.{i}.combined_delta"] = player.combined_delta
         return changes
 
-    async def _reload_pending(self, oid: ObjectId) -> Dict[str, Any]:
+    async def _reload_pending(self, oid: ObjectId) -> dict[str, Any]:
         """Re-fetch a pending match and rename _id -> match_id for the response."""
         updated = await self._m.q.find_pending_by_id(oid)
         updated["match_id"] = str(updated.pop("_id"))
@@ -55,7 +56,7 @@ class EditingService:
 
     async def append_discord_message_id_list(
         self, match_id: str, discord_message_id_list: list[str]
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:
@@ -70,8 +71,8 @@ class EditingService:
         return await self._reload_pending(oid)
 
     async def update_match(
-        self, match_id: str, update_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, match_id: str, update_data: dict[str, Any]
+    ) -> dict[str, Any]:
         if not update_data:
             raise MatchServiceError("Empty update payload")
         oid = self._m._to_oid(match_id)
@@ -86,7 +87,7 @@ class EditingService:
 
     async def set_player_order(
         self, match_id: str, player_order: str, discord_message_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:
@@ -119,7 +120,7 @@ class EditingService:
 
         match = await self._m._recompute_deltas(match)
 
-        changes: Dict[str, Any] = {}
+        changes: dict[str, Any] = {}
         changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [
             discord_message_id
         ]
@@ -133,7 +134,7 @@ class EditingService:
 
     async def change_order(
         self, match_id: str, new_order: str, discord_message_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:
@@ -158,7 +159,7 @@ class EditingService:
 
         match = await self._m._recompute_deltas(match)
 
-        changes: Dict[str, Any] = {}
+        changes: dict[str, Any] = {}
         changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [
             discord_message_id
         ]
@@ -170,7 +171,7 @@ class EditingService:
         logger.info("✅ 🔄 Changed player order for match %s", match_id)
         return await self._reload_pending(oid)
 
-    async def delete_pending_match(self, match_id: str) -> Dict[str, Any]:
+    async def delete_pending_match(self, match_id: str) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:
@@ -182,13 +183,13 @@ class EditingService:
 
     async def trigger_quit(
         self, match_id: str, quitter_discord_id: str, discord_message_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:
             raise NotFoundError("Match not found")
 
-        changes: Dict[str, Any] = {}
+        changes: dict[str, Any] = {}
         quitter_found = False
         for i, player in enumerate(res["players"]):
             if player.get("discord_id") == quitter_discord_id:
@@ -213,7 +214,7 @@ class EditingService:
         player_id: str,
         player_discord_id: str,
         discord_message_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:
@@ -233,7 +234,7 @@ class EditingService:
 
         match = await self._m._recompute_deltas(match)
 
-        changes: Dict[str, Any] = {}
+        changes: dict[str, Any] = {}
         changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [
             discord_message_id
         ]
@@ -249,7 +250,7 @@ class EditingService:
 
     async def assign_discord_id_all(
         self, match_id: str, player_discord_id: list[str], discord_message_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:
@@ -266,7 +267,7 @@ class EditingService:
 
         match = await self._m._recompute_deltas(match)
 
-        changes: Dict[str, Any] = {}
+        changes: dict[str, Any] = {}
         changes["discord_messages_id_list"] = res["discord_messages_id_list"] + [
             discord_message_id
         ]
@@ -285,7 +286,7 @@ class EditingService:
         sub_in_id: str,
         sub_out_discord_id: str,
         discord_message_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:
@@ -327,7 +328,7 @@ class EditingService:
 
     async def remove_sub(
         self, match_id: str, sub_out_id: str, discord_message_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:
@@ -361,7 +362,7 @@ class EditingService:
         contestor_discord_id: str,
         reason: str,
         discord_message_id: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:
@@ -388,7 +389,7 @@ class EditingService:
         patch: Sequence[SeatPatch],
         *,
         actor_is_staff: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """C1's declarative PATCH: one request, one judgement, one recompute.
 
         The whole patch is judged before any write, so a rejection leaves
@@ -433,7 +434,7 @@ class EditingService:
 def apply_players_patch(
     match: MatchModel,
     patch: Sequence[SeatPatch],
-    steam_ids: Mapping[str, Optional[str]],
+    steam_ids: Mapping[str, str | None],
 ) -> None:
     """Apply a validated patch in place (D154).
 
@@ -447,7 +448,7 @@ def apply_players_patch(
 
     Assumes validate_players_patch returned no violations.
     """
-    last: Dict[int, SeatPatch] = {}
+    last: dict[int, SeatPatch] = {}
     for entry in patch:
         last[entry.seat] = entry
 
@@ -473,7 +474,7 @@ def apply_players_patch(
         _apply_sub(match, seat, sub_out, steam_ids)
 
 
-def _leaver_index(match: MatchModel, seat: int) -> Optional[int]:
+def _leaver_index(match: MatchModel, seat: int) -> int | None:
     """The synthetic row paired with a seat, by the adjacency v1 builds.
 
     assign_sub inserts the leaver at sub_in_idx + 1, remove_sub reads
@@ -490,8 +491,8 @@ def _leaver_index(match: MatchModel, seat: int) -> Optional[int]:
 def _apply_sub(
     match: MatchModel,
     seat: int,
-    sub_out: Optional[str],
-    steam_ids: Mapping[str, Optional[str]],
+    sub_out: str | None,
+    steam_ids: Mapping[str, str | None],
 ) -> None:
     row = match.players[seat]
     leaver = _leaver_index(match, seat)

@@ -1,7 +1,7 @@
 import struct
 import sys
 import argparse
-from typing import List, Dict, Any
+from typing import Any
 import json
 
 loggingEnabled = False
@@ -39,7 +39,7 @@ class ChunkType:
     Unknown_long = 103842983
 
 
-def parse(data: bytes) -> Dict[str, Any]:
+def parse(data: bytes) -> dict[str, Any]:
     chunks = parse_raw(data)
     return parse_chunks(chunks)
 
@@ -51,7 +51,7 @@ def find_marker(group, marker):
     return None
 
 
-def parse_chunks(data: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+def parse_chunks(data: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
 
     players = []
     for x in data["group3"]:
@@ -108,7 +108,7 @@ def parse_chunks(data: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
     }
 
 
-def parse_raw(data: bytes) -> Dict[str, List[Dict[str, Any]]]:
+def parse_raw(data: bytes) -> dict[str, list[dict[str, Any]]]:
     if data[0:4] != b"CIV7":
         raise Exception("Not a CIV 7 save file!")
 
@@ -144,8 +144,8 @@ def parse_raw(data: bytes) -> Dict[str, List[Dict[str, Any]]]:
     }
 
 
-def read_n_chunks(data: bytes, offset: int, num_chunks: int) -> List[Dict[str, Any]]:
-    chunks: List[Dict[str, Any]] = []
+def read_n_chunks(data: bytes, offset: int, num_chunks: int) -> list[dict[str, Any]]:
+    chunks: list[dict[str, Any]] = []
     for i in range(num_chunks):
         prev_end = chunks[-1]["endOffset"] if chunks else offset
         result = parse_chunk(data, prev_end)
@@ -154,7 +154,7 @@ def read_n_chunks(data: bytes, offset: int, num_chunks: int) -> List[Dict[str, A
     return chunks
 
 
-def parse_chunk(data: bytes, offset: int) -> Dict[str, Any]:
+def parse_chunk(data: bytes, offset: int) -> dict[str, Any]:
     marker = data[offset : offset + 4]
     type_ = struct.unpack_from("<I", data, offset + 4)[0]
     data_start_offset = offset + 12

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from bson.int64 import Int64
 
@@ -33,11 +33,11 @@ class ApprovalService:
     def _shift_tally(
         self,
         existing: Any,
-        key: Optional[str],
+        key: str | None,
         *,
         won: bool,
         step: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """The rebuild uses the same bump(), so the two cannot drift."""
         tally = dict(existing) if isinstance(existing, dict) else {}
         if not key:
@@ -47,8 +47,8 @@ class ApprovalService:
     def update_existing_stat(
         self,
         player: PlayerModel,
-        existing_civs: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        existing_civs: dict[str, Any],
+    ) -> dict[str, Any]:
         # D44: the tally keys on the raw token; display names resolve on read.
         return self._shift_tally(
             existing_civs, player.civ, won=player.delta > 0, step=+1
@@ -57,8 +57,8 @@ class ApprovalService:
     def revert_existing_stat(
         self,
         player: PlayerModel,
-        existing_civs: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        existing_civs: dict[str, Any],
+    ) -> dict[str, Any]:
         return self._shift_tally(
             existing_civs, player.civ, won=player.delta > 0, step=-1
         )
@@ -66,8 +66,8 @@ class ApprovalService:
     def update_existing_leaders(
         self,
         player: PlayerModel,
-        existing_leaders: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        existing_leaders: dict[str, Any],
+    ) -> dict[str, Any]:
         # Civ6 records written before Entry 10 have no leader; they are left
         # out rather than bucketed under a placeholder key.
         return self._shift_tally(
@@ -77,8 +77,8 @@ class ApprovalService:
     def revert_existing_leaders(
         self,
         player: PlayerModel,
-        existing_leaders: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        existing_leaders: dict[str, Any],
+    ) -> dict[str, Any]:
         return self._shift_tally(
             existing_leaders, player.leader, won=player.delta > 0, step=-1
         )
@@ -92,10 +92,10 @@ class ApprovalService:
         mu: float,
         sigma: float,
         delta_value: float,
-        civs: Dict[str, Any],
-        leaders: Dict[str, Any],
+        civs: dict[str, Any],
+        leaders: dict[str, Any],
         step: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """One stats document for approve (step=+1) or revert (step=-1).
 
         Reverted counters clamp at 0 so a revert can never write negative stats.
@@ -119,7 +119,7 @@ class ApprovalService:
             "lastModified": datetime.now(UTC),
         }
 
-    async def revert_match(self, match_id: str) -> Dict[str, Any]:
+    async def revert_match(self, match_id: str) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_validated_by_id(oid)
         if not res:
@@ -137,7 +137,7 @@ class ApprovalService:
             async with await session.start_transaction():
                 try:
                     occurred_at = datetime.now(UTC)
-                    events: List[Dict[str, Any]] = []
+                    events: list[dict[str, Any]] = []
 
                     # Stats writes
                     for i, p in enumerate(match.players):
@@ -227,7 +227,7 @@ class ApprovalService:
 
     async def approve_match(
         self, match_id: str, approver_discord_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         # D84: the conditional claim replaces approve_lock. No match means
         # gone or already claimed -- both are the 404 the lock produced.
@@ -273,7 +273,7 @@ class ApprovalService:
                         )
 
                         occurred_at = datetime.now(UTC)
-                        events: List[Dict[str, Any]] = []
+                        events: list[dict[str, Any]] = []
 
                         # Stats writes
                         for i, p in enumerate(match.players):
