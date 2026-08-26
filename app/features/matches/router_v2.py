@@ -5,7 +5,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Header, UploadFile
 
-from app.core.dependencies import get_database, require_mito_token
+from app.core.dependencies import (
+    actor_discord_id,
+    get_database,
+    require_mito_token,
+)
 from app.core.errors import forbidden, invalid_request, not_found
 from app.features.matches.editing import EditingService
 from app.features.matches.errors import (
@@ -28,11 +32,6 @@ router = APIRouter(
     tags=["matches-v2"],
     dependencies=[Depends(require_mito_token)],
 )
-
-
-def actor_discord_id(x_actor_discord_id: str = Header()) -> str:
-    """D90's one identity header, replacing civup's five."""
-    return x_actor_discord_id
 
 
 def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:

@@ -23,6 +23,20 @@ def get_mongo_database(request: Request) -> AsyncDatabase:
     return database
 
 
+def actor_discord_id(x_actor_discord_id: str = Header()) -> str:
+    """D90/D94's one identity header, replacing civup's five.
+
+    Shared rather than per-feature: `/api/v2/matches` stamps it for D91's
+    authorship rules and C5's `activity_router` stamps it for D73's
+    censoring. Two copies of one header name is how the edition enum reached
+    three files (section 4 item 107).
+
+    Required, never defaulted -- an absent actor is a malformed request, not
+    an anonymous one.
+    """
+    return x_actor_discord_id
+
+
 def _require_bearer(
     authorization: str | None,
     *,
