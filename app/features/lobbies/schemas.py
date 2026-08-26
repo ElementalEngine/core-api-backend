@@ -18,9 +18,10 @@ responses carry no schema in openapi.json, alongside section 4 item 96.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CreateLobbyRequest(BaseModel):
@@ -56,3 +57,48 @@ class CreateLobbyRequest(BaseModel):
     # key is core-api's own id and the Activity resolves by channel, never
     # by this (spec section 2). Omitted from the document when absent.
     instance_id: str | None = Field(default=None, max_length=64)
+
+
+class SeatAction(StrEnum):
+    PLACE = "place"
+    LEAVE = "leave"
+
+
+class ChangeSeatRequest(BaseModel):
+    """One seat change. `place` covers self-place, move and host rearrange.
+
+    ⚠ Two actions rather than four. Moving IS placing at a different index,
+    and a host rearrange is placing aimed at somebody else -- so one action
+    plus an optional target covers all four of C5's verbs with one code path
+    and one call to `validate_seats`.
+
+    ⚠ `place` states the WHOLE desired position. Omitting `team` means no
+    side, not "keep the side you had": distinguishing the two would need a
+    sentinel, and a seat move that silently retains a team is the kind of
+    quiet action O-19b's compaction bug was made of.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # D77's optimistic concurrency. Revision starts at 1, so 0 is a client
+    # bug rather than "I have nothing".
+    expected_revision: int = Field(ge=1)
+    action: SeatAction
+    seat_index: int | None = Field(default=None, ge=0)
+    team: int | None = Field(default=None, ge=0)
+    # Absent means the actor. Naming somebody else is the host's rearrange
+    # and is refused for anyone else.
+    discord_id: str | None = Field(default=None, min_length=1, max_length=32)
+
+    @model_validator(mode="after")
+    def _fields_match_the_action(self) -> ChangeSeatRequest:
+        if self.action is SeatAction.PLACE and self.seat_index is None:
+            raise ValueError("seat_index is required to place a seat")
+        if self.action is SeatAction.LEAVE and (
+            self.seat_index is not None or self.team is not None
+        ):
+            raise ValueError("leaving takes no seat_index and no team")
+        return self
+
+
+__all__ = ["ChangeSeatRequest", "CreateLobbyRequest", "SeatAction"]

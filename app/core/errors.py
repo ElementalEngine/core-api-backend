@@ -56,15 +56,20 @@ def _error_envelope(
 
 
 def api_error(
-    *, code: str, message: str, status_code: int, retryable: bool = False
+    *,
+    code: str,
+    message: str,
+    status_code: int,
+    retryable: bool = False,
+    details: Any | None = None,
 ) -> HTTPException:
     """Raise through D92's envelope. S6 uses three codes on /api/v2/matches;
     S7 adds the closed enum, the INTERNAL catch-all and correlation_id."""
     return HTTPException(
         status_code=status_code,
-        detail=_error_envelope(code=code, message=message, retryable=retryable)[
-            "detail"
-        ],
+        detail=_error_envelope(
+            code=code, message=message, details=details, retryable=retryable
+        )["detail"],
     )
 
 
@@ -80,7 +85,7 @@ def not_found(message: str) -> HTTPException:
     return api_error(code="NOT_FOUND", message=message, status_code=404)
 
 
-def conflict(message: str) -> HTTPException:
+def conflict(message: str, details: Any | None = None) -> HTTPException:
     """C5 invariant 5: 409 with code CONFLICT.
 
     The CODE stays generic and the MESSAGE names which invariant refused --
@@ -88,10 +93,11 @@ def conflict(message: str) -> HTTPException:
     them; C5's contract fixes one code for every lobby conflict, so the
     distinction lives where a host can read it.
 
-    Mutations extend this with both revision numbers at CP5, when there is a
-    revision to carry (D77).
+    Mutations carry both revision numbers in `details` (C5 invariant 5), so a
+    client that lost a race can tell "you are behind" from "that is taken"
+    without a second read.
     """
-    return api_error(code="CONFLICT", message=message, status_code=409)
+    return api_error(code="CONFLICT", message=message, status_code=409, details=details)
 
 
 async def request_validation_exception_handler(

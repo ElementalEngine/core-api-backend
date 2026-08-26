@@ -11,10 +11,11 @@ second consumer yet (D13) -- so it is not its own feature.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from bson import ObjectId
-from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
+from pymongo import ASCENDING, DESCENDING, AsyncMongoClient, ReturnDocument
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import DuplicateKeyError
 
@@ -112,6 +113,44 @@ class LobbyRepository:
         except DuplicateKeyError as exc:
             raise LobbyInsertRefused(_refusing_index(exc)) from exc
         return {**document, "_id": result.inserted_id}
+
+    async def replace_seats(
+        self,
+        lobby_id: ObjectId,
+        expected_revision: int,
+        seats: list[dict[str, Any]],
+        now: datetime,
+        *,
+        absent_player: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Write a validated seat array under D77's revision gate.
+
+        The array written is the array `validate_seats` accepted, so no
+        arrangement can reach the collection without having been checked --
+        a targeted `$push`/`$set` would validate a prospective list and then
+        write something else.
+
+        ⚠ `absent_player` carries D176's `$ne` clause, and only when the
+        target is not currently seated, which is the case D176 measured at
+        `[1, 0]`. The `revision` clause reaches the same outcome on its own
+        -- any competing seat write bumps it and this filter stops matching
+        -- so the two are not independent guarantees; the measured one stays.
+
+        Returns the updated document, or None when nothing matched: stale
+        revision, or the player was seated in between. The caller re-reads to
+        say which (spec section 9).
+        """
+        query: dict[str, Any] = {"_id": lobby_id, "revision": expected_revision}
+        if absent_player is not None:
+            query["seats.discord_id"] = {"$ne": absent_player}
+        return await self._lobbies.find_one_and_update(
+            query,
+            {
+                "$set": {"seats": seats, "updated_at": now},
+                "$inc": {"revision": 1},
+            },
+            return_document=ReturnDocument.AFTER,
+        )
 
     async def find_by_id(self, lobby_id: ObjectId) -> dict[str, Any] | None:
         """One lobby by id, open or closed.

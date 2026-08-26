@@ -14,16 +14,23 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.features.lobbies.modes import InvalidLobbyShape, resolve_shape
+from app.features.lobbies.modes import (
+    InvalidLobbyShape,
+    InvalidSeating,
+    resolve_shape,
+)
 from app.features.lobbies.projection import BALLOT, PICK, POOL, POOL_APPEARANCES
-from app.features.lobbies.schemas import CreateLobbyRequest
+from app.features.lobbies.schemas import ChangeSeatRequest, CreateLobbyRequest
 from app.features.lobbies.service import (
     InvalidLobbyId,
     LobbyNotFound,
     LobbyService,
+    NotTheHost,
+    SeatChangeRefused,
     as_lobby_id,
     build_lobby_document,
     for_the_wire,
+    rearranged,
     seat_the_roster,
 )
 
@@ -53,12 +60,15 @@ class FakeSeasons:
 
 
 class FakeRepo:
-    def __init__(self, open_lobbies=None, lobby=None):
+    def __init__(self, open_lobbies=None, lobby=None, written=None, reread=None):
         self.inserted = None
         self.queries = []
         self.asked_for = []
+        self.writes = []
         self._open = open_lobbies or []
         self._lobby = lobby
+        self._written = written
+        self._reread = reread
 
     async def insert_lobby(self, document):
         self.inserted = document
@@ -70,7 +80,17 @@ class FakeRepo:
 
     async def find_by_id(self, lobby_id):
         self.asked_for.append(str(lobby_id))
+        # A refused write re-reads to say WHY (spec section 9), so the second
+        # look can legitimately see a different document.
+        if self._reread is not None and len(self.asked_for) > 1:
+            return self._reread
         return self._lobby
+
+    async def replace_seats(
+        self, lobby_id, expected_revision, seats, now, *, absent_player=None
+    ):
+        self.writes.append((expected_revision, seats, absent_player))
+        return self._written
 
 
 # --- seating ------------------------------------------------------------
@@ -506,3 +526,133 @@ def test_the_guard_reports_a_field_that_is_neither_public_nor_censored():
     seated = built_document()
     seated["seats"][0]["unlisted_seat_field"] = "x"
     assert unclassified(seated) == {"unlisted_seat_field"}
+
+
+# --- changing a seat (C5 PATCH /{id}/seats) -----------------------------
+
+OPEN_LOBBY = {
+    "_id": "L1",
+    "phase": "lobby",
+    "revision": 3,
+    "game_type": "ffa",
+    "number_teams": None,
+    "team_size": None,
+    "host_discord_id": "alice",
+    "seats": [{"seat_index": 0, "discord_id": "alice", "team": None}],
+}
+
+
+def change(repo, actor="alice", **body):
+    body.setdefault("action", "place")
+    body.setdefault("expected_revision", 3)
+    return asyncio.run(
+        LobbyService(repo, FakeSeasons()).change_seat(
+            HEX_ID, actor, ChangeSeatRequest(**body)
+        )
+    )
+
+
+def test_rearranging_keeps_the_seat_a_move_carries():
+    # A ballot -- later a pool and a pick -- belongs to the player, not the
+    # position. Rebuilding the seat would silently drop it.
+    seats = [{"seat_index": 0, "discord_id": "alice", "team": 0, "ballot": {"m": "p"}}]
+    moved = rearranged(
+        seats,
+        "alice",
+        ChangeSeatRequest(expected_revision=3, action="place", seat_index=7, team=1),
+    )
+    assert moved == [
+        {"seat_index": 7, "discord_id": "alice", "team": 1, "ballot": {"m": "p"}}
+    ]
+
+
+def test_rearranging_never_closes_a_gap():
+    # ⚠ O-19b: civup compacts before chunking, which moves a player across a
+    # team boundary that nobody asked to cross.
+    seats = [
+        {"seat_index": 0, "discord_id": "a"},
+        {"seat_index": 5, "discord_id": "b"},
+    ]
+    placed = rearranged(
+        seats, "c", ChangeSeatRequest(expected_revision=3, action="place", seat_index=2)
+    )
+    assert [seat["seat_index"] for seat in placed] == [0, 2, 5]
+
+
+def test_leaving_removes_only_the_target():
+    seats = [
+        {"seat_index": 0, "discord_id": "a"},
+        {"seat_index": 1, "discord_id": "b"},
+    ]
+    left = rearranged(
+        seats, "a", ChangeSeatRequest(expected_revision=3, action="leave")
+    )
+    assert [seat["discord_id"] for seat in left] == ["b"]
+
+
+def test_a_place_writes_the_array_it_validated():
+    repo = FakeRepo(lobby=OPEN_LOBBY, written={**OPEN_LOBBY, "revision": 4})
+    change(repo, actor="bob", seat_index=4)
+    expected_revision, seats, absent = repo.writes[0]
+    assert expected_revision == 3
+    assert [(s["discord_id"], s["seat_index"]) for s in seats] == [
+        ("alice", 0),
+        ("bob", 4),
+    ]
+    # ⚠ D176's clause, and only where D176 measured it: bob was not seated.
+    assert absent == "bob"
+
+
+def test_moving_a_seated_player_carries_no_absent_clause():
+    # The $ne would refuse the player their own seat.
+    repo = FakeRepo(lobby=OPEN_LOBBY, written={**OPEN_LOBBY, "revision": 4})
+    change(repo, actor="alice", seat_index=6)
+    assert repo.writes[0][2] is None
+
+
+def test_only_the_host_may_move_somebody_else():
+    repo = FakeRepo(lobby=OPEN_LOBBY, written=OPEN_LOBBY)
+    with pytest.raises(NotTheHost):
+        change(repo, actor="bob", seat_index=4, discord_id="carol")
+    assert repo.writes == []
+    # alice IS the host.
+    change(repo, actor="alice", seat_index=4, discord_id="carol")
+    assert repo.writes[0][1][-1]["discord_id"] == "carol"
+
+
+def test_an_illegal_arrangement_never_reaches_the_write():
+    repo = FakeRepo(lobby=OPEN_LOBBY, written=OPEN_LOBBY)
+    with pytest.raises(InvalidSeating):
+        change(repo, actor="bob", seat_index=0)  # alice holds seat 0
+    assert repo.writes == []
+
+
+def test_seats_are_settled_once_the_lobby_leaves_lobby_phase():
+    # D189. Ballots are per seat and turn_index points into the seating, so a
+    # move from `settings` on corrupts state no validator reads.
+    repo = FakeRepo(lobby={**OPEN_LOBBY, "phase": "settings"}, written=OPEN_LOBBY)
+    with pytest.raises(SeatChangeRefused) as exc:
+        change(repo, actor="bob", seat_index=4)
+    assert repo.writes == []
+    assert (exc.value.expected, exc.value.current) == (3, 3)
+
+
+def test_a_stale_revision_reports_both_numbers():
+    repo = FakeRepo(
+        lobby=OPEN_LOBBY, written=None, reread={**OPEN_LOBBY, "revision": 9}
+    )
+    with pytest.raises(SeatChangeRefused) as exc:
+        change(repo, actor="bob", seat_index=4)
+    assert (exc.value.expected, exc.value.current) == (3, 9)
+    assert "moved on" in str(exc.value)
+
+
+def test_a_lost_race_at_the_same_revision_names_the_seat_not_the_revision():
+    # ⚠ Spec section 9: matched-count zero is stale revision OR already
+    # seated, and only the re-read tells them apart. Same revision means
+    # D176's $ne refused, not that the caller is behind.
+    repo = FakeRepo(lobby=OPEN_LOBBY, written=None, reread=OPEN_LOBBY)
+    with pytest.raises(SeatChangeRefused) as exc:
+        change(repo, actor="bob", seat_index=4)
+    assert (exc.value.expected, exc.value.current) == (3, 3)
+    assert "already holds a seat" in str(exc.value)

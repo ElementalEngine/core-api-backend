@@ -7,15 +7,19 @@ unique indexes do the rest.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
 from bson import ObjectId
 
-from app.features.lobbies.modes import LobbyShape, resolve_shape
+from app.features.lobbies.modes import LobbyShape, resolve_shape, validate_seats
 from app.features.lobbies.projection import project_lobby
-from app.features.lobbies.schemas import CreateLobbyRequest
+from app.features.lobbies.schemas import (
+    ChangeSeatRequest,
+    CreateLobbyRequest,
+    SeatAction,
+)
 
 PHASE_LOBBY = "lobby"
 SOURCE_COMMAND = "command"
@@ -36,6 +40,24 @@ class InvalidLobbyId(ValueError):
 
 class LobbyNotFound(LookupError):
     """No lobby carries that id."""
+
+
+class NotTheHost(PermissionError):
+    """Only the host may move somebody else's seat."""
+
+
+class SeatChangeRefused(Exception):
+    """The lobby would not take the change. Carries both revisions.
+
+    One class for every 409 on this path (C5 invariant 5): a stale revision,
+    a race lost to D176's `$ne`, and a lobby past `lobby` phase all answer
+    CONFLICT with the same two numbers, and the MESSAGE says which.
+    """
+
+    def __init__(self, message: str, expected: int, current: int | None) -> None:
+        super().__init__(message)
+        self.expected = expected
+        self.current = current
 
 
 def as_lobby_id(lobby_id: str) -> ObjectId:
@@ -214,6 +236,70 @@ class LobbyService:
             return None
         return for_the_wire(found, viewer_discord_id)
 
+    async def change_seat(
+        self, lobby_id: str, actor_discord_id: str, request: ChangeSeatRequest
+    ) -> dict[str, Any]:
+        """One seat change, returning the updated censored snapshot (D77).
+
+        ⚠ Seats move only while the lobby is in `lobby` phase. Nothing said
+        so before -- inferred and recorded as D189, because from `settings`
+        on, ballots are per seat, ban turns are per team and `turn_index`
+        points into the seating, so a move corrupts state no validator reads.
+
+        Raises InvalidLobbyId, LobbyNotFound, NotTheHost, InvalidSeating for
+        an arrangement that cannot exist, and SeatChangeRefused for any 409.
+        """
+        oid = as_lobby_id(lobby_id)
+        found = await self._repository.find_by_id(oid)
+        if found is None:
+            raise LobbyNotFound(lobby_id)
+
+        current = found["revision"]
+        if found["phase"] != PHASE_LOBBY:
+            raise SeatChangeRefused(
+                f"Seats are settled once the lobby reaches {found['phase']}",
+                request.expected_revision,
+                current,
+            )
+
+        target = request.discord_id or actor_discord_id
+        if target != actor_discord_id and actor_discord_id != found["host_discord_id"]:
+            raise NotTheHost("Only the host can move another player's seat")
+
+        seated = found.get("seats") or []
+        arrangement = rearranged(seated, target, request)
+        validate_seats(
+            arrangement,
+            resolve_shape(
+                found["game_type"], found.get("number_teams"), found.get("team_size")
+            ),
+        )
+
+        written = await self._repository.replace_seats(
+            oid,
+            request.expected_revision,
+            arrangement,
+            datetime.now(UTC),
+            absent_player=None
+            if any(seat["discord_id"] == target for seat in seated)
+            else target,
+        )
+        if written is None:
+            latest = await self._repository.find_by_id(oid)
+            raise SeatChangeRefused(*self._why_refused(latest, request))
+        return for_the_wire(written, actor_discord_id)
+
+    @staticmethod
+    def _why_refused(
+        lobby: dict[str, Any] | None, request: ChangeSeatRequest
+    ) -> tuple[str, int, int | None]:
+        """Spec section 9: matched-count zero is stale revision OR already
+        seated, and only a re-read tells them apart."""
+        current = lobby["revision"] if lobby else None
+        if current != request.expected_revision:
+            return ("The lobby has moved on", request.expected_revision, current)
+        return ("That player already holds a seat", request.expected_revision, current)
+
     async def browse(
         self,
         guild_id: str,
@@ -233,12 +319,43 @@ class LobbyService:
         return [for_the_wire(lobby, viewer_discord_id) for lobby in found]
 
 
+def rearranged(
+    seats: Sequence[Mapping[str, Any]], target: str, request: ChangeSeatRequest
+) -> list[dict[str, Any]]:
+    """The seat array the request asks for, sorted by `seat_index`.
+
+    ⚠ A move KEEPS the existing seat document and changes its position, so
+    whatever the seat carries -- a ballot, later a pool and a pick -- follows
+    the player. Rebuilding the seat would silently drop it.
+
+    ⚠ Gaps are left exactly where they are. civup's `arrangeTeamLobbySlots`
+    compacts before chunking, which moves a player across a team boundary
+    without anyone asking for it (O-19b, C5 invariant 1).
+    """
+    others = [dict(seat) for seat in seats if seat.get("discord_id") != target]
+    if request.action is SeatAction.LEAVE:
+        return sorted(others, key=lambda seat: seat["seat_index"])
+    existing = next(
+        (dict(seat) for seat in seats if seat.get("discord_id") == target), {}
+    )
+    moved = {
+        **existing,
+        "discord_id": target,
+        "seat_index": request.seat_index,
+        "team": request.team,
+    }
+    return sorted([*others, moved], key=lambda seat: seat["seat_index"])
+
+
 __all__ = [
     "InvalidLobbyId",
     "LobbyNotFound",
     "LobbyService",
+    "NotTheHost",
+    "SeatChangeRefused",
     "as_lobby_id",
     "build_lobby_document",
     "for_the_wire",
+    "rearranged",
     "seat_the_roster",
 ]
