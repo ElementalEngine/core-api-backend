@@ -457,6 +457,93 @@
         "title": "ContestReportRequest",
         "type": "object"
       },
+      "CreateLobbyRequest": {
+        "additionalProperties": false,
+        "description": "Mite's create call. Authoritative guild, channel, host and roster.\n\n`extra=\"forbid\"` so a camelCase field name is refused rather than\nsilently dropped and then reported as a missing required field.",
+        "properties": {
+          "channel_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "edition": {
+            "enum": [
+              "civ6",
+              "civ7"
+            ],
+            "title": "Edition",
+            "type": "string"
+          },
+          "game_type": {
+            "title": "Game Type",
+            "type": "string"
+          },
+          "guild_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Guild Id",
+            "type": "string"
+          },
+          "host_discord_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Host Discord Id",
+            "type": "string"
+          },
+          "instance_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance Id"
+          },
+          "number_teams": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number Teams"
+          },
+          "roster": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 99,
+            "title": "Roster",
+            "type": "array"
+          },
+          "team_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Size"
+          }
+        },
+        "required": [
+          "guild_id",
+          "channel_id",
+          "host_discord_id",
+          "edition",
+          "game_type"
+        ],
+        "title": "CreateLobbyRequest",
+        "type": "object"
+      },
       "CreatePendingSuspensionRequest": {
         "properties": {
           "punishment_type": {
@@ -5329,6 +5416,241 @@
         "summary": "Get Civ Data",
         "tags": [
           "civ-data"
+        ]
+      }
+    },
+    "/api/v2/lobbies": {
+      "get": {
+        "description": "Open lobbies for a guild (D180).\n\n\u26a0 `guild_id` is required, never defaulted: a service token is\nper-service, not per-guild, so an unfiltered read would expose every\nlobby on the deployment to any holder of it.",
+        "operationId": "browse_lobbies_api_v2_lobbies_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Guild Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "edition",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Edition"
+            }
+          },
+          {
+            "in": "query",
+            "name": "game_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Game Type"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Browse Lobbies Api V2 Lobbies Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Browse Lobbies",
+        "tags": [
+          "lobbies"
+        ]
+      },
+      "post": {
+        "operationId": "create_lobby_api_v2_lobbies_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLobbyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Lobby Api V2 Lobbies Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Lobby",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
+    "/api/v2/lobbies/active": {
+      "get": {
+        "description": "One open lobby or none, by the D71 index.",
+        "operationId": "resolve_active_api_v2_lobbies_active_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Guild Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Channel Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Resolve Active Api V2 Lobbies Active Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Active",
+        "tags": [
+          "lobbies"
         ]
       }
     },
