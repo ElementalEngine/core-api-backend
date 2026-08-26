@@ -51,6 +51,25 @@ def as_lobby_id(lobby_id: str) -> ObjectId:
     return ObjectId(lobby_id)
 
 
+def _wire_value(value: Any) -> Any:
+    """RFC 3339 for a datetime, unchanged for anything else.
+
+    ⚠ `Z`, not `+00:00`. Both name the same instant, but FastAPI chooses
+    between them by accident: a route with a response model serialises
+    through Pydantic and emits `Z`, while `response_model=None` falls back to
+    `jsonable_encoder`, which calls `.isoformat()` and emits `+00:00`.
+    `GET /{id}` needs `response_model=None` for its 204, so it disagreed with
+    its three siblings on the wire -- measured, Correction 90.
+
+    Converting here removes the choice rather than settling it: a str reaches
+    either encoder unchanged, so every lobby route agrees by construction
+    instead of by both encoders happening to match.
+    """
+    if isinstance(value, datetime):
+        return value.isoformat().replace("+00:00", "Z")
+    return value
+
+
 def for_the_wire(
     document: dict[str, Any], viewer_discord_id: str | None
 ) -> dict[str, Any]:
@@ -73,7 +92,9 @@ def for_the_wire(
     """
     projected = project_lobby(document, viewer_discord_id)
     return {
-        key: str(value) if key in OBJECT_ID_FIELDS and value is not None else value
+        key: str(value)
+        if key in OBJECT_ID_FIELDS and value is not None
+        else _wire_value(value)
         for key, value in projected.items()
     }
 

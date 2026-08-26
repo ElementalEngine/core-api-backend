@@ -310,12 +310,23 @@ def test_browse_censors_every_lobby_not_only_the_first():
 
 
 def test_the_create_response_is_unchanged_by_the_projection():
-    # CP4b measured this response on the wire. A `lobby`-phase document has
-    # neither censored surface, so D186 must leave it identical to the
-    # stored document apart from the id conversion.
+    # CP4b measured this response on the wire, and D186 put the projection on
+    # the path: a `lobby`-phase document has neither censored surface, so the
+    # projection must neither strip a field, add one, nor alter a value.
+    #
+    # The timestamps are excluded because the boundary re-encodes them by
+    # design (Correction 90) and a test below pins that format exactly. The
+    # last assertion is what keeps the exclusion honest -- without it,
+    # dropping both timestamps entirely would pass.
     repo, seasons = FakeRepo(), FakeSeasons()
     result = asyncio.run(LobbyService(repo, seasons).create(request()))
-    assert result == {**repo.inserted, "_id": "L1"}
+    timestamps = {"created_at", "updated_at"}
+    stored = {**repo.inserted, "_id": "L1"}
+    assert set(result) == set(stored)
+    assert {k: v for k, v in result.items() if k not in timestamps} == {
+        k: v for k, v in stored.items() if k not in timestamps
+    }
+    assert all(isinstance(result[key], str) for key in timestamps)
 
 
 # --- reading one lobby (C5 GET /{id}, D77) ------------------------------
@@ -374,3 +385,44 @@ def test_a_missing_lobby_raises_rather_than_returning_none():
 
 def test_a_well_formed_id_round_trips_to_the_same_hex():
     assert str(as_lobby_id(HEX_ID)) == HEX_ID
+
+
+# --- one datetime encoding for every route (Correction 90) --------------
+
+
+def has_datetime(value):
+    if isinstance(value, datetime):
+        return True
+    if isinstance(value, dict):
+        return any(has_datetime(item) for item in value.values())
+    if isinstance(value, list):
+        return any(has_datetime(item) for item in value)
+    return False
+
+
+def test_a_datetime_leaves_the_boundary_as_rfc3339_with_z():
+    # Measured on the wire: /active emitted ...237000Z through Pydantic while
+    # GET /{id}, which needs response_model=None for its 204, emitted
+    # ...237000+00:00 through jsonable_encoder. Z is the one three routes
+    # already spoke, so this moves the fourth into line rather than the
+    # other three out of it.
+    stored = {
+        "_id": "L1",
+        "created_at": datetime(2026, 8, 26, 10, 31, 13, 237000, tzinfo=UTC),
+    }
+    assert for_the_wire(stored, None)["created_at"] == "2026-08-26T10:31:13.237000Z"
+
+
+def test_no_datetime_survives_the_boundary_at_any_depth():
+    # Deliberately broader than the converter, which handles the top level --
+    # the document's actual shape today. If a later phase nests a datetime
+    # inside seats, this fails and the converter grows for a stated reason,
+    # rather than one route quietly disagreeing with three again.
+    stored = {
+        "_id": "L1",
+        "created_at": datetime(2026, 8, 26, tzinfo=UTC),
+        "updated_at": datetime(2026, 8, 26, tzinfo=UTC),
+        "seats": [{"seat_index": 0, "discord_id": "alice"}],
+    }
+    assert has_datetime(stored), "fixture must contain what the test looks for"
+    assert not has_datetime(for_the_wire(stored, None))
