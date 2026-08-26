@@ -177,10 +177,12 @@ def test_create_refuses_a_bad_shape_before_touching_the_database():
 
 def test_resolve_active_passes_the_channel_and_returns_one_or_none():
     repo = FakeRepo(open_lobbies=[{"_id": "L1"}])
-    assert asyncio.run(LobbyService(repo, FakeSeasons()).resolve_active("g1", "c1"))
+    assert asyncio.run(
+        LobbyService(repo, FakeSeasons()).resolve_active("g1", "c1", "alice")
+    )
     assert repo.queries == [("g1", "c1", None, None)]
     empty = LobbyService(FakeRepo(), FakeSeasons())
-    assert asyncio.run(empty.resolve_active("g1", "c1")) is None
+    assert asyncio.run(empty.resolve_active("g1", "c1", "alice")) is None
 
 
 class FakeObjectId:
@@ -205,7 +207,7 @@ def test_the_wire_form_stringifies_both_object_ids():
         "guild_id": "g1",
         "seats": [{"seat_index": 0, "discord_id": "alice", "team": None}],
     }
-    wire = for_the_wire(stored)
+    wire = for_the_wire(stored, None)
     assert wire["_id"] == "aaa"
     assert wire["season_id"] == "bbb"
     assert isinstance(wire["_id"], str) and isinstance(wire["season_id"], str)
@@ -216,15 +218,18 @@ def test_the_wire_form_stringifies_both_object_ids():
 
 def test_the_wire_form_never_mutates_the_stored_document():
     stored = {"_id": FakeObjectId("aaa"), "season_id": FakeObjectId("bbb")}
-    for_the_wire(stored)
+    for_the_wire(stored, None)
     assert not isinstance(stored["_id"], str)
 
 
 def test_a_missing_object_id_is_left_alone_rather_than_stringified():
     # "None" as a string would be worse than a null.
-    assert for_the_wire({"_id": None, "season_id": None}) == {
+    assert for_the_wire({"_id": None, "season_id": None}, None) == {
         "_id": None,
         "season_id": None,
+        # project_lobby normalises a missing seats array; every stored lobby
+        # carries one, so this only shows up on a hand-built fragment.
+        "seats": [],
     }
 
 
@@ -241,5 +246,64 @@ async def _returns(value):
 
 def test_browse_passes_its_filters_and_never_a_channel():
     repo = FakeRepo()
-    asyncio.run(LobbyService(repo, FakeSeasons()).browse("g1", "civ6", "ffa"))
+    asyncio.run(LobbyService(repo, FakeSeasons()).browse("g1", "alice", "civ6", "ffa"))
     assert repo.queries == [("g1", None, "civ6", "ffa")]
+
+
+# --- censoring at the wire boundary (D186) ------------------------------
+
+SETTINGS_LOBBY = {
+    "_id": "L1",
+    "phase": "settings",
+    "seats": [
+        {"seat_index": 0, "discord_id": "alice", "ballot": {"map": "pangaea"}},
+        {"seat_index": 1, "discord_id": "bob", "ballot": {"map": "continents"}},
+    ],
+}
+
+
+def seats_by_id(lobby):
+    return {seat["discord_id"]: seat for seat in lobby["seats"]}
+
+
+def test_the_wire_form_censors_before_it_stringifies():
+    # The defect this exists for: CP4b's three routes returned the stored
+    # document raw, so project_lobby was on no application path at all.
+    # alice keeps hers and bob loses his in one assertion pair, so this
+    # cannot pass on a boundary that strips every ballot.
+    seats = seats_by_id(for_the_wire(SETTINGS_LOBBY, "alice"))
+    assert seats["alice"]["ballot"] == {"map": "pangaea"}
+    assert "ballot" not in seats["bob"]
+
+
+def test_an_observer_sees_participation_but_no_ballot():
+    wire = for_the_wire(SETTINGS_LOBBY, None)
+    assert all("ballot" not in seat for seat in wire["seats"])
+    # Counted before the ballots are removed, or it would always be 0 or 1.
+    assert wire["ballots_submitted"] == 2
+
+
+def test_resolve_active_censors_the_lobby_it_returns():
+    repo = FakeRepo(open_lobbies=[SETTINGS_LOBBY])
+    lobby = asyncio.run(
+        LobbyService(repo, FakeSeasons()).resolve_active("g1", "c1", "bob")
+    )
+    seats = seats_by_id(lobby)
+    assert seats["bob"]["ballot"] == {"map": "continents"}
+    assert "ballot" not in seats["alice"]
+
+
+def test_browse_censors_every_lobby_not_only_the_first():
+    repo = FakeRepo(open_lobbies=[SETTINGS_LOBBY, SETTINGS_LOBBY])
+    lobbies = asyncio.run(LobbyService(repo, FakeSeasons()).browse("g1", "alice"))
+    assert len(lobbies) == 2
+    assert all("ballot" not in seats_by_id(lobby)["bob"] for lobby in lobbies)
+
+
+def test_the_create_response_is_unchanged_by_the_projection():
+    # CP4b measured this response on the wire. A `lobby`-phase document has
+    # neither censored surface, so D186 must leave it identical to the
+    # stored document apart from the id conversion.
+    repo, seasons = FakeRepo(), FakeSeasons()
+    result = asyncio.run(LobbyService(repo, seasons).create(request()))
+    assert result == {**repo.inserted, "_id": "L1"}

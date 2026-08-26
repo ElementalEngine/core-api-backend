@@ -9,6 +9,10 @@ browse route: a parameterised path registered first would swallow it. There
 is no `/{id}` route yet -- it arrives at CP5, and this ordering already
 accommodates it.
 
+⚠ Every `activity_router` route stamps `X-Actor-Discord-Id` (C5 invariant 2,
+D90/D94) and hands it to the service, which is what `for_the_wire` censors
+against. `mite_router` passes None -- Mite holds no seat (D186).
+
 Handlers catch only what they can name. `except Exception` on a v2 route is
 what D92's catch-all exists to replace.
 """
@@ -21,6 +25,7 @@ from fastapi import APIRouter, Depends, Query, status
 from pymongo import AsyncMongoClient
 
 from app.core.dependencies import (
+    actor_discord_id,
     get_database,
     require_activity_token,
     require_mito_token,
@@ -77,10 +82,11 @@ async def create_lobby(
 async def resolve_active(
     guild_id: str = Query(min_length=1),
     channel_id: str = Query(min_length=1),
+    actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any] | None:
     """One open lobby or none, by the D71 index."""
-    return await _service(db).resolve_active(guild_id, channel_id)
+    return await _service(db).resolve_active(guild_id, channel_id, actor)
 
 
 @activity_router.get("")
@@ -88,6 +94,7 @@ async def browse_lobbies(
     guild_id: str = Query(min_length=1),
     edition: str | None = Query(default=None),
     game_type: str | None = Query(default=None),
+    actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> list[dict[str, Any]]:
     """Open lobbies for a guild (D180).
@@ -96,7 +103,7 @@ async def browse_lobbies(
     per-service, not per-guild, so an unfiltered read would expose every
     lobby on the deployment to any holder of it.
     """
-    return await _service(db).browse(guild_id, edition, game_type)
+    return await _service(db).browse(guild_id, actor, edition, game_type)
 
 
 __all__ = ["activity_router", "mite_router"]

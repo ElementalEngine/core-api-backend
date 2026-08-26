@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.features.lobbies.modes import LobbyShape, resolve_shape
+from app.features.lobbies.projection import project_lobby
 from app.features.lobbies.schemas import CreateLobbyRequest
 
 PHASE_LOBBY = "lobby"
@@ -22,8 +23,16 @@ SOURCE_COMMAND = "command"
 OBJECT_ID_FIELDS = ("_id", "season_id")
 
 
-def for_the_wire(document: dict[str, Any]) -> dict[str, Any]:
-    """A stored lobby as JSON can carry it.
+def for_the_wire(
+    document: dict[str, Any], viewer_discord_id: str | None
+) -> dict[str, Any]:
+    """A stored lobby as `viewer_discord_id` may see it, in JSON's types.
+
+    One edge doing two jobs, censoring first (D184, D186). Two calls would be
+    two rules to remember at every route; this is one, and the viewer has no
+    default, so no route can put a lobby on the wire without deciding who is
+    reading it. CP4b shipped three routes that returned the stored document
+    raw -- `project_lobby` was on no application path at all.
 
     ⚠ `_id` and `season_id` are BSON ObjectIds. Every other v2 feature returns
     a Pydantic response model, which declares its ids as `str` and serialises
@@ -34,9 +43,10 @@ def for_the_wire(document: dict[str, Any]) -> dict[str, Any]:
 
     Copied, never mutated: the caller may still be holding the stored form.
     """
+    projected = project_lobby(document, viewer_discord_id)
     return {
         key: str(value) if key in OBJECT_ID_FIELDS and value is not None else value
-        for key, value in document.items()
+        for key, value in projected.items()
     }
 
 
@@ -123,26 +133,35 @@ class LobbyService:
         )
         season = await self._seasons.get_current_season(request.edition)
         document = build_lobby_document(request, shape, season, datetime.now(UTC))
-        return for_the_wire(await self._repository.insert_lobby(document))
+        # Mite holds no seat, so the create response is the observer view.
+        # A `lobby`-phase document has neither censored surface, so that is
+        # the whole document -- and it still crosses the one boundary.
+        return for_the_wire(await self._repository.insert_lobby(document), None)
 
     async def resolve_active(
-        self, guild_id: str, channel_id: str
+        self, guild_id: str, channel_id: str, viewer_discord_id: str
     ) -> dict[str, Any] | None:
         """The open lobby for a channel -- one or none, by the D71 index."""
         found = await self._repository.find_open(guild_id, channel_id=channel_id)
-        return for_the_wire(found[0]) if found else None
+        return for_the_wire(found[0], viewer_discord_id) if found else None
 
     async def browse(
         self,
         guild_id: str,
+        viewer_discord_id: str,
         edition: str | None = None,
         game_type: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Open lobbies for a guild, optionally filtered (D180)."""
+        """Open lobbies for a guild, optionally filtered (D180).
+
+        ⚠ `find_open` selects on `closed_at` alone, so this returns lobbies in
+        every open phase -- including `settings` and blind `draft`. It is the
+        broadest read in the feature and the one that most needs a viewer.
+        """
         found = await self._repository.find_open(
             guild_id, edition=edition, game_type=game_type
         )
-        return [for_the_wire(lobby) for lobby in found]
+        return [for_the_wire(lobby, viewer_discord_id) for lobby in found]
 
 
 __all__ = [
