@@ -126,4 +126,4 @@ class MatchModel(BaseModel):
     contest_report_list: list[ContestReport]
 
 
-__all__ = ["StatModel", "PlayerModel", "ContestReport", "MatchModel"]
+__all__ = ["ContestReport", "MatchModel", "PlayerModel", "StatModel"]

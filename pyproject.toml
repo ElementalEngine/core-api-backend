@@ -17,7 +17,18 @@ target-version = "py314"
 # drifted. `ASYNC` was measured at the same time and returned ZERO findings
 # on 80 files, so it is not selected: a ruleset that enforces nothing today
 # is config for its own sake (D68). Re-measure when a new async path lands.
-select = ["E4", "E7", "E9", "F", "B023", "I", "UP"]
+# RUF100 removes suppressions that suppress nothing -- twenty were dead.
+# RUF022 sorts __all__. PTH prefers pathlib over os.path. B904 and TRY400
+# are NOT selected: both had only unsafe fixes, and losing a traceback is
+# worse than the lint. Reviewed by hand instead -- item 109.
+# RUF100 removes suppressions that suppress nothing -- twenty were dead.
+# RUF022 sorts __all__. PTH118/123 by code, NOT the prefix: `PTH` whole adds
+# five more rules whose only sites are the parsers' __main__ blocks and the
+# save-file harness in test/parsing, which is not in testpaths and where a
+# rewritten path silently means "no saves found" (item 109).
+# B904 and TRY400 are not selected either -- both offer only unsafe fixes,
+# and a wrongly-rewritten except clause loses a traceback.
+select = ["E4", "E7", "E9", "F", "B023", "I", "PTH118", "PTH123", "RUF022", "RUF100", "UP"]
 
 [tool.ruff.lint.isort]
 # Keep aliased imports in the block they belong to. The default splits every
@@ -33,9 +44,18 @@ combine-as-imports = true
                                                       # differs from not None. S6.
 "app/features/matches/editing.py" = ["E712"]  # the same set_player_order
                                               # site, moved verbatim in S6.
-"app/features/matches/parsers/civ6.py" = ["B023"]  # not firing; the
-                                       # closure is called inside its own
-                                       # iteration. §4 item 58.
+"app/features/matches/parsers/civ6.py" = ["B023", "PTH123"]  # B023 not
+                                       # firing; the closure is called inside
+                                       # its own iteration. §4 item 58.
+                                       # PTH123: the __main__ CLI block. S8.
+"app/features/matches/parsers/civ7.py" = ["PTH123"]  # the __main__ CLI
+                                       # block, same as civ6. S8.
+"test/parsing/*" = ["PTH118", "PTH123"]  # the save-file harness, which is
+                                       # NOT in testpaths -- run by hand
+                                       # against real saves. A path rewritten
+                                       # to satisfy a lint silently yields
+                                       # "no saves found", which passes with
+                                       # zero assertions. §4 item 109.
 
 [tool.mypy]
 python_version = "3.14"

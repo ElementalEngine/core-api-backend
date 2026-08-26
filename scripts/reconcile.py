@@ -19,7 +19,7 @@ from pathlib import Path
 # the repo root on sys.path -- running a file in scripts/ puts scripts/ there.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from bson.int64 import Int64  # noqa: E402
+from bson.int64 import Int64
 from pymongo import MongoClient
 
 from app.core.config import settings

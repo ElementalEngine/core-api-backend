@@ -24,10 +24,10 @@ from pathlib import Path
 # the repo root on sys.path -- running a file in scripts/ puts scripts/ there.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from pymongo import MongoClient  # noqa: E402
+from pymongo import MongoClient
 
-from app.core.config import settings  # noqa: E402
-from app.core.constants import COL_CIV_DATA, GAMES_DB  # noqa: E402
+from app.core.config import settings
+from app.core.constants import COL_CIV_DATA, GAMES_DB
 
 COL = "validated_matches"
 FILTER = {"game": "civ6", "players.civ": {"$regex": "^LEADER_"}}

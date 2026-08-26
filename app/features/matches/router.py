@@ -414,4 +414,4 @@ router = APIRouter()
 router.include_router(upload_router)
 router.include_router(matches_router)
 
-__all__ = ["matches_router", "upload_router", "router"]
+__all__ = ["matches_router", "router", "upload_router"]

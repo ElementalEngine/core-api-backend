@@ -8,6 +8,6 @@ from app.features.stats.service import StatsService
 __all__ = [
     "InvalidStatsRequestError",
     "StatsNotFoundError",
-    "StatsServiceError",
     "StatsService",
+    "StatsServiceError",
 ]

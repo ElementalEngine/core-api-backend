@@ -19,11 +19,11 @@ from pathlib import Path
 # the repo root on sys.path -- running a file in scripts/ puts scripts/ there.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from pymongo import AsyncMongoClient  # noqa: E402
+from pymongo import AsyncMongoClient
 
-from app.core.config import settings  # noqa: E402
-from app.features.civdata.repository import CivDataRepository  # noqa: E402
-from app.features.civdata.seeds import EDITIONS, to_documents  # noqa: E402
+from app.core.config import settings
+from app.features.civdata.repository import CivDataRepository
+from app.features.civdata.seeds import EDITIONS, to_documents
 
 
 async def main(argv: list[str]) -> int:

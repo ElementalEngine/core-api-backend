@@ -31,12 +31,12 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from pymongo import MongoClient, UpdateOne  # noqa: E402
+from pymongo import MongoClient, UpdateOne
 
-from app.core.config import settings  # noqa: E402
-from app.core.constants import GAMES_DB  # noqa: E402
-from app.features.matches.tallies import bump, is_rated, stat_legs  # noqa: E402
-from app.features.ratings.scope import stat_scope  # noqa: E402
+from app.core.config import settings
+from app.core.constants import GAMES_DB
+from app.features.matches.tallies import bump, is_rated, stat_legs
+from app.features.ratings.scope import stat_scope
 
 EDITIONS = ("civ6", "civ7")
 MODES = ("ffa", "teamer", "duel")
