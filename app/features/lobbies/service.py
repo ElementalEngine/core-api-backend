@@ -17,6 +17,28 @@ from app.features.lobbies.schemas import CreateLobbyRequest
 PHASE_LOBBY = "lobby"
 SOURCE_COMMAND = "command"
 
+# The ids Mongo owns. Everything else on a lobby document is already a JSON
+# primitive, a datetime, or a list of them.
+OBJECT_ID_FIELDS = ("_id", "season_id")
+
+
+def for_the_wire(document: dict[str, Any]) -> dict[str, Any]:
+    """A stored lobby as JSON can carry it.
+
+    ⚠ `_id` and `season_id` are BSON ObjectIds. Every other v2 feature returns
+    a Pydantic response model, which declares its ids as `str` and serialises
+    them for free; lobbies returns the raw document because D73's projection
+    decides the shape per recipient (D179), so nothing converts them and
+    nothing typed the boundary. FastAPI's serializer raises on the first one:
+    "'ObjectId' object is not iterable", after the write has already landed.
+
+    Copied, never mutated: the caller may still be holding the stored form.
+    """
+    return {
+        key: str(value) if key in OBJECT_ID_FIELDS and value is not None else value
+        for key, value in document.items()
+    }
+
 
 def seat_the_roster(roster: Sequence[str], shape: LobbyShape) -> list[dict[str, Any]]:
     """Seats for the roster, or none at all.
@@ -101,14 +123,14 @@ class LobbyService:
         )
         season = await self._seasons.get_current_season(request.edition)
         document = build_lobby_document(request, shape, season, datetime.now(UTC))
-        return await self._repository.insert_lobby(document)
+        return for_the_wire(await self._repository.insert_lobby(document))
 
     async def resolve_active(
         self, guild_id: str, channel_id: str
     ) -> dict[str, Any] | None:
         """The open lobby for a channel -- one or none, by the D71 index."""
         found = await self._repository.find_open(guild_id, channel_id=channel_id)
-        return found[0] if found else None
+        return for_the_wire(found[0]) if found else None
 
     async def browse(
         self,
@@ -117,9 +139,15 @@ class LobbyService:
         game_type: str | None = None,
     ) -> list[dict[str, Any]]:
         """Open lobbies for a guild, optionally filtered (D180)."""
-        return await self._repository.find_open(
+        found = await self._repository.find_open(
             guild_id, edition=edition, game_type=game_type
         )
+        return [for_the_wire(lobby) for lobby in found]
 
 
-__all__ = ["LobbyService", "build_lobby_document", "seat_the_roster"]
+__all__ = [
+    "LobbyService",
+    "build_lobby_document",
+    "for_the_wire",
+    "seat_the_roster",
+]

@@ -19,6 +19,7 @@ from app.features.lobbies.schemas import CreateLobbyRequest
 from app.features.lobbies.service import (
     LobbyService,
     build_lobby_document,
+    for_the_wire,
     seat_the_roster,
 )
 
@@ -180,6 +181,62 @@ def test_resolve_active_passes_the_channel_and_returns_one_or_none():
     assert repo.queries == [("g1", "c1", None, None)]
     empty = LobbyService(FakeRepo(), FakeSeasons())
     assert asyncio.run(empty.resolve_active("g1", "c1")) is None
+
+
+class FakeObjectId:
+    """Stands in for bson.ObjectId: str()s to a hex string and is otherwise
+    not JSON-serialisable, which is exactly how the real one behaves."""
+
+    def __init__(self, hex_value):
+        self._hex = hex_value
+
+    def __str__(self):
+        return self._hex
+
+
+def test_the_wire_form_stringifies_both_object_ids():
+    # ⚠ FastAPI raised "'ObjectId' object is not iterable" on the first
+    # live create -- AFTER the write landed, so the caller saw a 500 for a
+    # lobby that exists. Nothing typed this boundary: lobbies is the only v2
+    # feature returning a raw document rather than a response model (D179).
+    stored = {
+        "_id": FakeObjectId("aaa"),
+        "season_id": FakeObjectId("bbb"),
+        "guild_id": "g1",
+        "seats": [{"seat_index": 0, "discord_id": "alice", "team": None}],
+    }
+    wire = for_the_wire(stored)
+    assert wire["_id"] == "aaa"
+    assert wire["season_id"] == "bbb"
+    assert isinstance(wire["_id"], str) and isinstance(wire["season_id"], str)
+    # Everything else passes through untouched.
+    assert wire["guild_id"] == "g1"
+    assert wire["seats"] == stored["seats"]
+
+
+def test_the_wire_form_never_mutates_the_stored_document():
+    stored = {"_id": FakeObjectId("aaa"), "season_id": FakeObjectId("bbb")}
+    for_the_wire(stored)
+    assert not isinstance(stored["_id"], str)
+
+
+def test_a_missing_object_id_is_left_alone_rather_than_stringified():
+    # "None" as a string would be worse than a null.
+    assert for_the_wire({"_id": None, "season_id": None}) == {
+        "_id": None,
+        "season_id": None,
+    }
+
+
+def test_create_returns_the_wire_form():
+    repo, seasons = FakeRepo(), FakeSeasons()
+    repo.insert_lobby = lambda doc: _returns({**doc, "_id": FakeObjectId("L1")})
+    result = asyncio.run(LobbyService(repo, seasons).create(request()))
+    assert result["_id"] == "L1"
+
+
+async def _returns(value):
+    return value
 
 
 def test_browse_passes_its_filters_and_never_a_channel():
