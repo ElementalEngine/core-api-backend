@@ -20,23 +20,13 @@ from app.features.infractions.models import (
 )
 from app.features.infractions.repository import (
     create_pending_suspension as _repo_create_pending,
-)
-from app.features.infractions.repository import (
     delete_pending_suspension as _repo_delete_pending,
-)
-from app.features.infractions.repository import (
     find_or_create_suspension,
-    find_suspension,
-    upsert_suspension,
-)
-from app.features.infractions.repository import (
     find_pending_suspension as _repo_find_pending,
-)
-from app.features.infractions.repository import (
+    find_suspension,
     get_active_suspensions as _repo_get_active_suspensions,
-)
-from app.features.infractions.repository import (
     get_overdue_suspensions as _repo_get_overdue_suspensions,
+    upsert_suspension,
 )
 
 # ─── Domain constants ─────────────────────────────────────────────────────────

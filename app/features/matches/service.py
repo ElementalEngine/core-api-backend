@@ -13,8 +13,7 @@ from trueskill import Rating
 from app.core.coerce import as_float, as_int
 from app.core.config import settings
 from app.features.matches.approval import ApprovalService
-from app.features.matches.editing import EditingService
-from app.features.matches.editing import _require_int as _require_int
+from app.features.matches.editing import EditingService, _require_int as _require_int
 from app.features.matches.errors import (
     InvalidIDError,
     MatchServiceError,
