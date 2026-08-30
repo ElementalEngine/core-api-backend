@@ -1,0 +1,403 @@
+{
+  "settings": {
+    "all": [
+      {
+        "id": "turn_timer",
+        "title": "Turn Timer",
+        "options": [
+          {
+            "id": "none",
+            "emoji": "⛔",
+            "label": "None"
+          },
+          {
+            "id": "standard_120",
+            "emoji": "⏱️",
+            "label": "Standard 120"
+          },
+          {
+            "id": "dynamic",
+            "emoji": "🔄",
+            "label": "Dynamic"
+          }
+        ],
+        "default_option_id": "standard_120"
+      },
+      {
+        "id": "game_speed",
+        "title": "Game Speed",
+        "options": [
+          {
+            "id": "online",
+            "emoji": "⚡",
+            "label": "Online"
+          },
+          {
+            "id": "quick",
+            "emoji": "🏃",
+            "label": "Quick"
+          },
+          {
+            "id": "standard",
+            "emoji": "⏺️",
+            "label": "Standard"
+          },
+          {
+            "id": "epic",
+            "emoji": "🐢",
+            "label": "Epic"
+          },
+          {
+            "id": "marathon",
+            "emoji": "🏁",
+            "label": "Marathon"
+          }
+        ],
+        "default_option_id": "standard"
+      },
+      {
+        "id": "age_length",
+        "title": "Age Length",
+        "options": [
+          {
+            "id": "abbreviated",
+            "emoji": "✂️",
+            "label": "Abbreviated"
+          },
+          {
+            "id": "standard",
+            "emoji": "⏺️",
+            "label": "Standard"
+          },
+          {
+            "id": "long",
+            "emoji": "📏",
+            "label": "Long"
+          }
+        ],
+        "default_option_id": "standard"
+      },
+      {
+        "id": "end_age_countdown",
+        "title": "End Age Countdown",
+        "options": [
+          {
+            "id": "none",
+            "emoji": "⛔",
+            "label": "None"
+          },
+          {
+            "id": "10",
+            "emoji": "🔟",
+            "label": "10"
+          },
+          {
+            "id": "20",
+            "emoji": "2️⃣0️⃣",
+            "label": "20"
+          }
+        ],
+        "default_option_id": "10"
+      },
+      {
+        "id": "age_transition",
+        "title": "Age Transition",
+        "options": [
+          {
+            "id": "continuity",
+            "emoji": "🔗",
+            "label": "Continuity"
+          },
+          {
+            "id": "regroup",
+            "emoji": "🤝",
+            "label": "Regroup"
+          }
+        ],
+        "default_option_id": "continuity"
+      },
+      {
+        "id": "no_age_transition",
+        "title": "No Age Transition",
+        "options": [
+          {
+            "id": "enabled",
+            "emoji": "✅",
+            "label": "Enabled"
+          },
+          {
+            "id": "disabled",
+            "emoji": "⛔",
+            "label": "Disabled"
+          }
+        ],
+        "default_option_id": "disabled"
+      },
+      {
+        "id": "map_type",
+        "title": "Map Type",
+        "options": [
+          {
+            "id": "continents_plus",
+            "emoji": "🌍",
+            "label": "Continents Plus"
+          },
+          {
+            "id": "continents",
+            "emoji": "🌎",
+            "label": "Continents"
+          },
+          {
+            "id": "archipelago",
+            "emoji": "🏝️",
+            "label": "Archipelago"
+          },
+          {
+            "id": "fractal",
+            "emoji": "🌀",
+            "label": "Fractal"
+          },
+          {
+            "id": "shuffle",
+            "emoji": "🔀",
+            "label": "Shuffle"
+          },
+          {
+            "id": "terra_incognita",
+            "emoji": "🧭",
+            "label": "Terra Incognita"
+          },
+          {
+            "id": "pangea_plus",
+            "emoji": "🗺️",
+            "label": "Pangea Plus"
+          },
+          {
+            "id": "continents_and_islands",
+            "emoji": "🌊",
+            "label": "Continents and Islands"
+          },
+          {
+            "id": "pangea_and_islands",
+            "emoji": "🏖️",
+            "label": "Pangea and Islands"
+          },
+          {
+            "id": "shattered_seas",
+            "emoji": "💥",
+            "label": "Shattered Seas"
+          }
+        ],
+        "default_option_id": "continents_plus"
+      },
+      {
+        "id": "start_position",
+        "title": "Start Position",
+        "options": [
+          {
+            "id": "balanced",
+            "emoji": "⚖️",
+            "label": "Balanced"
+          },
+          {
+            "id": "standard",
+            "emoji": "⏺️",
+            "label": "Standard"
+          }
+        ],
+        "default_option_id": "balanced"
+      },
+      {
+        "id": "map_size",
+        "title": "Map Size",
+        "options": [
+          {
+            "id": "tiny",
+            "emoji": "🤏",
+            "label": "Tiny"
+          },
+          {
+            "id": "small",
+            "emoji": "📐",
+            "label": "Small"
+          },
+          {
+            "id": "standard",
+            "emoji": "⏺️",
+            "label": "Standard"
+          },
+          {
+            "id": "large",
+            "emoji": "📏",
+            "label": "Large"
+          },
+          {
+            "id": "huge",
+            "emoji": "🌐",
+            "label": "Huge"
+          }
+        ],
+        "default_option_id": "standard"
+      },
+      {
+        "id": "mementos",
+        "title": "Mementos",
+        "options": [
+          {
+            "id": "enabled",
+            "emoji": "✅",
+            "label": "Enabled"
+          },
+          {
+            "id": "disabled",
+            "emoji": "⛔",
+            "label": "Disabled"
+          }
+        ],
+        "default_option_id": "enabled"
+      },
+      {
+        "id": "difficulty",
+        "title": "Difficulty",
+        "options": [
+          {
+            "id": "scribe",
+            "emoji": "✍️",
+            "label": "Scribe"
+          },
+          {
+            "id": "governor",
+            "emoji": "🏛️",
+            "label": "Governor"
+          },
+          {
+            "id": "viceroy",
+            "emoji": "🎖️",
+            "label": "Viceroy"
+          },
+          {
+            "id": "sovereign",
+            "emoji": "👑",
+            "label": "Sovereign"
+          },
+          {
+            "id": "immortal",
+            "emoji": "💀",
+            "label": "Immortal"
+          },
+          {
+            "id": "deity",
+            "emoji": "⚡",
+            "label": "Deity"
+          },
+          {
+            "id": "custom",
+            "emoji": "🛠️",
+            "label": "Custom"
+          }
+        ],
+        "default_option_id": "sovereign"
+      },
+      {
+        "id": "disaster_frequency",
+        "title": "Disaster Frequency",
+        "options": [
+          {
+            "id": "light",
+            "emoji": "🌤️",
+            "label": "Light"
+          },
+          {
+            "id": "moderate",
+            "emoji": "🌩️",
+            "label": "Moderate"
+          },
+          {
+            "id": "catastrophic",
+            "emoji": "🌋",
+            "label": "Catastrophic"
+          }
+        ],
+        "default_option_id": "moderate"
+      }
+    ]
+  },
+  "settings_for": {
+    "ffa": "all",
+    "duel": "all",
+    "teamer": "all"
+  },
+  "draft_mode": {
+    "ffa": {
+      "id": "draft_mode",
+      "title": "Draft Mode",
+      "options": [
+        {
+          "id": "standard",
+          "emoji": "✅",
+          "label": "Standard"
+        },
+        {
+          "id": "snake",
+          "emoji": "🐍",
+          "label": "Snake"
+        },
+        {
+          "id": "random",
+          "emoji": "❓",
+          "label": "Random"
+        },
+        {
+          "id": "blind",
+          "emoji": "🕶️",
+          "label": "Blind"
+        }
+      ],
+      "default_option_id": "standard"
+    },
+    "duel": {
+      "id": "draft_mode",
+      "title": "Draft Mode",
+      "options": [
+        {
+          "id": "standard",
+          "emoji": "✅",
+          "label": "Standard"
+        },
+        {
+          "id": "random",
+          "emoji": "❓",
+          "label": "Random"
+        }
+      ],
+      "default_option_id": "standard"
+    },
+    "teamer": {
+      "id": "draft_mode",
+      "title": "Draft Mode",
+      "options": [
+        {
+          "id": "standard",
+          "emoji": "✅",
+          "label": "Standard"
+        },
+        {
+          "id": "cwc",
+          "emoji": "🌍",
+          "label": "CWC (shared pool)"
+        },
+        {
+          "id": "random",
+          "emoji": "❓",
+          "label": "Random"
+        }
+      ],
+      "default_option_id": "standard"
+    }
+  },
+  "draft_mode_for": {
+    "ffa": "ffa",
+    "duel": "duel",
+    "teamer": "teamer"
+  }
+}
