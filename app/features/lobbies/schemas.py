@@ -57,6 +57,14 @@ class CreateLobbyRequest(BaseModel):
     # key is core-api's own id and the Activity resolves by channel, never
     # by this (spec section 2). Omitted from the document when absent.
     instance_id: str | None = Field(default=None, max_length=64)
+    # ⚠ civ7 only, and NOT a ballot question -- Mite's slash command carries
+    # it, so it must arrive at creation or the civ ban cap has nothing to key
+    # on. civ-data's vocabulary, not Mite v1's `Antiquity_Age` (D196): every
+    # `CivRow.age_pool` reads `AGE_ANTIQUITY`, and a filter against the wrong
+    # spelling matches nothing, leaves no civ bannable, and raises nothing.
+    starting_age: Literal["AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"] | None = (
+        Field(default=None)
+    )
 
 
 class SeatAction(StrEnum):

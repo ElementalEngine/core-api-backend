@@ -502,6 +502,7 @@ PUBLIC_LOBBY_FIELDS = {
     "channel_id",
     "host_discord_id",
     "instance_id",
+    "starting_age",
     "source",
     "season_id",
     "season_label",

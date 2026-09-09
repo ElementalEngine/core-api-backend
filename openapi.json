@@ -593,6 +593,22 @@
             "title": "Roster",
             "type": "array"
           },
+          "starting_age": {
+            "anyOf": [
+              {
+                "enum": [
+                  "AGE_ANTIQUITY",
+                  "AGE_EXPLORATION",
+                  "AGE_MODERN"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starting Age"
+          },
           "team_size": {
             "anyOf": [
               {

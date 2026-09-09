@@ -209,6 +209,8 @@ def build_lobby_document(
     }
     if request.instance_id is not None:
         document["instance_id"] = request.instance_id
+    if request.starting_age is not None:
+        document["starting_age"] = request.starting_age
     return document
 
 
