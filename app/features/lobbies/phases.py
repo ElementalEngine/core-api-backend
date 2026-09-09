@@ -31,6 +31,11 @@ TERMINAL_PHASES = (COMPLETE, CANCELLED)
 CANCEL_BY_HOST = "host"
 CANCEL_TIMEOUT = "timeout"
 CANCEL_ABANDONED = "abandoned"
+# ⚠ D198. Bans are capped but the pool is not guaranteed: a lobby can ban
+# itself past the point where every player gets one leader. The advance
+# CANCELS rather than raising -- after D194 an advance can be triggered by a
+# POLL, so raising would make every read a 500 with no route out.
+CANCEL_NO_POOL = "no_pool"
 
 SOURCE_COMMAND = "command"
 SOURCE_ACTIVITY = "activity"
@@ -40,6 +45,7 @@ __all__ = [
     "CANCELLED",
     "CANCEL_ABANDONED",
     "CANCEL_BY_HOST",
+    "CANCEL_NO_POOL",
     "CANCEL_TIMEOUT",
     "COMPLETE",
     "DRAFT",

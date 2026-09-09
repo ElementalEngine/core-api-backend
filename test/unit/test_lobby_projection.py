@@ -26,7 +26,7 @@ def lobby(phase, draft_mode="standard", revealed_at=None):
     return {
         "_id": "L1",
         "phase": phase,
-        "draft_mode": draft_mode,
+        "settings": {"draft_mode": draft_mode},
         "revealed_at": revealed_at,
         "pool_appearances": ["LEADER_A", "LEADER_B", "LEADER_C"],
         "seats": [

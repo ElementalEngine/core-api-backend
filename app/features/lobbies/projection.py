@@ -49,10 +49,16 @@ def pools_are_secret(lobby: Mapping[str, Any]) -> bool:
     `complete` is not `draft`, so finishing reveals everything without a
     second rule. A cancelled blind draft stays censored: the table says
     nothing about it, and the safe reading of silence is to withhold.
+
+    ⚠ `draft_mode` lives in `settings`, not at the top level. It is a ballot
+    outcome (D191), and this condition read the top level until CP6c --
+    silently never true, so a blind draft would have shipped UNCENSORED.
+    The D179 guard cannot catch that: it checks which fields exist, not
+    whether a censoring condition can ever fire (Correction 97).
     """
     return (
         lobby.get("phase") == DRAFT
-        and lobby.get("draft_mode") == DRAFT_BLIND
+        and (lobby.get("settings") or {}).get("draft_mode") == DRAFT_BLIND
         and lobby.get("revealed_at") is None
     )
 
