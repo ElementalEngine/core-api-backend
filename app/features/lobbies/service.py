@@ -14,20 +14,34 @@ from typing import Any
 
 from bson import ObjectId
 
-from app.features.lobbies.modes import LobbyShape, resolve_shape, validate_seats
-from app.features.lobbies.phases import LOBBY, SOURCE_COMMAND
+from app.features.lobbies.modes import (
+    InvalidSeating,
+    LobbyShape,
+    resolve_shape,
+    validate_seats,
+)
+from app.features.lobbies.phases import BANS, LOBBY, SETTINGS, SOURCE_COMMAND
 from app.features.lobbies.projection import project_lobby
+from app.features.lobbies.questions import questions_for
 from app.features.lobbies.schemas import (
     ChangeSeatRequest,
     CreateLobbyRequest,
     SeatAction,
+    SubmitBallotRequest,
 )
+from app.features.lobbies.tally import resolve_settings
 
 # D177's staleness threshold. A whole draft is roughly fifteen minutes of
 # timers (spec section 7); an hour untouched is abandoned by any reading,
 # and every seat change bumps `updated_at`, so a lobby with people in it
 # never reaches this.
 STALE_AFTER = timedelta(hours=1)
+
+# Spec section 7. Bans is one window here; D72's two mechanisms -- a majority
+# vote in FFA, 1-2-2-1 captain turns in a teamer -- differ per turn and are
+# CP6b's, so 6a sets the phase's first deadline and nothing finer.
+SETTINGS_WINDOW = timedelta(minutes=5)
+BANS_WINDOW = timedelta(minutes=5)
 
 # The ids Mongo owns. Everything else on a lobby document is already a JSON
 # primitive, a datetime, or a list of them.
@@ -47,6 +61,10 @@ class InvalidLobbyId(ValueError):
 
 class LobbyNotFound(LookupError):
     """No lobby carries that id."""
+
+
+class NotSeated(PermissionError):
+    """Only a seated player votes. The host is not special here."""
 
 
 class NotTheHost(PermissionError):
@@ -243,6 +261,109 @@ class LobbyService:
         found = await self._repository.find_open(guild_id, channel_id=channel_id)
         return for_the_wire(found[0], viewer_discord_id) if found else None
 
+    async def _advanced(self, lobby: dict[str, Any]) -> dict[str, Any]:
+        """The lobby, with any expired deadline already applied (D74, D194).
+
+        ⚠ Timers are lazy: nothing sweeps them, so the next read or write past
+        `turn_expires_at` is what advances the phase. That has to include the
+        POLL -- a settings phase in a lobby nobody is writing to would
+        otherwise never expire, which is D177's lockout in a different place.
+
+        The write is revision-guarded, so fourteen clients polling the same
+        expired lobby produce exactly one advance; the losers get None and
+        keep the document they read, which the winner has already superseded.
+        """
+        expires = lobby.get("turn_expires_at")
+        # `core/db.py` opens the client tz_aware, so this compares two aware
+        # datetimes and needs no coercion.
+        if lobby["phase"] != SETTINGS or expires is None or expires > datetime.now(UTC):
+            return lobby
+        return await self._resolve_settings(lobby) or lobby
+
+    async def _resolve_settings(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
+        """Tally the ballots and move to `bans`. None if the lobby moved.
+
+        ⚠ Every question gets an answer, including from an empty room: a
+        question no seat answered locks to its default (D191), which is what
+        makes an expired settings phase safe to advance rather than stall.
+        """
+        now = datetime.now(UTC)
+        return await self._repository.apply_changes(
+            lobby["_id"],
+            lobby["revision"],
+            {
+                "settings": resolve_settings(
+                    lobby.get("seats") or [],
+                    questions_for(lobby["edition"], lobby["game_type"]),
+                    str(lobby["_id"]),
+                ),
+                "phase": BANS,
+                "turn_index": 0,
+                "turn_expires_at": now + BANS_WINDOW,
+            },
+            now,
+        )
+
+    async def submit_ballot(
+        self, lobby_id: str, actor_discord_id: str, request: SubmitBallotRequest
+    ) -> dict[str, Any]:
+        """One seat's ballot. Resolves the phase once every seat has voted."""
+        oid = as_lobby_id(lobby_id)
+        found = await self._repository.find_by_id(oid)
+        if found is None:
+            raise LobbyNotFound(lobby_id)
+        found = await self._advanced(found)
+        if found["phase"] != SETTINGS:
+            raise SeatChangeRefused(
+                f"The settings vote is not open at {found['phase']}",
+                request.expected_revision,
+                found["revision"],
+            )
+
+        seats = found.get("seats") or []
+        if not any(seat.get("discord_id") == actor_discord_id for seat in seats):
+            raise NotSeated("Only a seated player votes")
+
+        catalogue = {
+            question["id"]: question
+            for question in questions_for(found["edition"], found["game_type"])
+        }
+        for question_id, raw in request.selections.items():
+            question = catalogue.get(question_id)
+            if question is None:
+                raise InvalidSeating("selections", f"no question {question_id!r}")
+            offered = {option["id"] for option in question["options"]}
+            chosen = [c for c in str(raw).split("|") if c]
+            if not chosen or any(c not in offered for c in chosen):
+                raise InvalidSeating("selections", f"bad option for {question_id}")
+            if len(chosen) > question.get("max_selections", 1):
+                raise InvalidSeating(
+                    "selections", f"too many choices for {question_id}"
+                )
+
+        # The whole ballot replaces what the seat had, so a dropped answer
+        # cannot leave a stale one behind.
+        voted = [
+            {**seat, "ballot": dict(request.selections)}
+            if seat.get("discord_id") == actor_discord_id
+            else seat
+            for seat in seats
+        ]
+        now = datetime.now(UTC)
+        written = await self._repository.replace_seats(
+            oid, request.expected_revision, voted, now
+        )
+        if written is None:
+            latest = await self._repository.find_by_id(oid)
+            raise SeatChangeRefused(
+                *self._why_refused(latest, request.expected_revision)
+            )
+
+        occupied = [seat for seat in voted if seat.get("discord_id")]
+        if all(seat.get("ballot") for seat in occupied):
+            written = await self._resolve_settings(written) or written
+        return for_the_wire(written, actor_discord_id)
+
     async def read(
         self, lobby_id: str, viewer_discord_id: str, since: int | None = None
     ) -> dict[str, Any] | None:
@@ -257,11 +378,61 @@ class LobbyService:
         found = await self._repository.find_by_id(as_lobby_id(lobby_id))
         if found is None:
             raise LobbyNotFound(lobby_id)
+        found = await self._advanced(found)
         # Subscript, not .get(): a lobby with no revision is corrupt, and a
         # None here would compare unequal forever and never answer 204.
         if since is not None and found["revision"] == since:
             return None
         return for_the_wire(found, viewer_discord_id)
+
+    async def start(
+        self, lobby_id: str, actor_discord_id: str, expected_revision: int
+    ) -> dict[str, Any]:
+        """Close seating and open the settings vote (D190).
+
+        ⚠ Section 7's advance table has no `lobby -> settings` row and there
+        is no "all submitted" condition to hang it on, so this is the one
+        transition a timer cannot cover -- which is the restore trigger D94
+        recorded when it deleted the general `/advance`. Narrow on purpose:
+        one transition, one caller.
+
+        Not automatic at `min_seats`. FFA seats twelve and needs six, so the
+        sixth arrival does not mean nobody else is coming.
+        """
+        oid = as_lobby_id(lobby_id)
+        found = await self._repository.find_by_id(oid)
+        if found is None:
+            raise LobbyNotFound(lobby_id)
+        if found["phase"] != LOBBY:
+            raise SeatChangeRefused(
+                f"This lobby is already at {found['phase']}",
+                expected_revision,
+                found["revision"],
+            )
+        if actor_discord_id != found["host_discord_id"]:
+            raise NotTheHost("Only the host can start the lobby")
+
+        seats = found.get("seats") or []
+        seated = len([seat for seat in seats if seat.get("discord_id")])
+        if seated < found["min_seats"]:
+            raise SeatChangeRefused(
+                f"{found['min_seats']} players are needed to start,"
+                f" and {seated} are seated",
+                expected_revision,
+                found["revision"],
+            )
+
+        now = datetime.now(UTC)
+        written = await self._repository.apply_changes(
+            oid,
+            expected_revision,
+            {"phase": SETTINGS, "turn_expires_at": now + SETTINGS_WINDOW},
+            now,
+        )
+        if written is None:
+            latest = await self._repository.find_by_id(oid)
+            raise SeatChangeRefused(*self._why_refused(latest, expected_revision))
+        return for_the_wire(written, actor_discord_id)
 
     async def change_seat(
         self, lobby_id: str, actor_discord_id: str, request: ChangeSeatRequest
@@ -313,19 +484,21 @@ class LobbyService:
         )
         if written is None:
             latest = await self._repository.find_by_id(oid)
-            raise SeatChangeRefused(*self._why_refused(latest, request))
+            raise SeatChangeRefused(
+                *self._why_refused(latest, request.expected_revision)
+            )
         return for_the_wire(written, actor_discord_id)
 
     @staticmethod
     def _why_refused(
-        lobby: dict[str, Any] | None, request: ChangeSeatRequest
+        lobby: dict[str, Any] | None, expected: int
     ) -> tuple[str, int, int | None]:
         """Spec section 9: matched-count zero is stale revision OR already
         seated, and only a re-read tells them apart."""
         current = lobby["revision"] if lobby else None
-        if current != request.expected_revision:
-            return ("The lobby has moved on", request.expected_revision, current)
-        return ("That player already holds a seat", request.expected_revision, current)
+        if current != expected:
+            return ("The lobby has moved on", expected, current)
+        return ("That player already holds a seat", expected, current)
 
     async def browse(
         self,
@@ -379,6 +552,7 @@ __all__ = [
     "InvalidLobbyId",
     "LobbyNotFound",
     "LobbyService",
+    "NotSeated",
     "NotTheHost",
     "SeatChangeRefused",
     "as_lobby_id",

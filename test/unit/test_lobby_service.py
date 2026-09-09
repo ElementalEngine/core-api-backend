@@ -10,7 +10,7 @@ lookup so a malformed request reaches the database.
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -20,12 +20,17 @@ from app.features.lobbies.modes import (
     resolve_shape,
 )
 from app.features.lobbies.projection import BALLOT, PICK, POOL, POOL_APPEARANCES
-from app.features.lobbies.schemas import ChangeSeatRequest, CreateLobbyRequest
+from app.features.lobbies.schemas import (
+    ChangeSeatRequest,
+    CreateLobbyRequest,
+    SubmitBallotRequest,
+)
 from app.features.lobbies.service import (
     STALE_AFTER,
     InvalidLobbyId,
     LobbyNotFound,
     LobbyService,
+    NotSeated,
     NotTheHost,
     SeatChangeRefused,
     as_lobby_id,
@@ -62,18 +67,26 @@ class FakeSeasons:
 
 class FakeRepo:
     def __init__(
-        self, open_lobbies=None, lobby=None, written=None, reread=None, stale=None
+        self,
+        open_lobbies=None,
+        lobby=None,
+        written=None,
+        reread=None,
+        stale=None,
+        applied=None,
     ):
         self.inserted = None
         self.queries = []
         self.asked_for = []
         self.writes = []
         self.evictions = []
+        self.changes = []
         self._open = open_lobbies or []
         self._lobby = lobby
         self._written = written
         self._reread = reread
         self._stale = stale or []
+        self._applied = applied
 
     async def insert_lobby(self, document):
         self.inserted = document
@@ -99,7 +112,19 @@ class FakeRepo:
         self, lobby_id, expected_revision, seats, now, *, absent_player=None
     ):
         self.writes.append((expected_revision, seats, absent_player))
-        return self._written
+        # ⚠ The real one uses ReturnDocument.AFTER, so it returns the document
+        # INCLUDING the seats just written. Returning the pre-write document
+        # made every caller of this return value test against a lie -- it is
+        # what `_resolve_settings` reads to decide whether everyone has voted.
+        if self._written is None:
+            return None
+        return {**self._written, "seats": seats}
+
+    async def apply_changes(self, lobby_id, expected_revision, changes, now):
+        self.changes.append((expected_revision, changes))
+        if self._applied is None:
+            return None
+        return {**self._applied, **changes}
 
 
 # --- seating ------------------------------------------------------------
@@ -704,3 +729,137 @@ def test_eviction_asks_about_deduplicated_players_only():
         LobbyService(repo, FakeSeasons()).create(request(roster=["a", "a", "", "b"]))
     )
     assert repo.evictions[0][0] == ["a", "b"]
+
+
+# --- starting the vote and resolving it (D190, D191, D194) --------------
+
+VOTING = {
+    **OPEN_LOBBY,
+    "phase": "settings",
+    "edition": "civ6",
+    "min_seats": 2,
+    "turn_expires_at": datetime.now(UTC) + timedelta(minutes=5),
+    "seats": [
+        {"seat_index": 0, "discord_id": "alice", "team": None},
+        {"seat_index": 1, "discord_id": "bob", "team": None},
+    ],
+}
+IN_LOBBY = {**VOTING, "phase": "lobby", "turn_expires_at": None}
+
+
+def start(repo, actor="alice", revision=3):
+    return asyncio.run(LobbyService(repo, FakeSeasons()).start(HEX_ID, actor, revision))
+
+
+def vote(repo, actor="alice", **selections):
+    return asyncio.run(
+        LobbyService(repo, FakeSeasons()).submit_ballot(
+            HEX_ID,
+            actor,
+            SubmitBallotRequest(expected_revision=3, selections=selections),
+        )
+    )
+
+
+def test_starting_opens_the_settings_vote_with_a_deadline():
+    repo = FakeRepo(lobby=IN_LOBBY, applied=IN_LOBBY)
+    start(repo)
+    _, changes = repo.changes[0]
+    assert changes["phase"] == "settings"
+    assert changes["turn_expires_at"] > datetime.now(UTC)
+
+
+def test_only_the_host_starts():
+    repo = FakeRepo(lobby=IN_LOBBY, applied=IN_LOBBY)
+    with pytest.raises(NotTheHost):
+        start(repo, actor="bob")
+    assert repo.changes == []
+
+
+def test_starting_below_min_seats_is_refused():
+    # ⚠ Not automatic at min_seats either (D190): FFA seats twelve and needs
+    # six, so the sixth arrival does not mean nobody else is coming.
+    thin = {**IN_LOBBY, "min_seats": 6}
+    repo = FakeRepo(lobby=thin, applied=thin)
+    with pytest.raises(SeatChangeRefused):
+        start(repo)
+    assert repo.changes == []
+
+
+def test_starting_twice_is_refused():
+    repo = FakeRepo(lobby=VOTING, applied=VOTING)
+    with pytest.raises(SeatChangeRefused):
+        start(repo)
+
+
+def test_an_unseated_player_cannot_vote():
+    repo = FakeRepo(lobby=VOTING, written=VOTING, applied=VOTING)
+    with pytest.raises(NotSeated):
+        vote(repo, actor="mallory", map="pangaea")
+    assert repo.writes == []
+
+
+@pytest.mark.parametrize(
+    "selections",
+    [{"no_such_question": "a"}, {"map": "no_such_option"}, {"map": ""}],
+)
+def test_a_ballot_the_catalogue_does_not_recognise_is_refused(selections):
+    repo = FakeRepo(lobby=VOTING, written=VOTING, applied=VOTING)
+    with pytest.raises(InvalidSeating):
+        vote(repo, **selections)
+    assert repo.writes == []
+
+
+def test_a_ballot_is_stored_on_the_voting_seat_only():
+    repo = FakeRepo(lobby=VOTING, written=VOTING, applied=VOTING)
+    vote(repo, actor="alice", duration="unlimited")
+    _, seats, _ = repo.writes[0]
+    by_id = {seat["discord_id"]: seat for seat in seats}
+    assert by_id["alice"]["ballot"] == {"duration": "unlimited"}
+    assert not by_id["bob"].get("ballot")
+
+
+def test_the_last_ballot_tallies_and_moves_to_bans():
+    # ⚠ Both seats have voted, so the phase resolves in the same call the
+    # final ballot arrives in -- the caller never waits for a poll tick.
+    voted = {
+        **VOTING,
+        "seats": [
+            {
+                "seat_index": 0,
+                "discord_id": "alice",
+                "ballot": {"duration": "unlimited"},
+            },
+            {"seat_index": 1, "discord_id": "bob", "team": None},
+        ],
+    }
+    repo = FakeRepo(lobby=voted, written=voted, applied=voted)
+    vote(repo, actor="bob", duration="unlimited")
+    _, changes = repo.changes[0]
+    assert changes["phase"] == "bans"
+    assert changes["settings"]["duration"] == "unlimited"
+
+
+def test_a_ballot_short_of_everyone_does_not_advance():
+    repo = FakeRepo(lobby=VOTING, written=VOTING, applied=VOTING)
+    vote(repo, actor="alice", duration="unlimited")
+    assert repo.changes == []
+
+
+def test_a_read_past_the_deadline_advances_the_phase():
+    # ⚠ D74/D194: nothing sweeps timers, so the POLL has to advance them. A
+    # settings phase in a lobby nobody writes to would otherwise never expire.
+    expired = {**VOTING, "turn_expires_at": datetime.now(UTC) - timedelta(minutes=1)}
+    repo = FakeRepo(lobby=expired, applied=expired)
+    asyncio.run(LobbyService(repo, FakeSeasons()).read(HEX_ID, "alice"))
+    _, changes = repo.changes[0]
+    assert changes["phase"] == "bans"
+    # Nobody voted, so every question locks to its default (D191) -- which is
+    # what makes an expired vote safe to advance rather than stall.
+    assert changes["settings"]["duration"]
+
+
+def test_a_read_before_the_deadline_changes_nothing():
+    repo = FakeRepo(lobby=VOTING, applied=VOTING)
+    asyncio.run(LobbyService(repo, FakeSeasons()).read(HEX_ID, "alice"))
+    assert repo.changes == []

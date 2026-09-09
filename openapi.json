@@ -250,6 +250,20 @@
         "title": "Body_get_match_api_v1_get_match__put",
         "type": "object"
       },
+      "Body_start_lobby_api_v2_lobbies__lobby_id__start_post": {
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "Body_start_lobby_api_v2_lobbies__lobby_id__start_post",
+        "type": "object"
+      },
       "Body_upload_game_report_api_v1_upload_game_report__post": {
         "properties": {
           "discord_message_id": {
@@ -2469,6 +2483,31 @@
           }
         },
         "title": "StatSetV2",
+        "type": "object"
+      },
+      "SubmitBallotRequest": {
+        "additionalProperties": false,
+        "description": "One seat's settings ballot.\n\n\u26a0 The whole ballot, not a delta. A seat re-submitting replaces what it\nhad, so a client that dropped an answer cannot leave a stale one behind\n-- and \"has this seat answered question X\" stays a single lookup rather\nthan a merge of every submission it ever made.\n\nSelections are `option_id`, or `a|b` where the question allows more than\none (D191). Ids are checked against the catalogue, so a question or option\nthe ballot invents is a 400 rather than a vote nothing counts.",
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "selections": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "minProperties": 1,
+            "title": "Selections",
+            "type": "object"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "selections"
+        ],
+        "title": "SubmitBallotRequest",
         "type": "object"
       },
       "SupportedGame": {
@@ -5891,6 +5930,158 @@
           }
         },
         "summary": "Change Seat",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
+    "/api/v2/lobbies/{lobby_id}/start": {
+      "post": {
+        "description": "Close seating, open the settings vote (D190).\n\nThe one transition no timer covers: section 7's table has no\n`lobby -> settings` row and there is no \"all submitted\" to hang it on.",
+        "operationId": "start_lobby_api_v2_lobbies__lobby_id__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_start_lobby_api_v2_lobbies__lobby_id__start_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Lobby",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
+    "/api/v2/lobbies/{lobby_id}/votes": {
+      "put": {
+        "description": "One seat's settings ballot, resolving the phase on the last one.\n\n\u26a0 The response may come back already at `bans`: the final ballot tallies\nand advances in the same call, and so does any request arriving after\n`turn_expires_at` (D74, D194).",
+        "operationId": "submit_ballot_api_v2_lobbies__lobby_id__votes_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitBallotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Ballot",
         "tags": [
           "lobbies"
         ]

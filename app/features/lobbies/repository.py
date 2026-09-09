@@ -156,6 +156,28 @@ class LobbyRepository:
             return_document=ReturnDocument.AFTER,
         )
 
+    async def apply_changes(
+        self,
+        lobby_id: ObjectId,
+        expected_revision: int,
+        changes: dict[str, Any],
+        now: datetime,
+    ) -> dict[str, Any] | None:
+        """Revision-guarded write of top-level lobby fields.
+
+        The same gate `replace_seats` uses, without D176's `$ne` -- that
+        clause is about a player holding two seats and has nothing to say
+        about a phase or a resolved setting. Callers pass fields they have
+        already validated; this decides only whether the lobby has moved.
+
+        Returns the updated document, or None when the revision has moved on.
+        """
+        return await self._lobbies.find_one_and_update(
+            {"_id": lobby_id, "revision": expected_revision},
+            {"$set": {**changes, "updated_at": now}, "$inc": {"revision": 1}},
+            return_document=ReturnDocument.AFTER,
+        )
+
     async def find_by_id(self, lobby_id: ObjectId) -> dict[str, Any] | None:
         """One lobby by id, open or closed.
 

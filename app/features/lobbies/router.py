@@ -34,11 +34,16 @@ from app.core.dependencies import (
 from app.core.errors import conflict, forbidden, invalid_request, not_found
 from app.features.lobbies.modes import InvalidLobbyShape, InvalidSeating
 from app.features.lobbies.repository import LobbyInsertRefused, LobbyRepository
-from app.features.lobbies.schemas import ChangeSeatRequest, CreateLobbyRequest
+from app.features.lobbies.schemas import (
+    ChangeSeatRequest,
+    CreateLobbyRequest,
+    SubmitBallotRequest,
+)
 from app.features.lobbies.service import (
     InvalidLobbyId,
     LobbyNotFound,
     LobbyService,
+    NotSeated,
     NotTheHost,
     SeatChangeRefused,
 )
@@ -191,6 +196,100 @@ async def change_seat(
         actor,
         request.expected_revision,
         lobby["revision"],
+    )
+    return lobby
+
+
+@activity_router.post("/{lobby_id}/start", response_model=None)
+async def start_lobby(
+    lobby_id: str,
+    expected_revision: int = Body(embed=True, ge=1),
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """Close seating, open the settings vote (D190).
+
+    The one transition no timer covers: section 7's table has no
+    `lobby -> settings` row and there is no "all submitted" to hang it on.
+    """
+    try:
+        lobby = await _service(db).start(lobby_id, actor, expected_revision)
+    except InvalidLobbyId as exc:
+        raise invalid_request(str(exc)) from exc
+    except LobbyNotFound as exc:
+        raise not_found("Lobby not found") from exc
+    except NotTheHost as exc:
+        raise forbidden(str(exc)) from exc
+    except SeatChangeRefused as exc:
+        logger.warning(
+            "start refused. lobby=%s actor=%s expected=%s current=%s",
+            lobby_id,
+            actor,
+            exc.expected,
+            exc.current,
+        )
+        raise conflict(
+            str(exc),
+            details={
+                "expected_revision": exc.expected,
+                "current_revision": exc.current,
+            },
+        ) from exc
+    logger.info(
+        "lobby started. lobby=%s actor=%s expected=%s current=%s",
+        lobby_id,
+        actor,
+        expected_revision,
+        lobby["revision"],
+    )
+    return lobby
+
+
+@activity_router.put("/{lobby_id}/votes", response_model=None)
+async def submit_ballot(
+    lobby_id: str,
+    request: SubmitBallotRequest = Body(),
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """One seat's settings ballot, resolving the phase on the last one.
+
+    ⚠ The response may come back already at `bans`: the final ballot tallies
+    and advances in the same call, and so does any request arriving after
+    `turn_expires_at` (D74, D194).
+    """
+    try:
+        lobby = await _service(db).submit_ballot(lobby_id, actor, request)
+    except InvalidLobbyId as exc:
+        raise invalid_request(str(exc)) from exc
+    except LobbyNotFound as exc:
+        raise not_found("Lobby not found") from exc
+    except NotSeated as exc:
+        raise forbidden(str(exc)) from exc
+    except InvalidSeating as exc:
+        raise invalid_request(str(exc)) from exc
+    except SeatChangeRefused as exc:
+        logger.warning(
+            "ballot refused. lobby=%s actor=%s expected=%s current=%s",
+            lobby_id,
+            actor,
+            exc.expected,
+            exc.current,
+        )
+        raise conflict(
+            str(exc),
+            details={
+                "expected_revision": exc.expected,
+                "current_revision": exc.current,
+            },
+        ) from exc
+    logger.info(
+        "ballot submitted. lobby=%s actor=%s expected=%s current=%s phase=%s",
+        lobby_id,
+        actor,
+        request.expected_revision,
+        lobby["revision"],
+        lobby["phase"],
     )
     return lobby
 

@@ -101,4 +101,28 @@ class ChangeSeatRequest(BaseModel):
         return self
 
 
-__all__ = ["ChangeSeatRequest", "CreateLobbyRequest", "SeatAction"]
+class SubmitBallotRequest(BaseModel):
+    """One seat's settings ballot.
+
+    ⚠ The whole ballot, not a delta. A seat re-submitting replaces what it
+    had, so a client that dropped an answer cannot leave a stale one behind
+    -- and "has this seat answered question X" stays a single lookup rather
+    than a merge of every submission it ever made.
+
+    Selections are `option_id`, or `a|b` where the question allows more than
+    one (D191). Ids are checked against the catalogue, so a question or option
+    the ballot invents is a 400 rather than a vote nothing counts.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+    selections: dict[str, str] = Field(min_length=1)
+
+
+__all__ = [
+    "ChangeSeatRequest",
+    "CreateLobbyRequest",
+    "SeatAction",
+    "SubmitBallotRequest",
+]
