@@ -15,15 +15,13 @@ from typing import Any
 from bson import ObjectId
 
 from app.features.lobbies.modes import LobbyShape, resolve_shape, validate_seats
+from app.features.lobbies.phases import LOBBY, SOURCE_COMMAND
 from app.features.lobbies.projection import project_lobby
 from app.features.lobbies.schemas import (
     ChangeSeatRequest,
     CreateLobbyRequest,
     SeatAction,
 )
-
-PHASE_LOBBY = "lobby"
-SOURCE_COMMAND = "command"
 
 # D177's staleness threshold. A whole draft is roughly fifteen minutes of
 # timers (spec section 7); an hour untouched is abandoned by any reading,
@@ -182,7 +180,7 @@ def build_lobby_document(
         "seat_count": shape.seat_count,
         "min_seats": shape.min_seats,
         "seats": seat_the_roster(request.roster, shape),
-        "phase": PHASE_LOBBY,
+        "phase": LOBBY,
         "revision": 1,
         "created_at": now,
         # Bumped by every mutation from CP5 on. D177's staleness reads this:
@@ -284,7 +282,7 @@ class LobbyService:
             raise LobbyNotFound(lobby_id)
 
         current = found["revision"]
-        if found["phase"] != PHASE_LOBBY:
+        if found["phase"] != LOBBY:
             raise SeatChangeRefused(
                 f"Seats are settled once the lobby reaches {found['phase']}",
                 request.expected_revision,

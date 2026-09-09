@@ -20,6 +20,7 @@ from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import DuplicateKeyError
 
 from app.core.constants import COL_LOBBIES, COL_LOBBY_STATS, GAMES_DB
+from app.features.lobbies.phases import CANCEL_ABANDONED, CANCELLED
 
 # `closed_at` is set on `complete` AND on `cancelled` (spec section 3), so
 # testing it alone cannot drift out of step with `phase`.
@@ -38,8 +39,6 @@ SEATED_OPEN_LOBBY = {**OPEN_LOBBY, "seats.discord_id": {"$exists": True}}
 
 # Spec section 3: `cancelled` is a phase and the reason is a field. An
 # eviction is not a host cancelling, so it carries its own reason.
-PHASE_CANCELLED = "cancelled"
-CANCEL_ABANDONED = "abandoned"
 
 
 class LobbyInsertRefused(RuntimeError):
@@ -187,7 +186,7 @@ class LobbyRepository:
             {
                 "$set": {
                     "closed_at": now,
-                    "phase": PHASE_CANCELLED,
+                    "phase": CANCELLED,
                     "cancel_reason": CANCEL_ABANDONED,
                 },
                 "$inc": {"revision": 1},

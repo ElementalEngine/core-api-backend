@@ -24,9 +24,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-PHASE_SETTINGS = "settings"
-PHASE_DRAFT = "draft"
-PHASE_COMPLETE = "complete"
+from app.features.lobbies.phases import DRAFT, SETTINGS
+
 DRAFT_BLIND = "blind"
 
 BALLOT = "ballot"
@@ -41,7 +40,7 @@ def ballots_are_secret(lobby: Mapping[str, Any]) -> bool:
     Once settings closes the ballots are public -- the table censors the
     `settings` row only.
     """
-    return lobby.get("phase") == PHASE_SETTINGS
+    return lobby.get("phase") == SETTINGS
 
 
 def pools_are_secret(lobby: Mapping[str, Any]) -> bool:
@@ -52,7 +51,7 @@ def pools_are_secret(lobby: Mapping[str, Any]) -> bool:
     nothing about it, and the safe reading of silence is to withhold.
     """
     return (
-        lobby.get("phase") == PHASE_DRAFT
+        lobby.get("phase") == DRAFT
         and lobby.get("draft_mode") == DRAFT_BLIND
         and lobby.get("revealed_at") is None
     )
