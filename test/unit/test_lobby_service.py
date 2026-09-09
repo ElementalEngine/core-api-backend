@@ -24,6 +24,7 @@ from app.features.lobbies.schemas import (
     ChangeSeatRequest,
     CreateLobbyRequest,
     SubmitBallotRequest,
+    SubmitBansRequest,
 )
 from app.features.lobbies.service import (
     STALE_AFTER,
@@ -864,3 +865,139 @@ def test_a_read_before_the_deadline_changes_nothing():
     repo = FakeRepo(lobby=VOTING, applied=VOTING)
     asyncio.run(LobbyService(repo, FakeSeasons()).read(HEX_ID, "alice"))
     assert repo.changes == []
+
+
+# --- banning (D195, D196) ----------------------------------------------
+
+
+class FakeCivData:
+    """Two leaders and three civs spread across two ages."""
+
+    def __init__(self):
+        self.asked = []
+
+    async def fetch(self, edition):
+        self.asked.append(edition)
+        return {
+            "edition": edition,
+            "leader_data_version": 1,
+            "leaders": [
+                {"token": "LEADER_TRAJAN", "name": "Trajan"},
+                {"token": "LEADER_HATSHEPSUT", "name": "Hatshepsut"},
+            ],
+            "civs": [
+                {"token": "CIVILIZATION_ROME", "age_pool": "AGE_ANTIQUITY"},
+                {"token": "CIVILIZATION_EGYPT", "age_pool": "AGE_ANTIQUITY"},
+                {"token": "CIVILIZATION_SPAIN", "age_pool": "AGE_EXPLORATION"},
+            ],
+        }
+
+
+BANNING = {
+    **VOTING,
+    "phase": "bans",
+    "edition": "civ7",
+    "seats": [
+        {"seat_index": 0, "discord_id": "alice", "team": None},
+        {"seat_index": 1, "discord_id": "bob", "team": None},
+    ],
+}
+
+
+def ban(repo, actor="alice", civ_data=None, revision=3, **keys):
+    return asyncio.run(
+        LobbyService(repo, FakeSeasons(), civ_data or FakeCivData()).submit_bans(
+            HEX_ID, actor, SubmitBansRequest(expected_revision=revision, **keys)
+        )
+    )
+
+
+def test_bans_are_stored_on_the_submitting_seat_only():
+    repo = FakeRepo(lobby=BANNING, written=BANNING, applied=BANNING)
+    ban(repo, actor="alice", leader_keys=["LEADER_TRAJAN"])
+    _, seats, _ = repo.writes[0]
+    by_id = {seat["discord_id"]: seat for seat in seats}
+    assert by_id["alice"]["bans"]["leader_keys"] == ["LEADER_TRAJAN"]
+    assert by_id["bob"].get("bans") is None
+
+
+def test_banning_nothing_still_counts_as_submitting():
+    # ⚠ `bans is not None` is the submitted test, not "banned something" --
+    # otherwise a seat that wants no bans would stall the phase until the
+    # timer expired.
+    voted = {
+        **BANNING,
+        "seats": [
+            {"seat_index": 0, "discord_id": "alice", "bans": {"leader_keys": []}},
+            {"seat_index": 1, "discord_id": "bob", "team": None},
+        ],
+    }
+    repo = FakeRepo(lobby=voted, written=voted, applied=voted)
+    ban(repo, actor="bob")
+    assert repo.changes, "the empty submission completed the phase"
+
+
+def test_an_unseated_player_cannot_ban():
+    repo = FakeRepo(lobby=BANNING, written=BANNING, applied=BANNING)
+    with pytest.raises(NotSeated):
+        ban(repo, actor="mallory", leader_keys=["LEADER_TRAJAN"])
+    assert repo.writes == []
+
+
+def test_a_leader_the_edition_does_not_have_is_refused():
+    repo = FakeRepo(lobby=BANNING, written=BANNING, applied=BANNING)
+    with pytest.raises(InvalidSeating):
+        ban(repo, leader_keys=["LEADER_NOBODY"])
+    assert repo.writes == []
+
+
+def test_a_civ_outside_the_starting_age_is_refused():
+    # ⚠ The case civ-data is on the service for. CIVILIZATION_SPAIN is a real
+    # token for a civ that is not in an antiquity game, and banning it would
+    # burn one of only three slots -- a client bug, not collusion.
+    antiquity = {**BANNING, "starting_age": "AGE_ANTIQUITY"}
+    repo = FakeRepo(lobby=antiquity, written=antiquity, applied=antiquity)
+    with pytest.raises(InvalidSeating):
+        ban(repo, civ_keys=["CIVILIZATION_SPAIN"])
+    assert repo.writes == []
+    repo = FakeRepo(lobby=BANNING, written=BANNING, applied=BANNING)
+    ban(repo, civ_keys=["CIVILIZATION_SPAIN"])
+    assert repo.writes
+
+
+def test_bans_cannot_be_submitted_outside_the_ban_phase():
+    repo = FakeRepo(lobby=VOTING, written=VOTING, applied=VOTING)
+    with pytest.raises(SeatChangeRefused):
+        ban(repo, leader_keys=["LEADER_TRAJAN"])
+    assert repo.writes == []
+
+
+def test_the_last_submission_tallies_and_moves_to_draft():
+    both = {
+        **BANNING,
+        "seats": [
+            {
+                "seat_index": 0,
+                "discord_id": "alice",
+                "bans": {"leader_keys": ["LEADER_TRAJAN"], "civ_keys": []},
+            },
+            {"seat_index": 1, "discord_id": "bob", "team": None},
+        ],
+    }
+    repo = FakeRepo(lobby=both, written=both, applied=both)
+    ban(repo, actor="bob", leader_keys=["LEADER_TRAJAN"])
+    _, changes = repo.changes[0]
+    assert changes["phase"] == "draft"
+    assert changes["bans"]["leader"] == ["LEADER_TRAJAN"]
+
+
+def test_an_expired_ban_phase_advances_from_a_read():
+    # ⚠ The lazy timer generalising to a second phase (D74, D194): nothing
+    # sweeps it, so the poll is what moves an abandoned ban phase on. Built
+    # with NO civ-data on purpose -- the advance must not need it.
+    expired = {**BANNING, "turn_expires_at": datetime.now(UTC) - timedelta(minutes=1)}
+    repo = FakeRepo(lobby=expired, applied=expired)
+    asyncio.run(LobbyService(repo, FakeSeasons()).read(HEX_ID, "alice"))
+    _, changes = repo.changes[0]
+    assert changes["phase"] == "draft"
+    assert changes["bans"] == {"leader": [], "civ": []}
