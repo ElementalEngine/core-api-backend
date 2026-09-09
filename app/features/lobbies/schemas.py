@@ -128,9 +128,31 @@ class SubmitBallotRequest(BaseModel):
     selections: dict[str, str] = Field(min_length=1)
 
 
+class SubmitBansRequest(BaseModel):
+    """One seat's bans. The whole set, not a delta.
+
+    ⚠ Both lists may be empty -- a seat banning nothing has still SUBMITTED,
+    and the phase advances on all-submitted. Distinguishing "banned nothing"
+    from "has not banned" is why the seat stores `bans` as a document rather
+    than two bare lists (`bans is not None` is the submitted test).
+
+    Tokens are civ-data's, and are checked against it: leaders against the
+    edition's whole set, civs against the STARTING AGE's pool only. A civ
+    outside the chosen age is a real token for a civ not in the game, and
+    banning it would burn one of three slots (D196).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+    leader_keys: list[str] = Field(default_factory=list, max_length=40)
+    civ_keys: list[str] = Field(default_factory=list, max_length=40)
+
+
 __all__ = [
     "ChangeSeatRequest",
     "CreateLobbyRequest",
     "SeatAction",
     "SubmitBallotRequest",
+    "SubmitBansRequest",
 ]

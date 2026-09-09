@@ -14,13 +14,20 @@ from typing import Any
 
 from bson import ObjectId
 
+from app.features.lobbies.bans import bannable_civs, resolve_bans
 from app.features.lobbies.modes import (
     InvalidSeating,
     LobbyShape,
     resolve_shape,
     validate_seats,
 )
-from app.features.lobbies.phases import BANS, LOBBY, SETTINGS, SOURCE_COMMAND
+from app.features.lobbies.phases import (
+    BANS,
+    DRAFT,
+    LOBBY,
+    SETTINGS,
+    SOURCE_COMMAND,
+)
 from app.features.lobbies.projection import project_lobby
 from app.features.lobbies.questions import questions_for
 from app.features.lobbies.schemas import (
@@ -28,6 +35,7 @@ from app.features.lobbies.schemas import (
     CreateLobbyRequest,
     SeatAction,
     SubmitBallotRequest,
+    SubmitBansRequest,
 )
 from app.features.lobbies.tally import resolve_settings
 
@@ -42,6 +50,7 @@ STALE_AFTER = timedelta(hours=1)
 # CP6b's, so 6a sets the phase's first deadline and nothing finer.
 SETTINGS_WINDOW = timedelta(minutes=5)
 BANS_WINDOW = timedelta(minutes=5)
+DRAFT_WINDOW = timedelta(minutes=5)
 
 # The ids Mongo owns. Everything else on a lobby document is already a JSON
 # primitive, a datetime, or a list of them.
@@ -215,9 +224,14 @@ def build_lobby_document(
 
 
 class LobbyService:
-    def __init__(self, repository: Any, seasons: Any) -> None:
+    def __init__(self, repository: Any, seasons: Any, civ_data: Any = None) -> None:
         self._repository = repository
         self._seasons = seasons
+        # ⚠ Only the ban path reads it, so it defaults rather than forcing
+        # nineteen test call sites to pass a fake they never use. A ban
+        # submission with it absent raises loudly at the first attribute
+        # access; nothing reaches Mongo on a half-built service.
+        self._civ_data = civ_data
 
     async def create(self, request: CreateLobbyRequest) -> dict[str, Any]:
         """Raises InvalidLobbyShape for a bad mode, LobbyInsertRefused when a
@@ -278,9 +292,13 @@ class LobbyService:
         expires = lobby.get("turn_expires_at")
         # `core/db.py` opens the client tz_aware, so this compares two aware
         # datetimes and needs no coercion.
-        if lobby["phase"] != SETTINGS or expires is None or expires > datetime.now(UTC):
+        if expires is None or expires > datetime.now(UTC):
             return lobby
-        return await self._resolve_settings(lobby) or lobby
+        if lobby["phase"] == SETTINGS:
+            return await self._resolve_settings(lobby) or lobby
+        if lobby["phase"] == BANS:
+            return await self._resolve_bans(lobby) or lobby
+        return lobby
 
     async def _resolve_settings(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
         """Tally the ballots and move to `bans`. None if the lobby moved.
@@ -305,6 +323,99 @@ class LobbyService:
             },
             now,
         )
+
+    async def _resolve_bans(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
+        """Tally the bans and move to `draft`. None if the lobby moved.
+
+        ⚠ No civ-data here, deliberately. Tokens were checked when they were
+        submitted, so the advance needs only what the document already holds
+        -- which keeps a 503 for unseeded civ-data off the POLL path, where
+        "your lobby is unavailable because a seed is missing" is a poor
+        answer to "what is the state of my lobby".
+
+        ⚠ `random` advances to `draft` like every other mode for now. D193
+        has it skip to `complete`, but that shortcut belongs with the
+        assignment that makes `complete` truthful (CP6c): a terminal lobby
+        with no picks either lacks `closed_at`, breaking section 3, or sets
+        it and frees the channel on a lobby that never resolved.
+        """
+        now = datetime.now(UTC)
+        return await self._repository.apply_changes(
+            lobby["_id"],
+            lobby["revision"],
+            {
+                "bans": resolve_bans(
+                    lobby.get("seats") or [],
+                    lobby["edition"],
+                    lobby.get("starting_age"),
+                ),
+                "phase": DRAFT,
+                "turn_index": 0,
+                "turn_expires_at": now + DRAFT_WINDOW,
+            },
+            now,
+        )
+
+    async def submit_bans(
+        self, lobby_id: str, actor_discord_id: str, request: SubmitBansRequest
+    ) -> dict[str, Any]:
+        """One seat's bans. Resolves the phase once every seat has submitted."""
+        oid = as_lobby_id(lobby_id)
+        found = await self._repository.find_by_id(oid)
+        if found is None:
+            raise LobbyNotFound(lobby_id)
+        found = await self._advanced(found)
+        if found["phase"] != BANS:
+            raise SeatChangeRefused(
+                f"Bans are not open at {found['phase']}",
+                request.expected_revision,
+                found["revision"],
+            )
+
+        seats = found.get("seats") or []
+        if not any(seat.get("discord_id") == actor_discord_id for seat in seats):
+            raise NotSeated("Only a seated player bans")
+
+        payload = await self._civ_data.fetch(found["edition"])
+        legal = {
+            "leader": {row["token"] for row in payload["leaders"]},
+            # ⚠ Age-filtered. A civ outside the chosen starting age is a valid
+            # token for a civ that is not in the game, and banning it burns
+            # one of only three slots -- a client bug, not collusion.
+            "civ": set(bannable_civs(payload["civs"], found.get("starting_age"))),
+        }
+        submitted = {"leader": request.leader_keys, "civ": request.civ_keys}
+        for kind, keys in submitted.items():
+            unknown = [key for key in keys if key not in legal[kind]]
+            if unknown:
+                raise InvalidSeating(f"{kind}_keys", f"not bannable: {unknown[0]}")
+
+        banned = [
+            {
+                **seat,
+                "bans": {
+                    "leader_keys": list(request.leader_keys),
+                    "civ_keys": list(request.civ_keys),
+                },
+            }
+            if seat.get("discord_id") == actor_discord_id
+            else seat
+            for seat in seats
+        ]
+        now = datetime.now(UTC)
+        written = await self._repository.replace_seats(
+            oid, request.expected_revision, banned, now
+        )
+        if written is None:
+            latest = await self._repository.find_by_id(oid)
+            raise SeatChangeRefused(
+                *self._why_refused(latest, request.expected_revision)
+            )
+
+        occupied = [seat for seat in banned if seat.get("discord_id")]
+        if all(seat.get("bans") is not None for seat in occupied):
+            written = await self._resolve_bans(written) or written
+        return for_the_wire(written, actor_discord_id)
 
     async def submit_ballot(
         self, lobby_id: str, actor_discord_id: str, request: SubmitBallotRequest

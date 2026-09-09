@@ -2526,6 +2526,38 @@
         "title": "SubmitBallotRequest",
         "type": "object"
       },
+      "SubmitBansRequest": {
+        "additionalProperties": false,
+        "description": "One seat's bans. The whole set, not a delta.\n\n\u26a0 Both lists may be empty -- a seat banning nothing has still SUBMITTED,\nand the phase advances on all-submitted. Distinguishing \"banned nothing\"\nfrom \"has not banned\" is why the seat stores `bans` as a document rather\nthan two bare lists (`bans is not None` is the submitted test).\n\nTokens are civ-data's, and are checked against it: leaders against the\nedition's whole set, civs against the STARTING AGE's pool only. A civ\noutside the chosen age is a real token for a civ not in the game, and\nbanning it would burn one of three slots (D196).",
+        "properties": {
+          "civ_keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Civ Keys",
+            "type": "array"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "leader_keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Leader Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "SubmitBansRequest",
+        "type": "object"
+      },
       "SupportedGame": {
         "enum": [
           "civ6",
@@ -5870,6 +5902,82 @@
           }
         },
         "summary": "Read Lobby",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
+    "/api/v2/lobbies/{lobby_id}/bans": {
+      "put": {
+        "description": "One seat's bans, resolving the phase on the last submission.\n\n\u26a0 Leaders are checked against the edition; civs against the STARTING\nAGE's pool only, so a real token for a civ that is not in the game\ncannot burn one of three slots (D196).",
+        "operationId": "submit_bans_api_v2_lobbies__lobby_id__bans_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitBansRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Bans",
         "tags": [
           "lobbies"
         ]

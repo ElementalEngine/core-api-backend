@@ -32,12 +32,14 @@ from app.core.dependencies import (
     require_mito_token,
 )
 from app.core.errors import conflict, forbidden, invalid_request, not_found
+from app.features.civdata.repository import CivDataRepository
 from app.features.lobbies.modes import InvalidLobbyShape, InvalidSeating
 from app.features.lobbies.repository import LobbyInsertRefused, LobbyRepository
 from app.features.lobbies.schemas import (
     ChangeSeatRequest,
     CreateLobbyRequest,
     SubmitBallotRequest,
+    SubmitBansRequest,
 )
 from app.features.lobbies.service import (
     InvalidLobbyId,
@@ -74,7 +76,9 @@ activity_router = APIRouter(
 
 
 def _service(db: AsyncMongoClient) -> LobbyService:
-    return LobbyService(LobbyRepository(db), SeasonsRepository(db))
+    return LobbyService(
+        LobbyRepository(db), SeasonsRepository(db), CivDataRepository(db)
+    )
 
 
 @mite_router.post("", status_code=status.HTTP_201_CREATED)
@@ -285,6 +289,55 @@ async def submit_ballot(
         ) from exc
     logger.info(
         "ballot submitted. lobby=%s actor=%s expected=%s current=%s phase=%s",
+        lobby_id,
+        actor,
+        request.expected_revision,
+        lobby["revision"],
+        lobby["phase"],
+    )
+    return lobby
+
+
+@activity_router.put("/{lobby_id}/bans", response_model=None)
+async def submit_bans(
+    lobby_id: str,
+    request: SubmitBansRequest = Body(),
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """One seat's bans, resolving the phase on the last submission.
+
+    ⚠ Leaders are checked against the edition; civs against the STARTING
+    AGE's pool only, so a real token for a civ that is not in the game
+    cannot burn one of three slots (D196).
+    """
+    try:
+        lobby = await _service(db).submit_bans(lobby_id, actor, request)
+    except InvalidLobbyId as exc:
+        raise invalid_request(str(exc)) from exc
+    except LobbyNotFound as exc:
+        raise not_found("Lobby not found") from exc
+    except NotSeated as exc:
+        raise forbidden(str(exc)) from exc
+    except InvalidSeating as exc:
+        raise invalid_request(str(exc)) from exc
+    except SeatChangeRefused as exc:
+        logger.warning(
+            "bans refused. lobby=%s actor=%s expected=%s current=%s",
+            lobby_id,
+            actor,
+            exc.expected,
+            exc.current,
+        )
+        raise conflict(
+            str(exc),
+            details={
+                "expected_revision": exc.expected,
+                "current_revision": exc.current,
+            },
+        ) from exc
+    logger.info(
+        "bans submitted. lobby=%s actor=%s expected=%s current=%s phase=%s",
         lobby_id,
         actor,
         request.expected_revision,

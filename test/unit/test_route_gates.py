@@ -177,6 +177,9 @@ def test_each_lobby_route_carries_its_own_gate_not_merely_a_gate():
         # The only mutation on this router: the wrong gate here would hand
         # Mite the ability to move seats.
         ("PATCH", f"{LOBBY_PATH}/seats"),
+        ("POST", f"{LOBBY_PATH}/start"),
+        ("PUT", f"{LOBBY_PATH}/votes"),
+        ("PUT", f"{LOBBY_PATH}/bans"),
     ):
         gates = gate_callables(resolve(method, path))
         assert require_activity_token in gates, f"{method} {path}"
