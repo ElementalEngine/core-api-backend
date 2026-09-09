@@ -2580,6 +2580,7 @@
             "anyOf": [
               {
                 "maxLength": 64,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -2594,15 +2595,21 @@
             "type": "integer"
           },
           "token": {
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Token",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
           }
         },
         "required": [
-          "expected_revision",
-          "token"
+          "expected_revision"
         ],
         "title": "SubmitPickRequest",
         "type": "object"

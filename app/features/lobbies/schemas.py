@@ -164,8 +164,19 @@ class SubmitPickRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expected_revision: int = Field(ge=1)
-    token: str = Field(min_length=1, max_length=64)
-    civ_token: str | None = Field(default=None, max_length=64)
+    # ⚠ Both optional, at least one required. Snake on civ7 runs a leader
+    # round then a civ round, so the civ-round request carries `civ_token`
+    # ALONE -- a required `token` would force the client to resend a leader
+    # it has already locked, and the per-field lock would refuse it. The
+    # schema has to match the two-round shape, not the other way round.
+    token: str | None = Field(default=None, min_length=1, max_length=64)
+    civ_token: str | None = Field(default=None, min_length=1, max_length=64)
+
+    @model_validator(mode="after")
+    def _at_least_one_token(self) -> SubmitPickRequest:
+        if self.token is None and self.civ_token is None:
+            raise ValueError("a pick needs a token or a civ_token")
+        return self
 
 
 __all__ = [

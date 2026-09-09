@@ -48,6 +48,7 @@ from app.features.lobbies.service import (
     LobbyService,
     NotSeated,
     NotTheHost,
+    NotYourTurn,
     PickIsFinal,
     SeatChangeRefused,
 )
@@ -368,6 +369,11 @@ async def submit_pick(
     except LobbyNotFound as exc:
         raise not_found("Lobby not found") from exc
     except NotSeated as exc:
+        raise forbidden(str(exc)) from exc
+    except NotYourTurn as exc:
+        # ⚠ 403, not 409. A conflict says the lobby moved under you; this
+        # says it is exactly where you thought and somebody else is owed
+        # the pick.
         raise forbidden(str(exc)) from exc
     except PickIsFinal as exc:
         raise conflict(str(exc)) from exc

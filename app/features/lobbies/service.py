@@ -49,6 +49,12 @@ from app.features.lobbies.schemas import (
     SubmitPickRequest,
 )
 from app.features.lobbies.tally import resolve_settings
+from app.features.lobbies.turns import (
+    cwc_order,
+    is_turn_ordered,
+    snake_order,
+    whose_turn,
+)
 
 # D177's staleness threshold. A whole draft is roughly fifteen minutes of
 # timers (spec section 7); an hour untouched is abandoned by any reading,
@@ -61,6 +67,8 @@ STALE_AFTER = timedelta(hours=1)
 # CP6b's, so 6a sets the phase's first deadline and nothing finer.
 SETTINGS_WINDOW = timedelta(minutes=5)
 DRAFT_RANDOM = "random"
+DRAFT_CWC = "cwc"
+DRAFT_STANDARD = "standard"
 BANS_WINDOW = timedelta(minutes=5)
 DRAFT_WINDOW = timedelta(minutes=5)
 
@@ -82,6 +90,14 @@ class InvalidLobbyId(ValueError):
 
 class LobbyNotFound(LookupError):
     """No lobby carries that id."""
+
+
+class NotYourTurn(PermissionError):
+    """Somebody else is owed this pick.
+
+    ⚠ 403, not 409. A conflict means the lobby moved under you; this means
+    the lobby is exactly where you thought and it is not your turn.
+    """
 
 
 class PickIsFinal(Exception):
@@ -397,11 +413,61 @@ class LobbyService:
                 "closed_at": datetime.now(UTC),
                 "turn_expires_at": None,
             }
+        ordered: dict[str, Any] = {}
+        if is_turn_ordered(mode):
+            seat_ids = [seat["discord_id"] for seat in seated]
+            if mode == DRAFT_CWC:
+                # D75: the captain is DERIVED -- lowest seat_index per team,
+                # never stored as a flag. Computed once here and stored as
+                # the order itself, so a dispute reads what was used (D200).
+                lowest: dict[int, dict[str, Any]] = {}
+                for seat in seated:
+                    team = seat.get("team")
+                    if team is None:
+                        continue
+                    if (
+                        team not in lowest
+                        or seat["seat_index"] < lowest[team]["seat_index"]
+                    ):
+                        lowest[team] = seat
+                captains = [lowest[key]["discord_id"] for key in sorted(lowest)]
+                try:
+                    ordered["pick_order"] = cwc_order(
+                        captains, (lobby.get("team_size") or 0) * 2
+                    )
+                except ValueError as exc:
+                    # ⚠ CWC_PICK_ORDER is entries of 0/1, but a teamer may have
+                    # up to five teams and the ballot offers cwc to all of them.
+                    # Falling back keeps the lobby playable and loses no picks;
+                    # cancelling would punish players for a legal choice (O-35).
+                    logger.warning(
+                        "cwc unavailable, falling back to standard. lobby=%s %s",
+                        lobby["_id"],
+                        exc,
+                    )
+                    ordered = {
+                        "settings": {
+                            **(lobby.get("settings") or {}),
+                            "draft_mode": DRAFT_STANDARD,
+                        }
+                    }
+                else:
+                    ordered["teams"] = [
+                        {"team_index": index, "leaders": [], "civs": []}
+                        for index in range(2)
+                    ]
+            else:
+                # The snake is the reversal BETWEEN rounds: civ6 drafts
+                # leaders alone, civ7 adds a civ round running backwards.
+                rounds = 2 if lobby["edition"] == "civ7" else 1
+                ordered["pick_order"] = snake_order(seat_ids, rounds)
+
         return {
             "seats": seats,
             "phase": DRAFT,
             "turn_index": 0,
             "turn_expires_at": datetime.now(UTC) + DRAFT_WINDOW,
+            **ordered,
         }
 
     async def _resolve_bans(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
@@ -503,16 +569,27 @@ class LobbyService:
         mine = next((s for s in seats if s.get("discord_id") == actor_discord_id), None)
         if mine is None:
             raise NotSeated("Only a seated player picks")
-        # ⚠ O-34, and NOT a revision check: read at revision 5, change your
-        # mind, write at revision 5, and a revision guard is satisfied.
-        if mine.get("pick") is not None:
-            raise PickIsFinal("Your pick is already locked in")
+        mode = (found.get("settings") or {}).get("draft_mode")
+        order = found.get("pick_order") or []
+        turn_index = found.get("turn_index") or 0
+        if order and whose_turn(order, turn_index) != actor_discord_id:
+            raise NotYourTurn("It is not your turn to pick")
 
-        wanted = {"pick": (request.token, mine.get("pool"))}
+        wanted: dict[str, tuple[str, Any]] = {}
+        if request.token is not None:
+            wanted["pick"] = (request.token, mine.get("pool"))
         if request.civ_token is not None:
             wanted["civ_pick"] = (request.civ_token, mine.get("civ_pool"))
         chosen: dict[str, Any] = {}
         for field, (token, pool) in wanted.items():
+            # ⚠ O-34, PER FIELD and not a revision check. Per field because
+            # snake on civ7 runs a leader round then a civ round, so a seat
+            # picks twice -- locking on `pick` alone would refuse the second.
+            # Not a revision check because read-at-5, change-your-mind,
+            # write-at-5 satisfies a revision guard: this is a clause about
+            # the document's content, like D176's `$ne`.
+            if mine.get(field) is not None:
+                raise PickIsFinal(f"Your {field} is already locked in")
             if token not in (pool or []):
                 raise InvalidSeating(field, f"{token} is not in your pool")
             chosen[field] = token
@@ -521,9 +598,32 @@ class LobbyService:
             {**seat, **chosen} if seat.get("discord_id") == actor_discord_id else seat
             for seat in seats
         ]
+        changes: dict[str, Any] = {"seats": picked}
+        if mode == DRAFT_CWC:
+            # ⚠ D199, the one place the seat is not the unit of ownership: a
+            # captain drafts for the team and nobody is assigned a leader
+            # until the players divide them. Measured from Mite, which stores
+            # two entries, one per team.
+            teams = [dict(team) for team in found.get("teams") or []]
+            side = next(
+                (
+                    seat.get("team")
+                    for seat in seats
+                    if seat.get("discord_id") == actor_discord_id
+                ),
+                None,
+            )
+            for team in teams:
+                if team["team_index"] == side:
+                    team["leaders"] = [*team["leaders"], request.token]
+                    if request.civ_token is not None:
+                        team["civs"] = [*team["civs"], request.civ_token]
+            changes = {"teams": teams}
+        if order:
+            changes["turn_index"] = turn_index + 1
         now = datetime.now(UTC)
-        written = await self._repository.replace_seats(
-            oid, request.expected_revision, picked, now
+        written = await self._repository.apply_changes(
+            oid, request.expected_revision, changes, now
         )
         if written is None:
             latest = await self._repository.find_by_id(oid)
@@ -531,8 +631,17 @@ class LobbyService:
                 *self._why_refused(latest, request.expected_revision)
             )
 
+        # ⚠ Two completion tests, one phase (D199). Turn-ordered modes are
+        # done when the ORDER is spent -- a CWC captain picks for the whole
+        # team, so no seat ever holds a pick and "every seat has picked"
+        # would never fire. The others are done when every seat has one.
         occupied = [seat for seat in picked if seat.get("discord_id")]
-        if all(seat.get("pick") is not None for seat in occupied):
+        finished = (
+            whose_turn(order, turn_index + 1) is None
+            if order
+            else all(seat.get("pick") is not None for seat in occupied)
+        )
+        if finished:
             # ⚠ `revealed_at` is what un-censors a blind draft (D73). It is set
             # for every mode: `complete` already reveals, so a stray mode
             # cannot leave a finished lobby hidden.

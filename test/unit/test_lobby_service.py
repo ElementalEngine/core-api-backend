@@ -25,6 +25,7 @@ from app.features.lobbies.schemas import (
     CreateLobbyRequest,
     SubmitBallotRequest,
     SubmitBansRequest,
+    SubmitPickRequest,
 )
 from app.features.lobbies.service import (
     STALE_AFTER,
@@ -33,6 +34,8 @@ from app.features.lobbies.service import (
     LobbyService,
     NotSeated,
     NotTheHost,
+    NotYourTurn,
+    PickIsFinal,
     SeatChangeRefused,
     as_lobby_id,
     build_lobby_document,
@@ -1035,3 +1038,149 @@ def test_a_lobby_that_bans_itself_out_is_cancelled():
     assert changes["phase"] == "cancelled"
     assert changes["cancel_reason"] == "no_pool"
     assert changes["closed_at"] is not None
+
+
+# --- turn-ordered drafts (D199, D200) ------------------------------------
+
+DRAFTING = {
+    **BANNING,
+    "phase": "draft",
+    "edition": "civ6",
+    "settings": {"draft_mode": "snake"},
+    "pick_order": ["alice", "bob"],
+    "turn_index": 0,
+    "seats": [
+        {
+            "seat_index": 0,
+            "discord_id": "alice",
+            "team": 0,
+            "pool": ["LEADER_TRAJAN"],
+        },
+        {
+            "seat_index": 1,
+            "discord_id": "bob",
+            "team": 1,
+            "pool": ["LEADER_AMINA"],
+        },
+    ],
+}
+
+
+def pick(repo, actor, token=None, revision=3, civ_token=None):
+    body = {"expected_revision": revision}
+    if token is not None:
+        body["token"] = token
+    if civ_token is not None:
+        body["civ_token"] = civ_token
+    return asyncio.run(
+        LobbyService(repo, FakeSeasons(), FakeCivData()).submit_pick(
+            HEX_ID, actor, SubmitPickRequest(**body)
+        )
+    )
+
+
+def test_picking_out_of_turn_is_refused():
+    # ⚠ The whole gap CP6d closed: turn_index was written and read by nothing,
+    # so any seat could pick at any moment. Silent -- the draft simply stopped
+    # being a draft.
+    repo = FakeRepo(lobby=DRAFTING, applied=DRAFTING)
+    with pytest.raises(NotYourTurn):
+        pick(repo, "bob", "LEADER_AMINA")
+    assert repo.changes == []
+
+
+def test_the_seat_whose_turn_it_is_may_pick_and_the_index_advances():
+    repo = FakeRepo(lobby=DRAFTING, applied=DRAFTING)
+    pick(repo, "alice", "LEADER_TRAJAN")
+    _, changes = repo.changes[0]
+    assert changes["turn_index"] == 1
+    by_id = {s["discord_id"]: s for s in changes["seats"]}
+    assert by_id["alice"]["pick"] == "LEADER_TRAJAN"
+
+
+def test_a_token_outside_your_own_pool_is_refused():
+    repo = FakeRepo(lobby=DRAFTING, applied=DRAFTING)
+    with pytest.raises(InvalidSeating):
+        pick(repo, "alice", "LEADER_AMINA")
+    assert repo.changes == []
+
+
+def test_a_second_pick_of_the_same_field_is_refused():
+    # O-34, per field.
+    already = {
+        **DRAFTING,
+        "seats": [
+            {**DRAFTING["seats"][0], "pick": "LEADER_TRAJAN"},
+            DRAFTING["seats"][1],
+        ],
+    }
+    repo = FakeRepo(lobby=already, applied=already)
+    with pytest.raises(PickIsFinal):
+        pick(repo, "alice", "LEADER_TRAJAN")
+
+
+def test_a_civ_pick_is_allowed_after_a_leader_pick():
+    # ⚠ Why the lock is PER FIELD: snake on civ7 runs a leader round then a
+    # civ round, so a seat picks twice. Locking on `pick` alone would refuse
+    # the second and stall every civ7 snake draft.
+    civ7 = {
+        **DRAFTING,
+        "edition": "civ7",
+        "pick_order": ["alice", "bob", "bob", "alice"],
+        "turn_index": 3,
+        "seats": [
+            {
+                **DRAFTING["seats"][0],
+                "pick": "LEADER_TRAJAN",
+                "civ_pool": ["CIVILIZATION_ROME"],
+            },
+            DRAFTING["seats"][1],
+        ],
+    }
+    repo = FakeRepo(lobby=civ7, applied=civ7)
+    # The civ round sends civ_token ALONE -- the leader is already locked.
+    pick(repo, "alice", civ_token="CIVILIZATION_ROME")
+    _, changes = repo.changes[0]
+    by_id = {s["discord_id"]: s for s in changes["seats"]}
+    assert by_id["alice"]["civ_pick"] == "CIVILIZATION_ROME"
+
+
+def test_cwc_writes_the_team_and_never_the_seat():
+    # ⚠ D199, the one place the seat is not the unit of ownership. A captain
+    # drafts for the team; nobody is assigned a leader until the players
+    # divide them.
+    cwc = {
+        **DRAFTING,
+        "settings": {"draft_mode": "cwc"},
+        "pick_order": ["alice", "bob"],
+        "teams": [
+            {"team_index": 0, "leaders": [], "civs": []},
+            {"team_index": 1, "leaders": [], "civs": []},
+        ],
+    }
+    repo = FakeRepo(lobby=cwc, applied=cwc)
+    pick(repo, "alice", "LEADER_TRAJAN")
+    _, changes = repo.changes[0]
+    assert "seats" not in changes
+    assert changes["teams"][0]["leaders"] == ["LEADER_TRAJAN"]
+    assert changes["teams"][1]["leaders"] == []
+
+
+def test_a_turn_ordered_draft_completes_when_the_order_is_spent():
+    # ⚠ Two completion tests, one phase. A CWC captain picks for the team, so
+    # no seat ever holds a pick and "every seat has picked" would never fire.
+    cwc = {
+        **DRAFTING,
+        "settings": {"draft_mode": "cwc"},
+        "pick_order": ["alice"],
+        "turn_index": 0,
+        "teams": [{"team_index": 0, "leaders": [], "civs": []}],
+    }
+    repo = FakeRepo(lobby=cwc, applied=cwc)
+    pick(repo, "alice", "LEADER_TRAJAN")
+    assert repo.changes[-1][1]["phase"] == "complete"
+
+
+def test_a_pick_with_neither_token_is_refused():
+    with pytest.raises(ValueError):
+        SubmitPickRequest(expected_revision=3)
