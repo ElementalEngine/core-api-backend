@@ -40,6 +40,7 @@ from app.features.lobbies.schemas import (
     CreateLobbyRequest,
     SubmitBallotRequest,
     SubmitBansRequest,
+    SubmitPickRequest,
 )
 from app.features.lobbies.service import (
     InvalidLobbyId,
@@ -47,6 +48,7 @@ from app.features.lobbies.service import (
     LobbyService,
     NotSeated,
     NotTheHost,
+    PickIsFinal,
     SeatChangeRefused,
 )
 from app.features.seasons.repository import SeasonsRepository
@@ -343,6 +345,89 @@ async def submit_bans(
         request.expected_revision,
         lobby["revision"],
         lobby["phase"],
+    )
+    return lobby
+
+
+@activity_router.put("/{lobby_id}/picks", response_model=None)
+async def submit_pick(
+    lobby_id: str,
+    request: SubmitPickRequest = Body(),
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """One seat's pick, completing the lobby on the last one.
+
+    ⚠ **409 for a second pick, and it is not a revision conflict.** A pick is
+    final once made (O-34); the refusal reads the seat, not the revision.
+    """
+    try:
+        lobby = await _service(db).submit_pick(lobby_id, actor, request)
+    except InvalidLobbyId as exc:
+        raise invalid_request(str(exc)) from exc
+    except LobbyNotFound as exc:
+        raise not_found("Lobby not found") from exc
+    except NotSeated as exc:
+        raise forbidden(str(exc)) from exc
+    except PickIsFinal as exc:
+        raise conflict(str(exc)) from exc
+    except InvalidSeating as exc:
+        raise invalid_request(str(exc)) from exc
+    except SeatChangeRefused as exc:
+        logger.warning(
+            "pick refused. lobby=%s actor=%s expected=%s current=%s",
+            lobby_id,
+            actor,
+            exc.expected,
+            exc.current,
+        )
+        raise conflict(
+            str(exc),
+            details={
+                "expected_revision": exc.expected,
+                "current_revision": exc.current,
+            },
+        ) from exc
+    logger.info(
+        "pick submitted. lobby=%s actor=%s expected=%s current=%s phase=%s",
+        lobby_id,
+        actor,
+        request.expected_revision,
+        lobby["revision"],
+        lobby["phase"],
+    )
+    return lobby
+
+
+@activity_router.post("/{lobby_id}/cancel", response_model=None)
+async def cancel_lobby(
+    lobby_id: str,
+    expected_revision: int = Body(embed=True, ge=1),
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """The host ends the lobby. Frees the channel and every seat at once."""
+    try:
+        lobby = await _service(db).cancel(lobby_id, actor, expected_revision)
+    except InvalidLobbyId as exc:
+        raise invalid_request(str(exc)) from exc
+    except LobbyNotFound as exc:
+        raise not_found("Lobby not found") from exc
+    except NotTheHost as exc:
+        raise forbidden(str(exc)) from exc
+    except SeatChangeRefused as exc:
+        raise conflict(
+            str(exc),
+            details={
+                "expected_revision": exc.expected,
+                "current_revision": exc.current,
+            },
+        ) from exc
+    logger.info(
+        "lobby cancelled. lobby=%s actor=%s current=%s",
+        lobby_id,
+        actor,
+        lobby["revision"],
     )
     return lobby
 

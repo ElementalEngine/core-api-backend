@@ -23,10 +23,20 @@ from app.features.lobbies.modes import (
 )
 from app.features.lobbies.phases import (
     BANS,
+    CANCEL_BY_HOST,
+    CANCEL_NO_POOL,
+    CANCELLED,
+    COMPLETE,
     DRAFT,
     LOBBY,
     SETTINGS,
     SOURCE_COMMAND,
+)
+from app.features.lobbies.pools import (
+    NotEnoughPool,
+    assign_one_each,
+    deal,
+    remaining_after_bans,
 )
 from app.features.lobbies.projection import project_lobby
 from app.features.lobbies.questions import questions_for
@@ -36,6 +46,7 @@ from app.features.lobbies.schemas import (
     SeatAction,
     SubmitBallotRequest,
     SubmitBansRequest,
+    SubmitPickRequest,
 )
 from app.features.lobbies.tally import resolve_settings
 
@@ -49,6 +60,7 @@ STALE_AFTER = timedelta(hours=1)
 # vote in FFA, 1-2-2-1 captain turns in a teamer -- differ per turn and are
 # CP6b's, so 6a sets the phase's first deadline and nothing finer.
 SETTINGS_WINDOW = timedelta(minutes=5)
+DRAFT_RANDOM = "random"
 BANS_WINDOW = timedelta(minutes=5)
 DRAFT_WINDOW = timedelta(minutes=5)
 
@@ -70,6 +82,10 @@ class InvalidLobbyId(ValueError):
 
 class LobbyNotFound(LookupError):
     """No lobby carries that id."""
+
+
+class PickIsFinal(Exception):
+    """The seat already holds a pick, and a pick cannot be changed (O-34)."""
 
 
 class NotSeated(PermissionError):
@@ -324,6 +340,70 @@ class LobbyService:
             now,
         )
 
+    async def _deal_the_draft(self, lobby: dict[str, Any]) -> dict[str, Any]:
+        """What leaving `bans` writes, by draft mode (D193, D198).
+
+        ⚠ `random` has no draft: leaders are assigned straight from the
+        post-ban pool and the lobby is DONE. That is the `bans -> complete`
+        edge section 3's forward-only sequence does not otherwise permit, and
+        it was deferred until the dealer existed to make `complete` truthful.
+
+        ⚠ A lobby can ban itself past a usable pool. The caller CANCELS
+        rather than letting this raise: after D194 an advance can be triggered
+        by a POLL, so raising would make every read a 500 with no route out.
+        """
+        payload = await self._civ_data.fetch(lobby["edition"])
+        landed = lobby.get("bans") or {}
+        seated = [seat for seat in lobby.get("seats") or [] if seat.get("discord_id")]
+        players = len(seated)
+        mode = (lobby.get("settings") or {}).get("draft_mode")
+
+        # ⚠ civ7 drafts a leader AND a civ, from two independently dealt
+        # pools. civ6 is leaders only, so its civ list is empty and every
+        # civ-side call below no-ops rather than needing a branch.
+        kinds = {
+            "leader": remaining_after_bans(
+                [row["token"] for row in payload["leaders"]],
+                landed.get("leader") or [],
+            ),
+            "civ": remaining_after_bans(
+                [row["token"] for row in payload["civs"]], landed.get("civ") or []
+            ),
+        }
+
+        per_seat: dict[str, dict[str, Any]] = {
+            seat["discord_id"]: {} for seat in seated
+        }
+        for kind, pool in kinds.items():
+            if not pool:
+                continue
+            field = "pick" if mode == DRAFT_RANDOM else "pool"
+            suffix = "" if kind == "leader" else "civ_"
+            if mode == DRAFT_RANDOM:
+                allotted: list[Any] = list(assign_one_each(pool, players))
+            else:
+                allotted = list(deal(pool, players))
+            for seat, share in zip(seated, allotted, strict=True):
+                per_seat[seat["discord_id"]][f"{suffix}{field}"] = share
+
+        seats = [
+            {**seat, **per_seat[seat["discord_id"]]} if seat.get("discord_id") else seat
+            for seat in lobby.get("seats") or []
+        ]
+        if mode == DRAFT_RANDOM:
+            return {
+                "seats": seats,
+                "phase": COMPLETE,
+                "closed_at": datetime.now(UTC),
+                "turn_expires_at": None,
+            }
+        return {
+            "seats": seats,
+            "phase": DRAFT,
+            "turn_index": 0,
+            "turn_expires_at": datetime.now(UTC) + DRAFT_WINDOW,
+        }
+
     async def _resolve_bans(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
         """Tally the bans and move to `draft`. None if the lobby moved.
 
@@ -340,21 +420,137 @@ class LobbyService:
         it and frees the channel on a lobby that never resolved.
         """
         now = datetime.now(UTC)
+        tallied = {
+            **lobby,
+            "bans": resolve_bans(
+                lobby.get("seats") or [],
+                lobby["edition"],
+                lobby.get("starting_age"),
+            ),
+        }
+        try:
+            changes = await self._deal_the_draft(tallied)
+        except NotEnoughPool as exc:
+            logger.warning("lobby banned itself out. lobby=%s %s", lobby["_id"], exc)
+            changes = {
+                "phase": CANCELLED,
+                "cancel_reason": CANCEL_NO_POOL,
+                "closed_at": now,
+                "turn_expires_at": None,
+            }
         return await self._repository.apply_changes(
             lobby["_id"],
             lobby["revision"],
+            {"bans": tallied["bans"], **changes},
+            now,
+        )
+
+    async def cancel(
+        self, lobby_id: str, actor_discord_id: str, expected_revision: int
+    ) -> dict[str, Any]:
+        """The host abandons the lobby. Terminal, and it frees the channel.
+
+        ⚠ Host only. Any seated player leaving is `PATCH /seats`; cancelling
+        ends it for everyone, which is the host's call alone.
+        """
+        oid = as_lobby_id(lobby_id)
+        found = await self._repository.find_by_id(oid)
+        if found is None:
+            raise LobbyNotFound(lobby_id)
+        if found.get("closed_at") is not None:
+            raise SeatChangeRefused(
+                f"This lobby is already {found['phase']}",
+                expected_revision,
+                found["revision"],
+            )
+        if actor_discord_id != found["host_discord_id"]:
+            raise NotTheHost("Only the host can cancel the lobby")
+
+        now = datetime.now(UTC)
+        written = await self._repository.apply_changes(
+            oid,
+            expected_revision,
             {
-                "bans": resolve_bans(
-                    lobby.get("seats") or [],
-                    lobby["edition"],
-                    lobby.get("starting_age"),
-                ),
-                "phase": DRAFT,
-                "turn_index": 0,
-                "turn_expires_at": now + DRAFT_WINDOW,
+                "phase": CANCELLED,
+                "cancel_reason": CANCEL_BY_HOST,
+                "closed_at": now,
+                "turn_expires_at": None,
             },
             now,
         )
+        if written is None:
+            latest = await self._repository.find_by_id(oid)
+            raise SeatChangeRefused(*self._why_refused(latest, expected_revision))
+        return for_the_wire(written, actor_discord_id)
+
+    async def submit_pick(
+        self, lobby_id: str, actor_discord_id: str, request: SubmitPickRequest
+    ) -> dict[str, Any]:
+        """One seat's pick. Completes the lobby once every seat has picked."""
+        oid = as_lobby_id(lobby_id)
+        found = await self._repository.find_by_id(oid)
+        if found is None:
+            raise LobbyNotFound(lobby_id)
+        found = await self._advanced(found)
+        if found["phase"] != DRAFT:
+            raise SeatChangeRefused(
+                f"The draft is not open at {found['phase']}",
+                request.expected_revision,
+                found["revision"],
+            )
+
+        seats = found.get("seats") or []
+        mine = next((s for s in seats if s.get("discord_id") == actor_discord_id), None)
+        if mine is None:
+            raise NotSeated("Only a seated player picks")
+        # ⚠ O-34, and NOT a revision check: read at revision 5, change your
+        # mind, write at revision 5, and a revision guard is satisfied.
+        if mine.get("pick") is not None:
+            raise PickIsFinal("Your pick is already locked in")
+
+        wanted = {"pick": (request.token, mine.get("pool"))}
+        if request.civ_token is not None:
+            wanted["civ_pick"] = (request.civ_token, mine.get("civ_pool"))
+        chosen: dict[str, Any] = {}
+        for field, (token, pool) in wanted.items():
+            if token not in (pool or []):
+                raise InvalidSeating(field, f"{token} is not in your pool")
+            chosen[field] = token
+
+        picked = [
+            {**seat, **chosen} if seat.get("discord_id") == actor_discord_id else seat
+            for seat in seats
+        ]
+        now = datetime.now(UTC)
+        written = await self._repository.replace_seats(
+            oid, request.expected_revision, picked, now
+        )
+        if written is None:
+            latest = await self._repository.find_by_id(oid)
+            raise SeatChangeRefused(
+                *self._why_refused(latest, request.expected_revision)
+            )
+
+        occupied = [seat for seat in picked if seat.get("discord_id")]
+        if all(seat.get("pick") is not None for seat in occupied):
+            # ⚠ `revealed_at` is what un-censors a blind draft (D73). It is set
+            # for every mode: `complete` already reveals, so a stray mode
+            # cannot leave a finished lobby hidden.
+            written = (
+                await self._repository.apply_changes(
+                    oid,
+                    written["revision"],
+                    {
+                        "phase": COMPLETE,
+                        "revealed_at": now,
+                        "closed_at": now,
+                        "turn_expires_at": None,
+                    },
+                    now,
+                )
+                or written
+            )
+        return for_the_wire(written, actor_discord_id)
 
     async def submit_bans(
         self, lobby_id: str, actor_discord_id: str, request: SubmitBansRequest
@@ -667,6 +863,7 @@ __all__ = [
     "LobbyService",
     "NotSeated",
     "NotTheHost",
+    "PickIsFinal",
     "SeatChangeRefused",
     "as_lobby_id",
     "build_lobby_document",

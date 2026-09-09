@@ -884,6 +884,9 @@ class FakeCivData:
             "leaders": [
                 {"token": "LEADER_TRAJAN", "name": "Trajan"},
                 {"token": "LEADER_HATSHEPSUT", "name": "Hatshepsut"},
+                {"token": "LEADER_AUGUSTUS", "name": "Augustus"},
+                {"token": "LEADER_AMINA", "name": "Amina"},
+                {"token": "LEADER_XERXES", "name": "Xerxes"},
             ],
             "civs": [
                 {"token": "CIVILIZATION_ROME", "age_pool": "AGE_ANTIQUITY"},
@@ -997,7 +1000,38 @@ def test_an_expired_ban_phase_advances_from_a_read():
     # with NO civ-data on purpose -- the advance must not need it.
     expired = {**BANNING, "turn_expires_at": datetime.now(UTC) - timedelta(minutes=1)}
     repo = FakeRepo(lobby=expired, applied=expired)
-    asyncio.run(LobbyService(repo, FakeSeasons()).read(HEX_ID, "alice"))
+    asyncio.run(LobbyService(repo, FakeSeasons(), FakeCivData()).read(HEX_ID, "alice"))
     _, changes = repo.changes[0]
     assert changes["phase"] == "draft"
+    assert all(len(seat["pool"]) == 2 for seat in changes["seats"])
     assert changes["bans"] == {"leader": [], "civ": []}
+
+
+def test_a_lobby_that_bans_itself_out_is_cancelled():
+    # ⚠ D198, and it fired for real before this test existed: two leaders,
+    # one banned, two players needing one each. The advance CANCELS rather
+    # than raising -- a poll can trigger it, so raising would make every read
+    # a 500 with no route out.
+    keys = [
+        "LEADER_TRAJAN",
+        "LEADER_HATSHEPSUT",
+        "LEADER_AUGUSTUS",
+        "LEADER_AMINA",
+    ]
+    both = {
+        **BANNING,
+        "seats": [
+            {
+                "seat_index": 0,
+                "discord_id": "alice",
+                "bans": {"leader_keys": keys, "civ_keys": []},
+            },
+            {"seat_index": 1, "discord_id": "bob", "team": None},
+        ],
+    }
+    repo = FakeRepo(lobby=both, written=both, applied=both)
+    ban(repo, actor="bob", leader_keys=keys)
+    _, changes = repo.changes[0]
+    assert changes["phase"] == "cancelled"
+    assert changes["cancel_reason"] == "no_pool"
+    assert changes["closed_at"] is not None

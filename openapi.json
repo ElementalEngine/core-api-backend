@@ -237,6 +237,20 @@
         "title": "BatchStatsResponseV2",
         "type": "object"
       },
+      "Body_cancel_lobby_api_v2_lobbies__lobby_id__cancel_post": {
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "Body_cancel_lobby_api_v2_lobbies__lobby_id__cancel_post",
+        "type": "object"
+      },
       "Body_get_match_api_v1_get_match__put": {
         "properties": {
           "match_id": {
@@ -2556,6 +2570,41 @@
           "expected_revision"
         ],
         "title": "SubmitBansRequest",
+        "type": "object"
+      },
+      "SubmitPickRequest": {
+        "additionalProperties": false,
+        "description": "One seat's pick, from the pool that seat was dealt.\n\n\u26a0 **A pick is final once made (O-34).** The refusal is on the seat's own\nstate, NOT on `revision`: a revision guard permits exactly what the rule\nforbids -- read at revision 5, change your mind, write at revision 5, and\nnothing has moved so the guard is satisfied. Same shape as D176's `$ne`,\nwhich is a clause about the document's content rather than its version.\n\n`civ_token` is civ7 only; civ6 drafts leaders alone.",
+        "properties": {
+          "civ_token": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Civ Token"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "token": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "token"
+        ],
+        "title": "SubmitPickRequest",
         "type": "object"
       },
       "SupportedGame": {
@@ -5978,6 +6027,158 @@
           }
         },
         "summary": "Submit Bans",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
+    "/api/v2/lobbies/{lobby_id}/cancel": {
+      "post": {
+        "description": "The host ends the lobby. Frees the channel and every seat at once.",
+        "operationId": "cancel_lobby_api_v2_lobbies__lobby_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_cancel_lobby_api_v2_lobbies__lobby_id__cancel_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Lobby",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
+    "/api/v2/lobbies/{lobby_id}/picks": {
+      "put": {
+        "description": "One seat's pick, completing the lobby on the last one.\n\n\u26a0 **409 for a second pick, and it is not a revision conflict.** A pick is\nfinal once made (O-34); the refusal reads the seat, not the revision.",
+        "operationId": "submit_pick_api_v2_lobbies__lobby_id__picks_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitPickRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Pick",
         "tags": [
           "lobbies"
         ]

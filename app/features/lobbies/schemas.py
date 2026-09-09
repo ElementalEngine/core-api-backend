@@ -149,10 +149,30 @@ class SubmitBansRequest(BaseModel):
     civ_keys: list[str] = Field(default_factory=list, max_length=40)
 
 
+class SubmitPickRequest(BaseModel):
+    """One seat's pick, from the pool that seat was dealt.
+
+    ⚠ **A pick is final once made (O-34).** The refusal is on the seat's own
+    state, NOT on `revision`: a revision guard permits exactly what the rule
+    forbids -- read at revision 5, change your mind, write at revision 5, and
+    nothing has moved so the guard is satisfied. Same shape as D176's `$ne`,
+    which is a clause about the document's content rather than its version.
+
+    `civ_token` is civ7 only; civ6 drafts leaders alone.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+    token: str = Field(min_length=1, max_length=64)
+    civ_token: str | None = Field(default=None, max_length=64)
+
+
 __all__ = [
     "ChangeSeatRequest",
     "CreateLobbyRequest",
     "SeatAction",
     "SubmitBallotRequest",
     "SubmitBansRequest",
+    "SubmitPickRequest",
 ]
