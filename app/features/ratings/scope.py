@@ -1,9 +1,11 @@
-"""The stat document's address: which database, which collection (D123).
+"""The stat document's address: which database, which collection.
 
 One resolver serves the stat write and its ledger event, so a recorded scope
 can never name a collection other than the one written. These are rating
 domain rules rather than persistence plumbing, which is why they sit beside
 skill.py -- matches, stats and the tally rebuild all read them from here.
+
+Governed by D123.
 """
 
 from __future__ import annotations

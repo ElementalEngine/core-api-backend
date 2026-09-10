@@ -8,10 +8,7 @@ counters answer different questions only in FFA, and only `first` ever
 answers "how often did this player win" (D164, phase3-sequence section 4
 item 70).
 
-C2 requires a v2 read surface to state which counter it is showing, so v2
-says `rating_gains` and keeps `first` unchanged. `mu` stays an int here:
-StatsService rounds it in _doc_to_row, and a mapper cannot recover
-precision that is already gone (section 4 item 95).
+Governed by D164.
 """
 
 from __future__ import annotations

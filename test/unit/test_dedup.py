@@ -1,4 +1,4 @@
-"""Playbook Entry 12 Half B — two hashes at two strengths (D83).
+"""Playbook Entry 12 Half B — two hashes at two strengths.
 
 save_bytes_sha256 answers "is this the same file?" and hard-blocks in BOTH
 collections; save_file_hash stays the composition hash and answers "is this the
@@ -12,6 +12,8 @@ Also asserted: the field is never written empty. The partial index filters on
 {$exists: true}, so a "" or None default IS indexed, and two such documents
 collide on E11000 -- which would break the second approval of any pre-C10
 match.
+
+Governed by D83, D133.
 """
 
 from __future__ import annotations

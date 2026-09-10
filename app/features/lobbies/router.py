@@ -1,4 +1,4 @@
-"""The v2 lobbies surface: two routers on one prefix, gated separately (D94).
+"""The v2 lobbies surface: two routers on one prefix, gated separately.
 
 Both routers declare `prefix="/api/v2/lobbies"` and resolve as ONE ordered
 route table, so registration order decides which gate a path meets.
@@ -11,10 +11,12 @@ trusting declaration order (section 6b).
 
 Every `activity_router` route stamps `X-Actor-Discord-Id` (C5 invariant 2,
 D90/D94) and hands it to the service, which is what `for_the_wire` censors
-against. `mite_router` passes None -- Mite holds no seat (D186).
+against. `mite_router` passes None -- Mite holds no seat.
 
 Handlers catch only what they can name. `except Exception` on a v2 route is
-what D92's catch-all exists to replace.
+what catch-all exists to replace.
+
+Governed by D90, D92, D94, D186.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Fixtures for the players-patch applier (D154).
+"""Fixtures for the players-patch applier.
 
 The write-side twin of test_players_validator: the validator decides, this
 proves the decision is carried out on the array without disturbing anything
@@ -8,6 +8,8 @@ What should break this file: any change to the ordering rule. Flipping the
 structural sort to ascending leaves a well-formed document -- pairing
 intact, adjacency intact -- with the wrong player substituted, so the
 assertions here are on the exact array, never on an invariant.
+
+Governed by D154.
 """
 
 from types import SimpleNamespace

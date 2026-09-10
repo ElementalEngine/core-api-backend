@@ -1,12 +1,14 @@
 """The `lobbies` and `lobby_stats` collections: playbook Entry 7, contract C5.
 
-Half A only (D166): the collections and their three indexes. The domain --
+Half A only: the collections and their three indexes. The domain --
 creation, seats, phases, aggregation -- is Half B.
 
 One repository for both collections, following the house boundary: matches
 binds four, auth three, ratings two. `lobby_stats` is a rebuildable cache
 derived from `lobbies` (Entry 7), written in the same operation, with no
-second consumer yet (D13) -- so it is not its own feature.
+second consumer yet -- so it is not its own feature.
+
+Governed by D13, D166.
 """
 
 from __future__ import annotations

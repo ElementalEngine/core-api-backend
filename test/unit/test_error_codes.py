@@ -1,16 +1,13 @@
 """On the surfaces D92 governs, every code is one of its eight.
 
-D92 is scoped to C2 and C3 -- the matches and stats v2 routers, plus the
-app-wide handlers in core/errors that answer for them. Auth, infractions
-and civdata ship 26 feature-specific codes of their own, which C10 freezes
-and this test deliberately does not police (correction 59).
-
 A closed set is what lets a client branch exhaustively. It stays closed
 only if something checks, because nothing else does: the envelope never
 reaches the OpenAPI spec, so no generated type constrains it (section 4
 item 96).
 
 What should break this file: a v2 route inventing a ninth transport code.
+
+Governed by D92.
 """
 
 from __future__ import annotations

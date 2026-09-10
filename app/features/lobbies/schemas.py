@@ -9,11 +9,7 @@ costs the caller nothing and keeps every mode rule in one file.
 and `resolve_shape` owns it. `edition` is a Literal because it is a plain
 enum that no mode rule touches.
 
-There is no response model. D73's projection decides the response shape
-per recipient, and a model would have to make every censored field Optional
--- which would resurrect a hidden `ballot` or `pool` as `null` instead of
-absent, contradicting the projection's own tests. The cost is that these
-responses carry no schema in openapi.json, alongside section 4 item 96.
+Governed by D73.
 """
 
 from __future__ import annotations

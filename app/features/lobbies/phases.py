@@ -1,13 +1,9 @@
 """The lobby's phase union and the reasons it can close.
 
-One enum, previously owned by three modules: `projection.py` held
-`settings`/`draft`/`complete`, `repository.py` held `cancelled`/`abandoned`,
-`service.py` held `lobby`, and `bans` was defined nowhere at all. CP6 adds
-`bans` and every transition between the six, so a fourth owner was one commit
-away -- the same accretion section 4 item 107 records for the edition enum.
-
 Forward-only (spec section 3), with one exception: `random` skips the draft
-phase entirely, so `bans -> complete` is a legal edge (D193).
+phase entirely, so `bans -> complete` is a legal edge.
+
+Governed by D193.
 """
 
 from __future__ import annotations

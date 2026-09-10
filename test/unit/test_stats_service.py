@@ -2,7 +2,7 @@
 
 Covers:
 - reset_user_stats 404s BEFORE resetting when the user has no stats (no stat_reset
-  marker side effect), and resets exactly once when stats exist;
+ marker side effect), and resets exactly once when stats exist;
 - request validation rejections;
 - team generation returns a clean two-team partition of the input ids.
 """

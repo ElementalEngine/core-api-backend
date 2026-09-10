@@ -1,4 +1,4 @@
-"""Entry 11's cache and seed shape, without a database (D59, D60).
+"""Entry 11's cache and seed shape, without a database.
 
 What should break these: changing a seed label, dropping `started_at`,
 reintroducing `ended_at`, binding the wrong database or collection, making
@@ -10,6 +10,8 @@ Entry 11's dev dry-run -- D60 keeps it out of here.
 `asyncio.run` rather than a pytest-asyncio marker: the plugin is not a
 dependency, and an unrecognised marker leaves the coroutine un-awaited and
 the test green having run nothing (D86 Rule 1).
+
+Governed by D59, D60, D86.
 """
 
 from __future__ import annotations

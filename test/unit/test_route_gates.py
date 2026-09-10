@@ -1,10 +1,5 @@
 """Every mounted route carries a service-token gate, or is public on purpose.
 
-D169. This replaces the structural half of test_mito_gate.py, which looped a
-hand-maintained tuple of routers and had already fallen behind: it omitted
-`matches_v2_router`, so eight live routes were unasserted (Correction 65). A
-tuple can only ever check what somebody remembered to add to it.
-
 Derived from `app.routes` instead, so a new router without a gate fails here
 by construction rather than by recollection. Adding a route to PUBLIC_PATHS
 is the only way to exempt one, and that is a visible, reviewable act.
@@ -14,6 +9,8 @@ what a per-router tuple cannot express. That is also why route RESOLUTION
 lives here rather than in its own file: section 6b's hazard is a gate
 hazard -- a path resolving to the wrong route is checked against the wrong
 token, and no handler test can see it because the wrong handler runs fine.
+
+Governed by D169.
 """
 
 from __future__ import annotations

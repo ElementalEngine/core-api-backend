@@ -1,12 +1,12 @@
-"""D73's per-recipient visibility projection.
+"""per-recipient visibility projection.
 
 The server projects a different document per recipient. **Hidden information
 never leaves core-api** -- it is never filtered client-side.
 
 Two censored surfaces in the whole lobby, and no others:
 
-  settings     own ballot only, no tallies; observers see nothing until close
-  blind draft  own pool AND own pick only; observers nothing until reveal
+settings own ballot only, no tallies; observers see nothing until close
+ blind draft own pool AND own pick only; observers nothing until reveal
 
 The blind row is the one that is easy to get wrong: **the pool is secret,
 not just the pick.** Censoring `pick` alone leaks by elimination -- and so
@@ -17,6 +17,8 @@ Default-deny: a phase this module does not recognise is censored, not shown.
 An over-censoring bug is visible and gets reported; an under-censoring one is
 silent, which is why D86 Rule 3 calls this the only place where a defect is
 adversarial.
+
+Governed by D73, D86.
 """
 
 from __future__ import annotations

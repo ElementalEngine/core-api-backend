@@ -3,9 +3,11 @@
 Same shape as C1: one router, no assembly file, the Mito gate on the router
 rather than per route. The handlers catch only what they can name -- there
 is no `except Exception -> 503` here, because a bug is not a transient
-outage and D92's catch-all in core/errors answers it as INTERNAL/500.
+outage and catch-all in core/errors answers it as INTERNAL/500.
 
 The v1 routes stay until cutover: Mite still calls them (C2, "Replace").
+
+Governed by D92.
 """
 
 from __future__ import annotations

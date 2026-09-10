@@ -6,8 +6,10 @@ place to read when the rules change (spec section 11).
 
 `duel` derives to two teams of one. The spec already says "Duel = team of
 one" (section 4), and it is what makes `is_captain` -- the lowest seat_index
-within a team (D75) -- name both duellists with no special case. It stays a
+within a team -- name both duellists with no special case. It stays a
 distinct game_type because the rating scopes are per-mode (`rt_duel`).
+
+Governed by D75.
 """
 
 from __future__ import annotations

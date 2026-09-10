@@ -6,6 +6,8 @@ passes without touching validation.py, a fixture is asserting nothing.
 
 Fixtures are duck-typed on purpose: the validator is pure and structural,
 and these tables stay readable without a MatchModel constructor.
+
+Governed by D151, D155.
 """
 
 from types import SimpleNamespace

@@ -1,10 +1,12 @@
 """Creation: what the document carries, and who gets a seat.
 
-Pure -- a fake repository and a fake seasons cache, no database (D59, D60).
+Pure -- a fake repository and a fake seasons cache, no database.
 What should break these: seating an over-large roster, seating duplicates,
 assigning teams at creation, forgetting the season stamp, writing a field
 the lobby has not decided yet, or resolving the shape after the season
 lookup so a malformed request reaches the database.
+
+Governed by D59, D60.
 """
 
 from __future__ import annotations

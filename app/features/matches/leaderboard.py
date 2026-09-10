@@ -1,9 +1,11 @@
-"""The leaderboard read, carved out of MatchService (D114).
+"""The leaderboard read, carved out of MatchService.
 
 It touches no match collection: the rows come from a stat collection via
 RatingsRepository, and the only match-domain thing about it is the route it
 is served from. Both the v1 and the v2 handler call it directly, so nothing
 delegates through MatchService to reach it.
+
+Governed by D114.
 """
 
 from __future__ import annotations

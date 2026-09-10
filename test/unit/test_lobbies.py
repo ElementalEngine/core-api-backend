@@ -1,4 +1,4 @@
-"""Entry 7 Half A: the three index declarations (D166, D172).
+"""Entry 7 Half A: the three index declarations.
 
 What should break these: dropping `unique` from any of the three, using the
 uncreatable `$exists: False` form, giving the seat index the same filter as
@@ -9,6 +9,8 @@ component of the aggregate key, or binding the wrong collection.
 These prove the code still ASKS for the indexes, never that Mongo builds
 or enforces them -- D60 keeps the driver out of CI. Building, and the
 multikey behaviour D71 rests on, is Entry 7's dev dry-run.
+
+Governed by D60, D71, D166, D172.
 """
 
 from __future__ import annotations

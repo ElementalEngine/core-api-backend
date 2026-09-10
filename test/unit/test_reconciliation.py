@@ -1,11 +1,13 @@
-"""Fixture tests for the post-migration reconciliation arithmetic (D86).
+"""Fixture tests for the post-migration reconciliation arithmetic.
 
 D60 leaves the three transactional flows with no CI coverage, and D86 offers
 these as the cheap partial mitigation: the calculation itself is trusted even
-though the transaction is not. Pure -- no database (D59, D60).
+though the transaction is not. Pure -- no database.
 
 Fixture 7 is the one that proves the test can fail. Without it, 1-6 all pass
 on a query that returns "no divergence" unconditionally.
+
+Governed by D59, D60, D86.
 """
 
 from __future__ import annotations

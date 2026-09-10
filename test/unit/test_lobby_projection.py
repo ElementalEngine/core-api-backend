@@ -1,4 +1,4 @@
-"""D73's visibility table, row by row (D86 Rule 3, D167).
+"""visibility table, row by row (D86 Rule 3, D167).
 
 Rule 3 calls censoring the only place where a defect is silent and
 adversarial, so this is table-driven from the spec's own rows rather than
@@ -9,6 +9,8 @@ suite that only checked the visible half.
 The blind rows carry `pool` AND `pool_appearances`. Censoring `pick` alone
 leaks by elimination; leaving the union of all pools in place leaks the same
 way one level up, because pools are disjoint (spec section 4).
+
+Governed by D73, D86, D167.
 """
 
 from __future__ import annotations

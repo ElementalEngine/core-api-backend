@@ -2,11 +2,13 @@
 
 No router. `season_id` reaches clients only as a stamped field on lobby
 documents, and `season_label` from the cache below -- there is no second
-consumer, so there is no route (D95).
+consumer, so there is no route.
 
 The open season for an edition is the row with the greatest `started_at`.
 There is no `ended_at` and no open/closed flag: season N's end *is* season
-N+1's start, one value rather than two that must agree (D106).
+N+1's start, one value rather than two that must agree.
+
+Governed by D95, D106.
 """
 
 from __future__ import annotations

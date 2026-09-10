@@ -2,6 +2,8 @@
 
 D49 puts this test with the data rather than in a bot-side copy -- a test that
 passes while the source is broken is worse than no test. Pure, per D59/D60.
+
+Governed by D49, D59, D60.
 """
 
 from app.features.civdata.seeds import (

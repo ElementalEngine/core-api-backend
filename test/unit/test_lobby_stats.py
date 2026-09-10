@@ -2,7 +2,9 @@
 
 These counters are a permanent record that nothing recomputes. A double
 count or a wrong denominator is invisible and lasts forever -- the same class
-of problem D60's ledger reconciliation exists for.
+of problem ledger reconciliation exists for.
+
+Governed by D60.
 """
 
 from __future__ import annotations

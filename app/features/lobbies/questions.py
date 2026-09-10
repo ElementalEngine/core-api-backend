@@ -4,17 +4,19 @@
 are queried and versioned; these are read whole, never queried by field, and a
 stored ballot references their ids by name. A catalogue editable without a
 deploy could retire a question a live lobby has already voted on, so this
-changes by review and release rather than by a seed run (D192).
+changes by review and release rather than by a seed run.
 
 **Carried from Mite's `civ6-voting.config.ts` and `civ7-voting.config.ts`,
 with one deliberate correction.** Every title, label, emoji, default and cap
 was verified against that source. Duel's draft modes were NOT carried: v1
 hands duel the FFA list -- snake and blind included -- and `lobbies-domain-spec`
 section 5 said `standard` and CWC. Both are wrong; duel offers `standard` and
-`random` (D193).
+`random`.
 
 Settings vary by game type in civ6 and not in civ7, while draft modes vary by
 game type in both. Two independent maps, because they vary independently.
+
+Governed by D192, D193.
 """
 
 from __future__ import annotations

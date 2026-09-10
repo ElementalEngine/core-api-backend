@@ -8,6 +8,8 @@ was being supplied by the file on disk. §4 item 36.
 The ts_sigma_free / ts_teamer_boost assertions are gone with the fields: they
 could only fail when the dead config was removed, which is the correct change.
 D55a, D86 Rule 1.
+
+Governed by D86.
 """
 
 import importlib

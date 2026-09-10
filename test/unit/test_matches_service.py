@@ -3,14 +3,16 @@
 Covers:
 - stored subbedIn/subbedOut counters are read (not clobbered to 0) and accumulate on approve;
 - revert_match tolerates legacy docs with missing season/combined deltas and never writes
-  negative counters;
+ negative counters;
 - client-supplied numeric fields are validated (MatchServiceError -> 400, not ValueError -> 500);
 - update-match only writes whitelisted fields (match_id never enters the $set).
 
 Scope: logic only. FakeRepo and FakeSession stand in for the driver, so these
 tests assert that approve and revert reach commit -- not that a transaction
 provides atomicity. They do not discharge the Motor -> PyMongo transactional
-risk (D84).
+risk.
+
+Governed by D84.
 """
 
 from __future__ import annotations

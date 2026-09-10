@@ -8,6 +8,8 @@ never stricter than the client: a file Mite accepts must not 400 server-side.
 no generic HTTPException handler, so a 413 would be equally unstructured with a
 status Mite has never handled. The size code, envelope and 413 belong together
 in D92 -- §4 item 62, S7.
+
+Governed by D79, D83, D92.
 """
 
 from __future__ import annotations

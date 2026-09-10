@@ -1,11 +1,8 @@
 """The mito gate, end to end: 401 without the header, admitted with it.
 
-The structural half -- "every router carries a gate" -- moved to
-test_route_gates.py in S8 CP3. It looped a hand-maintained tuple that had
-already fallen behind by one router (Correction 65, D169); the replacement
-derives from the app's own route table.
-
 Needs httpx (FastAPI's TestClient transport) and skips cleanly without it.
+
+Governed by D169.
 """
 
 from __future__ import annotations
