@@ -178,6 +178,32 @@ class LobbyRepository:
             return_document=ReturnDocument.AFTER,
         )
 
+    async def claim_for_posting(
+        self, guild_id: str, now: datetime
+    ) -> dict[str, Any] | None:
+        """Claim the oldest unposted finished lobby for this guild, or None.
+
+        ⚠ One `findOneAndUpdate`, so two Mite instances polling together
+        cannot both claim the same lobby. `posted_at` is to posting what
+        `stats_written_at` is to counting: a fact about the document, not its
+        revision, and a retry after a crash carries the same revision.
+
+        ⚠ Oldest by `closed_at`, not `created_at` -- that is when it became
+        postable. Sorting by creation would post a long-running lobby ahead
+        of a quick one that actually finished first.
+
+        ⚠ Filtered by guild. C5 named no parameter, but every lobby is keyed
+        by guild and an unfiltered claim lets one guild's bot post another
+        guild's game. `{"posted_at": None}` matches absent and null alike,
+        which is D175's lesson about `$exists` on a field creation omits.
+        """
+        return await self._lobbies.find_one_and_update(
+            {"guild_id": guild_id, "phase": COMPLETE, "posted_at": None},
+            {"$set": {"posted_at": now}},
+            sort=[("closed_at", ASCENDING)],
+            return_document=ReturnDocument.AFTER,
+        )
+
     async def claim_for_stats(
         self, lobby_id: ObjectId, now: datetime
     ) -> dict[str, Any] | None:

@@ -438,4 +438,24 @@ async def cancel_lobby(
     return lobby
 
 
+@mite_router.post("/claim-post", response_model=None)
+async def claim_post(
+    response: Response,
+    guild_id: str = Query(min_length=1, max_length=32),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any] | None:
+    """Claim the oldest unposted finished lobby, or 204 when there is none.
+
+    ⚠ Declared BEFORE any parameterised sibling: a `/{lobby_id}` route
+    registered first would swallow this literal path and check a Mite-facing
+    request against the Activity gate.
+    """
+    lobby = await _service(db).claim_post(guild_id)
+    if lobby is None:
+        response.status_code = status.HTTP_204_NO_CONTENT
+        return None
+    logger.info("lobby claimed for posting. lobby=%s guild=%s", lobby["_id"], guild_id)
+    return lobby
+
+
 __all__ = ["activity_router", "mite_router"]

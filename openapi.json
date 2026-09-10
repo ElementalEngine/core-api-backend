@@ -5880,6 +5880,65 @@
         ]
       }
     },
+    "/api/v2/lobbies/claim-post": {
+      "post": {
+        "description": "Claim the oldest unposted finished lobby, or 204 when there is none.\n\n\u26a0 Declared BEFORE any parameterised sibling: a `/{lobby_id}` route\nregistered first would swallow this literal path and check a Mite-facing\nrequest against the Activity gate.",
+        "operationId": "claim_post_api_v2_lobbies_claim_post_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 1,
+              "title": "Guild Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Claim Post",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
     "/api/v2/lobbies/{lobby_id}": {
       "get": {
         "description": "One lobby, censored for the caller (D73), revision-gated (D77).\n\n204 when `since` already holds the current revision -- not 304, which\nwould invite cache and proxy semantics into the polling path. A lobby\nwith no `since` is read unconditionally.\n\n\u26a0 `revision` starts at 1, so `since=0` is refused rather than treated as\n\"send me everything\": no lobby has ever held it, and a client sending it\nhas a bug worth surfacing.",

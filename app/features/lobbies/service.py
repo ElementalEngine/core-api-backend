@@ -310,6 +310,16 @@ class LobbyService:
         found = await self._repository.find_open(guild_id, channel_id=channel_id)
         return for_the_wire(found[0], viewer_discord_id) if found else None
 
+    async def claim_post(self, guild_id: str) -> dict[str, Any] | None:
+        """The next finished lobby Mite should post, or None for 204.
+
+        ⚠ `None` viewer: Mite holds no seat, so it gets the observer view
+        (D186). A blind draft is `complete` by the time it is postable, so
+        nothing is censored from it anyway.
+        """
+        claimed = await self._repository.claim_for_posting(guild_id, datetime.now(UTC))
+        return None if claimed is None else for_the_wire(claimed, None)
+
     async def _count_the_lobby(self, lobby_id: Any) -> None:
         """Fold a finished lobby into `lobby_stats`, once and only once.
 

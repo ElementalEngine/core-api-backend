@@ -169,7 +169,13 @@ def test_each_lobby_route_carries_its_own_gate_not_merely_a_gate():
     # had taken the same dependency it would still pass. Section 6b makes
     # that gate-affecting, because the two share a prefix and resolve as one
     # ordered table.
-    assert require_mito_token in gate_callables(resolve("POST", "/api/v2/lobbies"))
+    # ⚠ Both Mite routes, and each asserted BOTH ways: the Mite gate
+    # present and the Activity gate absent. Section 4 item 112's last leg,
+    # unwritable until `claim-post` existed at CP8.
+    for mite_path in ("/api/v2/lobbies", "/api/v2/lobbies/claim-post"):
+        mite_gates = gate_callables(resolve("POST", mite_path))
+        assert require_mito_token in mite_gates, mite_path
+        assert require_activity_token not in mite_gates, mite_path
     for method, path in (
         ("GET", "/api/v2/lobbies"),
         ("GET", "/api/v2/lobbies/active"),
