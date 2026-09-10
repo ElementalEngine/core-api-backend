@@ -1141,32 +1141,6 @@ def test_a_second_pick_of_the_same_field_is_refused():
         pick(repo, "alice", "LEADER_TRAJAN")
 
 
-def test_a_civ_pick_is_allowed_after_a_leader_pick():
-    # ⚠ Why the lock is PER FIELD: snake on civ7 runs a leader round then a
-    # civ round, so a seat picks twice. Locking on `pick` alone would refuse
-    # the second and stall every civ7 snake draft.
-    civ7 = {
-        **DRAFTING,
-        "edition": "civ7",
-        "pick_order": ["alice", "bob", "bob", "alice"],
-        "turn_index": 3,
-        "seats": [
-            {
-                **DRAFTING["seats"][0],
-                "pick": "LEADER_TRAJAN",
-                "civ_pool": ["CIVILIZATION_ROME"],
-            },
-            DRAFTING["seats"][1],
-        ],
-    }
-    repo = FakeRepo(lobby=civ7, applied=civ7)
-    # The civ round sends civ_token ALONE -- the leader is already locked.
-    pick(repo, "alice", civ_token="CIVILIZATION_ROME")
-    _, changes = repo.changes[0]
-    by_id = {s["discord_id"]: s for s in changes["seats"]}
-    assert by_id["alice"]["civ_pick"] == "CIVILIZATION_ROME"
-
-
 def test_cwc_writes_the_team_and_never_the_seat():
     # ⚠ D199, the one place the seat is not the unit of ownership. A captain
     # drafts for the team; nobody is assigned a leader until the players
@@ -1280,3 +1254,48 @@ def test_a_counter_failure_never_fails_the_pick():
     repo = Exploding(lobby=done, applied=done)
     lobby = pick(repo, "alice", "LEADER_TRAJAN")
     assert lobby["phase"] == "complete"
+
+
+def test_civ7_picks_a_leader_and_a_civ_in_one_submission():
+    # ⚠ Replaces the two-round snake case. With snake gone, a civ7 pick is a
+    # single act: one leader from your leader pool and one civ from your civ
+    # pool, together. There is no second round to come back for.
+    civ7 = {
+        **DRAFTING,
+        "edition": "civ7",
+        "pick_order": [],
+        "seats": [
+            {
+                "seat_index": 0,
+                "discord_id": "alice",
+                "pool": ["LEADER_TRAJAN"],
+                "civ_pool": ["CIVILIZATION_ROME"],
+            }
+        ],
+    }
+    repo = FakeRepo(lobby=civ7, applied=civ7)
+    pick(repo, "alice", "LEADER_TRAJAN", civ_token="CIVILIZATION_ROME")
+    _, changes = repo.changes[0]
+    seat = changes["seats"][0]
+    assert seat["pick"] == "LEADER_TRAJAN"
+    assert seat["civ_pick"] == "CIVILIZATION_ROME"
+
+
+def test_a_seat_that_already_picked_is_refused_outright():
+    # One lock, one field. Snake was the only reason it was ever per-field.
+    already = {
+        **DRAFTING,
+        "pick_order": [],
+        "seats": [
+            {
+                "seat_index": 0,
+                "discord_id": "alice",
+                "pool": ["LEADER_TRAJAN"],
+                "pick": "LEADER_TRAJAN",
+            }
+        ],
+    }
+    repo = FakeRepo(lobby=already, applied=already)
+    with pytest.raises(PickIsFinal):
+        pick(repo, "alice", "LEADER_TRAJAN")
+    assert repo.changes == []

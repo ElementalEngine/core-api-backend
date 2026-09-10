@@ -338,11 +338,6 @@
           "label": "Standard"
         },
         {
-          "id": "snake",
-          "emoji": "🐍",
-          "label": "Snake"
-        },
-        {
           "id": "random",
           "emoji": "❓",
           "label": "Random"

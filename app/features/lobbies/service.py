@@ -50,12 +50,7 @@ from app.features.lobbies.schemas import (
 )
 from app.features.lobbies.stats import contributions
 from app.features.lobbies.tally import resolve_settings
-from app.features.lobbies.turns import (
-    cwc_order,
-    is_turn_ordered,
-    snake_order,
-    whose_turn,
-)
+from app.features.lobbies.turns import cwc_order, whose_turn
 
 # D177's staleness threshold. A whole draft is roughly fifteen minutes of
 # timers (spec section 7); an hour untouched is abandoned by any reading,
@@ -503,23 +498,15 @@ class LobbyService:
                 "turn_expires_at": None,
             }
         ordered: dict[str, Any] = {}
-        if is_turn_ordered(mode):
-            seat_ids = [seat["discord_id"] for seat in seated]
-            if mode == DRAFT_CWC:
-                # Stored rather than recomputed, so a dispute reads the order
-                # that was actually used (D200).
-                ordered["pick_order"] = cwc_order(
-                    captains, (lobby.get("team_size") or 0) * 2
-                )
-                ordered["teams"] = [
-                    {"team_index": index, "leaders": [], "civs": []}
-                    for index in range(2)
-                ]
-            else:
-                # The snake is the reversal BETWEEN rounds: civ6 drafts
-                # leaders alone, civ7 adds a civ round running backwards.
-                rounds = 2 if lobby["edition"] == "civ7" else 1
-                ordered["pick_order"] = snake_order(seat_ids, rounds)
+        if mode == DRAFT_CWC:
+            # Stored rather than recomputed, so a dispute reads the order that
+            # was actually used (D200). CWC is the only mode with turns.
+            ordered["pick_order"] = cwc_order(
+                captains, (lobby.get("team_size") or 0) * 2
+            )
+            ordered["teams"] = [
+                {"team_index": index, "leaders": [], "civs": []} for index in range(2)
+            ]
 
         if mode != (lobby.get("settings") or {}).get("draft_mode"):
             ordered["settings"] = {
@@ -669,20 +656,18 @@ class LobbyService:
             wanted["pick"] = (request.token, available["pick"])
         if request.civ_token is not None:
             wanted["civ_pick"] = (request.civ_token, available["civ_pick"])
+        # ⚠ O-34, and NOT a revision check: read at revision 5, change your
+        # mind, write at revision 5, and a revision guard is satisfied. This
+        # is a clause about the document's content, like D176's `$ne`.
+        #
+        # ⚠ A SEAT rule, so it cannot apply to CWC: a captain picks
+        # `team_size * 2` times and holds no `pick` of their own. There the
+        # turn order is the guard -- it advances, so a replay lands on
+        # somebody else's turn and `whose_turn` refuses it.
+        if mode != DRAFT_CWC and mine.get("pick") is not None:
+            raise PickIsFinal("Your pick is already locked in")
         chosen: dict[str, Any] = {}
         for field, (token, pool) in wanted.items():
-            # ⚠ O-34, PER FIELD and not a revision check. Per field because
-            # snake on civ7 runs a leader round then a civ round, so a seat
-            # picks twice -- locking on `pick` alone would refuse the second.
-            # Not a revision check because read-at-5, change-your-mind,
-            # write-at-5 satisfies a revision guard: this is a clause about
-            # the document's content, like D176's `$ne`.
-            # ⚠ A seat rule, so it cannot apply to CWC: a captain picks
-            # `team_size * 2` times and holds no `pick` of their own. There
-            # the turn order is the guard -- it advances, so a replay lands
-            # on somebody else's turn and `whose_turn` refuses it.
-            if mode != DRAFT_CWC and mine.get(field) is not None:
-                raise PickIsFinal(f"Your {field} is already locked in")
             if token not in (pool or []):
                 raise InvalidSeating(field, f"{token} is not in your pool")
             chosen[field] = token
