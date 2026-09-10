@@ -25,13 +25,13 @@ from app.features.lobbies.phases import CANCEL_ABANDONED, CANCELLED, COMPLETE
 # `closed_at` is set on `complete` AND on `cancelled` (spec section 3), so
 # testing it alone cannot drift out of step with `phase`.
 #
-# ⚠ `{"$exists": False}` CANNOT be used: MongoDB rewrites it as $not, which a
+# `{"$exists": False}` CANNOT be used: MongoDB rewrites it as $not, which a
 # partial index rejects (CannotCreateIndex 67). `{"closed_at": None}` selects
 # ABSENT fields as well as explicit nulls -- measured -- so it is a drop-in
 # for the intended meaning (D175, Correction 73a).
 OPEN_LOBBY = {"closed_at": None}
 
-# ⚠ The seat index needs the second clause. An EMPTY seats array indexes one
+# The seat index needs the second clause. An EMPTY seats array indexes one
 # `null` key, so without it only ONE seat-less lobby could be open fleet-wide
 # -- the state of every lobby in the instant after creation (Correction 73b).
 # Filtering on the indexed path itself is Entry 12's proven idiom.
@@ -78,7 +78,7 @@ class LobbyRepository:
             partialFilterExpression=OPEN_LOBBY,
             name="one_active_lobby_per_channel",
         )
-        # ⚠ MULTIKEY. Measured: it enforces one active seat per player ACROSS
+        # MULTIKEY. Measured: it enforces one active seat per player ACROSS
         # documents -- D71's canary, and the structural fix for O-18. It does
         # NOT enforce uniqueness WITHIN a document, because MongoDB
         # de-duplicates multikey keys per document; that is the `$ne` clause
@@ -134,7 +134,7 @@ class LobbyRepository:
         a targeted `$push`/`$set` would validate a prospective list and then
         write something else.
 
-        ⚠ `absent_player` carries D176's `$ne` clause, and only when the
+        `absent_player` carries D176's `$ne` clause, and only when the
         target is not currently seated, which is the case D176 measured at
         `[1, 0]`. The `revision` clause reaches the same outcome on its own
         -- any competing seat write bumps it and this filter stops matching
@@ -183,16 +183,16 @@ class LobbyRepository:
     ) -> dict[str, Any] | None:
         """Claim the oldest unposted finished lobby for this guild, or None.
 
-        ⚠ One `findOneAndUpdate`, so two Mite instances polling together
+        One `findOneAndUpdate`, so two Mite instances polling together
         cannot both claim the same lobby. `posted_at` is to posting what
         `stats_written_at` is to counting: a fact about the document, not its
         revision, and a retry after a crash carries the same revision.
 
-        ⚠ Oldest by `closed_at`, not `created_at` -- that is when it became
+        Oldest by `closed_at`, not `created_at` -- that is when it became
         postable. Sorting by creation would post a long-running lobby ahead
         of a quick one that actually finished first.
 
-        ⚠ Filtered by guild. C5 named no parameter, but every lobby is keyed
+        Filtered by guild. C5 named no parameter, but every lobby is keyed
         by guild and an unfiltered claim lets one guild's bot post another
         guild's game. `{"posted_at": None}` matches absent and null alike,
         which is D175's lesson about `$exists` on a field creation omits.
@@ -209,13 +209,13 @@ class LobbyRepository:
     ) -> dict[str, Any] | None:
         """Claim a completed lobby for counting, once and only once.
 
-        ⚠ Guarded on `stats_written_at` being ABSENT, not on `revision`.
+        Guarded on `stats_written_at` being ABSENT, not on `revision`.
         `$inc` has no memory, so a lobby counted twice is permanently wrong
         and invisible -- and a retry after a crash arrives with the SAME
         revision, so a revision guard would match again and double it. This
         is a fact about the document, like D176's `$ne` and O-34's lock.
 
-        ⚠ Returns the document as it was BEFORE the claim: that is what gets
+        Returns the document as it was BEFORE the claim: that is what gets
         counted, and the `stats_written_at` just set is not part of it.
         None means somebody else already claimed it.
         """
@@ -234,7 +234,7 @@ class LobbyRepository:
     ) -> int:
         """Upsert-and-$inc one aggregate row per token.
 
-        ⚠ Runs AFTER the claim, never before. A crash between them loses one
+        Runs AFTER the claim, never before. A crash between them loses one
         lobby's counters -- recoverable, because `stats_written_at` names the
         lobby that was missed. The other order double-counts on retry, which
         is not recoverable. D60's rule: prefer the failure you can find.
@@ -258,7 +258,7 @@ class LobbyRepository:
     async def find_by_id(self, lobby_id: ObjectId) -> dict[str, Any] | None:
         """One lobby by id, open or closed.
 
-        ⚠ No `closed_at` clause, unlike `find_open`. A completed lobby stays
+        No `closed_at` clause, unlike `find_open`. A completed lobby stays
         readable: D73's `complete` row shows everything, and that is the
         result screen the Activity renders once a draft ends.
         """
@@ -270,7 +270,7 @@ class LobbyRepository:
         """Close open lobbies holding any of `players` and untouched since
         `cutoff`. Returns the ones closed.
 
-        ⚠ `updated_at` repeats on the update filter, not only the find. A
+        `updated_at` repeats on the update filter, not only the find. A
         lobby touched between the two would otherwise be closed on the
         strength of a reading that is no longer true.
         """
@@ -306,7 +306,7 @@ class LobbyRepository:
         first, browse passes the optional filters. Two queries would drift --
         civup has six near-identical ones (D180).
 
-        ⚠ `guild_id` is required and never defaulted. A service token is
+        `guild_id` is required and never defaulted. A service token is
         per-service, not per-guild, so an unfiltered read would expose every
         lobby on the deployment to any holder of it.
 

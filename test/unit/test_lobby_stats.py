@@ -1,6 +1,6 @@
 """What a finished lobby contributes to `lobby_stats`.
 
-⚠ These counters are a permanent record that nothing recomputes. A double
+These counters are a permanent record that nothing recomputes. A double
 count or a wrong denominator is invisible and lasts forever -- the same class
 of problem D60's ledger reconciliation exists for.
 """
@@ -38,14 +38,14 @@ def test_a_seat_pick_counts_once_and_its_pool_counts_as_offered():
 
 
 def test_a_banned_token_never_appears_in_a_pool():
-    # ⚠ The denominator's integrity: a banned leader was never offered, so it
+    # The denominator's integrity: a banned leader was never offered, so it
     # must not count as one nobody picked.
     out = contributions(lobby("standard", seats=[{"discord_id": "a", "pool": ["L1"]}]))
     assert out["L_BAN"] == {"picks": 0, "bans": 1, "pool_appearances": 0}
 
 
 def test_random_contributes_no_picks_and_no_appearances():
-    # ⚠ Nobody chose and nobody was offered. Counting an assignment as a pick
+    # Nobody chose and nobody was offered. Counting an assignment as a pick
     # makes pick rate noise for every random game; the bans were real votes
     # and still count.
     out = contributions(
@@ -113,7 +113,7 @@ def test_civ7_counts_the_leader_and_the_civ_separately():
 
 @pytest.mark.parametrize("phase", ["cancelled", "draft", "bans", "settings", "lobby"])
 def test_only_a_completed_lobby_contributes(phase):
-    # ⚠ A cancelled draft dealt real pools and landed real bans, but no game
+    # A cancelled draft dealt real pools and landed real bans, but no game
     # happened, and stats describe what people play.
     out = contributions(
         {

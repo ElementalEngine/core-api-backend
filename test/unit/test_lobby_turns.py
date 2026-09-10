@@ -1,6 +1,6 @@
 """Turn order. CWC is the only mode that has turns.
 
-⚠ Without this, a pick is accepted from any seat at any moment -- and nothing
+Without this, a pick is accepted from any seat at any moment -- and nothing
 errors, the draft just stops being a draft.
 """
 
@@ -21,14 +21,14 @@ CAPTAINS = ["cap0", "cap1"]
     ],
 )
 def test_the_order_follows_the_table(turns, expected):
-    # ⚠ Carried verbatim from Mite and confirmed against civup: not a plain
+    # Carried verbatim from Mite and confirmed against civup: not a plain
     # alternation and not derivable from a rule, which is why it is a table.
     assert cwc_order(CAPTAINS, turns) == expected
 
 
 @pytest.mark.parametrize("team_size", [2, 4, 6, 8])
 def test_neither_team_ever_acts_more_often_than_the_other(team_size):
-    # ⚠ Bans and picks each slice to team_size * 2, so an uneven slice would
+    # Bans and picks each slice to team_size * 2, so an uneven slice would
     # hand one team an extra ban AND an extra pick.
     order = cwc_order(CAPTAINS, team_size * 2)
     assert order.count("cap0") == order.count("cap1") == team_size

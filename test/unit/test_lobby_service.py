@@ -118,7 +118,7 @@ class FakeRepo:
         self, lobby_id, expected_revision, seats, now, *, absent_player=None
     ):
         self.writes.append((expected_revision, seats, absent_player))
-        # ⚠ The real one uses ReturnDocument.AFTER, so it returns the document
+        # The real one uses ReturnDocument.AFTER, so it returns the document
         # INCLUDING the seats just written. Returning the pre-write document
         # made every caller of this return value test against a lie -- it is
         # what `_resolve_settings` reads to decide whether everyone has voted.
@@ -127,13 +127,13 @@ class FakeRepo:
         return {**self._written, "seats": seats}
 
     async def claim_for_stats(self, lobby_id, now):
-        # ⚠ Mirrors the real guard: the FIRST claim returns the document,
+        # Mirrors the real guard: the FIRST claim returns the document,
         # every later one returns None. A fake that always returned the
         # document would let a double count pass unnoticed.
         self.claims.append(lobby_id)
         if len(self.claims) > 1 or self._applied is None:
             return None
-        # ⚠ ReturnDocument.BEFORE on a lobby whose pick was ALREADY written
+        # ReturnDocument.BEFORE on a lobby whose pick was ALREADY written
         # by the preceding apply_changes, so it carries that pick. Returning
         # the pre-pick document counts nothing and hides the bug -- the same
         # divergence `replace_seats` had (section 4 item 121).
@@ -287,7 +287,7 @@ class FakeObjectId:
 
 
 def test_the_wire_form_stringifies_both_object_ids():
-    # ⚠ FastAPI raised "'ObjectId' object is not iterable" on the first
+    # FastAPI raised "'ObjectId' object is not iterable" on the first
     # live create -- AFTER the write landed, so the caller saw a 500 for a
     # lobby that exists. Nothing typed this boundary: lobbies is the only v2
     # feature returning a raw document rather than a response model (D179).
@@ -570,7 +570,7 @@ def unclassified(document):
 
 
 def test_every_field_the_builder_writes_is_classified():
-    # ⚠ The projection STRIPS rather than builds, so a field added to the
+    # The projection STRIPS rather than builds, so a field added to the
     # document is exposed by default. That is how pool_appearances was nearly
     # missed -- found by reading section 8 against section 6, not because
     # anything forced the question. This forces it.
@@ -628,7 +628,7 @@ def test_rearranging_keeps_the_seat_a_move_carries():
 
 
 def test_rearranging_never_closes_a_gap():
-    # ⚠ O-19b: civup compacts before chunking, which moves a player across a
+    # O-19b: civup compacts before chunking, which moves a player across a
     # team boundary that nobody asked to cross.
     seats = [
         {"seat_index": 0, "discord_id": "a"},
@@ -660,7 +660,7 @@ def test_a_place_writes_the_array_it_validated():
         ("alice", 0),
         ("bob", 4),
     ]
-    # ⚠ D176's clause, and only where D176 measured it: bob was not seated.
+    # D176's clause, and only where D176 measured it: bob was not seated.
     assert absent == "bob"
 
 
@@ -709,7 +709,7 @@ def test_a_stale_revision_reports_both_numbers():
 
 
 def test_a_lost_race_at_the_same_revision_names_the_seat_not_the_revision():
-    # ⚠ Spec section 9: matched-count zero is stale revision OR already
+    # Spec section 9: matched-count zero is stale revision OR already
     # seated, and only the re-read tells them apart. Same revision means
     # D176's $ne refused, not that the caller is behind.
     repo = FakeRepo(lobby=OPEN_LOBBY, written=None, reread=OPEN_LOBBY)
@@ -723,7 +723,7 @@ def test_a_lost_race_at_the_same_revision_names_the_seat_not_the_revision():
 
 
 def test_creation_evicts_stale_lobbies_holding_the_roster():
-    # ⚠ D74's timers are lazy and an abandoned lobby gets no read to
+    # D74's timers are lazy and an abandoned lobby gets no read to
     # evaluate them, so one_active_seat_per_player holds the seat forever
     # and the only symptom is a bare E11000. The read that triggers
     # evaluation has to be the NEW lobby's creation.
@@ -804,7 +804,7 @@ def test_only_the_host_starts():
 
 
 def test_starting_below_min_seats_is_refused():
-    # ⚠ Not automatic at min_seats either (D190): FFA seats twelve and needs
+    # Not automatic at min_seats either (D190): FFA seats twelve and needs
     # six, so the sixth arrival does not mean nobody else is coming.
     thin = {**IN_LOBBY, "min_seats": 6}
     repo = FakeRepo(lobby=thin, applied=thin)
@@ -847,7 +847,7 @@ def test_a_ballot_is_stored_on_the_voting_seat_only():
 
 
 def test_the_last_ballot_tallies_and_moves_to_bans():
-    # ⚠ Both seats have voted, so the phase resolves in the same call the
+    # Both seats have voted, so the phase resolves in the same call the
     # final ballot arrives in -- the caller never waits for a poll tick.
     voted = {
         **VOTING,
@@ -874,7 +874,7 @@ def test_a_ballot_short_of_everyone_does_not_advance():
 
 
 def test_a_read_past_the_deadline_advances_the_phase():
-    # ⚠ D74/D194: nothing sweeps timers, so the POLL has to advance them. A
+    # D74/D194: nothing sweeps timers, so the POLL has to advance them. A
     # settings phase in a lobby nobody writes to would otherwise never expire.
     expired = {**VOTING, "turn_expires_at": datetime.now(UTC) - timedelta(minutes=1)}
     repo = FakeRepo(lobby=expired, applied=expired)
@@ -950,7 +950,7 @@ def test_bans_are_stored_on_the_submitting_seat_only():
 
 
 def test_banning_nothing_still_counts_as_submitting():
-    # ⚠ `bans is not None` is the submitted test, not "banned something" --
+    # `bans is not None` is the submitted test, not "banned something" --
     # otherwise a seat that wants no bans would stall the phase until the
     # timer expired.
     voted = {
@@ -980,7 +980,7 @@ def test_a_leader_the_edition_does_not_have_is_refused():
 
 
 def test_a_civ_outside_the_starting_age_is_refused():
-    # ⚠ The case civ-data is on the service for. CIVILIZATION_SPAIN is a real
+    # The case civ-data is on the service for. CIVILIZATION_SPAIN is a real
     # token for a civ that is not in an antiquity game, and banning it would
     # burn one of only three slots -- a client bug, not collusion.
     antiquity = {**BANNING, "starting_age": "AGE_ANTIQUITY"}
@@ -1020,7 +1020,7 @@ def test_the_last_submission_tallies_and_moves_to_draft():
 
 
 def test_an_expired_ban_phase_advances_from_a_read():
-    # ⚠ The lazy timer generalising to a second phase (D74, D194): nothing
+    # The lazy timer generalising to a second phase (D74, D194): nothing
     # sweeps it, so the poll is what moves an abandoned ban phase on. Built
     # with NO civ-data on purpose -- the advance must not need it.
     expired = {**BANNING, "turn_expires_at": datetime.now(UTC) - timedelta(minutes=1)}
@@ -1033,7 +1033,7 @@ def test_an_expired_ban_phase_advances_from_a_read():
 
 
 def test_a_lobby_that_bans_itself_out_is_cancelled():
-    # ⚠ D198, and it fired for real before this test existed: two leaders,
+    # D198, and it fired for real before this test existed: two leaders,
     # one banned, two players needing one each. The advance CANCELS rather
     # than raising -- a poll can trigger it, so raising would make every read
     # a 500 with no route out.
@@ -1102,7 +1102,7 @@ def pick(repo, actor, token=None, revision=3, civ_token=None):
 
 
 def test_picking_out_of_turn_is_refused():
-    # ⚠ The whole gap CP6d closed: turn_index was written and read by nothing,
+    # The whole gap CP6d closed: turn_index was written and read by nothing,
     # so any seat could pick at any moment. Silent -- the draft simply stopped
     # being a draft.
     repo = FakeRepo(lobby=DRAFTING, applied=DRAFTING)
@@ -1142,14 +1142,14 @@ def test_a_second_pick_of_the_same_field_is_refused():
 
 
 def test_cwc_writes_the_team_and_never_the_seat():
-    # ⚠ D199, the one place the seat is not the unit of ownership. A captain
+    # D199, the one place the seat is not the unit of ownership. A captain
     # drafts for the team; nobody is assigned a leader until the players
     # divide them.
     cwc = {
         **DRAFTING,
         "settings": {"draft_mode": "cwc"},
         "pick_order": ["alice", "bob"],
-        # ⚠ D201: one shared pool on the lobby, not per-seat pools.
+        # D201: one shared pool on the lobby, not per-seat pools.
         "pool": ["LEADER_TRAJAN", "LEADER_AMINA"],
         "teams": [
             {"team_index": 0, "leaders": [], "civs": []},
@@ -1165,7 +1165,7 @@ def test_cwc_writes_the_team_and_never_the_seat():
 
 
 def test_a_turn_ordered_draft_completes_when_the_order_is_spent():
-    # ⚠ Two completion tests, one phase. A CWC captain picks for the team, so
+    # Two completion tests, one phase. A CWC captain picks for the team, so
     # no seat ever holds a pick and "every seat has picked" would never fire.
     cwc = {
         **DRAFTING,
@@ -1186,7 +1186,7 @@ def test_a_pick_with_neither_token_is_refused():
 
 
 def test_cwc_cannot_take_a_leader_another_team_already_took():
-    # ⚠ D201: one shared pool, so "already taken" is the only thing stopping
+    # D201: one shared pool, so "already taken" is the only thing stopping
     # two teams drafting the same leader. Per-seat pools made that impossible
     # by construction; a shared pool has to check.
     cwc = {
@@ -1209,7 +1209,7 @@ def test_cwc_cannot_take_a_leader_another_team_already_took():
 
 
 def test_a_finished_lobby_is_counted_once_and_only_once():
-    # ⚠ `$inc` has no memory, so a lobby counted twice is permanently wrong
+    # `$inc` has no memory, so a lobby counted twice is permanently wrong
     # and invisible. The claim is what prevents it, and it guards on the
     # document rather than on `revision` -- a retry arrives with the SAME
     # revision and a revision guard would match again.
@@ -1238,7 +1238,7 @@ def test_a_finished_lobby_is_counted_once_and_only_once():
 
 
 def test_a_counter_failure_never_fails_the_pick():
-    # ⚠ The picks are what players came for; the aggregate is a rebuildable
+    # The picks are what players came for; the aggregate is a rebuildable
     # cache. A broken counter shows in the log, and the claim marks the lobby
     # so one with `stats_written_at` and no rows is findable.
     class Exploding(FakeRepo):
@@ -1257,7 +1257,7 @@ def test_a_counter_failure_never_fails_the_pick():
 
 
 def test_civ7_picks_a_leader_and_a_civ_in_one_submission():
-    # ⚠ Replaces the two-round snake case. With snake gone, a civ7 pick is a
+    # Replaces the two-round snake case. With snake gone, a civ7 pick is a
     # single act: one leader from your leader pool and one civ from your civ
     # pool, together. There is no second round to come back for.
     civ7 = {

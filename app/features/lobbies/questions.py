@@ -1,12 +1,12 @@
 """The settings ballot's question catalogue.
 
-⚠ **Authored data, not a collection.** `civdata` seeds Mongo because its rows
+**Authored data, not a collection.** `civdata` seeds Mongo because its rows
 are queried and versioned; these are read whole, never queried by field, and a
 stored ballot references their ids by name. A catalogue editable without a
 deploy could retire a question a live lobby has already voted on, so this
 changes by review and release rather than by a seed run (D192).
 
-⚠ **Carried from Mite's `civ6-voting.config.ts` and `civ7-voting.config.ts`,
+**Carried from Mite's `civ6-voting.config.ts` and `civ7-voting.config.ts`,
 with one deliberate correction.** Every title, label, emoji, default and cap
 was verified against that source. Duel's draft modes were NOT carried: v1
 hands duel the FFA list -- snake and blind included -- and `lobbies-domain-spec`
@@ -44,7 +44,7 @@ def _catalogue(edition: str) -> dict[str, Any]:
 def questions_for(edition: str, game_type: str) -> list[dict[str, Any]]:
     """Every question a seat votes on, settings first and `draft_mode` last.
 
-    ⚠ Returns a deep copy. The catalogue is cached for the process lifetime,
+    Returns a deep copy. The catalogue is cached for the process lifetime,
     and a caller that mutated a question would change what every later lobby
     is asked -- the same reason D171 hands out a copy of the cached season.
     """

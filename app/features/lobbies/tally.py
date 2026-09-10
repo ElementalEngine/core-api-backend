@@ -1,25 +1,19 @@
 """Resolving the settings ballot.
 
-⚠ **Carried from Mite's `services/voting/domain/`, not reinvented** (D191).
-Changing how settings resolve changes game outcomes, which puts it in D66's
-class -- it belongs to the league, not to a migration.
+Each question is decided by plurality, and by approval where the question
+allows more than one selection -- a seat approving two maps casts two votes,
+stored as `a|b`.
 
-Three rules, each with a way to go wrong that no green test would show:
+A question that not every voter answered takes its default rather than the
+plurality of those who did answer. That is what makes an expired settings
+phase safe to advance: every question has a defined outcome.
 
-**Plurality per question**, and **approval** where `max_selections > 1`. A
-seat approving two maps casts two votes, not half a vote each -- v1 stores
-them `a|b` and counts each.
+Ties break on sha256(lobby_id:question_id), so a disputed tie can be
+recomputed from the lobby. The tied options are sorted before indexing;
+without that the result would follow dict iteration order, which is stable
+within a process but not across a restart.
 
-**A question not answered by EVERY voter locks to its default.** Not to the
-plurality of those who did answer. Stragglers decide nothing, and a settings
-phase that advances on timer expiry (spec section 7) therefore locks every
-unanswered question to its default.
-
-**Ties break deterministically** on `sha256(lobby_id:question_id)`, so a
-disputed tie recomputes forever -- better than civup's seeded random. ⚠ The
-tied options are SORTED before indexing: without that the "deterministic"
-answer depends on dict iteration order, which is stable within a process and
-not across a restart, destroying the one property the tie-break exists for.
+Governed by D191, D192.
 """
 
 from __future__ import annotations
@@ -34,7 +28,7 @@ SELECTION_SEPARATOR = "|"
 
 
 def seeded_index(lobby_id: str, question_id: str, count: int) -> int:
-    """v1's tie-break, seeded on the lobby rather than the session."""
+    """The tie-break index, seeded on the lobby and the question."""
     digest = hashlib.sha256(f"{lobby_id}:{question_id}".encode()).hexdigest()
     return int(digest[:8], 16) % count
 
@@ -50,9 +44,9 @@ def resolve_settings(
 
     for question in questions:
         question_id = question["id"]
-        # ⚠ Restricted to options the catalogue still offers. The catalogue
-        # changes by release (D192) and a lobby can be mid-vote across one, so
-        # a retired option must not win on votes cast before it went away.
+        # Only options the catalogue still offers can win. It changes by
+        # release and a lobby can be mid-vote across one, so a retired option
+        # must not take a question on votes cast before it went away.
         offered = {option["id"] for option in question["options"]}
         counts: Counter[str] = Counter()
         answered = 0

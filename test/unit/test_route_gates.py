@@ -9,7 +9,7 @@ Derived from `app.routes` instead, so a new router without a gate fails here
 by construction rather than by recollection. Adding a route to PUBLIC_PATHS
 is the only way to exempt one, and that is a visible, reviewable act.
 
-⚠ C5 puts two routers on ONE prefix under DIFFERENT tokens, which is exactly
+C5 puts two routers on ONE prefix under DIFFERENT tokens, which is exactly
 what a per-router tuple cannot express. That is also why route RESOLUTION
 lives here rather than in its own file: section 6b's hazard is a gate
 hazard -- a path resolving to the wrong route is checked against the wrong
@@ -93,7 +93,7 @@ def resolve(method: str, path: str):
 
 
 def test_the_extraction_finds_a_gate_on_a_route_known_to_have_one():
-    # ⚠ Without this, an extraction that returned nothing would make the test
+    # Without this, an extraction that returned nothing would make the test
     # below report "no ungated routes" while checking nothing at all -- green
     # for a reason unrelated to what it claims.
     by_path = {r.path: gate_callables(r) for r in api_routes()}
@@ -144,7 +144,7 @@ LOBBY_PATH = "/api/v2/lobbies/652f1a2b3c4d5e6f7a8b9c0d"
 
 
 def test_resolution_finds_a_route_for_an_unambiguous_path():
-    # ⚠ Without this, a wrong scope dict would resolve nothing at all and
+    # Without this, a wrong scope dict would resolve nothing at all and
     # every assertion below -- each of the form "did NOT resolve to {id}" --
     # would pass while checking nothing.
     route = resolve("POST", "/api/v2/lobbies")
@@ -169,7 +169,7 @@ def test_each_lobby_route_carries_its_own_gate_not_merely_a_gate():
     # had taken the same dependency it would still pass. Section 6b makes
     # that gate-affecting, because the two share a prefix and resolve as one
     # ordered table.
-    # ⚠ Both Mite routes, and each asserted BOTH ways: the Mite gate
+    # Both Mite routes, and each asserted BOTH ways: the Mite gate
     # present and the Activity gate absent. Section 4 item 112's last leg,
     # unwritable until `claim-post` existed at CP8.
     for mite_path in ("/api/v2/lobbies", "/api/v2/lobbies/claim-post"):

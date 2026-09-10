@@ -1,15 +1,19 @@
 """Resolving the ban phase.
 
-⚠ **One mechanism for every game type** (D195). Every seated player submits
-bans, a key lands at `floor(n/2)+1` of ALL seats, and the total is capped per
-edition. D72 specified captains banning in sequence for teamers and duels;
-nothing in Mite has ever done that -- `majorityBans` runs over every voter
-regardless of game type -- so this matches shipped behaviour and supersedes
-that section rather than changing how a teamer plays.
+Each seated player submits a set of leader and civ keys. A key lands when it
+reaches a majority of all seats -- not of the players who submitted, since a
+timeout creates non-submitters and must not make bans easier to land.
 
-⚠ **The caps are neither v1's nor D72's.** v1 ships civ6 leader 25, civ7
-leader 10 with civ 15 or 5; D72 recorded 15 and 5 for leaders and forgot civ
-bans existed. These are a deliberate change from the measured baseline.
+The number that can land is capped per edition, and for civ7 the civ cap
+depends on the starting age chosen when the lobby was created. At the cap,
+keys tied on the boundary all drop, but only when something below the cap
+ties with them; a cap falling in a gap keeps the full set.
+
+Bans name tokens from the civ-data catalogue. Civs are checked against the
+starting age's pool only, so a real token for a civ that is not in the game
+cannot use up one of the three slots.
+
+Governed by D195, D196.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ from typing import Any
 
 BAN_KINDS = ("leader", "civ")
 
-# ⚠ civ-data's vocabulary, not Mite v1's. v1's slash command offers
+# civ-data's vocabulary, not Mite v1's. v1's slash command offers
 # `Antiquity_Age`; every `CivRow.age_pool` says `AGE_ANTIQUITY`. A filter
 # written against the wrong one matches nothing, so NO civ is bannable and
 # nothing errors -- the cap simply never binds. One vocabulary behind the API,
@@ -37,7 +41,7 @@ CIV7_CIV_CAP_FIXED_AGE = 3
 def ban_caps(edition: str, starting_age: str | None) -> dict[str, int]:
     """How many bans may land, per kind.
 
-    ⚠ Civ7's civ cap depends on `starting_age`, which the SETTINGS vote
+    Civ7's civ cap depends on `starting_age`, which the SETTINGS vote
     resolved -- the first place one phase's outcome constrains the next
     phase's input. Read from the lobby, never from the request.
     """
@@ -55,7 +59,7 @@ def bannable_civs(
 ) -> list[str]:
     """The civ tokens a ban may name.
 
-    ⚠ With a starting age chosen, only that age's pool is reachable in game,
+    With a starting age chosen, only that age's pool is reachable in game,
     so only it is bannable -- roughly fifteen civs against a cap of three.
     Without one, all forty-four are, against a cap of ten. Filtering by an
     age nothing matches would leave nothing bannable and raise nothing.
@@ -70,12 +74,12 @@ def bannable_civs(
 def capped(counts: Mapping[str, int], qualified: Sequence[str], cap: int) -> list[str]:
     """The top `cap` bans, dropping every key tied at the boundary (D72).
 
-    ⚠ Seventeen qualify, the cap is fifteen, and ranks 15-17 all sit on six
+    Seventeen qualify, the cap is fifteen, and ranks 15-17 all sit on six
     votes: all three drop and fourteen land. Deterministic, no RNG, and no
     submission timestamps to store. Random tie-breaks are unexplainable to
     players; earliest-to-threshold rewards fast clicking. Both were rejected.
 
-    ⚠ Every qualifying key tied above the cap therefore lands NOTHING -- the
+    Every qualifying key tied above the cap therefore lands NOTHING -- the
     rule taken to its end, erring toward the larger pool as intended.
     """
     if cap <= 0:
@@ -98,7 +102,7 @@ def resolve_bans(
 ) -> dict[str, list[str]]:
     """The bans that land, per kind."""
     voters = [seat for seat in seats if seat.get("discord_id")]
-    # ⚠ Of ALL seats, not of submitters. A timeout creates non-submitters, and
+    # Of ALL seats, not of submitters. A timeout creates non-submitters, and
     # counting only those who voted would make bans EASIER to land as people
     # drop out, which is backwards.
     need = len(voters) // 2 + 1

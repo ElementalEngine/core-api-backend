@@ -1,6 +1,6 @@
 """The lobby's phase union and the reasons it can close.
 
-⚠ One enum, previously owned by three modules: `projection.py` held
+One enum, previously owned by three modules: `projection.py` held
 `settings`/`draft`/`complete`, `repository.py` held `cancelled`/`abandoned`,
 `service.py` held `lobby`, and `bans` was defined nowhere at all. CP6 adds
 `bans` and every transition between the six, so a fourth owner was one commit
@@ -31,7 +31,7 @@ TERMINAL_PHASES = (COMPLETE, CANCELLED)
 CANCEL_BY_HOST = "host"
 CANCEL_TIMEOUT = "timeout"
 CANCEL_ABANDONED = "abandoned"
-# ⚠ D198. Bans are capped but the pool is not guaranteed: a lobby can ban
+# D198. Bans are capped but the pool is not guaranteed: a lobby can ban
 # itself past the point where every player gets one leader. The advance
 # CANCELS rather than raising -- after D194 an advance can be triggered by a
 # POLL, so raising would make every read a 500 with no route out.

@@ -113,7 +113,7 @@ async def get_leaderboard(
             civ_version=game,
         )
     except ValueError as exc:
-        # ⚠ Section 4 item 94, verified on the wire at CP8: 500 for a bad
+        # Section 4 item 94, verified on the wire at CP8: 500 for a bad
         # `game_mode`. `stats_collection_name` raises ValueError for anything
         # but ffa|teamer|duel (`ratings/scope.py:35`), and neither catch below
         # is one -- so a user typo reached the generic handler. The v1 log

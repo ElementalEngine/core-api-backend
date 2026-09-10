@@ -1,6 +1,6 @@
 """The ban tally.
 
-⚠ Like the settings tally, this is arithmetic that runs once per lobby and
+Like the settings tally, this is arithmetic that runs once per lobby and
 writes a result nobody re-derives. Unlike it, a mistake here removes leaders
 from a pool people are about to draft from.
 """
@@ -31,13 +31,13 @@ def test_civ7_allows_ten_civ_bans_when_no_starting_age_is_chosen(age):
 
 @pytest.mark.parametrize("age", ["antiquity", "exploration", "modern"])
 def test_civ7_drops_to_three_civ_bans_once_an_age_is_chosen(age):
-    # ⚠ Read from the settings the previous phase resolved, never from the
+    # Read from the settings the previous phase resolved, never from the
     # request -- the first place one phase's outcome bounds the next.
     assert ban_caps("civ7", age) == {"leader": 10, "civ": 3}
 
 
 def test_a_key_lands_only_at_a_majority_of_all_seats():
-    # ⚠ Of ALL seats, not of submitters: a timeout creates non-submitters and
+    # Of ALL seats, not of submitters: a timeout creates non-submitters and
     # must not make bans easier to land.
     four = [seat("a", ["gandhi"]), seat("b", ["gandhi"]), seat("c"), seat("d")]
     assert resolve_bans(four, "civ6", None)["leader"] == []
@@ -71,7 +71,7 @@ def test_leaders_and_civs_are_tallied_independently():
 
 
 def test_the_cap_drops_every_key_tied_at_the_boundary():
-    # ⚠ D72 verbatim: seventeen clear the threshold, the cap is fifteen, and
+    # D72 verbatim: seventeen clear the threshold, the cap is fifteen, and
     # ranks 15-17 all sit on six votes -- all three drop, fourteen land.
     counts = {f"L{i}": 7 for i in range(14)} | {"T1": 6, "T2": 6, "T3": 6}
     landed = capped(counts, list(counts), 15)
@@ -93,7 +93,7 @@ def test_ties_below_the_cap_are_harmless():
 
 
 def test_the_cap_keeps_the_most_voted():
-    # ⚠ The boundary only drops when something BEYOND the cap ties with it.
+    # The boundary only drops when something BEYOND the cap ties with it.
     # `mid` is the boundary here and nothing ties with it, so it lands --
     # dropping it unconditionally would shrink every capped result by one.
     counts = {"low": 5, "high": 9, "mid": 7}

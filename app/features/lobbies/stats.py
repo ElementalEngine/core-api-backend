@@ -1,22 +1,19 @@
-"""What a finished lobby contributes to `lobby_stats`.
+"""What a finished lobby contributes to the `lobby_stats` aggregate.
 
-⚠ **`pool_appearances` is the denominator and cannot be backfilled** (D10):
-pick rate is picks divided by times offered. A token nobody was ever shown
-must not count as a refusal, and a token assigned without a choice must not
-count as a pick.
+Pick rate is picks divided by times offered, so the pool a player was shown
+is the denominator and cannot be reconstructed later. A token nobody saw must
+not count as one nobody wanted.
 
-Three shapes, because the draft has three:
+Three shapes, because the draft has three. Random contributes neither picks
+nor appearances: nobody chose and nobody was offered, and counting an
+assignment as a pick would make the rate meaningless. CWC reads its picks
+from the teams and its denominator from the one shared pool. Every other mode
+reads the seat's own pick and pool.
 
-- **`random`** contributes NEITHER picks nor appearances. Nobody chose and
-  nobody was offered; counting an assignment as a pick makes pick rate noise.
-  Its bans still count -- those were real votes.
-- **`cwc`** reads `teams[]` for picks and the lobby's ONE shared pool for
-  appearances (D199, D201).
-- everything else reads `seats[].pick` and each seat's own disjoint pool.
+Only a completed lobby contributes. A cancelled draft dealt real pools and
+landed real bans, but no game happened.
 
-⚠ **Only a completed lobby contributes.** A cancelled draft dealt real pools
-and landed real bans, but no game happened, and stats describe what people
-play.
+Governed by D10, D199, D201.
 """
 
 from __future__ import annotations
@@ -60,7 +57,7 @@ def contributions(lobby: Mapping[str, Any]) -> dict[str, dict[str, int]]:
         for team in lobby.get("teams") or []:
             for token in [*team.get("leaders", []), *team.get("civs", [])]:
                 counts[token][PICKS] += 1
-        # ⚠ Once per lobby, not once per captain: the pool is shared, so a
+        # Once per lobby, not once per captain: the pool is shared, so a
         # token was offered to the draft once however many turns it survived.
         for field in ("pool", "civ_pool"):
             for token in lobby.get(field) or []:

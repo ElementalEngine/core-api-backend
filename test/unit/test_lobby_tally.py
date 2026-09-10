@@ -1,6 +1,6 @@
 """The settings tally.
 
-⚠ This is arithmetic that can be wrong while every other test passes: it runs
+This is arithmetic that can be wrong while every other test passes: it runs
 once per lobby, writes a result nobody re-derives, and a mistake looks like a
 game people merely disagreed with.
 """
@@ -43,7 +43,7 @@ def test_the_option_with_most_votes_wins():
 
 
 def test_both_halves_of_an_approval_are_counted():
-    # ⚠ `a|b` is TWO votes, not half a vote each and not just the first. With
+    # `a|b` is TWO votes, not half a vote each and not just the first. With
     # only the first counted this is a 1-1 tie and the tie-break decides;
     # b winning outright is what proves the second selection landed.
     seats = [seat("x", map="a|b", speed="fast"), seat("y", map="b", speed="fast")]
@@ -51,7 +51,7 @@ def test_both_halves_of_an_approval_are_counted():
 
 
 def test_a_question_not_answered_by_everyone_locks_to_its_default():
-    # ⚠ v1's rule, carried deliberately (D191): stragglers decide nothing.
+    # v1's rule, carried deliberately (D191): stragglers decide nothing.
     # x voted for `b` and gets `a` anyway, because y never answered.
     seats = [seat("x", map="b", speed="fast"), seat("y", speed="fast")]
     assert resolve_settings(seats, BALLOT, LOBBY) == {"map": "a", "speed": "fast"}
@@ -82,7 +82,7 @@ def test_a_tie_resolves_the_same_way_every_time():
 
 
 def test_a_tie_does_not_depend_on_the_order_votes_arrived():
-    # ⚠ The property the whole tie-break exists for. Without sorting the tied
+    # The property the whole tie-break exists for. Without sorting the tied
     # options the answer follows dict iteration order -- stable inside one
     # process, different after a restart, and impossible to dispute.
     forward = [seat("x", map="a", speed="fast"), seat("y", map="b", speed="slow")]

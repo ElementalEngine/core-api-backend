@@ -1,6 +1,6 @@
 """The settings ballot catalogue.
 
-⚠ Two defects in authored data are invisible until a lobby is mid-vote: a
+Two defects in authored data are invisible until a lobby is mid-vote: a
 `default_option_id` naming no option, so the tally locks a setting to an id
 nothing recognises, and a duplicate question id, so one ballot key silently
 overwrites another. Both are cheap to assert and expensive to find later.
@@ -55,7 +55,7 @@ def test_draft_mode_is_asked_last_and_exactly_once(edition, game_type):
 
 @pytest.mark.parametrize("edition", EDITIONS)
 def test_duel_offers_standard_and_random_only(edition):
-    # ⚠ D193, and a deliberate divergence from v1 in both directions: Mite
+    # D193, and a deliberate divergence from v1 in both directions: Mite
     # hands duel the FFA list, snake and blind included, and the spec's mode
     # matrix said standard and CWC. Neither is what duel plays.
     modes = questions_for(edition, "duel")[-1]

@@ -4,7 +4,7 @@ Mite sends `game_type`, plus two numbers when it is a teamer. Everything
 else is derived here, so no client computes a seat count and there is one
 place to read when the rules change (spec section 11).
 
-⚠ `duel` derives to two teams of one. The spec already says "Duel = team of
+`duel` derives to two teams of one. The spec already says "Duel = team of
 one" (section 4), and it is what makes `is_captain` -- the lowest seat_index
 within a team (D75) -- name both duellists with no special case. It stays a
 distinct game_type because the rating scopes are per-mode (`rt_duel`).
@@ -130,7 +130,7 @@ def legal_teamer_shapes() -> tuple[tuple[int, int], ...]:
 def validate_seats(seats: Sequence[Mapping[str, Any]], shape: LobbyShape) -> None:
     """The seating rules, including the two no index can enforce.
 
-    ⚠ Neither of the first two has a Mongo leg left, and both were measured:
+    Neither of the first two has a Mongo leg left, and both were measured:
 
     **No duplicate player.** MongoDB de-duplicates multikey keys per
     document, so one lobby's seat array cannot collide with itself (D176).
@@ -143,7 +143,7 @@ def validate_seats(seats: Sequence[Mapping[str, Any]], shape: LobbyShape) -> Non
     This is now the only thing between a null seat and a lobby that
     mysteriously refuses joins.
 
-    ⚠ `seat_index` is absolute and gaps are legal. civup's
+    `seat_index` is absolute and gaps are legal. civup's
     `arrangeTeamLobbySlots` compacts before chunking, so closing a hole
     mid-lobby silently moves a player across a team boundary (O-19b).
 

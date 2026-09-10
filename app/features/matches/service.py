@@ -60,7 +60,7 @@ class MatchService:
             logger.info(f"✅ 🔍 Parsed as {data.get('game')}")
             return data
         except Exception as e:
-            raise ParseError(f"⚠️ Parse attempt failed: {e}")
+            raise ParseError(f"Parse attempt failed: {e}")
 
     async def discord_to_steam_id(self, discord_id: str) -> str:
         player = await self.q.get_user_by_discord_id(discord_id)

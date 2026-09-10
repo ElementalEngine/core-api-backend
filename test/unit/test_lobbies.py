@@ -6,7 +6,7 @@ the channel index, indexing `seats` instead of the array path
 `seats.discord_id`, giving `aggregate_key` a partial filter, losing a
 component of the aggregate key, or binding the wrong collection.
 
-⚠ These prove the code still ASKS for the indexes, never that Mongo builds
+These prove the code still ASKS for the indexes, never that Mongo builds
 or enforces them -- D60 keeps the driver out of CI. Building, and the
 multikey behaviour D71 rests on, is Entry 7's dev dry-run.
 """

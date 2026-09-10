@@ -1,16 +1,15 @@
-"""Dealing draft pools from the post-ban set.
+"""Dealing draft pools from the leaders and civs left after bans.
 
-⚠ **Deals are unseeded, and that is the opposite of the tie-break on purpose
-(D197).** D191 seeds ties on `sha256(lobby_id:question_id)` so a disputed
-result recomputes forever. A pool deal must never be reproducible from the
-lobby id: anyone holding it could compute a blind pool before it is dealt,
-which is the whole of blind. The record is the stored `seats[].pool`, not a
-seed anybody can replay.
+Every player gets the same number of options and the remainder is discarded:
+forty-four leaders across five players deals eight each and drops four. An
+uneven split would give somebody a wider choice than the rest.
 
-⚠ **The pool is truncated so every player gets the same count**, carried from
-Mite's `buildUniformTargets`: forty-four leaders across five players deals
-eight each and DISCARDS four. An uneven split would hand somebody a wider
-choice, which matters more than four leaders do.
+Deals use system randomness and are not seeded. A pool dealt from a
+reproducible seed could be worked out in advance by anyone holding the lobby
+id, which would defeat the blind draft. The dealt pools stored on the seats
+are the record, not the seed.
+
+Governed by D197, D198.
 """
 
 from __future__ import annotations
@@ -46,7 +45,7 @@ def even_split(total: int, players: int) -> tuple[int, int]:
 def deal(tokens: Sequence[str], players: int, rng: Any = _RANDOM) -> list[list[str]]:
     """One disjoint pool per player, every pool the same size.
 
-    ⚠ Disjoint by construction rather than by a check: the shuffled list is
+    Disjoint by construction rather than by a check: the shuffled list is
     consumed from the front, so no token can reach two players even if the
     sizing arithmetic is wrong.
     """
@@ -64,10 +63,9 @@ def assign_one_each(
 ) -> list[str]:
     """One token per player, all distinct -- `random` mode's whole draft.
 
-    ⚠ Mite samples WITH REPLACEMENT when the pool is smaller than the player
-    count, handing two players the same leader rather than failing. That
-    cannot arise under the current ban caps, and a silent duplicate is worse
-    than a refusal, so this raises instead.
+    Refuses rather than handing two players the same leader when the pool
+    is short. That cannot happen under the current ban caps, and a silent
+    duplicate would be worse than an error.
     """
     if len(tokens) < players:
         raise NotEnoughPool(

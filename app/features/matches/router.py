@@ -127,7 +127,7 @@ async def append_message_id_list(
         logger.warning("🔴 Match not found: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -153,7 +153,7 @@ async def update_match(payload: MatchUpdate = Form(), db=Depends(get_database)):
         logger.warning("🔴 Match not found: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -171,7 +171,7 @@ async def set_player_order(payload: SetPlayerOrder = Form(), db=Depends(get_data
         logger.warning("🔴 Match not found: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -189,7 +189,7 @@ async def change_order(payload: ChangeOrder = Form(), db=Depends(get_database)):
         logger.warning("🔴 Match not found: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -207,7 +207,7 @@ async def delete_pending_match(
         logger.warning("🔴 Match not found: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -229,7 +229,7 @@ async def trigger_quit(payload: TriggerQuit = Form(), db=Depends(get_database)):
         logger.warning("🔴 Match not found. matchID: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -257,7 +257,7 @@ async def assign_discord_id(
         logger.warning("🔴 Match not found. matchID: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -281,7 +281,7 @@ async def assign_discord_id_all(
         logger.warning("🔴 Match not found. matchID: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -307,7 +307,7 @@ async def assign_sub(payload: AssignSub = Form(), db=Depends(get_database)):
         logger.warning("🔴 Match not found. matchID: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -329,7 +329,7 @@ async def remove_sub(payload: RemoveSub = Form(), db=Depends(get_database)):
         logger.warning("🔴 Match not found. matchID: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -342,7 +342,7 @@ async def approve_match(payload: ApproveMatch = Form(), db=Depends(get_database)
         logger.warning("🔴 Match not found. matchID: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -362,7 +362,7 @@ async def contest_report(
         logger.warning("🔴 Match not found. matchID: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -375,7 +375,7 @@ async def revert_match(payload: RevertMatchRequest = Form(), db=Depends(get_data
         logger.warning("🔴 Match not found. matchID: %s", payload.match_id)
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -399,7 +399,7 @@ async def get_leaderboard_ranking(
             civ_version=payload.game,
         )
     except ValueError as exc:
-        # ⚠ Section 4 item 94, verified on the wire at CP8: 500 for a bad
+        # Section 4 item 94, verified on the wire at CP8: 500 for a bad
         # `game_mode`. `stats_collection_name` raises ValueError for anything
         # but ffa|teamer|duel (`ratings/scope.py:35`), and neither catch below
         # is one -- so a user typo reached the generic handler. The v1 log
@@ -417,7 +417,7 @@ async def get_leaderboard_ranking(
         )
         raise HTTPException(status_code=404, detail="Match not found") from exc
     except MatchServiceError as exc:
-        logger.warning("⚠️ Update error: %s", exc)
+        logger.warning("Update error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

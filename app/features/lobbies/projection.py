@@ -8,7 +8,7 @@ Two censored surfaces in the whole lobby, and no others:
   settings     own ballot only, no tallies; observers see nothing until close
   blind draft  own pool AND own pick only; observers nothing until reveal
 
-⚠ The blind row is the one that is easy to get wrong: **the pool is secret,
+The blind row is the one that is easy to get wrong: **the pool is secret,
 not just the pick.** Censoring `pick` alone leaks by elimination -- and so
 does leaving `pool_appearances` in place, since pools are disjoint across
 players (spec section 4), making that array the union of every pool.
@@ -50,7 +50,7 @@ def pools_are_secret(lobby: Mapping[str, Any]) -> bool:
     second rule. A cancelled blind draft stays censored: the table says
     nothing about it, and the safe reading of silence is to withhold.
 
-    ⚠ `draft_mode` lives in `settings`, not at the top level. It is a ballot
+    `draft_mode` lives in `settings`, not at the top level. It is a ballot
     outcome (D191), and this condition read the top level until CP6c --
     silently never true, so a blind draft would have shipped UNCENSORED.
     The D179 guard cannot catch that: it checks which fields exist, not
@@ -90,7 +90,7 @@ def project_lobby(
             if seat.get("discord_id") != viewer_discord_id:
                 seat.pop(POOL, None)
                 seat.pop(PICK, None)
-        # ⚠ The union of every pool. Disjoint pools mean a viewer who knows
+        # The union of every pool. Disjoint pools mean a viewer who knows
         # the union and their own pool knows what the others were dealt.
         projected.pop(POOL_APPEARANCES, None)
 

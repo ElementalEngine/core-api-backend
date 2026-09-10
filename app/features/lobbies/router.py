@@ -1,15 +1,15 @@
 """The v2 lobbies surface: two routers on one prefix, gated separately (D94).
 
-⚠ Both routers declare `prefix="/api/v2/lobbies"` and resolve as ONE ordered
+Both routers declare `prefix="/api/v2/lobbies"` and resolve as ONE ordered
 route table, so registration order decides which gate a path meets.
 `mite_router` is included first in `app/api/router.py` -- C5 section 6b.
 
-⚠ Within `activity_router`, the literal `/active` is declared BEFORE
+Within `activity_router`, the literal `/active` is declared BEFORE
 `/{lobby_id}`, which is declared last: a parameterised path registered first
 would swallow it. `test_route_gates.py` asserts the resolution rather than
 trusting declaration order (section 6b).
 
-⚠ Every `activity_router` route stamps `X-Actor-Discord-Id` (C5 invariant 2,
+Every `activity_router` route stamps `X-Actor-Discord-Id` (C5 invariant 2,
 D90/D94) and hands it to the service, which is what `for_the_wire` censors
 against. `mite_router` passes None -- Mite holds no seat (D186).
 
@@ -120,7 +120,7 @@ async def browse_lobbies(
 ) -> list[dict[str, Any]]:
     """Open lobbies for a guild (D180).
 
-    ⚠ `guild_id` is required, never defaulted: a service token is
+    `guild_id` is required, never defaulted: a service token is
     per-service, not per-guild, so an unfiltered read would expose every
     lobby on the deployment to any holder of it.
     """
@@ -143,7 +143,7 @@ async def read_lobby(
     would invite cache and proxy semantics into the polling path. A lobby
     with no `since` is read unconditionally.
 
-    ⚠ `revision` starts at 1, so `since=0` is refused rather than treated as
+    `revision` starts at 1, so `since=0` is refused rather than treated as
     "send me everything": no lobby has ever held it, and a client sending it
     has a bug worth surfacing.
     """
@@ -261,7 +261,7 @@ async def submit_ballot(
 ) -> dict[str, Any]:
     """One seat's settings ballot, resolving the phase on the last one.
 
-    ⚠ The response may come back already at `bans`: the final ballot tallies
+    The response may come back already at `bans`: the final ballot tallies
     and advances in the same call, and so does any request arriving after
     `turn_expires_at` (D74, D194).
     """
@@ -310,7 +310,7 @@ async def submit_bans(
 ) -> dict[str, Any]:
     """One seat's bans, resolving the phase on the last submission.
 
-    ⚠ Leaders are checked against the edition; civs against the STARTING
+    Leaders are checked against the edition; civs against the STARTING
     AGE's pool only, so a real token for a civ that is not in the game
     cannot burn one of three slots (D196).
     """
@@ -359,7 +359,7 @@ async def submit_pick(
 ) -> dict[str, Any]:
     """One seat's pick, completing the lobby on the last one.
 
-    ⚠ **409 for a second pick, and it is not a revision conflict.** A pick is
+    **409 for a second pick, and it is not a revision conflict.** A pick is
     final once made (O-34); the refusal reads the seat, not the revision.
     """
     try:
@@ -371,7 +371,7 @@ async def submit_pick(
     except NotSeated as exc:
         raise forbidden(str(exc)) from exc
     except NotYourTurn as exc:
-        # ⚠ 403, not 409. A conflict says the lobby moved under you; this
+        # 403, not 409. A conflict says the lobby moved under you; this
         # says it is exactly where you thought and somebody else is owed
         # the pick.
         raise forbidden(str(exc)) from exc
@@ -446,7 +446,7 @@ async def claim_post(
 ) -> dict[str, Any] | None:
     """Claim the oldest unposted finished lobby, or 204 when there is none.
 
-    ⚠ Declared BEFORE any parameterised sibling: a `/{lobby_id}` route
+    Declared BEFORE any parameterised sibling: a `/{lobby_id}` route
     registered first would swallow this literal path and check a Mite-facing
     request against the Activity gate.
     """

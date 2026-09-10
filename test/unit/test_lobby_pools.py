@@ -1,6 +1,6 @@
 """Dealing draft pools.
 
-⚠ Two properties matter more than the arithmetic: pools must be disjoint, or
+Two properties matter more than the arithmetic: pools must be disjoint, or
 two players draft the same leader; and a deal must NOT be reproducible from
 the lobby id, or a blind pool can be computed before it is dealt.
 """
@@ -23,7 +23,7 @@ TOKENS = [f"LEADER_{i:02d}" for i in range(44)]
 
 
 def test_the_pool_is_truncated_so_every_player_gets_the_same_count():
-    # ⚠ Forty-four across five deals eight each and DISCARDS four. An uneven
+    # Forty-four across five deals eight each and DISCARDS four. An uneven
     # split would hand somebody a wider choice, which matters more than four
     # leaders do.
     assert even_split(44, 5) == (8, 4)
@@ -52,7 +52,7 @@ def test_pools_are_disjoint_and_equal():
 
 
 def test_a_deal_is_not_reproducible_from_the_lobby():
-    # ⚠ D197, and the opposite of D191's tie-break by design. Seeding a deal
+    # D197, and the opposite of D191's tie-break by design. Seeding a deal
     # on the lobby id would let anyone holding it compute a blind pool before
     # it is dealt, which is the whole of blind.
     first = deal(TOKENS, 5)
@@ -68,7 +68,7 @@ def test_random_mode_assigns_one_distinct_token_each():
 
 
 def test_a_pool_too_small_to_assign_is_refused_rather_than_duplicated():
-    # ⚠ Mite samples WITH REPLACEMENT here, handing two players the same
+    # Mite samples WITH REPLACEMENT here, handing two players the same
     # leader rather than failing. A silent duplicate is worse than a refusal.
     with pytest.raises(NotEnoughPool):
         assign_one_each(["a", "b"], 5)

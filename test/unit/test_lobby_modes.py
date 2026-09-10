@@ -138,7 +138,7 @@ def test_a_legal_seating_is_accepted():
 
 @pytest.mark.parametrize("player", [None, ""])
 def test_a_seat_with_no_player_is_refused(player):
-    # ⚠ Correction 74: D175's partial filter EXCLUDES a lobby whose only seat
+    # Correction 74: D175's partial filter EXCLUDES a lobby whose only seat
     # lacks discord_id, so Mongo accepts the document and it breaks a later
     # join instead. Nothing else checks this any more.
     with pytest.raises(InvalidSeating) as exc:
@@ -149,7 +149,7 @@ def test_a_seat_with_no_player_is_refused(player):
 
 
 def test_one_player_cannot_hold_two_seats():
-    # ⚠ D176: MongoDB de-duplicates multikey keys per document, so the unique
+    # D176: MongoDB de-duplicates multikey keys per document, so the unique
     # index cannot collide a lobby with itself. The $ne on the write is the
     # guarantee; this is the refusal a host can read.
     with pytest.raises(InvalidSeating) as exc:
@@ -171,7 +171,7 @@ def test_two_seats_cannot_claim_one_index():
 
 
 def test_a_gap_is_legal_and_is_never_closed():
-    # ⚠ O-19b: civup's arrangeTeamLobbySlots compacts before chunking, so
+    # O-19b: civup's arrangeTeamLobbySlots compacts before chunking, so
     # closing a hole mid-lobby silently moves a player across a team
     # boundary. Indexes are absolute; empty positions are gaps (section 8).
     validate_seats([seat(0, "a"), seat(7, "b")], FFA_SHAPE)

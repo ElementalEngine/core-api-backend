@@ -5,11 +5,11 @@ a lobby that can exist". Both surface as INVALID_REQUEST -- 422 from the
 registered validation handler, 400 from `invalid_request` -- so the split
 costs the caller nothing and keeps every mode rule in one file.
 
-⚠ `game_type` is a plain str, not a Literal, deliberately: it is a mode rule
+`game_type` is a plain str, not a Literal, deliberately: it is a mode rule
 and `resolve_shape` owns it. `edition` is a Literal because it is a plain
 enum that no mode rule touches.
 
-⚠ There is no response model. D73's projection decides the response shape
+There is no response model. D73's projection decides the response shape
 per recipient, and a model would have to make every censored field Optional
 -- which would resurrect a hidden `ballot` or `pool` as `null` instead of
 absent, contradicting the projection's own tests. The cost is that these
@@ -45,7 +45,7 @@ class CreateLobbyRequest(BaseModel):
     # membership as eligibility, and voice membership churns constantly --
     # the Discord channel already scopes who can see the lobby.
     #
-    # ⚠ Seated only when the roster FITS. Fifteen people in voice and a 3v3
+    # Seated only when the roster FITS. Fifteen people in voice and a 3v3
     # opens empty: seating an arbitrary first six excludes people by list
     # order, and this is exactly where self-selection matters (D75).
     #
@@ -57,7 +57,7 @@ class CreateLobbyRequest(BaseModel):
     # key is core-api's own id and the Activity resolves by channel, never
     # by this (spec section 2). Omitted from the document when absent.
     instance_id: str | None = Field(default=None, max_length=64)
-    # ⚠ civ7 only, and NOT a ballot question -- Mite's slash command carries
+    # civ7 only, and NOT a ballot question -- Mite's slash command carries
     # it, so it must arrive at creation or the civ ban cap has nothing to key
     # on. civ-data's vocabulary, not Mite v1's `Antiquity_Age` (D196): every
     # `CivRow.age_pool` reads `AGE_ANTIQUITY`, and a filter against the wrong
@@ -75,12 +75,12 @@ class SeatAction(StrEnum):
 class ChangeSeatRequest(BaseModel):
     """One seat change. `place` covers self-place, move and host rearrange.
 
-    ⚠ Two actions rather than four. Moving IS placing at a different index,
+    Two actions rather than four. Moving IS placing at a different index,
     and a host rearrange is placing aimed at somebody else -- so one action
     plus an optional target covers all four of C5's verbs with one code path
     and one call to `validate_seats`.
 
-    ⚠ `place` states the WHOLE desired position. Omitting `team` means no
+    `place` states the WHOLE desired position. Omitting `team` means no
     side, not "keep the side you had": distinguishing the two would need a
     sentinel, and a seat move that silently retains a team is the kind of
     quiet action O-19b's compaction bug was made of.
@@ -112,7 +112,7 @@ class ChangeSeatRequest(BaseModel):
 class SubmitBallotRequest(BaseModel):
     """One seat's settings ballot.
 
-    ⚠ The whole ballot, not a delta. A seat re-submitting replaces what it
+    The whole ballot, not a delta. A seat re-submitting replaces what it
     had, so a client that dropped an answer cannot leave a stale one behind
     -- and "has this seat answered question X" stays a single lookup rather
     than a merge of every submission it ever made.
@@ -131,7 +131,7 @@ class SubmitBallotRequest(BaseModel):
 class SubmitBansRequest(BaseModel):
     """One seat's bans. The whole set, not a delta.
 
-    ⚠ Both lists may be empty -- a seat banning nothing has still SUBMITTED,
+    Both lists may be empty -- a seat banning nothing has still SUBMITTED,
     and the phase advances on all-submitted. Distinguishing "banned nothing"
     from "has not banned" is why the seat stores `bans` as a document rather
     than two bare lists (`bans is not None` is the submitted test).
@@ -152,7 +152,7 @@ class SubmitBansRequest(BaseModel):
 class SubmitPickRequest(BaseModel):
     """One seat's pick, from the pool that seat was dealt.
 
-    ⚠ **A pick is final once made (O-34).** The refusal is on the seat's own
+    **A pick is final once made (O-34).** The refusal is on the seat's own
     state, NOT on `revision`: a revision guard permits exactly what the rule
     forbids -- read at revision 5, change your mind, write at revision 5, and
     nothing has moved so the guard is satisfied. Same shape as D176's `$ne`,
@@ -164,7 +164,7 @@ class SubmitPickRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expected_revision: int = Field(ge=1)
-    # ⚠ Both optional, at least one required. Snake on civ7 runs a leader
+    # Both optional, at least one required. Snake on civ7 runs a leader
     # round then a civ round, so the civ-round request carries `civ_token`
     # ALONE -- a required `token` would force the client to resend a leader
     # it has already locked, and the per-field lock would refuse it. The

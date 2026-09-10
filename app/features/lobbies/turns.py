@@ -1,11 +1,11 @@
 """Whose turn it is. CWC is the only mode that has turns.
 
-⚠ **One order table serves both phases.** CWC captains ban in turn and then
+**One order table serves both phases.** CWC captains ban in turn and then
 pick in turn, sliced to `team_size * 2` each time, so a 4v4 is eight bans
 then eight picks. Every slice comes out even -- neither team ever acts more
 often than the other.
 
-⚠ **Stored, not re-derived.** The order is written onto the lobby when the
+**Stored, not re-derived.** The order is written onto the lobby when the
 draft is dealt, so a dispute reads what was actually used rather than a rule
 recomputed later.
 """
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-# ⚠ Carried verbatim from Mite's `draft.config.ts`, and confirmed against
+# Carried verbatim from Mite's `draft.config.ts`, and confirmed against
 # civup. Sixteen entries of TEAM index. It is not a plain alternation and not
 # derivable from a rule, which is why it is a table rather than a formula.
 CWC_PICK_ORDER = (0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1)

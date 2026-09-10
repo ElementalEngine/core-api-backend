@@ -6,7 +6,7 @@ written case by case, and every row asserts what is HIDDEN as well as what
 is shown -- a projection that returned the document untouched would pass a
 suite that only checked the visible half.
 
-⚠ The blind rows carry `pool` AND `pool_appearances`. Censoring `pick` alone
+The blind rows carry `pool` AND `pool_appearances`. Censoring `pick` alone
 leaks by elimination; leaving the union of all pools in place leaks the same
 way one level up, because pools are disjoint (spec section 4).
 """
