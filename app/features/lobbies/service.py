@@ -52,15 +52,8 @@ from app.features.lobbies.stats import contributions
 from app.features.lobbies.tally import resolve_settings
 from app.features.lobbies.turns import cwc_order, whose_turn
 
-# D177's staleness threshold. A whole draft is roughly fifteen minutes of
-# timers (spec section 7); an hour untouched is abandoned by any reading,
-# and every seat change bumps `updated_at`, so a lobby with people in it
-# never reaches this.
 STALE_AFTER = timedelta(hours=1)
 
-# Spec section 7. Bans is one window here; D72's two mechanisms -- a majority
-# vote in FFA, 1-2-2-1 captain turns in a teamer -- differ per turn and are
-# CP6b's, so 6a sets the phase's first deadline and nothing finer.
 SETTINGS_WINDOW = timedelta(minutes=5)
 DRAFT_RANDOM = "random"
 DRAFT_CWC = "cwc"
@@ -76,12 +69,7 @@ logger = logging.getLogger(__name__)
 
 
 class InvalidLobbyId(ValueError):
-    """The path id is not a well-formed ObjectId.
-
-    Kept distinct from LobbyNotFound on purpose: a malformed id is a caller
-    defect (400) and a well-formed id with no document is an ordinary miss
-    (404). One answer for both would return 404 for a typo and hide the bug.
-    """
+    """The path id is not a well-formed ObjectId."""
 
 
 class LobbyNotFound(LookupError):
@@ -89,15 +77,11 @@ class LobbyNotFound(LookupError):
 
 
 class NotYourTurn(PermissionError):
-    """Somebody else is owed this pick.
-
-    403, not 409. A conflict means the lobby moved under you; this means
-    the lobby is exactly where you thought and it is not your turn.
-    """
+    """Somebody else is owed this pick."""
 
 
 class PickIsFinal(Exception):
-    """The seat already holds a pick, and a pick cannot be changed (O-34)."""
+    """The seat already holds a pick, and a pick cannot be changed."""
 
 
 class NotSeated(PermissionError):
@@ -109,12 +93,7 @@ class NotTheHost(PermissionError):
 
 
 class SeatChangeRefused(Exception):
-    """The lobby would not take the change. Carries both revisions.
-
-    One class for every 409 on this path (C5 invariant 5): a stale revision,
-    a race lost to D176's `$ne`, and a lobby past `lobby` phase all answer
-    CONFLICT with the same two numbers, and the MESSAGE says which.
-    """
+    """The lobby would not take the change. Carries both revisions."""
 
     def __init__(self, message: str, expected: int, current: int | None) -> None:
         super().__init__(message)
@@ -123,32 +102,14 @@ class SeatChangeRefused(Exception):
 
 
 def as_lobby_id(lobby_id: str) -> ObjectId:
-    """The path string as an ObjectId, or InvalidLobbyId.
-
-    `ObjectId("nope")` raises `bson.errors.InvalidId`, which no handler
-    names, so it would reach D92's catch-all as a 500 -- C5 section 6b's own
-    "malformed-ObjectId 500". Tested rather than caught, following
-    `MatchService._to_oid`.
-    """
+    """The path string as an ObjectId, or InvalidLobbyId."""
     if not ObjectId.is_valid(lobby_id):
         raise InvalidLobbyId("Invalid lobby id")
     return ObjectId(lobby_id)
 
 
 def _wire_value(value: Any) -> Any:
-    """RFC 3339 for a datetime, unchanged for anything else.
-
-    `Z`, not `+00:00`. Both name the same instant, but FastAPI chooses
-    between them by accident: a route with a response model serialises
-    through Pydantic and emits `Z`, while `response_model=None` falls back to
-    `jsonable_encoder`, which calls `.isoformat()` and emits `+00:00`.
-    `GET /{id}` needs `response_model=None` for its 204, so it disagreed with
-    its three siblings on the wire -- measured, Correction 90.
-
-    Converting here removes the choice rather than settling it: a str reaches
-    either encoder unchanged, so every lobby route agrees by construction
-    instead of by both encoders happening to match.
-    """
+    """RFC 3339 for a datetime, unchanged for anything else."""
     if isinstance(value, datetime):
         return value.isoformat().replace("+00:00", "Z")
     return value
@@ -157,23 +118,7 @@ def _wire_value(value: Any) -> Any:
 def for_the_wire(
     document: dict[str, Any], viewer_discord_id: str | None
 ) -> dict[str, Any]:
-    """A stored lobby as `viewer_discord_id` may see it, in JSON's types.
-
-    One edge doing two jobs, censoring first (D184, D186). Two calls would be
-    two rules to remember at every route; this is one, and the viewer has no
-    default, so no route can put a lobby on the wire without deciding who is
-    reading it. CP4b shipped three routes that returned the stored document
-    raw -- `project_lobby` was on no application path at all.
-
-    `_id` and `season_id` are BSON ObjectIds. Every other v2 feature returns
-    a Pydantic response model, which declares its ids as `str` and serialises
-    them for free; lobbies returns the raw document because D73's projection
-    decides the shape per recipient (D179), so nothing converts them and
-    nothing typed the boundary. FastAPI's serializer raises on the first one:
-    "'ObjectId' object is not iterable", after the write has already landed.
-
-    Copied, never mutated: the caller may still be holding the stored form.
-    """
+    """A stored lobby as `viewer_discord_id` may see it, in JSON's types."""
     projected = project_lobby(document, viewer_discord_id)
     return {
         key: str(value)
@@ -184,20 +129,7 @@ def for_the_wire(
 
 
 def seat_the_roster(roster: Sequence[str], shape: LobbyShape) -> list[dict[str, Any]]:
-    """Seats for the roster, or none at all.
-
-    Fits-or-empty. Fifteen in voice and a 3v3 opens empty: seating an
-    arbitrary first six excludes people by list order, and self-selection is
-    the rule that matters here (D75, D181).
-
-    Deduplicated first. A repeated id would otherwise become two seats for
-    one player -- which neither index catches, because MongoDB de-duplicates
-    multikey keys per document (D176), and the `$ne` write guard does not
-    apply to an insert.
-
-    `team` is null for everyone, including a teamer: seating means "you are
-    in this lobby", never "you are on red". Sides are chosen, not assigned.
-    """
+    """Seats for the roster, or none at all."""
     unique = list(dict.fromkeys(player for player in roster if player))
     if not unique or len(unique) > shape.seat_count:
         return []
@@ -213,14 +145,7 @@ def build_lobby_document(
     season: dict[str, Any],
     now: datetime,
 ) -> dict[str, Any]:
-    """The document as it exists at creation.
-
-    Fields the lobby has not decided yet are ABSENT, not null: draft_mode,
-    map settings and pool size are the settings phase's; bans, picks and
-    pool_appearances belong to phases that have not run. `closed_at` is
-    absent too, and the partial filters select that exactly as they select an
-    explicit null -- measured (D175, Correction 73a).
-    """
+    """The document as it exists at creation."""
     document: dict[str, Any] = {
         "guild_id": request.guild_id,
         "channel_id": request.channel_id,
@@ -238,10 +163,6 @@ def build_lobby_document(
         "phase": LOBBY,
         "revision": 1,
         "created_at": now,
-        # Bumped by every mutation from CP5 on. D177's staleness reads this:
-        # turn_expires_at exists only during bans and draft, so D74's timer
-        # cannot see a lobby abandoned in `lobby` phase -- the case eviction
-        # exists for.
         "updated_at": now,
     }
     if request.instance_id is not None:
@@ -255,18 +176,12 @@ class LobbyService:
     def __init__(self, repository: Any, seasons: Any, civ_data: Any = None) -> None:
         self._repository = repository
         self._seasons = seasons
-        # Only the ban path reads it, so it defaults rather than forcing
-        # nineteen test call sites to pass a fake they never use. A ban
-        # submission with it absent raises loudly at the first attribute
-        # access; nothing reaches Mongo on a half-built service.
         self._civ_data = civ_data
 
     async def create(self, request: CreateLobbyRequest) -> dict[str, Any]:
-        """Raises InvalidLobbyShape for a bad mode, LobbyInsertRefused when a
-        unique index says the channel or a player is already taken.
-
-        The shape is resolved BEFORE the season lookup, so a malformed request
-        never touches the database.
+        """
+        Raises InvalidLobbyShape for a bad mode, LobbyInsertRefused when a unique
+        index says the channel or a player is already taken.
         """
         shape = resolve_shape(
             request.game_type, request.number_teams, request.team_size
@@ -274,12 +189,6 @@ class LobbyService:
         season = await self._seasons.get_current_season(request.edition)
         now = datetime.now(UTC)
 
-        # D177. `one_active_seat_per_player` turns a stuck lobby into a
-        # stuck player: D74's timers are lazy, and an ABANDONED lobby gets
-        # no read to evaluate them, so the seat is held indefinitely and the
-        # only symptom is a bare E11000 with no route out. The read that
-        # triggers evaluation has to be the NEW lobby's creation -- the one
-        # event guaranteed to happen when the lockout matters to somebody.
         roster = [player for player in dict.fromkeys(request.roster) if player]
         if roster:
             for evicted in await self._repository.evict_stale(
@@ -293,43 +202,22 @@ class LobbyService:
                 )
 
         document = build_lobby_document(request, shape, season, now)
-        # Mite holds no seat, so the create response is the observer view.
-        # A `lobby`-phase document has neither censored surface, so that is
-        # the whole document -- and it still crosses the one boundary.
         return for_the_wire(await self._repository.insert_lobby(document), None)
 
     async def resolve_active(
         self, guild_id: str, channel_id: str, viewer_discord_id: str
     ) -> dict[str, Any] | None:
-        """The open lobby for a channel -- one or none, by the D71 index."""
+        """The open lobby for a channel -- one or none, by the index."""
         found = await self._repository.find_open(guild_id, channel_id=channel_id)
         return for_the_wire(found[0], viewer_discord_id) if found else None
 
     async def claim_post(self, guild_id: str) -> dict[str, Any] | None:
-        """The next finished lobby Mite should post, or None for 204.
-
-        `None` viewer: Mite holds no seat, so it gets the observer view
-        (D186). A blind draft is `complete` by the time it is postable, so
-        nothing is censored from it anyway.
-        """
+        """The next finished lobby Mite should post, or None for 204."""
         claimed = await self._repository.claim_for_posting(guild_id, datetime.now(UTC))
         return None if claimed is None else for_the_wire(claimed, None)
 
     async def _count_the_lobby(self, lobby_id: Any) -> None:
-        """Fold a finished lobby into `lobby_stats`, once and only once.
-
-        Claim first, count second (D10). A crash between them loses one
-        lobby's counters and `stats_written_at` names which -- recoverable.
-        The other order double-counts on retry, and `$inc` has no memory, so
-        that is permanent and invisible. D60's rule: prefer the failure you
-        can find.
-
-        Never raises into its caller. The picks are what players came for
-        and the aggregate is a rebuildable cache; failing a 200 because a
-        counter did not move would be the wrong trade. The cost is that a
-        broken counter shows only in the log, which is why the claim marks
-        the lobby: one with `stats_written_at` and no rows is findable.
-        """
+        """Fold a finished lobby into `lobby_stats`, once and only once."""
         try:
             claimed = await self._repository.claim_for_stats(
                 lobby_id, datetime.now(UTC)
@@ -351,17 +239,7 @@ class LobbyService:
             logger.exception("lobby stats not counted. lobby=%s", lobby_id)
 
     async def _advanced(self, lobby: dict[str, Any]) -> dict[str, Any]:
-        """The lobby, with any expired deadline already applied (D74, D194).
-
-        Timers are lazy: nothing sweeps them, so the next read or write past
-        `turn_expires_at` is what advances the phase. That has to include the
-        POLL -- a settings phase in a lobby nobody is writing to would
-        otherwise never expire, which is D177's lockout in a different place.
-
-        The write is revision-guarded, so fourteen clients polling the same
-        expired lobby produce exactly one advance; the losers get None and
-        keep the document they read, which the winner has already superseded.
-        """
+        """The lobby, with any expired deadline already applied."""
         expires = lobby.get("turn_expires_at")
         # `core/db.py` opens the client tz_aware, so this compares two aware
         # datetimes and needs no coercion.
@@ -374,12 +252,7 @@ class LobbyService:
         return lobby
 
     async def _resolve_settings(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
-        """Tally the ballots and move to `bans`. None if the lobby moved.
-
-        Every question gets an answer, including from an empty room: a
-        question no seat answered locks to its default (D191), which is what
-        makes an expired settings phase safe to advance rather than stall.
-        """
+        """Tally the ballots and move to `bans`. None if the lobby moved."""
         now = datetime.now(UTC)
         return await self._repository.apply_changes(
             lobby["_id"],
@@ -398,30 +271,15 @@ class LobbyService:
         )
 
     async def _deal_the_draft(self, lobby: dict[str, Any]) -> dict[str, Any]:
-        """What leaving `bans` writes, by draft mode (D193, D198).
-
-        `random` has no draft: leaders are assigned straight from the
-        post-ban pool and the lobby is DONE. That is the `bans -> complete`
-        edge section 3's forward-only sequence does not otherwise permit, and
-        it was deferred until the dealer existed to make `complete` truthful.
-
-        A lobby can ban itself past a usable pool. The caller CANCELS
-        rather than letting this raise: after D194 an advance can be triggered
-        by a POLL, so raising would make every read a 500 with no route out.
-        """
+        """What leaving `bans` writes, by draft mode."""
         payload = await self._civ_data.fetch(lobby["edition"])
         landed = lobby.get("bans") or {}
         seated = [seat for seat in lobby.get("seats") or [] if seat.get("discord_id")]
         players = len(seated)
         mode = (lobby.get("settings") or {}).get("draft_mode")
 
-        # Viability is decided BEFORE dealing, because a fallback to
-        # `standard` needs per-seat pools where CWC needs one shared pool
-        # (D201). Deciding after would deal the wrong shape.
         captains: list[str] = []
         if mode == DRAFT_CWC:
-            # D75: the captain is DERIVED -- lowest seat_index per team,
-            # never stored as a flag.
             lowest: dict[int, dict[str, Any]] = {}
             for seat in seated:
                 team = seat.get("team")
@@ -436,10 +294,6 @@ class LobbyService:
             try:
                 cwc_order(captains, (lobby.get("team_size") or 0) * 2)
             except ValueError as exc:
-                # CWC_PICK_ORDER is entries of 0/1, but a teamer may have up
-                # to five teams and the ballot offers cwc to all of them.
-                # Falling back keeps the lobby playable and loses no picks;
-                # cancelling would punish players for a legal choice (O-35).
                 logger.warning(
                     "cwc unavailable, falling back to standard. lobby=%s %s",
                     lobby["_id"],
@@ -447,9 +301,6 @@ class LobbyService:
                 )
                 mode = DRAFT_STANDARD
 
-        # civ7 drafts a leader AND a civ, from two independently dealt
-        # pools. civ6 is leaders only, so its civ list is empty and every
-        # civ-side call below no-ops rather than needing a branch.
         kinds = {
             "leader": remaining_after_bans(
                 [row["token"] for row in payload["leaders"]],
@@ -460,11 +311,6 @@ class LobbyService:
             ),
         }
 
-        # D201, measured from Mite (`cwc.ts:328` holds ONE shuffled
-        # `leaderPool` on the session). A captain picks `team_size * 2` times,
-        # so per-seat pools would give them seven leaders to make six picks
-        # from while five teammates hold pools nobody drafts. It would mostly
-        # WORK, which is worse than failing.
         shared: dict[str, Any] = {}
         if mode == DRAFT_CWC:
             shared["pool"] = list(kinds["leader"])
@@ -499,8 +345,6 @@ class LobbyService:
             }
         ordered: dict[str, Any] = {}
         if mode == DRAFT_CWC:
-            # Stored rather than recomputed, so a dispute reads the order that
-            # was actually used (D200). CWC is the only mode with turns.
             ordered["pick_order"] = cwc_order(
                 captains, (lobby.get("team_size") or 0) * 2
             )
@@ -523,20 +367,7 @@ class LobbyService:
         }
 
     async def _resolve_bans(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
-        """Tally the bans and move to `draft`. None if the lobby moved.
-
-        No civ-data here, deliberately. Tokens were checked when they were
-        submitted, so the advance needs only what the document already holds
-        -- which keeps a 503 for unseeded civ-data off the POLL path, where
-        "your lobby is unavailable because a seed is missing" is a poor
-        answer to "what is the state of my lobby".
-
-        `random` advances to `draft` like every other mode for now. D193
-        has it skip to `complete`, but that shortcut belongs with the
-        assignment that makes `complete` truthful (CP6c): a terminal lobby
-        with no picks either lacks `closed_at`, breaking section 3, or sets
-        it and frees the channel on a lobby that never resolved.
-        """
+        """Tally the bans and move to `draft`. None if the lobby moved."""
         now = datetime.now(UTC)
         tallied = {
             **lobby,
@@ -571,11 +402,7 @@ class LobbyService:
     async def cancel(
         self, lobby_id: str, actor_discord_id: str, expected_revision: int
     ) -> dict[str, Any]:
-        """The host abandons the lobby. Terminal, and it frees the channel.
-
-        Host only. Any seated player leaving is `PATCH /seats`; cancelling
-        ends it for everyone, which is the host's call alone.
-        """
+        """The host abandons the lobby. Terminal, and it frees the channel."""
         oid = as_lobby_id(lobby_id)
         found = await self._repository.find_by_id(oid)
         if found is None:
@@ -632,9 +459,6 @@ class LobbyService:
         if order and whose_turn(order, turn_index) != actor_discord_id:
             raise NotYourTurn("It is not your turn to pick")
 
-        # D201. CWC reads the lobby's shared pool minus what is already
-        # taken; every other mode reads the seat's own disjoint pool, where
-        # nothing can be taken twice by construction.
         if mode == DRAFT_CWC:
             taken = {
                 token
@@ -656,14 +480,6 @@ class LobbyService:
             wanted["pick"] = (request.token, available["pick"])
         if request.civ_token is not None:
             wanted["civ_pick"] = (request.civ_token, available["civ_pick"])
-        # O-34, and NOT a revision check: read at revision 5, change your
-        # mind, write at revision 5, and a revision guard is satisfied. This
-        # is a clause about the document's content, like D176's `$ne`.
-        #
-        # A SEAT rule, so it cannot apply to CWC: a captain picks
-        # `team_size * 2` times and holds no `pick` of their own. There the
-        # turn order is the guard -- it advances, so a replay lands on
-        # somebody else's turn and `whose_turn` refuses it.
         if mode != DRAFT_CWC and mine.get("pick") is not None:
             raise PickIsFinal("Your pick is already locked in")
         chosen: dict[str, Any] = {}
@@ -678,10 +494,6 @@ class LobbyService:
         ]
         changes: dict[str, Any] = {"seats": picked}
         if mode == DRAFT_CWC:
-            # D199, the one place the seat is not the unit of ownership: a
-            # captain drafts for the team and nobody is assigned a leader
-            # until the players divide them. Measured from Mite, which stores
-            # two entries, one per team.
             teams = [dict(team) for team in found.get("teams") or []]
             side = next(
                 (
@@ -709,10 +521,6 @@ class LobbyService:
                 *self._why_refused(latest, request.expected_revision)
             )
 
-        # Two completion tests, one phase (D199). Turn-ordered modes are
-        # done when the ORDER is spent -- a CWC captain picks for the whole
-        # team, so no seat ever holds a pick and "every seat has picked"
-        # would never fire. The others are done when every seat has one.
         occupied = [seat for seat in picked if seat.get("discord_id")]
         finished = (
             whose_turn(order, turn_index + 1) is None
@@ -720,9 +528,6 @@ class LobbyService:
             else all(seat.get("pick") is not None for seat in occupied)
         )
         if finished:
-            # `revealed_at` is what un-censors a blind draft (D73). It is set
-            # for every mode: `complete` already reveals, so a stray mode
-            # cannot leave a finished lobby hidden.
             written = (
                 await self._repository.apply_changes(
                     oid,
@@ -763,9 +568,6 @@ class LobbyService:
         payload = await self._civ_data.fetch(found["edition"])
         legal = {
             "leader": {row["token"] for row in payload["leaders"]},
-            # Age-filtered. A civ outside the chosen starting age is a valid
-            # token for a civ that is not in the game, and banning it burns
-            # one of only three slots -- a client bug, not collusion.
             "civ": set(bannable_civs(payload["civs"], found.get("starting_age"))),
         }
         submitted = {"leader": request.leader_keys, "civ": request.civ_keys}
@@ -864,14 +666,7 @@ class LobbyService:
     async def read(
         self, lobby_id: str, viewer_discord_id: str, since: int | None = None
     ) -> dict[str, Any] | None:
-        """The censored snapshot, or None when `since` already holds its revision.
-
-        D77's revision gate: a polling caller sends the revision it has, and
-        None means nothing has moved -- 204 at the route, never 304, which
-        would invite cache and proxy semantics into the polling path.
-
-        Raises InvalidLobbyId for a malformed id, LobbyNotFound for a miss.
-        """
+        """The censored snapshot, or None when `since` already holds its revision."""
         found = await self._repository.find_by_id(as_lobby_id(lobby_id))
         if found is None:
             raise LobbyNotFound(lobby_id)
@@ -885,17 +680,7 @@ class LobbyService:
     async def start(
         self, lobby_id: str, actor_discord_id: str, expected_revision: int
     ) -> dict[str, Any]:
-        """Close seating and open the settings vote (D190).
-
-        Section 7's advance table has no `lobby -> settings` row and there
-        is no "all submitted" condition to hang it on, so this is the one
-        transition a timer cannot cover -- which is the restore trigger D94
-        recorded when it deleted the general `/advance`. Narrow on purpose:
-        one transition, one caller.
-
-        Not automatic at `min_seats`. FFA seats twelve and needs six, so the
-        sixth arrival does not mean nobody else is coming.
-        """
+        """Close seating and open the settings vote."""
         oid = as_lobby_id(lobby_id)
         found = await self._repository.find_by_id(oid)
         if found is None:
@@ -934,16 +719,7 @@ class LobbyService:
     async def change_seat(
         self, lobby_id: str, actor_discord_id: str, request: ChangeSeatRequest
     ) -> dict[str, Any]:
-        """One seat change, returning the updated censored snapshot (D77).
-
-        Seats move only while the lobby is in `lobby` phase. Nothing said
-        so before -- inferred and recorded as D189, because from `settings`
-        on, ballots are per seat, ban turns are per team and `turn_index`
-        points into the seating, so a move corrupts state no validator reads.
-
-        Raises InvalidLobbyId, LobbyNotFound, NotTheHost, InvalidSeating for
-        an arrangement that cannot exist, and SeatChangeRefused for any 409.
-        """
+        """One seat change, returning the updated censored snapshot."""
         oid = as_lobby_id(lobby_id)
         found = await self._repository.find_by_id(oid)
         if found is None:
@@ -990,8 +766,10 @@ class LobbyService:
     def _why_refused(
         lobby: dict[str, Any] | None, expected: int
     ) -> tuple[str, int, int | None]:
-        """Spec section 9: matched-count zero is stale revision OR already
-        seated, and only a re-read tells them apart."""
+        """
+        Spec section 9: matched-count zero is stale revision OR already seated, and
+        only a re-read tells them apart.
+        """
         current = lobby["revision"] if lobby else None
         if current != expected:
             return ("The lobby has moved on", expected, current)
@@ -1004,12 +782,7 @@ class LobbyService:
         edition: str | None = None,
         game_type: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Open lobbies for a guild, optionally filtered (D180).
-
-        `find_open` selects on `closed_at` alone, so this returns lobbies in
-        every open phase -- including `settings` and blind `draft`. It is the
-        broadest read in the feature and the one that most needs a viewer.
-        """
+        """Open lobbies for a guild, optionally filtered."""
         found = await self._repository.find_open(
             guild_id, edition=edition, game_type=game_type
         )
@@ -1019,16 +792,7 @@ class LobbyService:
 def rearranged(
     seats: Sequence[Mapping[str, Any]], target: str, request: ChangeSeatRequest
 ) -> list[dict[str, Any]]:
-    """The seat array the request asks for, sorted by `seat_index`.
-
-    A move KEEPS the existing seat document and changes its position, so
-    whatever the seat carries -- a ballot, later a pool and a pick -- follows
-    the player. Rebuilding the seat would silently drop it.
-
-    Gaps are left exactly where they are. civup's `arrangeTeamLobbySlots`
-    compacts before chunking, which moves a player across a team boundary
-    without anyone asking for it (O-19b, C5 invariant 1).
-    """
+    """The seat array the request asks for, sorted by `seat_index`."""
     others = [dict(seat) for seat in seats if seat.get("discord_id") != target]
     if request.action is SeatAction.LEAVE:
         return sorted(others, key=lambda seat: seat["seat_index"])

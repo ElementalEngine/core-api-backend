@@ -44,9 +44,6 @@ def resolve_settings(
 
     for question in questions:
         question_id = question["id"]
-        # Only options the catalogue still offers can win. It changes by
-        # release and a lobby can be mid-vote across one, so a retired option
-        # must not take a question on votes cast before it went away.
         offered = {option["id"] for option in question["options"]}
         counts: Counter[str] = Counter()
         answered = 0

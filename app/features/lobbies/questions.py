@@ -42,12 +42,7 @@ def _catalogue(edition: str) -> dict[str, Any]:
 
 
 def questions_for(edition: str, game_type: str) -> list[dict[str, Any]]:
-    """Every question a seat votes on, settings first and `draft_mode` last.
-
-    Returns a deep copy. The catalogue is cached for the process lifetime,
-    and a caller that mutated a question would change what every later lobby
-    is asked -- the same reason D171 hands out a copy of the cached season.
-    """
+    """Every question a seat votes on, settings first and `draft_mode` last."""
     catalogue = _catalogue(edition)
     try:
         settings = catalogue["settings"][catalogue["settings_for"][game_type]]

@@ -34,11 +34,7 @@ MIN_TEAM_SIZE, MAX_TEAM_SIZE = 2, 6
 
 
 class InvalidLobbyShape(ValueError):
-    """The mode fields do not describe a lobby that can exist.
-
-    Carries the offending field so the route can answer INVALID_REQUEST with
-    something a host can act on, rather than a bare 400.
-    """
+    """The mode fields do not describe a lobby that can exist."""
 
     def __init__(self, field: str, message: str) -> None:
         super().__init__(message)
@@ -46,12 +42,7 @@ class InvalidLobbyShape(ValueError):
 
 
 class InvalidSeating(ValueError):
-    """The seats do not describe an arrangement that can exist.
-
-    Distinct from InvalidLobbyShape: there the mode fields are wrong, here
-    the shape is fine and the seating is not. Carries the offending field for
-    the same reason -- a host can act on "seat 3 is taken", not on a 400.
-    """
+    """The seats do not describe an arrangement that can exist."""
 
     def __init__(self, field: str, message: str) -> None:
         super().__init__(message)
@@ -114,11 +105,7 @@ def resolve_shape(
 
 
 def legal_teamer_shapes() -> tuple[tuple[int, int], ...]:
-    """Every `(number_teams, team_size)` the rules above admit.
-
-    Derived, never listed: adding a shape means changing a bound, not editing
-    an enumeration that some other file also keeps.
-    """
+    """Every `(number_teams, team_size)` the rules above admit."""
     return tuple(
         (teams, size)
         for teams in range(MIN_TEAMS, MAX_TEAMS + 1)
@@ -128,27 +115,7 @@ def legal_teamer_shapes() -> tuple[tuple[int, int], ...]:
 
 
 def validate_seats(seats: Sequence[Mapping[str, Any]], shape: LobbyShape) -> None:
-    """The seating rules, including the two no index can enforce.
-
-    Neither of the first two has a Mongo leg left, and both were measured:
-
-    **No duplicate player.** MongoDB de-duplicates multikey keys per
-    document, so one lobby's seat array cannot collide with itself (D176).
-    The `$ne` predicate on the write is the guarantee; this is the second
-    line, and the readable refusal before the round trip.
-
-    **No seat without a player.** D175's partial filter excludes a lobby
-    whose only seat lacks `discord_id`, so Mongo ACCEPTS the bad document and
-    it breaks a later join instead -- symptom far from cause (Correction 74).
-    This is now the only thing between a null seat and a lobby that
-    mysteriously refuses joins.
-
-    `seat_index` is absolute and gaps are legal. civup's
-    `arrangeTeamLobbySlots` compacts before chunking, so closing a hole
-    mid-lobby silently moves a player across a team boundary (O-19b).
-
-    Raises InvalidSeating naming the offending field; returns None otherwise.
-    """
+    """The seating rules, including the two no index can enforce."""
     players: set[str] = set()
     indexes: set[int] = set()
     per_team: dict[int, int] = {}

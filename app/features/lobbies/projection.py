@@ -35,27 +35,12 @@ POOL_APPEARANCES = "pool_appearances"
 
 
 def ballots_are_secret(lobby: Mapping[str, Any]) -> bool:
-    """During `settings` a seat sees its own ballot and nobody else's.
-
-    Once settings closes the ballots are public -- the table censors the
-    `settings` row only.
-    """
+    """During `settings` a seat sees its own ballot and nobody else's."""
     return lobby.get("phase") == SETTINGS
 
 
 def pools_are_secret(lobby: Mapping[str, Any]) -> bool:
-    """Blind draft, before the reveal.
-
-    `complete` is not `draft`, so finishing reveals everything without a
-    second rule. A cancelled blind draft stays censored: the table says
-    nothing about it, and the safe reading of silence is to withhold.
-
-    `draft_mode` lives in `settings`, not at the top level. It is a ballot
-    outcome (D191), and this condition read the top level until CP6c --
-    silently never true, so a blind draft would have shipped UNCENSORED.
-    The D179 guard cannot catch that: it checks which fields exist, not
-    whether a censoring condition can ever fire (Correction 97).
-    """
+    """Blind draft, before the reveal."""
     return (
         lobby.get("phase") == DRAFT
         and (lobby.get("settings") or {}).get("draft_mode") == DRAFT_BLIND
@@ -66,12 +51,7 @@ def pools_are_secret(lobby: Mapping[str, Any]) -> bool:
 def project_lobby(
     lobby: Mapping[str, Any], viewer_discord_id: str | None
 ) -> dict[str, Any]:
-    """The lobby as `viewer_discord_id` may see it.
-
-    An observer -- anyone not holding a seat, including `None` -- matches no
-    seat, so every per-seat rule below hides everything from them without a
-    separate branch.
-    """
+    """The lobby as `viewer_discord_id` may see it."""
     projected = dict(lobby)
     seats = [dict(seat) for seat in lobby.get("seats") or []]
 

@@ -14,18 +14,11 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-# Carried verbatim from Mite's `draft.config.ts`, and confirmed against
-# civup. Sixteen entries of TEAM index. It is not a plain alternation and not
-# derivable from a rule, which is why it is a table rather than a formula.
 CWC_PICK_ORDER = (0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1)
 
 
 def cwc_order(captains: Sequence[str], turns: int) -> list[str]:
-    """The captain who acts at each turn, for bans or for picks.
-
-    Raises ValueError past the table's length rather than wrapping: wrapping
-    would silently give a longer draft an ordering nobody chose.
-    """
+    """The captain who acts at each turn, for bans or for picks."""
     if len(captains) != 2:
         raise ValueError(f"cwc needs exactly two captains, got {len(captains)}")
     if turns > len(CWC_PICK_ORDER):

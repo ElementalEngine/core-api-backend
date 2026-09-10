@@ -32,11 +32,7 @@ PHASE_COMPLETE = "complete"
 
 
 def contributions(lobby: Mapping[str, Any]) -> dict[str, dict[str, int]]:
-    """Per-token counters to increment, keyed by token.
-
-    The caller supplies `(season_id, edition, game_type)` from the same
-    lobby; only the token varies within one document.
-    """
+    """Per-token counters to increment, keyed by token."""
     counts: dict[str, dict[str, int]] = defaultdict(
         lambda: {PICKS: 0, BANS: 0, POOL_APPEARANCES: 0}
     )

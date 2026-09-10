@@ -94,8 +94,6 @@ async def create_lobby(
     except InvalidLobbyShape as exc:
         raise invalid_request(str(exc)) from exc
     except LobbyInsertRefused as exc:
-        # Both D71 invariants are 409. The index name says which, and the
-        # message says it in words a host can act on.
         raise conflict(REFUSAL_MESSAGES.get(exc.index, str(exc))) from exc
 
 
@@ -106,7 +104,7 @@ async def resolve_active(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any] | None:
-    """One open lobby or none, by the D71 index."""
+    """One open lobby or none, by the index."""
     return await _service(db).resolve_active(guild_id, channel_id, actor)
 
 
@@ -118,18 +116,10 @@ async def browse_lobbies(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> list[dict[str, Any]]:
-    """Open lobbies for a guild (D180).
-
-    `guild_id` is required, never defaulted: a service token is
-    per-service, not per-guild, so an unfiltered read would expose every
-    lobby on the deployment to any holder of it.
-    """
+    """Open lobbies for a guild."""
     return await _service(db).browse(guild_id, actor, edition, game_type)
 
 
-# Declared last: `/active` is a literal at the same depth and would be
-# captured as an id by a parameterised route registered before it (C5
-# section 6b).
 @activity_router.get("/{lobby_id}", response_model=None)
 async def read_lobby(
     lobby_id: str,
@@ -137,16 +127,7 @@ async def read_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any] | Response:
-    """One lobby, censored for the caller (D73), revision-gated (D77).
-
-    204 when `since` already holds the current revision -- not 304, which
-    would invite cache and proxy semantics into the polling path. A lobby
-    with no `since` is read unconditionally.
-
-    `revision` starts at 1, so `since=0` is refused rather than treated as
-    "send me everything": no lobby has ever held it, and a client sending it
-    has a bug worth surfacing.
-    """
+    """One lobby, censored for the caller, revision-gated."""
     try:
         snapshot = await _service(db).read(lobby_id, actor, since)
     except InvalidLobbyId as exc:
@@ -165,12 +146,9 @@ async def change_seat(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """Self-place, leave, move and host rearrange (C5), returning the
-    updated censored snapshot so the caller never waits for a poll tick.
-
-    Both revisions reach journald on every outcome (C5 invariant 4): when a
-    409 is disputed the log answers who held which revision, with no event
-    machinery.
+    """
+    Self-place, leave, move and host rearrange (C5), returning the updated censored
+    snapshot so the caller never waits for a poll tick.
     """
     try:
         lobby = await _service(db).change_seat(lobby_id, actor, request)
@@ -214,11 +192,7 @@ async def start_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """Close seating, open the settings vote (D190).
-
-    The one transition no timer covers: section 7's table has no
-    `lobby -> settings` row and there is no "all submitted" to hang it on.
-    """
+    """Close seating, open the settings vote."""
     try:
         lobby = await _service(db).start(lobby_id, actor, expected_revision)
     except InvalidLobbyId as exc:
@@ -259,12 +233,7 @@ async def submit_ballot(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """One seat's settings ballot, resolving the phase on the last one.
-
-    The response may come back already at `bans`: the final ballot tallies
-    and advances in the same call, and so does any request arriving after
-    `turn_expires_at` (D74, D194).
-    """
+    """One seat's settings ballot, resolving the phase on the last one."""
     try:
         lobby = await _service(db).submit_ballot(lobby_id, actor, request)
     except InvalidLobbyId as exc:
@@ -308,12 +277,7 @@ async def submit_bans(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """One seat's bans, resolving the phase on the last submission.
-
-    Leaders are checked against the edition; civs against the STARTING
-    AGE's pool only, so a real token for a civ that is not in the game
-    cannot burn one of three slots (D196).
-    """
+    """One seat's bans, resolving the phase on the last submission."""
     try:
         lobby = await _service(db).submit_bans(lobby_id, actor, request)
     except InvalidLobbyId as exc:
@@ -357,11 +321,7 @@ async def submit_pick(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """One seat's pick, completing the lobby on the last one.
-
-    **409 for a second pick, and it is not a revision conflict.** A pick is
-    final once made (O-34); the refusal reads the seat, not the revision.
-    """
+    """One seat's pick, completing the lobby on the last one."""
     try:
         lobby = await _service(db).submit_pick(lobby_id, actor, request)
     except InvalidLobbyId as exc:
@@ -371,9 +331,6 @@ async def submit_pick(
     except NotSeated as exc:
         raise forbidden(str(exc)) from exc
     except NotYourTurn as exc:
-        # 403, not 409. A conflict says the lobby moved under you; this
-        # says it is exactly where you thought and somebody else is owed
-        # the pick.
         raise forbidden(str(exc)) from exc
     except PickIsFinal as exc:
         raise conflict(str(exc)) from exc
@@ -444,12 +401,7 @@ async def claim_post(
     guild_id: str = Query(min_length=1, max_length=32),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any] | None:
-    """Claim the oldest unposted finished lobby, or 204 when there is none.
-
-    Declared BEFORE any parameterised sibling: a `/{lobby_id}` route
-    registered first would swallow this literal path and check a Mite-facing
-    request against the Activity gate.
-    """
+    """Claim the oldest unposted finished lobby, or 204 when there is none."""
     lobby = await _service(db).claim_post(guild_id)
     if lobby is None:
         response.status_code = status.HTTP_204_NO_CONTENT

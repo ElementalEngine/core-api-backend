@@ -26,12 +26,7 @@ class NotEnoughPool(ValueError):
 
 
 def even_split(total: int, players: int) -> tuple[int, int]:
-    """Per-player pool size, and how many entries fall off the end.
-
-    Raises NotEnoughPool when a player would get nothing -- a draft where
-    somebody has an empty pool is not a draft, and failing here is far
-    cheaper than failing at the pick.
-    """
+    """Per-player pool size, and how many entries fall off the end."""
     if players <= 0:
         raise NotEnoughPool("a draft needs at least one player")
     per_player = total // players
@@ -43,12 +38,7 @@ def even_split(total: int, players: int) -> tuple[int, int]:
 
 
 def deal(tokens: Sequence[str], players: int, rng: Any = _RANDOM) -> list[list[str]]:
-    """One disjoint pool per player, every pool the same size.
-
-    Disjoint by construction rather than by a check: the shuffled list is
-    consumed from the front, so no token can reach two players even if the
-    sizing arithmetic is wrong.
-    """
+    """One disjoint pool per player, every pool the same size."""
     per_player, _ = even_split(len(tokens), players)
     shuffled = list(tokens)
     rng.shuffle(shuffled)
@@ -61,12 +51,7 @@ def deal(tokens: Sequence[str], players: int, rng: Any = _RANDOM) -> list[list[s
 def assign_one_each(
     tokens: Sequence[str], players: int, rng: Any = _RANDOM
 ) -> list[str]:
-    """One token per player, all distinct -- `random` mode's whole draft.
-
-    Refuses rather than handing two players the same leader when the pool
-    is short. That cannot happen under the current ban caps, and a silent
-    duplicate would be worse than an error.
-    """
+    """One token per player, all distinct -- `random` mode's whole draft."""
     if len(tokens) < players:
         raise NotEnoughPool(
             f"{len(tokens)} remain after bans and {players} players need one each"

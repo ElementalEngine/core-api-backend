@@ -25,11 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CreateLobbyRequest(BaseModel):
-    """Mite's create call. Authoritative guild, channel, host and roster.
-
-    `extra="forbid"` so a camelCase field name is refused rather than
-    silently dropped and then reported as a missing required field.
-    """
+    """Mite's create call. Authoritative guild, channel, host and roster."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -40,28 +36,8 @@ class CreateLobbyRequest(BaseModel):
     game_type: str
     number_teams: int | None = None
     team_size: int | None = None
-    # Voice members. A creation-time INPUT, not a stored field: it seats
-    # people and is then discarded. Keeping it would mean enforcing voice
-    # membership as eligibility, and voice membership churns constantly --
-    # the Discord channel already scopes who can see the lobby.
-    #
-    # Seated only when the roster FITS. Fifteen people in voice and a 3v3
-    # opens empty: seating an arbitrary first six excludes people by list
-    # order, and this is exactly where self-selection matters (D75).
-    #
-    # May be empty -- a host outside voice gets a lobby nobody is in yet,
-    # which is legal and is why the seat index carries the $exists clause
-    # (D175, Correction 73b).
     roster: list[str] = Field(default_factory=list, max_length=99)
-    # Discord's Activity instance. A diagnostic attribute only: the lobby
-    # key is core-api's own id and the Activity resolves by channel, never
-    # by this (spec section 2). Omitted from the document when absent.
     instance_id: str | None = Field(default=None, max_length=64)
-    # civ7 only, and NOT a ballot question -- Mite's slash command carries
-    # it, so it must arrive at creation or the civ ban cap has nothing to key
-    # on. civ-data's vocabulary, not Mite v1's `Antiquity_Age` (D196): every
-    # `CivRow.age_pool` reads `AGE_ANTIQUITY`, and a filter against the wrong
-    # spelling matches nothing, leaves no civ bannable, and raises nothing.
     starting_age: Literal["AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"] | None = (
         Field(default=None)
     )
@@ -73,23 +49,10 @@ class SeatAction(StrEnum):
 
 
 class ChangeSeatRequest(BaseModel):
-    """One seat change. `place` covers self-place, move and host rearrange.
-
-    Two actions rather than four. Moving IS placing at a different index,
-    and a host rearrange is placing aimed at somebody else -- so one action
-    plus an optional target covers all four of C5's verbs with one code path
-    and one call to `validate_seats`.
-
-    `place` states the WHOLE desired position. Omitting `team` means no
-    side, not "keep the side you had": distinguishing the two would need a
-    sentinel, and a seat move that silently retains a team is the kind of
-    quiet action O-19b's compaction bug was made of.
-    """
+    """One seat change. `place` covers self-place, move and host rearrange."""
 
     model_config = ConfigDict(extra="forbid")
 
-    # D77's optimistic concurrency. Revision starts at 1, so 0 is a client
-    # bug rather than "I have nothing".
     expected_revision: int = Field(ge=1)
     action: SeatAction
     seat_index: int | None = Field(default=None, ge=0)
@@ -110,17 +73,7 @@ class ChangeSeatRequest(BaseModel):
 
 
 class SubmitBallotRequest(BaseModel):
-    """One seat's settings ballot.
-
-    The whole ballot, not a delta. A seat re-submitting replaces what it
-    had, so a client that dropped an answer cannot leave a stale one behind
-    -- and "has this seat answered question X" stays a single lookup rather
-    than a merge of every submission it ever made.
-
-    Selections are `option_id`, or `a|b` where the question allows more than
-    one (D191). Ids are checked against the catalogue, so a question or option
-    the ballot invents is a 400 rather than a vote nothing counts.
-    """
+    """One seat's settings ballot."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -129,18 +82,7 @@ class SubmitBallotRequest(BaseModel):
 
 
 class SubmitBansRequest(BaseModel):
-    """One seat's bans. The whole set, not a delta.
-
-    Both lists may be empty -- a seat banning nothing has still SUBMITTED,
-    and the phase advances on all-submitted. Distinguishing "banned nothing"
-    from "has not banned" is why the seat stores `bans` as a document rather
-    than two bare lists (`bans is not None` is the submitted test).
-
-    Tokens are civ-data's, and are checked against it: leaders against the
-    edition's whole set, civs against the STARTING AGE's pool only. A civ
-    outside the chosen age is a real token for a civ not in the game, and
-    banning it would burn one of three slots (D196).
-    """
+    """One seat's bans. The whole set, not a delta."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -150,25 +92,11 @@ class SubmitBansRequest(BaseModel):
 
 
 class SubmitPickRequest(BaseModel):
-    """One seat's pick, from the pool that seat was dealt.
-
-    **A pick is final once made (O-34).** The refusal is on the seat's own
-    state, NOT on `revision`: a revision guard permits exactly what the rule
-    forbids -- read at revision 5, change your mind, write at revision 5, and
-    nothing has moved so the guard is satisfied. Same shape as D176's `$ne`,
-    which is a clause about the document's content rather than its version.
-
-    `civ_token` is civ7 only; civ6 drafts leaders alone.
-    """
+    """One seat's pick, from the pool that seat was dealt."""
 
     model_config = ConfigDict(extra="forbid")
 
     expected_revision: int = Field(ge=1)
-    # Both optional, at least one required. Snake on civ7 runs a leader
-    # round then a civ round, so the civ-round request carries `civ_token`
-    # ALONE -- a required `token` would force the client to resend a leader
-    # it has already locked, and the per-field lock would refuse it. The
-    # schema has to match the two-round shape, not the other way round.
     token: str | None = Field(default=None, min_length=1, max_length=64)
     civ_token: str | None = Field(default=None, min_length=1, max_length=64)
 
