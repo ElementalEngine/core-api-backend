@@ -85,6 +85,8 @@ class FakeRepo:
         self.writes = []
         self.evictions = []
         self.changes = []
+        self.claims = []
+        self.counted = []
         self._open = open_lobbies or []
         self._lobby = lobby
         self._written = written
@@ -123,6 +125,26 @@ class FakeRepo:
         if self._written is None:
             return None
         return {**self._written, "seats": seats}
+
+    async def claim_for_stats(self, lobby_id, now):
+        # ⚠ Mirrors the real guard: the FIRST claim returns the document,
+        # every later one returns None. A fake that always returned the
+        # document would let a double count pass unnoticed.
+        self.claims.append(lobby_id)
+        if len(self.claims) > 1 or self._applied is None:
+            return None
+        # ⚠ ReturnDocument.BEFORE on a lobby whose pick was ALREADY written
+        # by the preceding apply_changes, so it carries that pick. Returning
+        # the pre-pick document counts nothing and hides the bug -- the same
+        # divergence `replace_seats` had (section 4 item 121).
+        latest = dict(self._applied)
+        for _, changes in self.changes:
+            latest.update(changes)
+        return {**latest, "phase": "complete"}
+
+    async def add_contributions(self, key, counts):
+        self.counted.append((key, counts))
+        return len(counts)
 
     async def apply_changes(self, lobby_id, expected_revision, changes, now):
         self.changes.append((expected_revision, changes))
@@ -1210,3 +1232,51 @@ def test_cwc_cannot_take_a_leader_another_team_already_took():
     assert repo.changes == []
     pick(repo, "bob", "LEADER_AMINA")
     assert repo.changes[0][1]["teams"][1]["leaders"] == ["LEADER_AMINA"]
+
+
+def test_a_finished_lobby_is_counted_once_and_only_once():
+    # ⚠ `$inc` has no memory, so a lobby counted twice is permanently wrong
+    # and invisible. The claim is what prevents it, and it guards on the
+    # document rather than on `revision` -- a retry arrives with the SAME
+    # revision and a revision guard would match again.
+    done = {
+        **DRAFTING,
+        "settings": {"draft_mode": "standard"},
+        "pick_order": [],
+        "seats": [
+            {
+                "seat_index": 0,
+                "discord_id": "alice",
+                "pool": ["LEADER_TRAJAN"],
+            }
+        ],
+    }
+    repo = FakeRepo(lobby=done, applied=done)
+    pick(repo, "alice", "LEADER_TRAJAN")
+    assert len(repo.counted) == 1
+    key, counts = repo.counted[0]
+    assert key["edition"] == "civ6"
+    assert counts["LEADER_TRAJAN"]["picks"] == 1
+
+    # A second completion claims nothing, so nothing is counted again.
+    asyncio.run(LobbyService(repo, FakeSeasons(), FakeCivData())._count_the_lobby("L1"))
+    assert len(repo.counted) == 1
+
+
+def test_a_counter_failure_never_fails_the_pick():
+    # ⚠ The picks are what players came for; the aggregate is a rebuildable
+    # cache. A broken counter shows in the log, and the claim marks the lobby
+    # so one with `stats_written_at` and no rows is findable.
+    class Exploding(FakeRepo):
+        async def claim_for_stats(self, lobby_id, now):
+            raise RuntimeError("mongo is having a day")
+
+    done = {
+        **DRAFTING,
+        "settings": {"draft_mode": "standard"},
+        "pick_order": [],
+        "seats": [{"seat_index": 0, "discord_id": "alice", "pool": ["LEADER_TRAJAN"]}],
+    }
+    repo = Exploding(lobby=done, applied=done)
+    lobby = pick(repo, "alice", "LEADER_TRAJAN")
+    assert lobby["phase"] == "complete"
