@@ -48,6 +48,7 @@ from app.features.lobbies.schemas import (
     SubmitBansRequest,
     SubmitPickRequest,
 )
+from app.features.lobbies.stats import contributions
 from app.features.lobbies.tally import resolve_settings
 from app.features.lobbies.turns import (
     cwc_order,
@@ -309,6 +310,41 @@ class LobbyService:
         found = await self._repository.find_open(guild_id, channel_id=channel_id)
         return for_the_wire(found[0], viewer_discord_id) if found else None
 
+    async def _count_the_lobby(self, lobby_id: Any) -> None:
+        """Fold a finished lobby into `lobby_stats`, once and only once.
+
+        ⚠ Claim first, count second (D10). A crash between them loses one
+        lobby's counters and `stats_written_at` names which -- recoverable.
+        The other order double-counts on retry, and `$inc` has no memory, so
+        that is permanent and invisible. D60's rule: prefer the failure you
+        can find.
+
+        ⚠ Never raises into its caller. The picks are what players came for
+        and the aggregate is a rebuildable cache; failing a 200 because a
+        counter did not move would be the wrong trade. The cost is that a
+        broken counter shows only in the log, which is why the claim marks
+        the lobby: one with `stats_written_at` and no rows is findable.
+        """
+        try:
+            claimed = await self._repository.claim_for_stats(
+                lobby_id, datetime.now(UTC)
+            )
+            if claimed is None:
+                return
+            counts = contributions(claimed)
+            if not counts:
+                return
+            await self._repository.add_contributions(
+                {
+                    "season_id": claimed.get("season_id"),
+                    "edition": claimed["edition"],
+                    "game_type": claimed["game_type"],
+                },
+                counts,
+            )
+        except Exception:
+            logger.exception("lobby stats not counted. lobby=%s", lobby_id)
+
     async def _advanced(self, lobby: dict[str, Any]) -> dict[str, Any]:
         """The lobby, with any expired deadline already applied (D74, D194).
 
@@ -523,12 +559,17 @@ class LobbyService:
                 "closed_at": now,
                 "turn_expires_at": None,
             }
-        return await self._repository.apply_changes(
+        written = await self._repository.apply_changes(
             lobby["_id"],
             lobby["revision"],
             {"bans": tallied["bans"], **changes},
             now,
         )
+        # ⚠ `random` reaches `complete` right here, with no pick ever
+        # submitted, so this is the only place its stats can be counted.
+        if written is not None and written.get("phase") == COMPLETE:
+            await self._count_the_lobby(written["_id"])
+        return written
 
     async def cancel(
         self, lobby_id: str, actor_discord_id: str, expected_revision: int
@@ -701,6 +742,7 @@ class LobbyService:
                 )
                 or written
             )
+            await self._count_the_lobby(oid)
         return for_the_wire(written, actor_discord_id)
 
     async def submit_bans(

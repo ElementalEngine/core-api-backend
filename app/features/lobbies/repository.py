@@ -20,7 +20,7 @@ from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import DuplicateKeyError
 
 from app.core.constants import COL_LOBBIES, COL_LOBBY_STATS, GAMES_DB
-from app.features.lobbies.phases import CANCEL_ABANDONED, CANCELLED
+from app.features.lobbies.phases import CANCEL_ABANDONED, CANCELLED, COMPLETE
 
 # `closed_at` is set on `complete` AND on `cancelled` (spec section 3), so
 # testing it alone cannot drift out of step with `phase`.
@@ -177,6 +177,57 @@ class LobbyRepository:
             {"$set": {**changes, "updated_at": now}, "$inc": {"revision": 1}},
             return_document=ReturnDocument.AFTER,
         )
+
+    async def claim_for_stats(
+        self, lobby_id: ObjectId, now: datetime
+    ) -> dict[str, Any] | None:
+        """Claim a completed lobby for counting, once and only once.
+
+        ⚠ Guarded on `stats_written_at` being ABSENT, not on `revision`.
+        `$inc` has no memory, so a lobby counted twice is permanently wrong
+        and invisible -- and a retry after a crash arrives with the SAME
+        revision, so a revision guard would match again and double it. This
+        is a fact about the document, like D176's `$ne` and O-34's lock.
+
+        ⚠ Returns the document as it was BEFORE the claim: that is what gets
+        counted, and the `stats_written_at` just set is not part of it.
+        None means somebody else already claimed it.
+        """
+        return await self._lobbies.find_one_and_update(
+            {
+                "_id": lobby_id,
+                "phase": COMPLETE,
+                "stats_written_at": {"$exists": False},
+            },
+            {"$set": {"stats_written_at": now}},
+            return_document=ReturnDocument.BEFORE,
+        )
+
+    async def add_contributions(
+        self, key: dict[str, Any], counts: dict[str, dict[str, int]]
+    ) -> int:
+        """Upsert-and-$inc one aggregate row per token.
+
+        ⚠ Runs AFTER the claim, never before. A crash between them loses one
+        lobby's counters -- recoverable, because `stats_written_at` names the
+        lobby that was missed. The other order double-counts on retry, which
+        is not recoverable. D60's rule: prefer the failure you can find.
+
+        The unique `aggregate_key` index is what makes the upsert safe; two
+        concurrent writers would otherwise both miss and both insert.
+        """
+        written = 0
+        for token, fields in counts.items():
+            increments = {field: value for field, value in fields.items() if value}
+            if not increments:
+                continue
+            await self._lobby_stats.update_one(
+                {**key, "token": token},
+                {"$inc": increments, "$setOnInsert": {**key, "token": token}},
+                upsert=True,
+            )
+            written += 1
+        return written
 
     async def find_by_id(self, lobby_id: ObjectId) -> dict[str, Any] | None:
         """One lobby by id, open or closed.
