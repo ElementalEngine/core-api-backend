@@ -276,10 +276,6 @@ def read_array_0a(buffer, state):
     for i in range(array_len):
         index = struct.unpack("<I", buffer[state["pos"] : state["pos"] + 4])[0]
         if index > array_len:
-            # Fires on every valid Civ6 save -- marker cc272701, all four
-            # fixtures. An array sub-format this parser does not decode,
-            # walked past deliberately. Not an error-as-data path: raising
-            # here breaks valid saves. D83 excludes it. Correction 21.
             log("Index outside bounds of array at " + hex(state["pos"]))
             return array_len
         log(f"reading array index {index} at {hex(state['pos'])}")

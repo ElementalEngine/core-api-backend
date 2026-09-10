@@ -1127,7 +1127,7 @@
         "type": "object"
       },
       "ManualRegistrationChoice": {
-        "description": "Staff-facing platform choice for `/manual-register`.\n\nDistinct from RegistrationPlatform because \"Steam Family Share\" is not a stored\nplatform: it persists as linked_platform=steam with method=admin_steam_family_share.\nThe backend owns the mapping to (stored platform, method) via `resolved()`.",
+        "description": "Staff-facing platform choice for `/manual-register`.",
         "enum": [
           "steam",
           "steam_family_share",
@@ -1732,7 +1732,7 @@
         "type": "object"
       },
       "RegistrationMethod": {
-        "description": "How a registration's account ownership was established.\n\nStored at registrations.<game>.method. Legacy records may carry the pre-change\nvalues \"oauth\" (treated as OAUTH_STEAM_API) or \"manual_admin\" (treated as attested).",
+        "description": "How a registration's account ownership was established.",
         "enum": [
           "oauth_steam_api",
           "admin_steam_family_share",
@@ -2190,7 +2190,7 @@
         "type": "string"
       },
       "SeatPatchIn": {
-        "description": "One seat's requested changes. Absent means unchanged (D89, D154).\n\n`sub_out` is three-state: absent leaves the pairing alone, a discord id\ncreates or repoints it, null clears it. Nothing else is nullable -- a\nnull placement would otherwise read as \"unchanged\" on one path and as a\nvalue on another, which is the kind of silence this route exists to\nremove.",
+        "description": "One seat's requested changes. Absent means unchanged.",
         "properties": {
           "discord_id": {
             "anyOf": [
@@ -2249,7 +2249,7 @@
       },
       "SelfServiceRegistrationRequest": {
         "additionalProperties": false,
-        "description": "Civ7 non-Steam self-service registration (currently 2K only).\n\nThe Auth Bot supplies the Discord identity fields automatically. game/platform are\naccepted but the backend enforces game=civ7 + platform=2k (see ManualRegistrationService).",
+        "description": "Civ7 non-Steam self-service registration (currently 2K only).",
         "properties": {
           "discord_display_name": {
             "anyOf": [

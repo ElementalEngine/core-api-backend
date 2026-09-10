@@ -26,9 +26,5 @@ router.include_router(stats_router)
 router.include_router(stats_v2_router)
 router.include_router(infractions_router)
 router.include_router(civ_data_router)
-# C5 section 6b: both lobby routers share `/api/v2/lobbies` and resolve as
-# ONE ordered table, so whichever registers first claims an ambiguous path.
-# Mite's two routes go first -- a Mite path matching an Activity-gated route
-# would be checked against the WRONG TOKEN, which no handler test can catch.
 router.include_router(lobbies_mite_router)
 router.include_router(lobbies_activity_router)

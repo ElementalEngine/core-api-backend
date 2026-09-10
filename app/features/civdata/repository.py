@@ -34,8 +34,6 @@ class CivDataRepository:
             kind = doc.pop("kind", None)
             doc.pop("edition", None)
             (leaders if kind == "leader" else civs).append(doc)
-        # More than one means a seed run died partway. Mite caches on this
-        # number, so reporting either value would pin it to a stale table.
         return {
             "edition": edition,
             "leader_data_version": versions.pop() if len(versions) == 1 else None,
@@ -46,11 +44,7 @@ class CivDataRepository:
     async def seed(
         self, edition: str, documents: list[dict[str, Any]]
     ) -> dict[str, int]:
-        """Upsert one edition's documents, then drop tokens the file dropped.
-
-        Upsert rather than drop-and-insert: the collection is never empty
-        mid-run, so a deployed route cannot serve a half-seeded payload.
-        """
+        """Upsert one edition's documents, then drop tokens the file dropped."""
         if not documents:
             # $nin against an empty list matches everything.
             raise ValueError(f"refusing to seed {edition} with no documents")

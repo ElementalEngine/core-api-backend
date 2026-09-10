@@ -12,18 +12,12 @@ from pymongo.asynchronous.collection import AsyncCollection
 
 from app.core.constants import COL_SUB_EVENTS, COL_USERS, DB_SERVER_MEMBERS, GAMES_DB
 
-# ---- match collection names (single source of truth, D157) ----
-
 COL_PENDING_MATCHES = "pending_matches"
 COL_VALIDATED_MATCHES = "validated_matches"
 
 
 class MatchRepository:
-    """Every read and write against the match collections (D157, S6).
-
-    The three handles live here because nothing else uses them and
-    ensure_indexes below already declares their indexes.
-    """
+    """Every read and write against the match collections (D157, S6)."""
 
     def __init__(self, client: AsyncMongoClient) -> None:
         self._client = client
@@ -32,10 +26,6 @@ class MatchRepository:
         self._validated: AsyncCollection = mr[COL_VALIDATED_MATCHES]
         self._sub_events: AsyncCollection = mr[COL_SUB_EVENTS]
         self._users: AsyncCollection = client[DB_SERVER_MEMBERS][COL_USERS]
-
-    # -------------------- session and user lookups --------------------
-    # From MongoQueries, which S7 deleted. MatchService is the only caller
-    # of the lookups; auth keeps its own against the same collection.
 
     async def start_session(self) -> AsyncClientSession:
         return self._client.start_session()
@@ -64,9 +54,11 @@ class MatchRepository:
     async def find_validated_by_bytes(
         self, save_bytes_sha256: str
     ) -> dict[str, Any] | None:
-        """The cross-collection half of the dedup. The unique indexes are
-        per-collection, so approval moving a document out of pending_matches
-        is what reopened the double-rating path. D83, Entry 12."""
+        """
+        The cross-collection half of the dedup. The unique indexes are
+        per-collection, so approval moving a document out of pending_matches is
+        what reopened the double-rating path., Entry 12.
+        """
         return await self._validated.find_one({"save_bytes_sha256": save_bytes_sha256})
 
     async def find_pending_by_id(self, oid: ObjectId) -> dict[str, Any] | None:
@@ -78,11 +70,7 @@ class MatchRepository:
     async def claim_pending_match(
         self, oid: ObjectId, *, now: datetime
     ) -> dict[str, Any] | None:
-        """Claim a pending match for approval; None means already claimed or gone.
-
-        D84's claim. Pending-ness is which collection the document is in, so
-        the claim is an additive field rather than a status transition.
-        """
+        """Claim a pending match for approval; None means already claimed or gone."""
         return await self._pending.find_one_and_update(
             {"_id": oid, "approving_at": {"$exists": False}},
             {"$set": {"approving_at": now}},
@@ -176,9 +164,6 @@ class MatchRepository:
         )
 
     async def ensure_indexes(self) -> None:
-        # Partial on {$exists: true}: a plain unique index collapses every
-        # missing value into one null and rejects the second document that
-        # has no byte hash. Legacy documents have none. Playbook Entry 12.
         for col, name in (
             (self._pending, "pending_matches_save_bytes_uq"),
             (self._validated, "validated_matches_save_bytes_uq"),

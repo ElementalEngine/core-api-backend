@@ -44,8 +44,10 @@ def test_fixture_1_three_approves_no_reverts():
 
 
 def test_fixture_2_revert_nets_out():
-    """A query filtering to event_type 'approve' would report every reverted
-    match as divergence. Summing all events nets them naturally."""
+    """
+    A query filtering to event_type 'approve' would report every reverted match as
+    divergence. Summing all events nets them naturally.
+    """
     events = [
         ev(1, FFA, 1250.0, 1263.0, 0),
         ev(1, FFA, 1263.0, 1280.0, 1),
@@ -64,8 +66,10 @@ def test_fixture_3_reset_carries_its_movement():
 
 
 def test_fixture_3b_reset_leaves_no_stat_document():
-    """A reset deletes the document. Missing is initial_mu, not an error --
-    otherwise every reset player diverges by exactly their whole rating."""
+    """
+    A reset deletes the document. Missing is initial_mu, not an error -- otherwise
+    every reset player diverges by exactly their whole rating.
+    """
     events = [
         ev(1, FFA, 1250.0, 1300.0, 0),
         ev(1, FFA, 1300.0, INITIAL_MU, 1, "reset"),
@@ -78,14 +82,18 @@ def test_fixture_4_player_with_zero_events_is_skipped():
 
 
 def test_fixture_5_placeholder_player_is_skipped():
-    """Placeholders have neither side of the equation; the ledger writes skip
-    them by the same guard."""
+    """
+    Placeholders have neither side of the equation; the ledger writes skip them by
+    the same guard.
+    """
     assert reconcile([ev(-1, FFA, 1250.0, 1300.0)], {}, initial_mu=INITIAL_MU) == []
 
 
 def test_fixture_6_scopes_reconcile_independently():
-    """One approve writes three stat documents per player. Summing across
-    scopes produces a number that means nothing."""
+    """
+    One approve writes three stat documents per player. Summing across scopes
+    produces a number that means nothing.
+    """
     events = [
         ev(1, FFA, 1250.0, 1263.0, 0),
         ev(1, SEASON, 1250.0, 1244.0, 0),
@@ -109,8 +117,10 @@ def test_fixture_7_broken_set_is_reported():
 
 
 def test_fixture_8_float_accumulation_sets_epsilon():
-    """The worst accumulation found over 3,600 trials, reproduced exactly.
-    It must be non-zero -- a fixture that never accumulates sets nothing."""
+    """
+    The worst accumulation found over 3,600 trials, reproduced exactly. It must be
+    non-zero -- a fixture that never accumulates sets nothing.
+    """
     random.seed(7)
     mu = INITIAL_MU
     events = []

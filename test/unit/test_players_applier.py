@@ -58,8 +58,6 @@ def shape(match):
 
 
 def test_two_subs_in_one_patch_land_on_the_seats_the_client_named():
-    # The fixture nobody writes without D154. Ascending order marks B as the
-    # sub instead of C -- valid-looking, and the wrong player.
     match = M(P(0, 0, "A"), P(1, 1, "B"), P(2, 2, "C"), P(3, 3, "D"))
     patch = [SeatPatch(0, sub_out="L0"), SeatPatch(2, sub_out="L2")]
     assert validate_players_patch(match, patch, actor_is_staff=False) == []
@@ -111,8 +109,6 @@ def test_placement_propagates_to_the_derived_leaver_row():
 
 
 def test_repointing_a_sub_replaces_the_leaver_rather_than_adding_one():
-    # Item 79: v1's assign_sub would strand two subbed_out rows on one team
-    # and rate a duel as 2v1. Declaratively the seat holds one pairing.
     match = M(P(0, 0, "A", is_sub=True), P(0, 0, "X", subbed_out=True), P(1, 1, "B"))
     apply_players_patch(match, [SeatPatch(0, sub_out="y")], STEAM)
     assert shape(match) == [

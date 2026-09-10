@@ -23,14 +23,7 @@ def build_match_event(
     sigma_after: float,
     applied_delta: float,
 ) -> dict[str, Any]:
-    """One ledger event, for one player, in one scope.
-
-    No clock and no database: the caller passes a single occurred_at for the
-    whole transaction, so the function stays pure and testable.
-
-    applied_delta is what the code applied, not mu_after - mu_before.
-    Reconciliation sums the pair; when the two disagree, that is the finding.
-    """
+    """One ledger event, for one player, in one scope."""
     return {
         "event_type": event_type,
         "match_id": match_id,
@@ -56,11 +49,7 @@ def build_reset_event(
     sigma_before: float,
     sigma_after: float,
 ) -> dict[str, Any]:
-    """A stat reset, for one player, in one scope.
-
-    No match_id and no match_created_at: a reset attaches to no match, which
-    is why the unique index is filtered on match_id existing.
-    """
+    """A stat reset, for one player, in one scope."""
     return {
         "event_type": "reset",
         "occurred_at": occurred_at,

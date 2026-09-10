@@ -19,9 +19,6 @@ from pathlib import Path
 
 Finding = tuple[str, str, str]
 
-# Two wrong delegators and one correct one. Without a case the check can
-# fail on, the suite passes on a checker that finds nothing at all -- D86
-# Rule 1, and the shape of s6-close.md section 8's first quarantine check.
 BROKEN_SOURCE = """
 class Svc:
     async def packed(self, a, b):

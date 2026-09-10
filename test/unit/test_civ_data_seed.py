@@ -39,8 +39,6 @@ def test_civ6_leaders():
 
 
 def test_civ6_has_no_civ_documents():
-    # D96: civ6 is leaders only. Its civ tokens appear as the target of the
-    # mapping, never as rows -- nobody holds civ6 civ display names.
     assert "civs" not in load_seed("civ6")
 
 
@@ -53,8 +51,6 @@ def test_civ7_leaders_are_civ_agnostic():
     for row in leaders:
         assert row["token"].startswith("LEADER_")
         assert row["name"]
-        # A civ7 leader's CPL name does not vary by civilization -- the tuple
-        # key get_cpl_name used was never built (D138).
         assert "civ" not in row
 
 
@@ -94,8 +90,6 @@ def test_to_documents_shape():
 
 
 def test_documents_carry_no_authoring_fields():
-    # Provenance stays in the file. A served field nobody reads still lands
-    # in Mite's generated types.
     docs = to_documents("civ6") + to_documents("civ7")
     leaked = {key for doc in docs for key in doc if key in AUTHORING_ONLY}
     assert leaked == set()

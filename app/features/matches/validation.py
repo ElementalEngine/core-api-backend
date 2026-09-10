@@ -46,13 +46,12 @@ class Violation:
 
 @dataclass(frozen=True, slots=True)
 class SeatPatch:
-    """One seat's declarative changes. UNSET means unchanged (D89, D154)."""
+    """One seat's declarative changes. UNSET means unchanged."""
 
     seat: int
     placement: int | UnsetType = UNSET
     discord_id: str | UnsetType = UNSET
     quit: bool | UnsetType = UNSET
-    # str creates or repoints a pairing; None clears it (D154, Correction 45).
     sub_out: str | None | UnsetType = UNSET
 
     def is_empty(self) -> bool:
@@ -77,12 +76,7 @@ class _Seat:
 
 
 def _seats(match: MatchModel) -> list[_Seat]:
-    """Project the players array onto editable seats.
-
-    Synthetic subbed_out rows are not seats: their fields are derived from the
-    sub-in row above them (service.py:672-686), so every check runs over this
-    projection and a patch may never address them.
-    """
+    """Project the players array onto editable seats."""
     seats: list[_Seat] = []
     for i, p in enumerate(match.players):
         if p.subbed_out:
@@ -94,7 +88,7 @@ def _seats(match: MatchModel) -> list[_Seat]:
 
 
 def _pairing_faults(seats: Sequence[_Seat]) -> set[int]:
-    """Teams holding an is_sub seat with no paired leaver (D155)."""
+    """Teams holding an is_sub seat with no paired leaver."""
     return {s.team for s in seats if s.is_sub and s.leaver is None}
 
 
@@ -107,11 +101,7 @@ def _teams_at(seats: Sequence[_Seat]) -> dict[int, set[int]]:
 
 
 def _tie_growth(pre: Sequence[_Seat], post: Sequence[_Seat]) -> set[int]:
-    """Placement values the patch ties across teams, or widens a tie onto.
-
-    A tie is a placement held by two or more distinct teams — teammates
-    sharing a placement is the normal teamer shape, never a tie.
-    """
+    """Placement values the patch ties across teams, or widens a tie onto."""
     a, b = _teams_at(pre), _teams_at(post)
     return {v for v, teams in b.items() if len(teams) > 1 and len(teams) > len(a[v])}
 
@@ -127,13 +117,7 @@ def _split_teams(seats: Sequence[_Seat]) -> set[int]:
 def validate_players_patch(
     match: MatchModel, patch: Sequence[SeatPatch], *, actor_is_staff: bool
 ) -> list[Violation]:
-    """Judge the whole patch as one atomic decision (D151).
-
-    Returns every violation, deterministically ordered; [] is the only legal
-    result. Conditions that can pre-exist on a match — a tie, an unpaired
-    sub, a split team — fire only on what the patch introduces, so legacy
-    documents stay editable (D91's "introduces", generalised).
-    """
+    """Judge the whole patch as one atomic decision."""
     out: list[Violation] = []
 
     if not patch or all(e.is_empty() for e in patch):

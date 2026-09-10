@@ -171,8 +171,6 @@ class MatchService:
         if not match.players:
             return []
 
-        # A session cannot carry concurrent operations, and approve reads its
-        # pre-state inside the transaction (D84).
         if session is not None:
             return [
                 await self.get_player_ranking(
@@ -300,11 +298,7 @@ class MatchService:
         return match, post
 
     async def _recompute_deltas(self, match: MatchModel) -> MatchModel:
-        """Recompute the delta/season_delta/combined_delta triple on match.players.
-
-        This spine (three ranking loads + three rating passes) used to be copy-pasted
-        in six methods.
-        """
+        """Recompute the delta/season_delta/combined_delta triple on match.players."""
         players_ranking = await self.get_players_ranking(match)
         players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
         players_combined_ranking = await self.get_players_ranking(

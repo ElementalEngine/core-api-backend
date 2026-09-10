@@ -135,10 +135,6 @@ class RegistrationService:
         if not steam_id:
             raise RankRoleEligibilityError(discord_user_id)
 
-        # Rank roles require an account whose Steam ownership is API-verifiable. Only
-        # OAuth-Steam registrations (and the legacy "oauth" value) qualify. Steam Family
-        # Share and any admin-attested registration are explicitly ineligible even though
-        # they may carry a steam linked account.
         regs = user.get("registrations") or {}
         if not _has_steam_api_registration(regs):
             raise RankRoleEligibilityError(discord_user_id)

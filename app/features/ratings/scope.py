@@ -47,11 +47,7 @@ def stat_scope(
     is_cloud: bool,
     is_combined: bool,
 ) -> str:
-    """The stat document's address, and the ledger's scope field.
-
-    One resolver for the stat write and its event, so a recorded scope can
-    never name a collection other than the one written.
-    """
+    """The stat document's address, and the ledger's scope field."""
     db = stats_db_name(civ_version=civ_version, is_seasonal=is_seasonal)
     col = stats_collection_name(
         match_type=match_type, is_cloud=is_cloud, is_combined=is_combined

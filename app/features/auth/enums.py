@@ -25,11 +25,7 @@ class RegistrationPlatform(StrEnum):
 
 
 class RegistrationMethod(StrEnum):
-    """How a registration's account ownership was established.
-
-    Stored at registrations.<game>.method. Legacy records may carry the pre-change
-    values "oauth" (treated as OAUTH_STEAM_API) or "manual_admin" (treated as attested).
-    """
+    """How a registration's account ownership was established."""
 
     OAUTH_STEAM_API = "oauth_steam_api"
     ADMIN_STEAM_FAMILY_SHARE = "admin_steam_family_share"
@@ -38,12 +34,7 @@ class RegistrationMethod(StrEnum):
 
 
 class ManualRegistrationChoice(StrEnum):
-    """Staff-facing platform choice for `/manual-register`.
-
-    Distinct from RegistrationPlatform because "Steam Family Share" is not a stored
-    platform: it persists as linked_platform=steam with method=admin_steam_family_share.
-    The backend owns the mapping to (stored platform, method) via `resolved()`.
-    """
+    """Staff-facing platform choice for `/manual-register`."""
 
     STEAM = "steam"
     STEAM_FAMILY_SHARE = "steam_family_share"

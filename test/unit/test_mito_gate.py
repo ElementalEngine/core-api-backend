@@ -25,9 +25,6 @@ def test_gate_returns_401_without_header_and_admits_with_it(monkeypatch):
 
     from app.core import dependencies
 
-    # Patch the exact settings object the dependency closes over — the config
-    # module gets reloaded by test_config.py/test_auth_config.py, so importing
-    # app.core.config.settings here could yield a different instance.
     monkeypatch.setattr(dependencies.settings, "mito_service_token", SecretStr(TOKEN))
 
     app = FastAPI()

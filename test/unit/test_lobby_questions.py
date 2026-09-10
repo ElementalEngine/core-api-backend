@@ -36,9 +36,6 @@ def test_question_ids_are_unique_within_a_ballot(edition, game_type):
 
 @pytest.mark.parametrize(("edition", "game_type"), EVERY_BALLOT)
 def test_every_question_is_answerable(edition, game_type):
-    # A question with one option is a statement, and one with none cannot be
-    # voted on at all -- either would stall a phase that advances on "all
-    # submitted" (section 7).
     for question in questions_for(edition, game_type):
         assert len(question["options"]) >= 2, question["id"]
         assert question["title"], question["id"]
@@ -55,9 +52,6 @@ def test_draft_mode_is_asked_last_and_exactly_once(edition, game_type):
 
 @pytest.mark.parametrize("edition", EDITIONS)
 def test_duel_offers_standard_and_random_only(edition):
-    # D193, and a deliberate divergence from v1 in both directions: Mite
-    # hands duel the FFA list, snake and blind included, and the spec's mode
-    # matrix said standard and CWC. Neither is what duel plays.
     modes = questions_for(edition, "duel")[-1]
     assert [option["id"] for option in modes["options"]] == ["standard", "random"]
 
@@ -71,8 +65,6 @@ def test_cwc_is_offered_to_teamer_and_nowhere_else(edition):
 
 @pytest.mark.parametrize("edition", EDITIONS)
 def test_random_is_offered_everywhere(edition):
-    # It skips the draft phase entirely rather than running turns (D193), so
-    # it is the one mode every game type can always fall back to.
     for game_type in GAME_TYPES:
         offered = {o["id"] for o in questions_for(edition, game_type)[-1]["options"]}
         assert "random" in offered, game_type
@@ -95,8 +87,6 @@ def test_multi_select_is_capped_below_the_option_count():
 
 
 def test_the_catalogue_hands_out_a_copy():
-    # Cached for the process lifetime (D171's reason): a caller that mutated a
-    # question would change what every later lobby is asked.
     questions_for("civ6", "ffa")[0]["title"] = "MUTATED"
     assert questions_for("civ6", "ffa")[0]["title"] != "MUTATED"
 

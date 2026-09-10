@@ -28,10 +28,7 @@ def read_entry(entry: Any) -> tuple[int, int]:
 
 
 def bump(tally: dict[str, Any], key: str, *, won: bool, step: int) -> dict[str, Any]:
-    """Move one key by step, normalising whatever shape was there.
-
-    Reverts clamp at zero so a revert can never write a negative count.
-    """
+    """Move one key by step, normalising whatever shape was there."""
     games, wins = read_entry(tally.get(key))
     games += step
     if won:

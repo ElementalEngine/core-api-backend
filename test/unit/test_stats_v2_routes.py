@@ -43,7 +43,6 @@ def test_the_legacy_put_pair_is_gone():
 
 
 def test_the_v1_stats_routes_survive_until_cutover():
-    # C2 is "Replace / hard cutover": Mite v1 still calls these.
     assert ("GET", "/api/v1/stats/user") in _routes("/api/v1/stats")
     assert ("POST", "/api/v1/stats/batch") in _routes("/api/v1/stats")
 

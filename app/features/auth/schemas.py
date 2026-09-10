@@ -88,11 +88,7 @@ class ManualRegistrationRequest(BaseModel):
 
 
 class SelfServiceRegistrationRequest(BaseModel):
-    """Civ7 non-Steam self-service registration (currently 2K only).
-
-    The Auth Bot supplies the Discord identity fields automatically. game/platform are
-    accepted but the backend enforces game=civ7 + platform=2k (see ManualRegistrationService).
-    """
+    """Civ7 non-Steam self-service registration (currently 2K only)."""
 
     model_config = ConfigDict(extra="forbid")
 

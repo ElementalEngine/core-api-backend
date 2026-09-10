@@ -24,16 +24,7 @@ def get_mongo_database(request: Request) -> AsyncDatabase:
 
 
 def actor_discord_id(x_actor_discord_id: str = Header()) -> str:
-    """D90/D94's one identity header, replacing civup's five.
-
-    Shared rather than per-feature: `/api/v2/matches` stamps it for D91's
-    authorship rules and C5's `activity_router` stamps it for D73's
-    censoring. Two copies of one header name is how the edition enum reached
-    three files (section 4 item 107).
-
-    Required, never defaulted -- an absent actor is a malformed request, not
-    an anonymous one.
-    """
+    """The single identity header every activity route requires."""
     return x_actor_discord_id
 
 
@@ -99,17 +90,7 @@ def require_mito_token(authorization: str | None = Header(default=None)) -> None
 
 
 def require_activity_token(authorization: str | None = Header(default=None)) -> None:
-    """The Activity server's own credential, separate from Mito's by D94.
-
-    These seven routes submit picks, cancel a draft, and read any lobby AS ANY
-    ACTOR through D73's per-caller censoring. A shared gate would hand Mite
-    that reach and the Activity the ability to claim posts -- strictly wider
-    than D17 locked. Not the same case as `require_any_service_token`, which
-    widens only over read-only reference data (D96).
-
-    Unset until S10 provisions the credential, in which case these routes
-    answer 503 rather than admitting anyone else's token.
-    """
+    """The Activity server's own credential, separate from Mito's by."""
     _require_bearer(
         authorization,
         configured=settings.activity_service_token.get_secret_value(),
@@ -119,16 +100,7 @@ def require_activity_token(authorization: str | None = Header(default=None)) -> 
 
 
 def require_any_service_token(authorization: str | None = Header(default=None)) -> None:
-    """Accept any configured service token.
-
-    Read-only reference data every consumer needs identically, so there is no
-    authority to leak by widening the gate (D96). Naming one bot's token here
-    would mean re-editing it for each consumer that legitimately reads it.
-
-    The Activity is admitted here (C8) because it drafts from the leader and
-    civ tables. That is the whole of what widening buys it -- the lobby routes
-    take their own gate, per D94.
-    """
+    """Accept any configured service token."""
     configured = [
         settings.mito_service_token.get_secret_value(),
         settings.lj_service_token.get_secret_value(),

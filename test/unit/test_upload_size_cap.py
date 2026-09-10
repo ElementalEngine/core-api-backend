@@ -33,11 +33,6 @@ def _client(monkeypatch):
     monkeypatch.setattr(dependencies.settings, "mito_service_token", SecretStr(TOKEN))
     app = FastAPI()
     app.include_router(upload_router)
-    # get_database raises AppDependencyError during dependency resolution --
-    # before the handler body -- so the cap is unreachable without this. D60
-    # names dependency_overrides as the route-test mechanism. The override is
-    # never used: an oversized body is rejected before MatchService is built,
-    # and an at-limit body fails parsing first.
     app.dependency_overrides[get_database] = lambda: None
     return TestClient(app, raise_server_exceptions=False)
 
@@ -66,9 +61,5 @@ def test_oversized_upload_is_rejected_for_size(monkeypatch):
 def test_body_at_the_limit_is_not_rejected_for_size(monkeypatch):
     from app.features.matches.router import MAX_SAVE_BYTES
 
-    # Not a real save, so it fails downstream -- but never on size. Asserting
-    # on res.text rather than res.json(): past the cap the request reaches
-    # MatchService with the overridden (None) db and fails there, and a bare
-    # FastAPI() has no handler for that, so the body is not JSON.
     res = _post(_client(monkeypatch), b"X" * MAX_SAVE_BYTES)
     assert "too large" not in res.text.lower()

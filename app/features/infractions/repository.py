@@ -72,11 +72,7 @@ async def upsert_suspension(
 async def find_or_create_suspension(
     db: AsyncMongoClient, discord_id: str
 ) -> SuspensionDocument:
-    """Atomic upsert — never a read-then-write race.
-
-    $setOnInsert runs only when a new document is created; existing documents
-    are returned as-is, preserving any existing tier/suspension state.
-    """
+    """Atomic upsert — never a read-then-write race."""
     col = suspensions_col(db)
     _default_ir: dict[str, Any] = {"tier": 0, "decays": None}
     result: dict[str, Any] | None = await col.find_one_and_update(
@@ -159,11 +155,11 @@ async def get_active_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]
 
 
 async def get_overdue_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]:
-    """Suspensions whose `ends` has already passed but the flag was never
-    cleared — happens if the bot was offline (crash, restart, redeploy) when
-    the in-memory expiry timer should have fired. Mirrors
-    get_active_suspensions exactly, with the `ends` bound inverted; uses the
-    same compound index.
+    """
+    Suspensions whose `ends` has already passed but the flag was never cleared —
+    happens if the bot was offline (crash, restart, redeploy) when the in-memory
+    expiry timer should have fired. Mirrors get_active_suspensions exactly, with
+    the `ends` bound inverted; uses the same compound index.
     """
     col = suspensions_col(db)
     now = datetime.now(UTC)

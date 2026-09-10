@@ -63,8 +63,10 @@ def api_error(
     retryable: bool = False,
     details: Any | None = None,
 ) -> HTTPException:
-    """Raise through D92's envelope. S6 uses three codes on /api/v2/matches;
-    S7 adds the closed enum, the INTERNAL catch-all and correlation_id."""
+    """
+    Raise through's envelope. S6 uses three codes on /api/v2/matches; S7 adds the
+    closed enum, the INTERNAL catch-all and correlation_id.
+    """
     return HTTPException(
         status_code=status_code,
         detail=_error_envelope(
@@ -86,17 +88,7 @@ def not_found(message: str) -> HTTPException:
 
 
 def conflict(message: str, details: Any | None = None) -> HTTPException:
-    """C5 invariant 5: 409 with code CONFLICT.
-
-    The CODE stays generic and the MESSAGE names which invariant refused --
-    auth's six *_CONFLICT codes are per-feature because its callers branch on
-    them; C5's contract fixes one code for every lobby conflict, so the
-    distinction lives where a host can read it.
-
-    Mutations carry both revision numbers in `details` (C5 invariant 5), so a
-    client that lost a race can tell "you are behind" from "that is taken"
-    without a second read.
-    """
+    """C5 invariant 5: 409 with code CONFLICT."""
     return api_error(code="CONFLICT", message=message, status_code=409, details=details)
 
 
@@ -129,12 +121,7 @@ async def app_dependency_exception_handler(
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """D92's catch-all: INTERNAL / 500 / retryable false, never 503.
-
-    503 is reserved for Mongo unreachable and the dependency gate. A bug is
-    not a transient fault, and dressing one as a retryable outage invites the
-    client to retry it forever.
-    """
+    """D92's catch-all: INTERNAL / 500 / retryable false, never 503."""
     correlation_id = str(getattr(request.state, "correlation_id", "") or "")
     logger.exception(
         "Unhandled error correlation_id=%s method=%s path=%s",

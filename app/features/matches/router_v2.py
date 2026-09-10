@@ -35,11 +35,7 @@ router = APIRouter(
 
 
 def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:
-    """D152: Mite supplies facts about the guild, core-api owns the rules.
-
-    An assertion by the token holder, not a verification -- it cannot catch
-    a Mite bug, and Mite's own check remains the enforcement.
-    """
+    """D152: Mite supplies facts about the guild, core-api owns the rules."""
     return x_actor_is_staff
 
 
@@ -61,11 +57,7 @@ def _require_reporter(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
 
 
 def _require_player(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
-    """D91: a player in the match, or staff.
-
-    Unassigned seats hold placeholder ids, so those players cannot be matched
-    and cannot contest -- which is why "or staff" is in the rule.
-    """
+    """D91: a player in the match, or staff."""
     if is_staff:
         return
     if not any(p.get("discord_id") == actor for p in doc.get("players", [])):
@@ -113,12 +105,6 @@ async def get_leaderboard(
             civ_version=game,
         )
     except ValueError as exc:
-        # Section 4 item 94, verified on the wire at CP8: 500 for a bad
-        # `game_mode`. `stats_collection_name` raises ValueError for anything
-        # but ffa|teamer|duel (`ratings/scope.py:35`), and neither catch below
-        # is one -- so a user typo reached the generic handler. The v1 log
-        # line "Invalid game type for leaderboard" was written for this and
-        # never once fired. Caught FIRST: MatchServiceError does not cover it.
         raise invalid_request(str(exc)) from exc
     except NotFoundError as exc:
         raise not_found(str(exc)) from exc
@@ -157,8 +143,6 @@ async def approve_match(
     actor: str = Depends(actor_discord_id),
     db=Depends(get_database),
 ) -> dict[str, Any]:
-    # Staff-only, enforced Mite-side (D91): staff is a guild property
-    # core-api cannot see.
     svc = MatchService(db)
     try:
         return await svc.approve_match(match_id, actor)
@@ -188,7 +172,6 @@ async def contest_match(
 
 @router.post("/matches/{match_id}/revert", response_model=MatchResponse)
 async def revert_match(match_id: str, db=Depends(get_database)) -> dict[str, Any]:
-    # Staff-only, enforced Mite-side (D91).
     svc = MatchService(db)
     try:
         return await svc.revert_match(match_id)

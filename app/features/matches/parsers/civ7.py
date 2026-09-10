@@ -321,15 +321,10 @@ def extract_turn(root):
 
 
 def extract_game_age(root):
-    # The token is the stored value, as civ and leader already are (D44).
-    # Display resolution belongs to the read side, not the parser. D129.
     return root["age"]["value"]
 
 
 def extract_map_type(root):
-    # The fallback is the entry key, never another locale: map_type feeds the
-    # composition hash, so a fr_FR fallback would hash the same game
-    # differently from an en_US one. D83 Bug 1, D134.
     parsed = json.loads(root["map"]["value"])
     for entry, langs in parsed.items():
         for lang in langs:

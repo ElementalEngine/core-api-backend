@@ -28,8 +28,6 @@ def test_ffa_fills_to_a_ceiling_with_a_floor():
 
 
 def test_duel_is_two_teams_of_one():
-    # Not team: null. `is_captain` is the lowest seat_index WITHIN a team
-    # (D75), so two teams of one names both duellists with no special case.
     shape = resolve_shape("duel")
     assert (shape.number_teams, shape.team_size) == (2, 1)
     assert (shape.seat_count, shape.min_seats) == (2, 2)
@@ -118,8 +116,6 @@ def test_shapes_are_frozen():
         shape.seat_count = 99  # type: ignore[misc]
 
 
-# --- seating (D176, Correction 74, O-19b) -------------------------------
-
 FFA_SHAPE = resolve_shape("ffa")
 TEAMER_SHAPE = resolve_shape("teamer", 3, 3)
 
@@ -138,9 +134,6 @@ def test_a_legal_seating_is_accepted():
 
 @pytest.mark.parametrize("player", [None, ""])
 def test_a_seat_with_no_player_is_refused(player):
-    # Correction 74: D175's partial filter EXCLUDES a lobby whose only seat
-    # lacks discord_id, so Mongo accepts the document and it breaks a later
-    # join instead. Nothing else checks this any more.
     with pytest.raises(InvalidSeating) as exc:
         validate_seats(
             [{"seat_index": 0, "discord_id": player, "team": None}], FFA_SHAPE
@@ -149,9 +142,6 @@ def test_a_seat_with_no_player_is_refused(player):
 
 
 def test_one_player_cannot_hold_two_seats():
-    # D176: MongoDB de-duplicates multikey keys per document, so the unique
-    # index cannot collide a lobby with itself. The $ne on the write is the
-    # guarantee; this is the refusal a host can read.
     with pytest.raises(InvalidSeating) as exc:
         validate_seats([seat(0, "a"), seat(1, "a")], FFA_SHAPE)
     assert exc.value.field == "discord_id"
@@ -171,9 +161,6 @@ def test_two_seats_cannot_claim_one_index():
 
 
 def test_a_gap_is_legal_and_is_never_closed():
-    # O-19b: civup's arrangeTeamLobbySlots compacts before chunking, so
-    # closing a hole mid-lobby silently moves a player across a team
-    # boundary. Indexes are absolute; empty positions are gaps (section 8).
     validate_seats([seat(0, "a"), seat(7, "b")], FFA_SHAPE)
 
 

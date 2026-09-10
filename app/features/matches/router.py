@@ -46,10 +46,6 @@ upload_router = APIRouter(
 )
 
 
-# Mirrors Mite's CIV_SAVE.MAX_BYTES (constants.ts:73). Not a setting: two
-# numbers in two repos with nothing keeping them in sync is how they drift,
-# and being stricter than the client rejects files Mite already accepted.
-# D83 Hardening 2.
 MAX_SAVE_BYTES = 12 * 1024 * 1024
 _READ_CHUNK = 1024 * 1024
 
@@ -387,10 +383,6 @@ async def get_leaderboard_ranking(
 ):
     svc = LeaderboardService(db)
     try:
-        # NOTE: parameter order matters here.
-        # - game: civ_version (civ6|civ7)
-        # - game_type: PBC|realtime (used to infer cloud)
-        # - game_mode: ffa|teamer|duel|combined (match_type)
         return await svc.get_leaderboard(
             match_type=payload.game_mode,
             is_cloud=payload.game_type,
@@ -399,12 +391,6 @@ async def get_leaderboard_ranking(
             civ_version=payload.game,
         )
     except ValueError as exc:
-        # Section 4 item 94, verified on the wire at CP8: 500 for a bad
-        # `game_mode`. `stats_collection_name` raises ValueError for anything
-        # but ffa|teamer|duel (`ratings/scope.py:35`), and neither catch below
-        # is one -- so a user typo reached the generic handler. The v1 log
-        # line "Invalid game type for leaderboard" was written for this and
-        # never once fired. Caught FIRST: MatchServiceError does not cover it.
         logger.warning(
             "\u26a0\ufe0f Invalid game_mode for leaderboard: %s", payload.game_mode
         )

@@ -118,25 +118,14 @@ class FakeRepo:
         self, lobby_id, expected_revision, seats, now, *, absent_player=None
     ):
         self.writes.append((expected_revision, seats, absent_player))
-        # The real one uses ReturnDocument.AFTER, so it returns the document
-        # INCLUDING the seats just written. Returning the pre-write document
-        # made every caller of this return value test against a lie -- it is
-        # what `_resolve_settings` reads to decide whether everyone has voted.
         if self._written is None:
             return None
         return {**self._written, "seats": seats}
 
     async def claim_for_stats(self, lobby_id, now):
-        # Mirrors the real guard: the FIRST claim returns the document,
-        # every later one returns None. A fake that always returned the
-        # document would let a double count pass unnoticed.
         self.claims.append(lobby_id)
         if len(self.claims) > 1 or self._applied is None:
             return None
-        # ReturnDocument.BEFORE on a lobby whose pick was ALREADY written
-        # by the preceding apply_changes, so it carries that pick. Returning
-        # the pre-pick document counts nothing and hides the bug -- the same
-        # divergence `replace_seats` had (section 4 item 121).
         latest = dict(self._applied)
         for _, changes in self.changes:
             latest.update(changes)
@@ -185,13 +174,10 @@ def test_seats_are_indexed_from_zero_with_no_team():
     assert [s["seat_index"] for s in seats] == [0, 1, 2]
     # Seating means "you are in this lobby", never "you are on red".
     assert all(s["team"] is None for s in seats)
-    # D71: a seat exists only when occupied; discord_id never null or absent.
     assert all(s["discord_id"] for s in seats)
 
 
 def test_duplicates_never_produce_two_seats_for_one_player():
-    # Neither index catches this: multikey keys are de-duplicated per
-    # document (D176), and the $ne write guard does not apply to an insert.
     shape = resolve_shape("ffa")
     seats = seat_the_roster(["a", "b", "a", "b", "c"], shape)
     ids = [s["discord_id"] for s in seats]
@@ -213,9 +199,6 @@ def test_document_stamps_the_season_and_derived_shape():
 
 
 def test_undecided_fields_are_absent_not_null():
-    # closed_at absent is what the partial filters select (D175). The rest
-    # belong to phases that have not run; writing them as null would claim
-    # a decision nobody made.
     doc = build_lobby_document(request(), resolve_shape("ffa"), SEASON, NOW)
     for field in (
         "closed_at",
@@ -276,8 +259,10 @@ def test_resolve_active_passes_the_channel_and_returns_one_or_none():
 
 
 class FakeObjectId:
-    """Stands in for bson.ObjectId: str()s to a hex string and is otherwise
-    not JSON-serialisable, which is exactly how the real one behaves."""
+    """
+    Stands in for bson.ObjectId: str()s to a hex string and is otherwise not
+    JSON-serialisable, which is exactly how the real one behaves.
+    """
 
     def __init__(self, hex_value):
         self._hex = hex_value
@@ -287,10 +272,6 @@ class FakeObjectId:
 
 
 def test_the_wire_form_stringifies_both_object_ids():
-    # FastAPI raised "'ObjectId' object is not iterable" on the first
-    # live create -- AFTER the write landed, so the caller saw a 500 for a
-    # lobby that exists. Nothing typed this boundary: lobbies is the only v2
-    # feature returning a raw document rather than a response model (D179).
     stored = {
         "_id": FakeObjectId("aaa"),
         "season_id": FakeObjectId("bbb"),
@@ -340,8 +321,6 @@ def test_browse_passes_its_filters_and_never_a_channel():
     assert repo.queries == [("g1", None, "civ6", "ffa")]
 
 
-# --- censoring at the wire boundary (D186) ------------------------------
-
 SETTINGS_LOBBY = {
     "_id": "L1",
     "phase": "settings",
@@ -357,10 +336,6 @@ def seats_by_id(lobby):
 
 
 def test_the_wire_form_censors_before_it_stringifies():
-    # The defect this exists for: CP4b's three routes returned the stored
-    # document raw, so project_lobby was on no application path at all.
-    # alice keeps hers and bob loses his in one assertion pair, so this
-    # cannot pass on a boundary that strips every ballot.
     seats = seats_by_id(for_the_wire(SETTINGS_LOBBY, "alice"))
     assert seats["alice"]["ballot"] == {"map": "pangaea"}
     assert "ballot" not in seats["bob"]
@@ -391,14 +366,6 @@ def test_browse_censors_every_lobby_not_only_the_first():
 
 
 def test_the_create_response_is_unchanged_by_the_projection():
-    # CP4b measured this response on the wire, and D186 put the projection on
-    # the path: a `lobby`-phase document has neither censored surface, so the
-    # projection must neither strip a field, add one, nor alter a value.
-    #
-    # The timestamps are excluded because the boundary re-encodes them by
-    # design (Correction 90) and a test below pins that format exactly. The
-    # last assertion is what keeps the exclusion honest -- without it,
-    # dropping both timestamps entirely would pass.
     repo, seasons = FakeRepo(), FakeSeasons()
     result = asyncio.run(LobbyService(repo, seasons).create(request()))
     timestamps = {"created_at", "updated_at"}
@@ -409,8 +376,6 @@ def test_the_create_response_is_unchanged_by_the_projection():
     }
     assert all(isinstance(result[key], str) for key in timestamps)
 
-
-# --- reading one lobby (C5 GET /{id}, D77) ------------------------------
 
 HEX_ID = "652f1a2b3c4d5e6f7a8b9c0d"
 READ_LOBBY = {**SETTINGS_LOBBY, "revision": 4}
@@ -429,8 +394,6 @@ def test_read_censors_for_the_caller():
 
 
 def test_read_withholds_only_when_the_revision_has_not_moved():
-    # Both legs together (D77). The first alone would pass on a read that
-    # returns None unconditionally.
     repo = FakeRepo(lobby=READ_LOBBY)
     assert read(repo, lobby_id=HEX_ID, viewer_discord_id="bob", since=4) is None
     moved = read(repo, lobby_id=HEX_ID, viewer_discord_id="bob", since=3)
@@ -468,9 +431,6 @@ def test_a_well_formed_id_round_trips_to_the_same_hex():
     assert str(as_lobby_id(HEX_ID)) == HEX_ID
 
 
-# --- one datetime encoding for every route (Correction 90) --------------
-
-
 def has_datetime(value):
     if isinstance(value, datetime):
         return True
@@ -482,11 +442,6 @@ def has_datetime(value):
 
 
 def test_a_datetime_leaves_the_boundary_as_rfc3339_with_z():
-    # Measured on the wire: /active emitted ...237000Z through Pydantic while
-    # GET /{id}, which needs response_model=None for its 204, emitted
-    # ...237000+00:00 through jsonable_encoder. Z is the one three routes
-    # already spoke, so this moves the fourth into line rather than the
-    # other three out of it.
     stored = {
         "_id": "L1",
         "created_at": datetime(2026, 8, 26, 10, 31, 13, 237000, tzinfo=UTC),
@@ -495,10 +450,6 @@ def test_a_datetime_leaves_the_boundary_as_rfc3339_with_z():
 
 
 def test_no_datetime_survives_the_boundary_at_any_depth():
-    # Deliberately broader than the converter, which handles the top level --
-    # the document's actual shape today. If a later phase nests a datetime
-    # inside seats, this fails and the converter grows for a stated reason,
-    # rather than one route quietly disagreeing with three again.
     stored = {
         "_id": "L1",
         "created_at": datetime(2026, 8, 26, tzinfo=UTC),
@@ -508,17 +459,6 @@ def test_no_datetime_survives_the_boundary_at_any_depth():
     assert has_datetime(stored), "fixture must contain what the test looks for"
     assert not has_datetime(for_the_wire(stored, None))
 
-
-# --- D179's classification guard ----------------------------------------
-#
-# D179 refused the built-view shape in the projection: enumerating 26 public
-# fields to protect one conditional one is ceremony, and an allowlist catches
-# a DERIVED leak like pool_appearances no better than a denylist. What it
-# accepted instead was this -- the enumeration lives in the check, where its
-# only job is to make adding a field a decision.
-#
-# The censored names are imported from projection.py rather than retyped, so
-# a new censored surface cannot be added there and forgotten here.
 
 CENSORED_LOBBY_FIELDS = {POOL_APPEARANCES}
 CENSORED_SEAT_FIELDS = {BALLOT, POOL, PICK}
@@ -570,18 +510,12 @@ def unclassified(document):
 
 
 def test_every_field_the_builder_writes_is_classified():
-    # The projection STRIPS rather than builds, so a field added to the
-    # document is exposed by default. That is how pool_appearances was nearly
-    # missed -- found by reading section 8 against section 6, not because
-    # anything forced the question. This forces it.
     document = built_document()
     assert document["seats"], "the fixture must seat someone or the seat leg is vacuous"
     assert not unclassified(document), sorted(unclassified(document))
 
 
 def test_the_guard_reports_a_field_that_is_neither_public_nor_censored():
-    # D86 Rule 1: the check has to be able to fail for the reason it exists.
-    # Without this, the test above passes on a guard that returns nothing.
     smuggled = {**built_document(), "unlisted_field": "x"}
     assert unclassified(smuggled) == {"unlisted_field"}
     seated = built_document()
@@ -628,8 +562,6 @@ def test_rearranging_keeps_the_seat_a_move_carries():
 
 
 def test_rearranging_never_closes_a_gap():
-    # O-19b: civup compacts before chunking, which moves a player across a
-    # team boundary that nobody asked to cross.
     seats = [
         {"seat_index": 0, "discord_id": "a"},
         {"seat_index": 5, "discord_id": "b"},
@@ -660,7 +592,6 @@ def test_a_place_writes_the_array_it_validated():
         ("alice", 0),
         ("bob", 4),
     ]
-    # D176's clause, and only where D176 measured it: bob was not seated.
     assert absent == "bob"
 
 
@@ -689,8 +620,6 @@ def test_an_illegal_arrangement_never_reaches_the_write():
 
 
 def test_seats_are_settled_once_the_lobby_leaves_lobby_phase():
-    # D189. Ballots are per seat and turn_index points into the seating, so a
-    # move from `settings` on corrupts state no validator reads.
     repo = FakeRepo(lobby={**OPEN_LOBBY, "phase": "settings"}, written=OPEN_LOBBY)
     with pytest.raises(SeatChangeRefused) as exc:
         change(repo, actor="bob", seat_index=4)
@@ -709,9 +638,6 @@ def test_a_stale_revision_reports_both_numbers():
 
 
 def test_a_lost_race_at_the_same_revision_names_the_seat_not_the_revision():
-    # Spec section 9: matched-count zero is stale revision OR already
-    # seated, and only the re-read tells them apart. Same revision means
-    # D176's $ne refused, not that the caller is behind.
     repo = FakeRepo(lobby=OPEN_LOBBY, written=None, reread=OPEN_LOBBY)
     with pytest.raises(SeatChangeRefused) as exc:
         change(repo, actor="bob", seat_index=4)
@@ -719,14 +645,7 @@ def test_a_lost_race_at_the_same_revision_names_the_seat_not_the_revision():
     assert "already holds a seat" in str(exc.value)
 
 
-# --- D177's eviction ----------------------------------------------------
-
-
 def test_creation_evicts_stale_lobbies_holding_the_roster():
-    # D74's timers are lazy and an abandoned lobby gets no read to
-    # evaluate them, so one_active_seat_per_player holds the seat forever
-    # and the only symptom is a bare E11000. The read that triggers
-    # evaluation has to be the NEW lobby's creation.
     repo = FakeRepo(stale=[{"_id": "OLD", "channel_id": "c9", "updated_at": NOW}])
     asyncio.run(
         LobbyService(repo, FakeSeasons()).create(request(roster=["alice", "bob"]))
@@ -757,8 +676,6 @@ def test_eviction_asks_about_deduplicated_players_only():
     )
     assert repo.evictions[0][0] == ["a", "b"]
 
-
-# --- starting the vote and resolving it (D190, D191, D194) --------------
 
 VOTING = {
     **OPEN_LOBBY,
@@ -804,8 +721,6 @@ def test_only_the_host_starts():
 
 
 def test_starting_below_min_seats_is_refused():
-    # Not automatic at min_seats either (D190): FFA seats twelve and needs
-    # six, so the sixth arrival does not mean nobody else is coming.
     thin = {**IN_LOBBY, "min_seats": 6}
     repo = FakeRepo(lobby=thin, applied=thin)
     with pytest.raises(SeatChangeRefused):
@@ -874,15 +789,11 @@ def test_a_ballot_short_of_everyone_does_not_advance():
 
 
 def test_a_read_past_the_deadline_advances_the_phase():
-    # D74/D194: nothing sweeps timers, so the POLL has to advance them. A
-    # settings phase in a lobby nobody writes to would otherwise never expire.
     expired = {**VOTING, "turn_expires_at": datetime.now(UTC) - timedelta(minutes=1)}
     repo = FakeRepo(lobby=expired, applied=expired)
     asyncio.run(LobbyService(repo, FakeSeasons()).read(HEX_ID, "alice"))
     _, changes = repo.changes[0]
     assert changes["phase"] == "bans"
-    # Nobody voted, so every question locks to its default (D191) -- which is
-    # what makes an expired vote safe to advance rather than stall.
     assert changes["settings"]["duration"]
 
 
@@ -890,9 +801,6 @@ def test_a_read_before_the_deadline_changes_nothing():
     repo = FakeRepo(lobby=VOTING, applied=VOTING)
     asyncio.run(LobbyService(repo, FakeSeasons()).read(HEX_ID, "alice"))
     assert repo.changes == []
-
-
-# --- banning (D195, D196) ----------------------------------------------
 
 
 class FakeCivData:
@@ -950,9 +858,6 @@ def test_bans_are_stored_on_the_submitting_seat_only():
 
 
 def test_banning_nothing_still_counts_as_submitting():
-    # `bans is not None` is the submitted test, not "banned something" --
-    # otherwise a seat that wants no bans would stall the phase until the
-    # timer expired.
     voted = {
         **BANNING,
         "seats": [
@@ -980,9 +885,6 @@ def test_a_leader_the_edition_does_not_have_is_refused():
 
 
 def test_a_civ_outside_the_starting_age_is_refused():
-    # The case civ-data is on the service for. CIVILIZATION_SPAIN is a real
-    # token for a civ that is not in an antiquity game, and banning it would
-    # burn one of only three slots -- a client bug, not collusion.
     antiquity = {**BANNING, "starting_age": "AGE_ANTIQUITY"}
     repo = FakeRepo(lobby=antiquity, written=antiquity, applied=antiquity)
     with pytest.raises(InvalidSeating):
@@ -1020,9 +922,6 @@ def test_the_last_submission_tallies_and_moves_to_draft():
 
 
 def test_an_expired_ban_phase_advances_from_a_read():
-    # The lazy timer generalising to a second phase (D74, D194): nothing
-    # sweeps it, so the poll is what moves an abandoned ban phase on. Built
-    # with NO civ-data on purpose -- the advance must not need it.
     expired = {**BANNING, "turn_expires_at": datetime.now(UTC) - timedelta(minutes=1)}
     repo = FakeRepo(lobby=expired, applied=expired)
     asyncio.run(LobbyService(repo, FakeSeasons(), FakeCivData()).read(HEX_ID, "alice"))
@@ -1033,10 +932,6 @@ def test_an_expired_ban_phase_advances_from_a_read():
 
 
 def test_a_lobby_that_bans_itself_out_is_cancelled():
-    # D198, and it fired for real before this test existed: two leaders,
-    # one banned, two players needing one each. The advance CANCELS rather
-    # than raising -- a poll can trigger it, so raising would make every read
-    # a 500 with no route out.
     keys = [
         "LEADER_TRAJAN",
         "LEADER_HATSHEPSUT",
@@ -1061,8 +956,6 @@ def test_a_lobby_that_bans_itself_out_is_cancelled():
     assert changes["cancel_reason"] == "no_pool"
     assert changes["closed_at"] is not None
 
-
-# --- turn-ordered drafts (D199, D200) ------------------------------------
 
 DRAFTING = {
     **BANNING,
@@ -1102,9 +995,6 @@ def pick(repo, actor, token=None, revision=3, civ_token=None):
 
 
 def test_picking_out_of_turn_is_refused():
-    # The whole gap CP6d closed: turn_index was written and read by nothing,
-    # so any seat could pick at any moment. Silent -- the draft simply stopped
-    # being a draft.
     repo = FakeRepo(lobby=DRAFTING, applied=DRAFTING)
     with pytest.raises(NotYourTurn):
         pick(repo, "bob", "LEADER_AMINA")
@@ -1128,7 +1018,6 @@ def test_a_token_outside_your_own_pool_is_refused():
 
 
 def test_a_second_pick_of_the_same_field_is_refused():
-    # O-34, per field.
     already = {
         **DRAFTING,
         "seats": [
@@ -1142,14 +1031,10 @@ def test_a_second_pick_of_the_same_field_is_refused():
 
 
 def test_cwc_writes_the_team_and_never_the_seat():
-    # D199, the one place the seat is not the unit of ownership. A captain
-    # drafts for the team; nobody is assigned a leader until the players
-    # divide them.
     cwc = {
         **DRAFTING,
         "settings": {"draft_mode": "cwc"},
         "pick_order": ["alice", "bob"],
-        # D201: one shared pool on the lobby, not per-seat pools.
         "pool": ["LEADER_TRAJAN", "LEADER_AMINA"],
         "teams": [
             {"team_index": 0, "leaders": [], "civs": []},
@@ -1186,9 +1071,6 @@ def test_a_pick_with_neither_token_is_refused():
 
 
 def test_cwc_cannot_take_a_leader_another_team_already_took():
-    # D201: one shared pool, so "already taken" is the only thing stopping
-    # two teams drafting the same leader. Per-seat pools made that impossible
-    # by construction; a shared pool has to check.
     cwc = {
         **DRAFTING,
         "settings": {"draft_mode": "cwc"},
@@ -1209,10 +1091,6 @@ def test_cwc_cannot_take_a_leader_another_team_already_took():
 
 
 def test_a_finished_lobby_is_counted_once_and_only_once():
-    # `$inc` has no memory, so a lobby counted twice is permanently wrong
-    # and invisible. The claim is what prevents it, and it guards on the
-    # document rather than on `revision` -- a retry arrives with the SAME
-    # revision and a revision guard would match again.
     done = {
         **DRAFTING,
         "settings": {"draft_mode": "standard"},
@@ -1238,9 +1116,6 @@ def test_a_finished_lobby_is_counted_once_and_only_once():
 
 
 def test_a_counter_failure_never_fails_the_pick():
-    # The picks are what players came for; the aggregate is a rebuildable
-    # cache. A broken counter shows in the log, and the claim marks the lobby
-    # so one with `stats_written_at` and no rows is findable.
     class Exploding(FakeRepo):
         async def claim_for_stats(self, lobby_id, now):
             raise RuntimeError("mongo is having a day")
@@ -1257,9 +1132,6 @@ def test_a_counter_failure_never_fails_the_pick():
 
 
 def test_civ7_picks_a_leader_and_a_civ_in_one_submission():
-    # Replaces the two-round snake case. With snake gone, a civ7 pick is a
-    # single act: one leader from your leader pool and one civ from your civ
-    # pool, together. There is no second round to come back for.
     civ7 = {
         **DRAFTING,
         "edition": "civ7",

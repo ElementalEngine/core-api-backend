@@ -37,9 +37,6 @@ class RatingsRepository:
         self._resets: AsyncCollection = client[GAMES_DB][COL_STAT_RESETS]
 
     async def ensure_indexes(self) -> None:
-        # Reset events carry no match_id. Without the partial filter a unique
-        # index treats every missing value as one null and collides them on a
-        # player's second reset.
         await self._events.create_index(
             [
                 ("match_id", ASCENDING),
@@ -122,11 +119,7 @@ class RatingsRepository:
         is_combined: bool,
         discord_ids: list[str],
     ) -> dict[str, dict[str, Any]]:
-        """Batch fetch stat docs by discord id.
-
-        Returns mapping: discord_id -> doc for ids that exist.
-        Missing ids are simply absent.
-        """
+        """Batch fetch stat docs by discord id."""
         if not discord_ids:
             return {}
 
@@ -179,9 +172,6 @@ class RatingsRepository:
         occurred_at = datetime.now(UTC)
         pid = Int64(discord_id)
 
-        # is_combined ignores match_type, so the twelve combinations name only
-        # eight documents. One event per distinct scope, or a reset counts its
-        # combined movement three times.
         scopes = sorted(
             {
                 stat_scope(
@@ -219,9 +209,6 @@ class RatingsRepository:
                         col = self._client[db_name][col_name]
                         doc = await col.find_one({"_id": pid}, session=session)
                         await col.delete_one({"_id": pid}, session=session)
-                        # A scope with no document still gets an event: the
-                        # player's effective rating is ts_mu either way, and
-                        # the chain stays continuous for reconciliation.
                         events.append(
                             build_reset_event(
                                 occurred_at=occurred_at,

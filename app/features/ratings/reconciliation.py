@@ -29,22 +29,7 @@ def reconcile(
     initial_mu: float,
     epsilon: float = EPSILON,
 ) -> list[Divergence]:
-    """Sum ledger deltas per (player_id, scope); assert they equal stat movement.
-
-    The ledger starts at go-live (D39), so both sides anchor on the ledger's
-    own first event rather than on INITIAL_MU: mu_before of the earliest event
-    IS the pre-ledger state, and a player with no events is skipped.
-
-    actual_mu maps (player_id, scope) to the stat document's mu, or None when
-    no document exists. None means initial_mu, not an error -- a reset deletes
-    the document and the player's effective rating reverts to it.
-
-    Sigma is deliberately not reconciled: revert computes sigma + 2 rather than
-    restoring, so it satisfies no sum invariant.
-
-    No stat_reset marker filter is needed. This reads rating_events and stat
-    documents and never touches validated_matches.
-    """
+    """Sum ledger deltas per (player_id, scope); assert they equal stat movement."""
     grouped: dict[tuple[int, str], list[Mapping[str, Any]]] = {}
     for e in sorted(events, key=lambda e: e["occurred_at"]):
         pid = int(e["player_id"])

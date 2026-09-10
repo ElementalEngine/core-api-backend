@@ -1,10 +1,3 @@
-# D83 Bug 1: extract_map_type left map_type unbound when no en_US locale
-# existed, raising UnboundLocalError -> 500 on upload. The inner break also
-# exited only the inner loop, so on a multi-entry blob the LAST match won.
-#
-# D134: the fallback is the entry KEY, never another locale. map_type feeds
-# the composition hash (service.py:351), so a fr_FR fallback would hash the
-# same game differently from an en_US client and split dedup by language.
 import json
 
 import pytest

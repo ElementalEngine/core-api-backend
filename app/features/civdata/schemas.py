@@ -18,7 +18,6 @@ class CivRow(BaseModel):
 
 class CivDataResponse(BaseModel):
     edition: str
-    # Global, not per-edition: the lobby stamps one value (D96).
     leader_data_version: int
     leaders: list[LeaderRow]
     # Empty for civ6, which is leaders only.

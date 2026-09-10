@@ -7,9 +7,6 @@ from typing import Any
 SEED_DIR = Path(__file__).resolve().parent / "seed"
 EDITIONS = ("civ6", "civ7")
 
-# Provenance and the unfilled type placeholder are the authoring record. They
-# stay in the file and out of the documents: no consumer reads them, and a
-# served field nobody uses still lands in Mite's generated types (D49, D68).
 AUTHORING_ONLY = frozenset({"civ_source", "age_pool_source", "type"})
 
 
@@ -23,12 +20,7 @@ def load_seed(edition: str) -> dict[str, Any]:
 
 
 def to_documents(edition: str) -> list[dict[str, Any]]:
-    """Flatten one edition's seed into civ_data documents.
-
-    Leaders and civs share the collection and the {edition, token} unique
-    index; kind is what tells them apart. The version is stamped on every
-    document so a served payload carries the version it was seeded from.
-    """
+    """Flatten one edition's seed into civ_data documents."""
     seed = load_seed(edition)
     version = seed["leader_data_version"]
     docs: list[dict[str, Any]] = []

@@ -44,17 +44,16 @@ class FakeCollection:
         matches = [d for d in self._docs if d["edition"] == flt["edition"]]
         if not matches:
             return None
-        # Honour `sort` the way Mongo does -- return the first row after
-        # sorting -- so the repository's sort DIRECTION is under test. A fake
-        # that picked the max itself would pass whichever way it was written.
         for field, direction in reversed(sort or []):
             matches.sort(key=lambda d: d[field], reverse=direction < 0)
         return matches[0]
 
 
 def _repo(docs):
-    """Built through __init__ on a nested-dict client, so a wrong GAMES_DB or
-    COL_SEASONS raises KeyError here instead of passing silently."""
+    """
+    Built through __init__ on a nested-dict client, so a wrong GAMES_DB or
+    COL_SEASONS raises KeyError here instead of passing silently.
+    """
     collection = FakeCollection(docs)
     return SeasonsRepository({GAMES_DB: {COL_SEASONS: collection}}), collection
 
@@ -71,8 +70,6 @@ def test_seed_is_one_row_per_edition_with_no_ended_at():
     assert [d["edition"] for d in docs] == ["civ6", "civ7"]
     assert [d["label"] for d in docs] == ["Season 6", "Season 1"]
     assert all(d["started_at"] == NOW for d in docs)
-    # D106 removed ended_at. Nothing is nullable and nothing is absent by
-    # convention, so the document carries exactly these three fields.
     assert all(set(d) == {"edition", "label", "started_at"} for d in docs)
 
 
@@ -108,8 +105,6 @@ def test_latest_started_at_wins_per_edition():
         {"edition": "civ6", "label": "Season 7", "started_at": later}
     ]
     repo, _ = _repo(docs)
-    # Entry 11 check 7, the rollover rehearsal, as a permanent test: civ6
-    # rolls and civ7 does not (D105).
     assert asyncio.run(repo.get_current_season("civ6"))["label"] == "Season 7"
     assert asyncio.run(repo.get_current_season("civ7"))["label"] == "Season 1"
 
@@ -123,10 +118,12 @@ def test_clear_cache_forces_a_reread():
 
 
 class RecordingCollection(FakeCollection):
-    """Captures index declarations. Mongo building them is Entry 11's dev
-    dry-run (D60 forbids a DB here); what this pins is that we still ASK for
-    them -- D106 records the risk of someone dropping the unique index to
-    silence the E11000 that proves the seed cannot double-run."""
+    """
+    Captures index declarations. Mongo building them is Entry 11's dev dry-run (D60
+    forbids a DB here); what this pins is that we still ASK for them -- records the
+    risk of someone dropping the unique index to silence the E11000 that proves the
+    seed cannot double-run.
+    """
 
     def __init__(self):
         super().__init__([])
@@ -142,8 +139,6 @@ def test_ensure_indexes_declares_the_lookup_and_the_unique_label():
     asyncio.run(repo.ensure_indexes())
     by_name = {i["name"]: i for i in collection.indexes}
     assert set(by_name) == {"current_season_lookup", "unique_label_per_edition"}
-    # Descending on started_at is what makes "greatest started_at" an index
-    # scan rather than a sort (D106).
     assert by_name["current_season_lookup"]["keys"] == [
         ("edition", 1),
         ("started_at", -1),
@@ -194,9 +189,6 @@ def test_seed_inserts_every_document_and_returns_the_count():
 
 
 def test_reseeding_raises_already_seeded_not_a_driver_error():
-    # insert_many raises BulkWriteError; DuplicateKeyError comes only from
-    # insert_one. Catching the wrong one made a re-seed traceback instead of
-    # reporting cleanly -- Entry 11 check 6 found it on the cluster.
     collection = SeedingCollection(raise_codes=[11000])
     with pytest.raises(SeasonsAlreadySeededError):
         asyncio.run(_seed_repo(collection).seed(seed_documents(NOW)))

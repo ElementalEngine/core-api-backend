@@ -21,8 +21,6 @@ CAPTAINS = ["cap0", "cap1"]
     ],
 )
 def test_the_order_follows_the_table(turns, expected):
-    # Carried verbatim from Mite and confirmed against civup: not a plain
-    # alternation and not derivable from a rule, which is why it is a table.
     assert cwc_order(CAPTAINS, turns) == expected
 
 

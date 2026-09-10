@@ -24,8 +24,6 @@ async def get_civ_data(
 ) -> CivDataResponse:
     payload = await CivDataRepository(client).fetch(edition)
     if payload["leader_data_version"] is None:
-        # Empty means unseeded, not "this edition has no data". A client that
-        # cached an empty table would draft from nothing (D49).
         detail = ErrorResponse(
             error=ErrorDetail(
                 code="CIV_DATA_NOT_SEEDED",

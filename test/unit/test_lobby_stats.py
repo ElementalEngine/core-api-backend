@@ -45,9 +45,6 @@ def test_a_banned_token_never_appears_in_a_pool():
 
 
 def test_random_contributes_no_picks_and_no_appearances():
-    # Nobody chose and nobody was offered. Counting an assignment as a pick
-    # makes pick rate noise for every random game; the bans were real votes
-    # and still count.
     out = contributions(
         lobby(
             "random",
@@ -61,7 +58,6 @@ def test_random_contributes_no_picks_and_no_appearances():
 
 
 def test_cwc_reads_the_team_and_the_shared_pool():
-    # D199 and D201: picks live on teams[], and the pool is one shared list.
     out = contributions(
         lobby(
             "cwc",

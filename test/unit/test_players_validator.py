@@ -72,7 +72,6 @@ def test_unknown_seat_above_and_below_range():
 
 
 def test_placement_range_is_team_count_not_player_count():
-    # Correction 44: the duel has three rows but T=2, so 0..1 is the range.
     duel = paired_duel()
     assert rules(check(duel, [SeatPatch(0, placement=2)])) == [
         Rule.PLACEMENT_OUT_OF_RANGE
@@ -137,8 +136,6 @@ def test_sub_out_is_declarative_and_idempotent():
 
 
 def test_patch_created_sub_is_paired_by_construction():
-    # D154: one field carries both halves, so UNPAIRED_SUB is unrepresentable
-    # in a well-formed body.
     assert check(ffa(), [SeatPatch(1, sub_out="left")]) == []
 
 
@@ -190,8 +187,6 @@ def test_is_placeholder_is_the_single_predicate():
 
 
 def test_canary_the_validator_can_actually_fail():
-    # D86 Rule 1: neutering validate_players_patch to `return []` must turn
-    # this red while the legal-patch assertions above stay green.
     violating = check(ffa(), [SeatPatch(9, quit=True)])
     assert violating, "a violating patch produced no violations"
     assert check(ffa(), [SeatPatch(0, discord_id="ok")]) == []

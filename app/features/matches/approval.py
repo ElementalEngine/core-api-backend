@@ -20,12 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class ApprovalService:
-    """Approve and revert: the two flows that move ratings.
-
-    Reads and rating maths stay on MatchService and are borrowed through
-    self._m; this owns the transactional write side, which is what
-    playbook Entry 8 rewrites.
-    """
+    """Approve and revert: the two flows that move ratings."""
 
     def __init__(self, matches: MatchService) -> None:
         self._m = matches
@@ -49,7 +44,6 @@ class ApprovalService:
         player: PlayerModel,
         existing_civs: dict[str, Any],
     ) -> dict[str, Any]:
-        # D44: the tally keys on the raw token; display names resolve on read.
         return self._shift_tally(
             existing_civs, player.civ, won=player.delta > 0, step=+1
         )
@@ -96,10 +90,7 @@ class ApprovalService:
         leaders: dict[str, Any],
         step: int,
     ) -> dict[str, Any]:
-        """One stats document for approve (step=+1) or revert (step=-1).
-
-        Reverted counters clamp at 0 so a revert can never write negative stats.
-        """
+        """One stats document for approve (step=+1) or revert (step=-1)."""
 
         def shift(current: int, hit: bool) -> int:
             value = current + (step if hit else 0)
@@ -229,8 +220,6 @@ class ApprovalService:
         self, match_id: str, approver_discord_id: str
     ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
-        # D84: the conditional claim replaces approve_lock. No match means
-        # gone or already claimed -- both are the 404 the lock produced.
         res = await self._m.q.claim_pending_match(oid, now=datetime.now(UTC))
         if res is None:
             raise NotFoundError("Match not found")
@@ -249,9 +238,6 @@ class ApprovalService:
             async with session:
                 async with await session.start_transaction():
                     try:
-                        # D84: pre-state reads inside the transaction. The lock
-                        # was substituting for this, not merely serialising
-                        # approvals, which is why they are one change.
                         pre_lifetime = await self._m.get_players_ranking(
                             match, session=session
                         )
@@ -362,9 +348,6 @@ class ApprovalService:
 
                         await self._m.ratings.insert_events(events, session=session)
 
-                        # Move pending -> validated. D122: the validated
-                        # document keeps the pending _id, so a match holds one
-                        # identity for its life and its events link.
                         now = datetime.now(UTC)
                         validated_doc = match.model_dump()
                         validated_doc["_id"] = oid
@@ -378,10 +361,6 @@ class ApprovalService:
                             "discord_messages_id_list", []
                         )
                         validated_doc["save_file_hash"] = res.get("save_file_hash", "")
-                        # Conditional, not defaulted: "" and None both satisfy
-                        # the partial index's {$exists: true}, so a default
-                        # would collide the second approval of any match
-                        # predating Entry 12. D83 Hardening 1.
                         byte_hash = res.get("save_bytes_sha256")
                         if byte_hash:
                             validated_doc["save_bytes_sha256"] = byte_hash

@@ -2,12 +2,6 @@ import os
 
 from app.features.matches.parsers import civ6
 
-# Players are returned grouped by team, not in slot order. These expectations
-# match that order deliberately -- it has been live for the whole rating
-# history and D66 freezes it (§4 item 14). leader and civ are asserted in
-# their Entry 10 Half A shape: LEADER_* in leader, CIVILIZATION_* in civ,
-# both read straight from the save (D136).
-
 
 def _test_parse_civ6_save(
     file_path,

@@ -7,12 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class StatModel(BaseModel):
-    """Stat row used for ranking/stats calculations.
-
-    Canonical identifier across the codebase is discord_id (string). Stats collections
-    historically used Mongo _id equal to the Discord ID (often numeric). This model
-    accepts either shape and normalizes.
-    """
+    """Stat row used for ranking/stats calculations."""
 
     index: int
 
@@ -117,10 +112,6 @@ class MatchModel(BaseModel):
     flagged: bool = False
     flagged_by: str | None = None
     save_file_hash: str
-    # Entry 12: the byte hash. Optional because 35,941 existing
-    # documents have none -- and it must never be written empty, since
-    # the partial index filters on {$exists: true} and would collide
-    # every such document. D83, D133.
     save_bytes_sha256: str | None = None
     reporter_discord_id: str
     contest_report_list: list[ContestReport]

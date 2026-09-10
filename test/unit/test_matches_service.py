@@ -65,9 +65,6 @@ def make_match_doc(players, *, is_cloud=False):
     }
 
 
-# Tracks the driver's call convention, not its semantics: start_transaction is
-# awaited as PyMongo requires, commit is recorded as a flag. A transaction that
-# never commits atomically still passes every test below.
 class FakeSession:
     def __init__(self):
         self.committed = False
@@ -388,9 +385,6 @@ def test_approving_a_sub_writes_one_dated_row():
 
 
 def test_paired_duel_with_one_sub_approves():
-    # D155: §4 item 76's "a duel with one sub is the everyday case" is
-    # disproved. Pairing keeps both rating passes at two groups, so this
-    # must approve without TrueSkill's "Need multiple rating groups".
     players = [
         make_player(discord_id="111", team=0, placement=0, is_sub=True),
         make_player(

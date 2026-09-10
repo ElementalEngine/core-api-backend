@@ -76,7 +76,9 @@ def _get_infraction(record: SuspensionDocument, category: TierCategory) -> Any:
 
 
 def _current_end_or_now(record: SuspensionDocument, now: datetime) -> datetime:
-    """Base date for stacking suspension days — active end or now, whichever is later."""
+    """
+    Base date for stacking suspension days — active end or now, whichever is later.
+    """
     return record.ends if (record.ends and record.ends > now) else now
 
 

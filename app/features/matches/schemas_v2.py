@@ -8,14 +8,7 @@ from app.features.matches.validation import SeatPatch
 
 
 class SeatPatchIn(BaseModel):
-    """One seat's requested changes. Absent means unchanged (D89, D154).
-
-    `sub_out` is three-state: absent leaves the pairing alone, a discord id
-    creates or repoints it, null clears it. Nothing else is nullable -- a
-    null placement would otherwise read as "unchanged" on one path and as a
-    value on another, which is the kind of silence this route exists to
-    remove.
-    """
+    """One seat's requested changes. Absent means unchanged."""
 
     seat: int
     placement: int | None = None
@@ -37,11 +30,7 @@ class PlayersPatch(BaseModel):
     players: list[SeatPatchIn] = Field(default_factory=list)
 
     def to_seat_patches(self) -> list[SeatPatch]:
-        """Wire model to domain patch.
-
-        Reads model_fields_set, never the values: exclude_none would collapse
-        `sub_out: null` -- clear the pairing -- into "field absent".
-        """
+        """Wire model to domain patch."""
         out: list[SeatPatch] = []
         for entry in self.players:
             declared = entry.model_fields_set

@@ -71,8 +71,6 @@ def test_leaders_and_civs_are_tallied_independently():
 
 
 def test_the_cap_drops_every_key_tied_at_the_boundary():
-    # D72 verbatim: seventeen clear the threshold, the cap is fifteen, and
-    # ranks 15-17 all sit on six votes -- all three drop, fourteen land.
     counts = {f"L{i}": 7 for i in range(14)} | {"T1": 6, "T2": 6, "T3": 6}
     landed = capped(counts, list(counts), 15)
     assert len(landed) == 14
@@ -80,9 +78,6 @@ def test_the_cap_drops_every_key_tied_at_the_boundary():
 
 
 def test_every_key_tied_above_the_cap_lands_nothing():
-    # The rule taken to its end. Twenty leaders on identical counts and a cap
-    # of fifteen: all twenty sit at the boundary, so none land. Deliberate --
-    # it errs toward the larger pool, which is what the rule is for.
     flat = {f"F{i}": 6 for i in range(20)}
     assert capped(flat, list(flat), 15) == []
 
@@ -93,9 +88,6 @@ def test_ties_below_the_cap_are_harmless():
 
 
 def test_the_cap_keeps_the_most_voted():
-    # The boundary only drops when something BEYOND the cap ties with it.
-    # `mid` is the boundary here and nothing ties with it, so it lands --
-    # dropping it unconditionally would shrink every capped result by one.
     counts = {"low": 5, "high": 9, "mid": 7}
     assert capped(counts, list(counts), 2) == ["high", "mid"]
 

@@ -1,6 +1,3 @@
-# D83 Bug 2: the readers returned their error text as data, so a malformed
-# save produced a player named "Error reading string: {...}" and proceeded
-# to rating. These fail before the fix by returning a str instead of raising.
 import pytest
 
 from app.features.matches.parsers import civ6

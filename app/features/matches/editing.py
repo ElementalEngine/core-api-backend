@@ -21,7 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 def _require_int(value: Any, field_name: str) -> int:
-    """Parse a client-supplied numeric field; bad input becomes a 400 instead of a bare 500."""
+    """
+    Parse a client-supplied numeric field; bad input becomes a 400 instead of a
+    bare 500.
+    """
     try:
         return int(str(value).strip())
     except TypeError, ValueError:
@@ -29,12 +32,7 @@ def _require_int(value: Any, field_name: str) -> int:
 
 
 class EditingService:
-    """The pending-document edit loop (D114, carved in S6).
-
-    Reads, id resolution and the recompute stay on MatchService and are
-    borrowed through self._m; this owns every mutation of a pending match
-    short of approval. C1's declarative PATCH lands here.
-    """
+    """The pending-document edit loop (D114, carved in S6)."""
 
     def __init__(self, matches: MatchService) -> None:
         self._m = matches
@@ -373,7 +371,6 @@ class EditingService:
             contestor_discord_id=contestor_discord_id, reason=reason
         )
         match.contest_report_list.append(contest_report_entry)
-        # v2 contests are ephemeral (D102), so there is no message to record.
         if discord_message_id is not None:
             match.discord_messages_id_list = match.discord_messages_id_list + [
                 discord_message_id
@@ -390,12 +387,7 @@ class EditingService:
         *,
         actor_is_staff: bool,
     ) -> dict[str, Any]:
-        """C1's declarative PATCH: one request, one judgement, one recompute.
-
-        The whole patch is judged before any write, so a rejection leaves
-        the document untouched -- partial application is impossible by
-        construction rather than by care (D89, D151).
-        """
+        """C1's declarative PATCH: one request, one judgement, one recompute."""
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:
@@ -436,18 +428,7 @@ def apply_players_patch(
     patch: Sequence[SeatPatch],
     steam_ids: Mapping[str, str | None],
 ) -> None:
-    """Apply a validated patch in place (D154).
-
-    A seat is a position in the pre-patch array, so field mutations run
-    first and structural substitution operations last, in descending seat
-    order. Descending means each insert or pop only disturbs positions
-    above itself. Ascending substitutes the wrong player: after an insert
-    at a low seat, every higher seat names the row below the one the
-    client meant, and the result is well formed -- pairing intact,
-    adjacency intact -- so nothing downstream catches it.
-
-    Assumes validate_players_patch returned no violations.
-    """
+    """Apply a validated patch in place."""
     last: dict[int, SeatPatch] = {}
     for entry in patch:
         last[entry.seat] = entry
@@ -475,13 +456,7 @@ def apply_players_patch(
 
 
 def _leaver_index(match: MatchModel, seat: int) -> int | None:
-    """The synthetic row paired with a seat, by the adjacency v1 builds.
-
-    assign_sub inserts the leaver at sub_in_idx + 1, remove_sub reads
-    idx - 1 and set_player_order copies the placement from the row above.
-    Three sites depend on it and one has already been wrong once
-    (`fix: pop wrong index`), so it is read here, never assumed.
-    """
+    """The synthetic row paired with a seat, by the adjacency v1 builds."""
     nxt = seat + 1
     if nxt < len(match.players) and match.players[nxt].subbed_out:
         return nxt
@@ -505,10 +480,6 @@ def _apply_sub(
         return
 
     if leaver is not None:
-        # Repoint rather than insert a second row. This is item 79's guard:
-        # v1's assign_sub checks only the range, so subbing one seat twice
-        # strands two leavers on one team and rates a duel as 2v1. The
-        # declarative shape makes the guard structural, not a check.
         match.players[leaver].discord_id = sub_out
         match.players[leaver].steam_id = steam_ids.get(sub_out)
         return

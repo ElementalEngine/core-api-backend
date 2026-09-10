@@ -64,9 +64,6 @@ def test_one_active_lobby_per_channel_is_keyed_on_guild_and_channel():
 
 
 def test_the_seat_index_is_on_the_array_path_not_the_array():
-    # `seats` would index whole subdocuments and enforce nothing about the
-    # player; `seats.discord_id` is what makes the index multikey and is the
-    # structural fix for O-18 (D71).
     lobbies, _ = _declared()
     assert lobbies["one_active_seat_per_player"]["keys"] == [("seats.discord_id", 1)]
 
@@ -80,9 +77,6 @@ def test_every_filter_keys_off_closed_at_never_phase():
 
 
 def test_no_filter_uses_the_uncreatable_exists_false_form():
-    # MongoDB rewrites {$exists: False} as $not, which a partial index
-    # refuses outright: CannotCreateIndex 67. Nothing in CI builds an index,
-    # so this is the only place that failure can be caught early.
     lobbies, stats = _declared()
     for index in list(lobbies.values()) + list(stats.values()):
         for clause in (index["partial"] or {}).values():
@@ -90,9 +84,6 @@ def test_no_filter_uses_the_uncreatable_exists_false_form():
 
 
 def test_the_two_lobby_filters_are_not_the_same():
-    # A copy-paste giving the seat index the channel index's filter passes
-    # every other test here, and silently restores the defect where only ONE
-    # seat-less lobby could be open fleet-wide (Correction 73b).
     lobbies, _ = _declared()
     channel = lobbies["one_active_lobby_per_channel"]["partial"]
     seat = lobbies["one_active_seat_per_player"]["partial"]
