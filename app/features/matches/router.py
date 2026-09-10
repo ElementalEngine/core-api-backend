@@ -398,6 +398,17 @@ async def get_leaderboard_ranking(
             is_combined=payload.is_combined,
             civ_version=payload.game,
         )
+    except ValueError as exc:
+        # ⚠ Section 4 item 94, verified on the wire at CP8: 500 for a bad
+        # `game_mode`. `stats_collection_name` raises ValueError for anything
+        # but ffa|teamer|duel (`ratings/scope.py:35`), and neither catch below
+        # is one -- so a user typo reached the generic handler. The v1 log
+        # line "Invalid game type for leaderboard" was written for this and
+        # never once fired. Caught FIRST: MatchServiceError does not cover it.
+        logger.warning(
+            "\u26a0\ufe0f Invalid game_mode for leaderboard: %s", payload.game_mode
+        )
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotFoundError as exc:
         logger.warning(
             "🔴 Invalid game type for leaderboard. game:%s game_mode:%s",
