@@ -1153,6 +1153,8 @@ def test_cwc_writes_the_team_and_never_the_seat():
         **DRAFTING,
         "settings": {"draft_mode": "cwc"},
         "pick_order": ["alice", "bob"],
+        # ⚠ D201: one shared pool on the lobby, not per-seat pools.
+        "pool": ["LEADER_TRAJAN", "LEADER_AMINA"],
         "teams": [
             {"team_index": 0, "leaders": [], "civs": []},
             {"team_index": 1, "leaders": [], "civs": []},
@@ -1174,6 +1176,7 @@ def test_a_turn_ordered_draft_completes_when_the_order_is_spent():
         "settings": {"draft_mode": "cwc"},
         "pick_order": ["alice"],
         "turn_index": 0,
+        "pool": ["LEADER_TRAJAN"],
         "teams": [{"team_index": 0, "leaders": [], "civs": []}],
     }
     repo = FakeRepo(lobby=cwc, applied=cwc)
@@ -1184,3 +1187,26 @@ def test_a_turn_ordered_draft_completes_when_the_order_is_spent():
 def test_a_pick_with_neither_token_is_refused():
     with pytest.raises(ValueError):
         SubmitPickRequest(expected_revision=3)
+
+
+def test_cwc_cannot_take_a_leader_another_team_already_took():
+    # ⚠ D201: one shared pool, so "already taken" is the only thing stopping
+    # two teams drafting the same leader. Per-seat pools made that impossible
+    # by construction; a shared pool has to check.
+    cwc = {
+        **DRAFTING,
+        "settings": {"draft_mode": "cwc"},
+        "pick_order": ["alice", "bob"],
+        "turn_index": 1,
+        "pool": ["LEADER_TRAJAN", "LEADER_AMINA"],
+        "teams": [
+            {"team_index": 0, "leaders": ["LEADER_TRAJAN"], "civs": []},
+            {"team_index": 1, "leaders": [], "civs": []},
+        ],
+    }
+    repo = FakeRepo(lobby=cwc, applied=cwc)
+    with pytest.raises(InvalidSeating):
+        pick(repo, "bob", "LEADER_TRAJAN")
+    assert repo.changes == []
+    pick(repo, "bob", "LEADER_AMINA")
+    assert repo.changes[0][1]["teams"][1]["leaders"] == ["LEADER_AMINA"]

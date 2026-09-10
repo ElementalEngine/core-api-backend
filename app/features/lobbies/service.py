@@ -374,6 +374,38 @@ class LobbyService:
         players = len(seated)
         mode = (lobby.get("settings") or {}).get("draft_mode")
 
+        # ⚠ Viability is decided BEFORE dealing, because a fallback to
+        # `standard` needs per-seat pools where CWC needs one shared pool
+        # (D201). Deciding after would deal the wrong shape.
+        captains: list[str] = []
+        if mode == DRAFT_CWC:
+            # D75: the captain is DERIVED -- lowest seat_index per team,
+            # never stored as a flag.
+            lowest: dict[int, dict[str, Any]] = {}
+            for seat in seated:
+                team = seat.get("team")
+                if team is None:
+                    continue
+                if (
+                    team not in lowest
+                    or seat["seat_index"] < lowest[team]["seat_index"]
+                ):
+                    lowest[team] = seat
+            captains = [lowest[key]["discord_id"] for key in sorted(lowest)]
+            try:
+                cwc_order(captains, (lobby.get("team_size") or 0) * 2)
+            except ValueError as exc:
+                # ⚠ CWC_PICK_ORDER is entries of 0/1, but a teamer may have up
+                # to five teams and the ballot offers cwc to all of them.
+                # Falling back keeps the lobby playable and loses no picks;
+                # cancelling would punish players for a legal choice (O-35).
+                logger.warning(
+                    "cwc unavailable, falling back to standard. lobby=%s %s",
+                    lobby["_id"],
+                    exc,
+                )
+                mode = DRAFT_STANDARD
+
         # ⚠ civ7 drafts a leader AND a civ, from two independently dealt
         # pools. civ6 is leaders only, so its civ list is empty and every
         # civ-side call below no-ops rather than needing a branch.
@@ -387,10 +419,21 @@ class LobbyService:
             ),
         }
 
+        # ⚠ D201, measured from Mite (`cwc.ts:328` holds ONE shuffled
+        # `leaderPool` on the session). A captain picks `team_size * 2` times,
+        # so per-seat pools would give them seven leaders to make six picks
+        # from while five teammates hold pools nobody drafts. It would mostly
+        # WORK, which is worse than failing.
+        shared: dict[str, Any] = {}
+        if mode == DRAFT_CWC:
+            shared["pool"] = list(kinds["leader"])
+            if kinds["civ"]:
+                shared["civ_pool"] = list(kinds["civ"])
+
         per_seat: dict[str, dict[str, Any]] = {
             seat["discord_id"]: {} for seat in seated
         }
-        for kind, pool in kinds.items():
+        for kind, pool in ({} if mode == DRAFT_CWC else kinds).items():
             if not pool:
                 continue
             field = "pick" if mode == DRAFT_RANDOM else "pool"
@@ -417,56 +460,32 @@ class LobbyService:
         if is_turn_ordered(mode):
             seat_ids = [seat["discord_id"] for seat in seated]
             if mode == DRAFT_CWC:
-                # D75: the captain is DERIVED -- lowest seat_index per team,
-                # never stored as a flag. Computed once here and stored as
-                # the order itself, so a dispute reads what was used (D200).
-                lowest: dict[int, dict[str, Any]] = {}
-                for seat in seated:
-                    team = seat.get("team")
-                    if team is None:
-                        continue
-                    if (
-                        team not in lowest
-                        or seat["seat_index"] < lowest[team]["seat_index"]
-                    ):
-                        lowest[team] = seat
-                captains = [lowest[key]["discord_id"] for key in sorted(lowest)]
-                try:
-                    ordered["pick_order"] = cwc_order(
-                        captains, (lobby.get("team_size") or 0) * 2
-                    )
-                except ValueError as exc:
-                    # ⚠ CWC_PICK_ORDER is entries of 0/1, but a teamer may have
-                    # up to five teams and the ballot offers cwc to all of them.
-                    # Falling back keeps the lobby playable and loses no picks;
-                    # cancelling would punish players for a legal choice (O-35).
-                    logger.warning(
-                        "cwc unavailable, falling back to standard. lobby=%s %s",
-                        lobby["_id"],
-                        exc,
-                    )
-                    ordered = {
-                        "settings": {
-                            **(lobby.get("settings") or {}),
-                            "draft_mode": DRAFT_STANDARD,
-                        }
-                    }
-                else:
-                    ordered["teams"] = [
-                        {"team_index": index, "leaders": [], "civs": []}
-                        for index in range(2)
-                    ]
+                # Stored rather than recomputed, so a dispute reads the order
+                # that was actually used (D200).
+                ordered["pick_order"] = cwc_order(
+                    captains, (lobby.get("team_size") or 0) * 2
+                )
+                ordered["teams"] = [
+                    {"team_index": index, "leaders": [], "civs": []}
+                    for index in range(2)
+                ]
             else:
                 # The snake is the reversal BETWEEN rounds: civ6 drafts
                 # leaders alone, civ7 adds a civ round running backwards.
                 rounds = 2 if lobby["edition"] == "civ7" else 1
                 ordered["pick_order"] = snake_order(seat_ids, rounds)
 
+        if mode != (lobby.get("settings") or {}).get("draft_mode"):
+            ordered["settings"] = {
+                **(lobby.get("settings") or {}),
+                "draft_mode": mode,
+            }
         return {
             "seats": seats,
             "phase": DRAFT,
             "turn_index": 0,
             "turn_expires_at": datetime.now(UTC) + DRAFT_WINDOW,
+            **shared,
             **ordered,
         }
 
@@ -575,11 +594,30 @@ class LobbyService:
         if order and whose_turn(order, turn_index) != actor_discord_id:
             raise NotYourTurn("It is not your turn to pick")
 
+        # ⚠ D201. CWC reads the lobby's shared pool minus what is already
+        # taken; every other mode reads the seat's own disjoint pool, where
+        # nothing can be taken twice by construction.
+        if mode == DRAFT_CWC:
+            taken = {
+                token
+                for team in found.get("teams") or []
+                for token in [*team.get("leaders", []), *team.get("civs", [])]
+            }
+            available = {
+                "pick": [t for t in found.get("pool") or [] if t not in taken],
+                "civ_pick": [t for t in found.get("civ_pool") or [] if t not in taken],
+            }
+        else:
+            available = {
+                "pick": list(mine.get("pool") or []),
+                "civ_pick": list(mine.get("civ_pool") or []),
+            }
+
         wanted: dict[str, tuple[str, Any]] = {}
         if request.token is not None:
-            wanted["pick"] = (request.token, mine.get("pool"))
+            wanted["pick"] = (request.token, available["pick"])
         if request.civ_token is not None:
-            wanted["civ_pick"] = (request.civ_token, mine.get("civ_pool"))
+            wanted["civ_pick"] = (request.civ_token, available["civ_pick"])
         chosen: dict[str, Any] = {}
         for field, (token, pool) in wanted.items():
             # ⚠ O-34, PER FIELD and not a revision check. Per field because
@@ -588,7 +626,11 @@ class LobbyService:
             # Not a revision check because read-at-5, change-your-mind,
             # write-at-5 satisfies a revision guard: this is a clause about
             # the document's content, like D176's `$ne`.
-            if mine.get(field) is not None:
+            # ⚠ A seat rule, so it cannot apply to CWC: a captain picks
+            # `team_size * 2` times and holds no `pick` of their own. There
+            # the turn order is the guard -- it advances, so a replay lands
+            # on somebody else's turn and `whose_turn` refuses it.
+            if mode != DRAFT_CWC and mine.get(field) is not None:
                 raise PickIsFinal(f"Your {field} is already locked in")
             if token not in (pool or []):
                 raise InvalidSeating(field, f"{token} is not in your pool")
@@ -972,6 +1014,7 @@ __all__ = [
     "LobbyService",
     "NotSeated",
     "NotTheHost",
+    "NotYourTurn",
     "PickIsFinal",
     "SeatChangeRefused",
     "as_lobby_id",
