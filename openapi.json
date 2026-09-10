@@ -356,7 +356,7 @@
       },
       "ChangeSeatRequest": {
         "additionalProperties": false,
-        "description": "One seat change. `place` covers self-place, move and host rearrange.\n\n\u26a0 Two actions rather than four. Moving IS placing at a different index,\nand a host rearrange is placing aimed at somebody else -- so one action\nplus an optional target covers all four of C5's verbs with one code path\nand one call to `validate_seats`.\n\n\u26a0 `place` states the WHOLE desired position. Omitting `team` means no\nside, not \"keep the side you had\": distinguishing the two would need a\nsentinel, and a seat move that silently retains a team is the kind of\nquiet action O-19b's compaction bug was made of.",
+        "description": "One seat change. `place` covers self-place, move and host rearrange.\n\nTwo actions rather than four. Moving IS placing at a different index,\nand a host rearrange is placing aimed at somebody else -- so one action\nplus an optional target covers all four of C5's verbs with one code path\nand one call to `validate_seats`.\n\n`place` states the WHOLE desired position. Omitting `team` means no\nside, not \"keep the side you had\": distinguishing the two would need a\nsentinel, and a seat move that silently retains a team is the kind of\nquiet action O-19b's compaction bug was made of.",
         "properties": {
           "action": {
             "$ref": "#/components/schemas/SeatAction"
@@ -2517,7 +2517,7 @@
       },
       "SubmitBallotRequest": {
         "additionalProperties": false,
-        "description": "One seat's settings ballot.\n\n\u26a0 The whole ballot, not a delta. A seat re-submitting replaces what it\nhad, so a client that dropped an answer cannot leave a stale one behind\n-- and \"has this seat answered question X\" stays a single lookup rather\nthan a merge of every submission it ever made.\n\nSelections are `option_id`, or `a|b` where the question allows more than\none (D191). Ids are checked against the catalogue, so a question or option\nthe ballot invents is a 400 rather than a vote nothing counts.",
+        "description": "One seat's settings ballot.\n\nThe whole ballot, not a delta. A seat re-submitting replaces what it\nhad, so a client that dropped an answer cannot leave a stale one behind\n-- and \"has this seat answered question X\" stays a single lookup rather\nthan a merge of every submission it ever made.\n\nSelections are `option_id`, or `a|b` where the question allows more than\none (D191). Ids are checked against the catalogue, so a question or option\nthe ballot invents is a 400 rather than a vote nothing counts.",
         "properties": {
           "expected_revision": {
             "minimum": 1.0,
@@ -2542,7 +2542,7 @@
       },
       "SubmitBansRequest": {
         "additionalProperties": false,
-        "description": "One seat's bans. The whole set, not a delta.\n\n\u26a0 Both lists may be empty -- a seat banning nothing has still SUBMITTED,\nand the phase advances on all-submitted. Distinguishing \"banned nothing\"\nfrom \"has not banned\" is why the seat stores `bans` as a document rather\nthan two bare lists (`bans is not None` is the submitted test).\n\nTokens are civ-data's, and are checked against it: leaders against the\nedition's whole set, civs against the STARTING AGE's pool only. A civ\noutside the chosen age is a real token for a civ not in the game, and\nbanning it would burn one of three slots (D196).",
+        "description": "One seat's bans. The whole set, not a delta.\n\nBoth lists may be empty -- a seat banning nothing has still SUBMITTED,\nand the phase advances on all-submitted. Distinguishing \"banned nothing\"\nfrom \"has not banned\" is why the seat stores `bans` as a document rather\nthan two bare lists (`bans is not None` is the submitted test).\n\nTokens are civ-data's, and are checked against it: leaders against the\nedition's whole set, civs against the STARTING AGE's pool only. A civ\noutside the chosen age is a real token for a civ not in the game, and\nbanning it would burn one of three slots (D196).",
         "properties": {
           "civ_keys": {
             "items": {
@@ -2574,7 +2574,7 @@
       },
       "SubmitPickRequest": {
         "additionalProperties": false,
-        "description": "One seat's pick, from the pool that seat was dealt.\n\n\u26a0 **A pick is final once made (O-34).** The refusal is on the seat's own\nstate, NOT on `revision`: a revision guard permits exactly what the rule\nforbids -- read at revision 5, change your mind, write at revision 5, and\nnothing has moved so the guard is satisfied. Same shape as D176's `$ne`,\nwhich is a clause about the document's content rather than its version.\n\n`civ_token` is civ7 only; civ6 drafts leaders alone.",
+        "description": "One seat's pick, from the pool that seat was dealt.\n\n**A pick is final once made (O-34).** The refusal is on the seat's own\nstate, NOT on `revision`: a revision guard permits exactly what the rule\nforbids -- read at revision 5, change your mind, write at revision 5, and\nnothing has moved so the guard is satisfied. Same shape as D176's `$ne`,\nwhich is a clause about the document's content rather than its version.\n\n`civ_token` is civ7 only; civ6 drafts leaders alone.",
         "properties": {
           "civ_token": {
             "anyOf": [
@@ -5629,7 +5629,7 @@
     },
     "/api/v2/lobbies": {
       "get": {
-        "description": "Open lobbies for a guild (D180).\n\n\u26a0 `guild_id` is required, never defaulted: a service token is\nper-service, not per-guild, so an unfiltered read would expose every\nlobby on the deployment to any holder of it.",
+        "description": "Open lobbies for a guild (D180).\n\n`guild_id` is required, never defaulted: a service token is\nper-service, not per-guild, so an unfiltered read would expose every\nlobby on the deployment to any holder of it.",
         "operationId": "browse_lobbies_api_v2_lobbies_get",
         "parameters": [
           {
@@ -5882,7 +5882,7 @@
     },
     "/api/v2/lobbies/claim-post": {
       "post": {
-        "description": "Claim the oldest unposted finished lobby, or 204 when there is none.\n\n\u26a0 Declared BEFORE any parameterised sibling: a `/{lobby_id}` route\nregistered first would swallow this literal path and check a Mite-facing\nrequest against the Activity gate.",
+        "description": "Claim the oldest unposted finished lobby, or 204 when there is none.\n\nDeclared BEFORE any parameterised sibling: a `/{lobby_id}` route\nregistered first would swallow this literal path and check a Mite-facing\nrequest against the Activity gate.",
         "operationId": "claim_post_api_v2_lobbies_claim_post_post",
         "parameters": [
           {
@@ -5941,7 +5941,7 @@
     },
     "/api/v2/lobbies/{lobby_id}": {
       "get": {
-        "description": "One lobby, censored for the caller (D73), revision-gated (D77).\n\n204 when `since` already holds the current revision -- not 304, which\nwould invite cache and proxy semantics into the polling path. A lobby\nwith no `since` is read unconditionally.\n\n\u26a0 `revision` starts at 1, so `since=0` is refused rather than treated as\n\"send me everything\": no lobby has ever held it, and a client sending it\nhas a bug worth surfacing.",
+        "description": "One lobby, censored for the caller (D73), revision-gated (D77).\n\n204 when `since` already holds the current revision -- not 304, which\nwould invite cache and proxy semantics into the polling path. A lobby\nwith no `since` is read unconditionally.\n\n`revision` starts at 1, so `since=0` is refused rather than treated as\n\"send me everything\": no lobby has ever held it, and a client sending it\nhas a bug worth surfacing.",
         "operationId": "read_lobby_api_v2_lobbies__lobby_id__get",
         "parameters": [
           {
@@ -6024,7 +6024,7 @@
     },
     "/api/v2/lobbies/{lobby_id}/bans": {
       "put": {
-        "description": "One seat's bans, resolving the phase on the last submission.\n\n\u26a0 Leaders are checked against the edition; civs against the STARTING\nAGE's pool only, so a real token for a civ that is not in the game\ncannot burn one of three slots (D196).",
+        "description": "One seat's bans, resolving the phase on the last submission.\n\nLeaders are checked against the edition; civs against the STARTING\nAGE's pool only, so a real token for a civ that is not in the game\ncannot burn one of three slots (D196).",
         "operationId": "submit_bans_api_v2_lobbies__lobby_id__bans_put",
         "parameters": [
           {
@@ -6176,7 +6176,7 @@
     },
     "/api/v2/lobbies/{lobby_id}/picks": {
       "put": {
-        "description": "One seat's pick, completing the lobby on the last one.\n\n\u26a0 **409 for a second pick, and it is not a revision conflict.** A pick is\nfinal once made (O-34); the refusal reads the seat, not the revision.",
+        "description": "One seat's pick, completing the lobby on the last one.\n\n**409 for a second pick, and it is not a revision conflict.** A pick is\nfinal once made (O-34); the refusal reads the seat, not the revision.",
         "operationId": "submit_pick_api_v2_lobbies__lobby_id__picks_put",
         "parameters": [
           {
@@ -6404,7 +6404,7 @@
     },
     "/api/v2/lobbies/{lobby_id}/votes": {
       "put": {
-        "description": "One seat's settings ballot, resolving the phase on the last one.\n\n\u26a0 The response may come back already at `bans`: the final ballot tallies\nand advances in the same call, and so does any request arriving after\n`turn_expires_at` (D74, D194).",
+        "description": "One seat's settings ballot, resolving the phase on the last one.\n\nThe response may come back already at `bans`: the final ballot tallies\nand advances in the same call, and so does any request arriving after\n`turn_expires_at` (D74, D194).",
         "operationId": "submit_ballot_api_v2_lobbies__lobby_id__votes_put",
         "parameters": [
           {
