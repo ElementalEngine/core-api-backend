@@ -455,6 +455,7 @@ PUBLIC_LOBBY_FIELDS = {
     "updated_at",
     "settings",
     "voice_channel_id",
+    "no_pick_from",
 }
 PUBLIC_SEAT_FIELDS = {"seat_index", "discord_id", "team", "ready"}
 
@@ -1337,3 +1338,60 @@ def test_staff_mid_game_elsewhere_cannot_observe():
     repo = Busy(lobby=HIDDEN, applied=HIDDEN)
     seen = watch(repo, "mod")
     assert seen["seats"][0].get("pick") is None
+
+
+def test_a_cwc_pick_turn_refreshes_the_clock():
+    # Every ban turn resets the deadline; picks did not, so a whole cwc draft
+    # shared one window and a 6v6's twelve turns could not fit inside it.
+    cwc = {
+        **DRAFTING,
+        "settings": {"draft_mode": "cwc"},
+        "pick_order": ["alice", "bob", "bob", "alice"],
+        "turn_index": 0,
+        "pool": ["LEADER_TRAJAN", "LEADER_AMINA"],
+        "teams": [
+            {"team_index": 0, "leaders": [], "civs": []},
+            {"team_index": 1, "leaders": [], "civs": []},
+        ],
+    }
+    repo = FakeRepo(lobby=cwc, applied=cwc)
+    pick(repo, "alice", "LEADER_TRAJAN")
+    _, changes = repo.changes[0]
+    assert changes["turn_index"] == 1
+    assert changes["turn_expires_at"] > datetime.now(UTC)
+
+
+def test_a_draft_that_runs_out_of_time_is_cancelled():
+    # There is no safe default for a pick: assigning a leader on somebody's
+    # behalf decides their game. The reason names who was still owed one.
+    stalled = {
+        **DRAFTING,
+        "settings": {"draft_mode": "standard"},
+        "pick_order": [],
+        "turn_expires_at": datetime.now(UTC) - timedelta(minutes=1),
+        "seats": [
+            {"seat_index": 0, "discord_id": "alice", "pick": "LEADER_TRAJAN"},
+            {"seat_index": 1, "discord_id": "bob", "pool": ["LEADER_AMINA"]},
+        ],
+    }
+    repo = FakeRepo(lobby=stalled, applied=stalled)
+    asyncio.run(LobbyService(repo, FakeSeasons(), FakeCivData()).read(HEX_ID, "alice"))
+    _, changes = repo.changes[0]
+    assert changes["phase"] == "cancelled"
+    assert changes["cancel_reason"] == "no_pick"
+    assert changes["no_pick_from"] == ["bob"]
+
+
+def test_an_expired_cwc_draft_names_the_captain_who_stalled_it():
+    stalled = {
+        **DRAFTING,
+        "settings": {"draft_mode": "cwc"},
+        "pick_order": ["alice", "bob"],
+        "turn_index": 1,
+        "turn_expires_at": datetime.now(UTC) - timedelta(seconds=1),
+        "teams": [{"team_index": 0, "leaders": [], "civs": []}],
+    }
+    repo = FakeRepo(lobby=stalled, applied=stalled)
+    asyncio.run(LobbyService(repo, FakeSeasons(), FakeCivData()).read(HEX_ID, "alice"))
+    _, changes = repo.changes[0]
+    assert changes["no_pick_from"] == ["bob"]

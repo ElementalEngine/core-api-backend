@@ -25,6 +25,7 @@ from app.features.lobbies.modes import (
 from app.features.lobbies.phases import (
     BANS,
     CANCEL_BY_HOST,
+    CANCEL_NO_PICK,
     CANCEL_NO_POOL,
     CANCELLED,
     COMPLETE,
@@ -313,7 +314,40 @@ class LobbyService:
             if lobby.get("ban_order"):
                 return await self._skip_cwc_ban(lobby) or lobby
             return await self._resolve_bans(lobby) or lobby
+        if lobby["phase"] == DRAFT:
+            return await self._abandon_draft(lobby) or lobby
         return lobby
+
+    async def _abandon_draft(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
+        """Cancel a draft nobody finished.
+
+        Unlike settings and bans there is no safe default: assigning a leader
+        on somebody's behalf decides their game for them. The reason names
+        who was still owed a pick so the embed can say why.
+        """
+        order = lobby.get("pick_order")
+        if order:
+            owed = [whose_turn(order, lobby.get("turn_index") or 0)]
+        else:
+            owed = [
+                seat["discord_id"]
+                for seat in lobby.get("seats") or []
+                if seat.get("discord_id") and seat.get("pick") is None
+            ]
+        now = datetime.now(UTC)
+        logger.info("draft abandoned. lobby=%s waiting on %s", lobby["_id"], owed)
+        return await self._repository.apply_changes(
+            lobby["_id"],
+            lobby["revision"],
+            {
+                "phase": CANCELLED,
+                "cancel_reason": CANCEL_NO_PICK,
+                "no_pick_from": [who for who in owed if who],
+                "closed_at": now,
+                "turn_expires_at": None,
+            },
+            now,
+        )
 
     async def _skip_cwc_ban(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
         """A captain who runs out of time loses the ban, not the lobby."""
@@ -768,9 +802,10 @@ class LobbyService:
                     if request.civ_token is not None:
                         team["civs"] = [*team["civs"], request.civ_token]
             changes = {"teams": teams}
+        now = datetime.now(UTC)
         if order:
             changes["turn_index"] = turn_index + 1
-        now = datetime.now(UTC)
+            changes["turn_expires_at"] = now + CWC_TURN
         written = await self._repository.apply_changes(
             oid, request.expected_revision, changes, now
         )
