@@ -37,7 +37,6 @@ from app.features.lobbies.service import (
     NotSeated,
     NotTheHost,
     NotYourTurn,
-    NotYourTurn,
     PickIsFinal,
     SeatChangeRefused,
     as_lobby_id,

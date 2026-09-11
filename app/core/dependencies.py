@@ -23,6 +23,11 @@ def get_mongo_database(request: Request) -> AsyncDatabase:
     return database
 
 
+def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:
+    """Whether the caller holds a staff role. The bot asserts it; we apply it."""
+    return x_actor_is_staff
+
+
 def actor_discord_id(x_actor_discord_id: str = Header()) -> str:
     """The single identity header every activity route requires."""
     return x_actor_discord_id

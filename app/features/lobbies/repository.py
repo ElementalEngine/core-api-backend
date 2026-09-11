@@ -22,7 +22,12 @@ from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import DuplicateKeyError
 
 from app.core.constants import COL_LOBBIES, COL_LOBBY_STATS, GAMES_DB
-from app.features.lobbies.phases import CANCEL_ABANDONED, CANCELLED, COMPLETE
+from app.features.lobbies.phases import (
+    CANCEL_ABANDONED,
+    CANCELLED,
+    COMPLETE,
+    LOBBY,
+)
 
 OPEN_LOBBY = {"closed_at": None}
 
@@ -167,6 +172,22 @@ class LobbyRepository:
             )
             written += 1
         return written
+
+    async def is_playing_a_started_lobby(self, discord_id: str) -> bool:
+        """Whether this player holds a seat in a lobby that has begun.
+
+        Covered by the same partial index as the one-seat-per-player rule, so
+        this is a point lookup rather than a scan.
+        """
+        found = await self._lobbies.find_one(
+            {
+                "seats.discord_id": discord_id,
+                "closed_at": None,
+                "phase": {"$ne": LOBBY},
+            },
+            {"_id": 1},
+        )
+        return found is not None
 
     async def find_by_id(self, lobby_id: ObjectId) -> dict[str, Any] | None:
         """One lobby by id, open or closed."""

@@ -22,6 +22,7 @@ from pymongo import AsyncMongoClient
 
 from app.core.dependencies import (
     actor_discord_id,
+    actor_is_staff,
     get_database,
     require_activity_token,
     require_mito_token,
@@ -32,8 +33,8 @@ from app.features.lobbies.modes import InvalidLobbyShape, InvalidSeating
 from app.features.lobbies.repository import LobbyInsertRefused, LobbyRepository
 from app.features.lobbies.schemas import (
     ChangeSeatRequest,
-    MarkReadyRequest,
     CreateLobbyRequest,
+    MarkReadyRequest,
     SubmitBallotRequest,
     SubmitBansRequest,
     SubmitPickRequest,
@@ -121,11 +122,15 @@ async def read_lobby(
     lobby_id: str,
     since: int | None = Query(default=None, ge=1),
     actor: str = Depends(actor_discord_id),
+    is_staff: bool = Depends(actor_is_staff),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any] | Response:
-    """One lobby, censored for the caller, revision-gated."""
+    """One lobby, censored for the caller, revision-gated.
+
+    Staff watching a lobby they are not playing in see it uncensored.
+    """
     try:
-        snapshot = await _service(db).read(lobby_id, actor, since)
+        snapshot = await _service(db).read(lobby_id, actor, since, is_staff=is_staff)
     except InvalidLobbyId as exc:
         raise invalid_request(str(exc)) from exc
     except LobbyNotFound as exc:

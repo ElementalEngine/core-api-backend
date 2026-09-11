@@ -45,8 +45,8 @@ from app.features.lobbies.projection import project_lobby
 from app.features.lobbies.questions import questions_for
 from app.features.lobbies.schemas import (
     ChangeSeatRequest,
-    MarkReadyRequest,
     CreateLobbyRequest,
+    MarkReadyRequest,
     SeatAction,
     SubmitBallotRequest,
     SubmitBansRequest,
@@ -122,10 +122,19 @@ def _wire_value(value: Any) -> Any:
 
 
 def for_the_wire(
-    document: dict[str, Any], viewer_discord_id: str | None
+    document: dict[str, Any],
+    viewer_discord_id: str | None,
+    *,
+    uncensored: bool = False,
 ) -> dict[str, Any]:
-    """A stored lobby as `viewer_discord_id` may see it, in JSON's types."""
-    projected = project_lobby(document, viewer_discord_id)
+    """A stored lobby as `viewer_discord_id` may see it, in JSON's types.
+
+    `uncensored` is for staff observers, who need a blind draft's picks to
+    adjudicate it. The secrecy is between players.
+    """
+    projected = (
+        dict(document) if uncensored else project_lobby(document, viewer_discord_id)
+    )
     return {
         key: str(value)
         if key in OBJECT_ID_FIELDS and value is not None
@@ -842,7 +851,12 @@ class LobbyService:
         return for_the_wire(written, actor_discord_id)
 
     async def read(
-        self, lobby_id: str, viewer_discord_id: str, since: int | None = None
+        self,
+        lobby_id: str,
+        viewer_discord_id: str,
+        since: int | None = None,
+        *,
+        is_staff: bool = False,
     ) -> dict[str, Any] | None:
         """The censored snapshot, or None when `since` already holds its revision."""
         found = await self._repository.find_by_id(as_lobby_id(lobby_id))
@@ -853,7 +867,25 @@ class LobbyService:
         # None here would compare unequal forever and never answer 204.
         if since is not None and found["revision"] == since:
             return None
-        return for_the_wire(found, viewer_discord_id)
+        observing = await self._observing(found, viewer_discord_id, is_staff)
+        return for_the_wire(found, viewer_discord_id, uncensored=observing)
+
+    async def _observing(
+        self, lobby: dict[str, Any], viewer_discord_id: str, is_staff: bool
+    ) -> bool:
+        """Whether this caller watches the lobby rather than plays in it.
+
+        Staff only, and not while they are mid-game themselves: someone in a
+        lobby that has started cannot watch another one.
+        """
+        if not is_staff:
+            return False
+        if any(
+            seat.get("discord_id") == viewer_discord_id
+            for seat in lobby.get("seats") or []
+        ):
+            return False
+        return not await self._repository.is_playing_a_started_lobby(viewer_discord_id)
 
     async def start(
         self, lobby_id: str, actor_discord_id: str, expected_revision: int

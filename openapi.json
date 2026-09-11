@@ -5994,7 +5994,7 @@
     },
     "/api/v2/lobbies/{lobby_id}": {
       "get": {
-        "description": "One lobby, censored for the caller, revision-gated.",
+        "description": "One lobby, censored for the caller, revision-gated.\n\nStaff watching a lobby they are not playing in see it uncensored.",
         "operationId": "read_lobby_api_v2_lobbies__lobby_id__get",
         "parameters": [
           {
@@ -6046,6 +6046,16 @@
             "schema": {
               "title": "X-Actor-Discord-Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-is-staff",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "X-Actor-Is-Staff",
+              "type": "boolean"
             }
           }
         ],

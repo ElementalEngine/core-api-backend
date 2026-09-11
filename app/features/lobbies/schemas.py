@@ -137,8 +137,8 @@ class SubmitPickRequest(BaseModel):
 
 __all__ = [
     "ChangeSeatRequest",
-    "MarkReadyRequest",
     "CreateLobbyRequest",
+    "MarkReadyRequest",
     "SeatAction",
     "SubmitBallotRequest",
     "SubmitBansRequest",
