@@ -59,6 +59,10 @@ def request(**overrides):
         "game_type": "ffa",
     }
     body.update(overrides)
+    # A teamer chooses its draft mode at creation, so every teamer fixture
+    # needs one. standard, because cwc constrains the shape as well.
+    if body["game_type"] == "teamer":
+        body.setdefault("draft_mode", "standard")
     return CreateLobbyRequest(**body)
 
 
@@ -485,6 +489,7 @@ PUBLIC_LOBBY_FIELDS = {
     "revision",
     "created_at",
     "updated_at",
+    "settings",
 }
 PUBLIC_SEAT_FIELDS = {"seat_index", "discord_id", "team"}
 

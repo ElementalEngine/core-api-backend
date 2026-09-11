@@ -44,8 +44,13 @@ def test_every_question_is_answerable(edition, game_type):
 
 
 @pytest.mark.parametrize(("edition", "game_type"), EVERY_BALLOT)
-def test_draft_mode_is_asked_last_and_exactly_once(edition, game_type):
+def test_draft_mode_is_asked_last_and_only_where_it_is_voted_on(edition, game_type):
+    # A teamer picks standard or cwc when the lobby is created, so its ballot
+    # has no draft-mode question at all.
     asked = [question["id"] for question in questions_for(edition, game_type)]
+    if game_type == "teamer":
+        assert "draft_mode" not in asked
+        return
     assert asked[-1] == "draft_mode"
     assert asked.count("draft_mode") == 1
 
@@ -57,15 +62,22 @@ def test_duel_offers_standard_and_random_only(edition):
 
 
 @pytest.mark.parametrize("edition", EDITIONS)
-def test_cwc_is_offered_to_teamer_and_nowhere_else(edition):
+def test_no_ballot_offers_cwc(edition):
+    # cwc is a create-time choice now; offering it on a ballot would let a
+    # lobby vote for a mode whose captains were never seated.
+    # `cwc` is also a timer option in one civ6 question, so this checks the
+    # draft-mode question specifically rather than every option on the ballot.
     for game_type in GAME_TYPES:
-        offered = {o["id"] for o in questions_for(edition, game_type)[-1]["options"]}
-        assert ("cwc" in offered) is (game_type == "teamer"), game_type
+        modes = [
+            q for q in questions_for(edition, game_type) if q["id"] == "draft_mode"
+        ]
+        for question in modes:
+            assert "cwc" not in {o["id"] for o in question["options"]}, game_type
 
 
 @pytest.mark.parametrize("edition", EDITIONS)
-def test_random_is_offered_everywhere(edition):
-    for game_type in GAME_TYPES:
+def test_random_is_offered_wherever_the_mode_is_voted_on(edition):
+    for game_type in ("ffa", "duel"):
         offered = {o["id"] for o in questions_for(edition, game_type)[-1]["options"]}
         assert "random" in offered, game_type
 

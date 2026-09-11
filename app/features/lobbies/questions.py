@@ -48,10 +48,15 @@ def questions_for(edition: str, game_type: str) -> list[dict[str, Any]]:
     catalogue = _catalogue(edition)
     try:
         settings = catalogue["settings"][catalogue["settings_for"][game_type]]
-        draft_mode = catalogue["draft_mode"][catalogue["draft_mode_for"][game_type]]
     except KeyError as exc:
         raise UnknownBallot(f"{edition} has no ballot for {game_type}") from exc
-    return json.loads(json.dumps([*settings, draft_mode]))
+    # A teamer's draft mode is chosen when the lobby is created, so it is not
+    # on the ballot; every other game type votes on it.
+    variant = catalogue["draft_mode_for"].get(game_type)
+    asked = [*settings]
+    if variant is not None:
+        asked.append(catalogue["draft_mode"][variant])
+    return json.loads(json.dumps(asked))
 
 
 def question_ids(edition: str, game_type: str) -> set[str]:

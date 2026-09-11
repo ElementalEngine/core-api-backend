@@ -448,33 +448,10 @@
         }
       ],
       "default_option_id": "standard"
-    },
-    "teamer": {
-      "id": "draft_mode",
-      "title": "Draft Mode",
-      "options": [
-        {
-          "id": "standard",
-          "emoji": "✅",
-          "label": "Standard"
-        },
-        {
-          "id": "cwc",
-          "emoji": "🌍",
-          "label": "CWC (shared pool)"
-        },
-        {
-          "id": "random",
-          "emoji": "❓",
-          "label": "Random"
-        }
-      ],
-      "default_option_id": "standard"
     }
   },
   "draft_mode_for": {
     "ffa": "ffa",
-    "duel": "duel",
-    "teamer": "teamer"
+    "duel": "duel"
   }
 }

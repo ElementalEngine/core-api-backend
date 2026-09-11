@@ -169,6 +169,8 @@ def build_lobby_document(
         document["instance_id"] = request.instance_id
     if request.starting_age is not None:
         document["starting_age"] = request.starting_age
+    if request.draft_mode is not None:
+        document["settings"] = {"draft_mode": request.draft_mode}
     return document
 
 
@@ -282,11 +284,16 @@ class LobbyService:
             lobby["_id"],
             lobby["revision"],
             {
-                "settings": resolve_settings(
-                    lobby.get("seats") or [],
-                    questions_for(lobby["edition"], lobby["game_type"]),
-                    str(lobby["_id"]),
-                ),
+                # Merged, not replaced: a teamer's draft mode was written at
+                # creation and is not on the ballot to be re-resolved.
+                "settings": {
+                    **(lobby.get("settings") or {}),
+                    **resolve_settings(
+                        lobby.get("seats") or [],
+                        questions_for(lobby["edition"], lobby["game_type"]),
+                        str(lobby["_id"]),
+                    ),
+                },
                 "phase": BANS,
                 "turn_index": 0,
                 "turn_expires_at": now + BANS_WINDOW,

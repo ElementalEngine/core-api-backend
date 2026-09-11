@@ -552,6 +552,21 @@
             "title": "Channel Id",
             "type": "string"
           },
+          "draft_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "standard",
+                  "cwc"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Draft Mode"
+          },
           "edition": {
             "enum": [
               "civ6",

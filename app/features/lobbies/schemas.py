@@ -32,11 +32,32 @@ class CreateLobbyRequest(BaseModel):
     game_type: str
     number_teams: int | None = None
     team_size: int | None = None
+    # Teamers choose between standard and cwc here rather than on the ballot:
+    # cwc needs captains identified before the ban phase, and a ballot answer
+    # arrives too late to seat them.
+    draft_mode: Literal["standard", "cwc"] | None = None
     roster: list[str] = Field(default_factory=list, max_length=99)
     instance_id: str | None = Field(default=None, max_length=64)
     starting_age: Literal["AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"] | None = (
         Field(default=None)
     )
+
+    @model_validator(mode="after")
+    def _draft_mode_suits_the_game_type(self) -> CreateLobbyRequest:
+        if self.game_type != "teamer":
+            if self.draft_mode is not None:
+                raise ValueError("only a teamer chooses its draft mode at creation")
+            return self
+        if self.draft_mode is None:
+            raise ValueError("a teamer must choose standard or cwc")
+        if self.draft_mode == "cwc":
+            # The pick order alternates between exactly two sides, and an odd
+            # team size is a league rule rather than a limit of the table.
+            if self.number_teams != 2:
+                raise ValueError("cwc needs exactly two teams")
+            if not self.team_size or self.team_size % 2:
+                raise ValueError("cwc needs an even team size")
+        return self
 
 
 class SeatAction(StrEnum):
