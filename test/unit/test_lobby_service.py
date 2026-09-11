@@ -37,6 +37,7 @@ from app.features.lobbies.service import (
     NotSeated,
     NotTheHost,
     NotYourTurn,
+    NotYourTurn,
     PickIsFinal,
     SeatChangeRefused,
     as_lobby_id,
@@ -1167,3 +1168,93 @@ def ready(repo, actor="alice", revision=3):
             HEX_ID, actor, MarkReadyRequest(expected_revision=revision)
         )
     )
+
+
+# --- cwc captains ban in turn ------------------------------------------
+
+CWC = {
+    **BANNING,
+    "edition": "civ6",
+    "settings": {"draft_mode": "cwc"},
+    "team_size": 2,
+    "number_teams": 2,
+    "ban_order": ["alice", "bob", "bob", "alice"],
+    "turn_index": 0,
+    "bans": {"leader": [], "civ": []},
+    "seats": [
+        {"seat_index": 0, "discord_id": "alice", "team": 0},
+        {"seat_index": 1, "discord_id": "bob", "team": 1},
+    ],
+}
+
+
+def test_a_captain_cannot_ban_out_of_turn():
+    repo = FakeRepo(lobby=CWC, written=CWC, applied=CWC)
+    with pytest.raises(NotYourTurn):
+        ban(repo, actor="bob", leader_keys=["LEADER_TRAJAN"])
+    assert repo.changes == []
+
+
+def test_a_turn_bans_one_leader_and_advances_the_order():
+    repo = FakeRepo(lobby=CWC, written=CWC, applied=CWC)
+    ban(repo, actor="alice", leader_keys=["LEADER_TRAJAN"])
+    _, changes = repo.changes[0]
+    assert changes["bans"]["leader"] == ["LEADER_TRAJAN"]
+    assert changes["turn_index"] == 1
+
+
+def test_a_civ6_turn_banning_two_leaders_is_refused():
+    # A turn is one action. Letting a captain send several would make the
+    # order meaningless.
+    repo = FakeRepo(lobby=CWC, written=CWC, applied=CWC)
+    with pytest.raises(InvalidSeating):
+        ban(repo, actor="alice", leader_keys=["LEADER_TRAJAN", "LEADER_AMINA"])
+    assert repo.changes == []
+
+
+def test_a_civ7_turn_bans_a_leader_and_a_civ_together():
+    civ7 = {**CWC, "edition": "civ7"}
+    repo = FakeRepo(lobby=civ7, written=civ7, applied=civ7)
+    ban(
+        repo,
+        actor="alice",
+        leader_keys=["LEADER_TRAJAN"],
+        civ_keys=["CIVILIZATION_ROME"],
+    )
+    _, changes = repo.changes[0]
+    assert changes["bans"] == {
+        "leader": ["LEADER_TRAJAN"],
+        "civ": ["CIVILIZATION_ROME"],
+    }
+
+
+def test_a_civ7_turn_without_a_civ_is_refused():
+    civ7 = {**CWC, "edition": "civ7"}
+    repo = FakeRepo(lobby=civ7, written=civ7, applied=civ7)
+    with pytest.raises(InvalidSeating):
+        ban(repo, actor="alice", leader_keys=["LEADER_TRAJAN"])
+
+
+def test_a_key_already_banned_cannot_be_banned_again():
+    taken = {**CWC, "bans": {"leader": ["LEADER_TRAJAN"], "civ": []}}
+    repo = FakeRepo(lobby=taken, written=taken, applied=taken)
+    with pytest.raises(InvalidSeating):
+        ban(repo, actor="alice", leader_keys=["LEADER_TRAJAN"])
+
+
+def test_the_last_ban_turn_deals_the_draft():
+    spent = {**CWC, "turn_index": 3, "bans": {"leader": ["A", "B", "C"], "civ": []}}
+    repo = FakeRepo(lobby=spent, written=spent, applied=spent)
+    ban(repo, actor="alice", leader_keys=["LEADER_TRAJAN"])
+    assert len(repo.changes) == 2, "the ban, then the deal"
+    assert repo.changes[-1][1]["phase"] == "draft"
+
+
+def test_a_ban_turn_that_expires_is_skipped_not_cancelled():
+    # A captain who runs out of time loses the ban, not the lobby.
+    expired = {**CWC, "turn_expires_at": datetime.now(UTC) - timedelta(seconds=1)}
+    repo = FakeRepo(lobby=expired, applied=expired)
+    asyncio.run(LobbyService(repo, FakeSeasons(), FakeCivData()).read(HEX_ID, "alice"))
+    _, changes = repo.changes[0]
+    assert changes["turn_index"] == 1
+    assert changes["turn_expires_at"] > datetime.now(UTC)

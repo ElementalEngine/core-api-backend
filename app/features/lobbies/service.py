@@ -63,6 +63,8 @@ DRAFT_RANDOM = "random"
 DRAFT_CWC = "cwc"
 DRAFT_STANDARD = "standard"
 BANS_WINDOW = timedelta(minutes=5)
+# One cwc turn, for a ban or for a pick.
+CWC_TURN = timedelta(seconds=30)
 DRAFT_WINDOW = timedelta(minutes=5)
 
 # The ids Mongo owns. Everything else on a lobby document is already a JSON
@@ -282,8 +284,26 @@ class LobbyService:
         if lobby["phase"] == SETTINGS:
             return await self._resolve_settings(lobby) or lobby
         if lobby["phase"] == BANS:
+            if lobby.get("ban_order"):
+                return await self._skip_cwc_ban(lobby) or lobby
             return await self._resolve_bans(lobby) or lobby
         return lobby
+
+    async def _skip_cwc_ban(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
+        """A captain who runs out of time loses the ban, not the lobby."""
+        turn_index = (lobby.get("turn_index") or 0) + 1
+        now = datetime.now(UTC)
+        logger.info(
+            "cwc ban turn skipped. lobby=%s turn=%s", lobby["_id"], turn_index - 1
+        )
+        if whose_turn(lobby["ban_order"], turn_index) is None:
+            return await self._deal_after_cwc_bans({**lobby, "turn_index": turn_index})
+        return await self._repository.apply_changes(
+            lobby["_id"],
+            lobby["revision"],
+            {"turn_index": turn_index, "turn_expires_at": now + CWC_TURN},
+            now,
+        )
 
     async def _resolve_settings(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
         """Tally the ballots and move to `bans`. None if the lobby moved."""
@@ -308,6 +328,18 @@ class LobbyService:
             },
             now,
         )
+
+    @staticmethod
+    def _captains(seats: list[dict[str, Any]]) -> list[str]:
+        """Seat one of each team, in team order."""
+        lowest: dict[int, dict[str, Any]] = {}
+        for seat in seats:
+            team = seat.get("team")
+            if team is None or not seat.get("discord_id"):
+                continue
+            if team not in lowest or seat["seat_index"] < lowest[team]["seat_index"]:
+                lowest[team] = seat
+        return [lowest[key]["discord_id"] for key in sorted(lowest)]
 
     async def _deal_the_draft(self, lobby: dict[str, Any]) -> dict[str, Any]:
         """What leaving `bans` writes, by draft mode."""
@@ -411,6 +443,78 @@ class LobbyService:
             **shared,
             **ordered,
         }
+
+    async def _ban_in_turn(
+        self,
+        oid: Any,
+        lobby: dict[str, Any],
+        actor_discord_id: str,
+        request: SubmitBansRequest,
+    ) -> dict[str, Any]:
+        """One captain's turn in a cwc ban order.
+
+        A turn bans one leader, and one civ as well in civ7. The bans land on
+        the lobby rather than on a seat: nobody is banning for themselves.
+        """
+        order = lobby["ban_order"]
+        turn_index = lobby.get("turn_index") or 0
+        if whose_turn(order, turn_index) != actor_discord_id:
+            raise NotYourTurn("It is not your turn to ban")
+
+        wants_civ = lobby["edition"] == "civ7"
+        expected = 1 + int(wants_civ)
+        if len(request.leader_keys) != 1 or len(request.civ_keys) != int(wants_civ):
+            raise InvalidSeating(
+                "leader_keys", f"a turn bans exactly {expected} key(s)"
+            )
+
+        landed = lobby.get("bans") or {}
+        already = set(landed.get("leader") or []) | set(landed.get("civ") or [])
+        for key in [*request.leader_keys, *request.civ_keys]:
+            if key in already:
+                raise InvalidSeating("leader_keys", f"{key} is already banned")
+
+        now = datetime.now(UTC)
+        written = await self._repository.apply_changes(
+            oid,
+            request.expected_revision,
+            {
+                "bans": {
+                    "leader": [*(landed.get("leader") or []), *request.leader_keys],
+                    "civ": [*(landed.get("civ") or []), *request.civ_keys],
+                },
+                "turn_index": turn_index + 1,
+                "turn_expires_at": now + CWC_TURN,
+            },
+            now,
+        )
+        if written is None:
+            latest = await self._repository.find_by_id(oid)
+            raise SeatChangeRefused(
+                *self._why_refused(latest, request.expected_revision)
+            )
+        if whose_turn(order, turn_index + 1) is None:
+            written = await self._deal_after_cwc_bans(written) or written
+        return for_the_wire(written, actor_discord_id)
+
+    async def _deal_after_cwc_bans(
+        self, lobby: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """The ban order is spent, so the draft is dealt from what is left."""
+        now = datetime.now(UTC)
+        try:
+            changes = await self._deal_the_draft(lobby)
+        except NotEnoughPool as exc:
+            logger.warning("lobby banned itself out. lobby=%s %s", lobby["_id"], exc)
+            changes = {
+                "phase": CANCELLED,
+                "cancel_reason": CANCEL_NO_POOL,
+                "closed_at": now,
+                "turn_expires_at": None,
+            }
+        return await self._repository.apply_changes(
+            lobby["_id"], lobby["revision"], changes, now
+        )
 
     async def _resolve_bans(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
         """Tally the bans and move to `draft`. None if the lobby moved."""
@@ -659,6 +763,9 @@ class LobbyService:
             if unknown:
                 raise InvalidSeating(f"{kind}_keys", f"not bannable: {unknown[0]}")
 
+        if found.get("ban_order"):
+            return await self._ban_in_turn(oid, found, actor_discord_id, request)
+
         banned = [
             {
                 **seat,
@@ -779,13 +886,29 @@ class LobbyService:
         written = await self._repository.apply_changes(
             oid,
             expected_revision,
-            {"phase": SETTINGS, "turn_expires_at": now + SETTINGS_WINDOW},
+            {
+                "phase": SETTINGS,
+                "turn_expires_at": now + SETTINGS_WINDOW,
+                # cwc captains ban in turn, so the order has to exist before
+                # the ban phase opens rather than when the draft is dealt.
+                **self._cwc_ban_order(found),
+            },
             now,
         )
         if written is None:
             latest = await self._repository.find_by_id(oid)
             raise SeatChangeRefused(*self._why_refused(latest, expected_revision))
         return for_the_wire(written, actor_discord_id)
+
+    def _cwc_ban_order(self, lobby: dict[str, Any]) -> dict[str, Any]:
+        """The ban turn order, for a cwc lobby only."""
+        if (lobby.get("settings") or {}).get("draft_mode") != DRAFT_CWC:
+            return {}
+        captains = self._captains(lobby.get("seats") or [])
+        return {
+            "ban_order": cwc_order(captains, (lobby.get("team_size") or 0) * 2),
+            "turn_index": 0,
+        }
 
     async def change_seat(
         self, lobby_id: str, actor_discord_id: str, request: ChangeSeatRequest
