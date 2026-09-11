@@ -132,6 +132,9 @@ class FakeRepo:
         self._lobby = {**(self._lobby or self._written), "seats": seats}
         return {**self._written, "seats": seats}
 
+    async def is_playing_a_started_lobby(self, discord_id):
+        return False
+
     async def claim_for_stats(self, lobby_id, now):
         self.claims.append(lobby_id)
         if len(self.claims) > 1 or self._applied is None:
@@ -1257,3 +1260,80 @@ def test_a_ban_turn_that_expires_is_skipped_not_cancelled():
     _, changes = repo.changes[0]
     assert changes["turn_index"] == 1
     assert changes["turn_expires_at"] > datetime.now(UTC)
+
+
+# --- staff observers ----------------------------------------------------
+
+HIDDEN = {
+    **DRAFTING,
+    "settings": {"draft_mode": "blind"},
+    "pick_order": [],
+    "revealed_at": None,
+    "seats": [
+        {
+            "seat_index": 0,
+            "discord_id": "alice",
+            "pool": ["LEADER_TRAJAN"],
+            "pick": "LEADER_TRAJAN",
+        }
+    ],
+}
+
+
+TWO_HIDDEN = {
+    **HIDDEN,
+    "seats": [
+        *HIDDEN["seats"],
+        {
+            "seat_index": 1,
+            "discord_id": "bob",
+            "pool": ["LEADER_AMINA"],
+            "pick": "LEADER_AMINA",
+        },
+    ],
+}
+
+
+def watch(repo, actor, is_staff=True):
+    return asyncio.run(
+        LobbyService(repo, FakeSeasons(), FakeCivData()).read(
+            HEX_ID, actor, is_staff=is_staff
+        )
+    )
+
+
+def test_a_player_never_sees_another_blind_pick():
+    repo = FakeRepo(lobby=HIDDEN, applied=HIDDEN)
+    seen = watch(repo, "bob", is_staff=False)
+    assert seen["seats"][0].get("pick") is None
+
+
+def test_staff_watching_a_lobby_see_every_blind_pick():
+    # Adjudication needs them. The secrecy is between players, and a censored
+    # view never shows two seats' picks at once.
+    repo = FakeRepo(lobby=TWO_HIDDEN, applied=TWO_HIDDEN)
+    seen = watch(repo, "mod")
+    assert [seat["pick"] for seat in seen["seats"]] == [
+        "LEADER_TRAJAN",
+        "LEADER_AMINA",
+    ]
+
+
+def test_staff_playing_in_the_lobby_are_players_not_observers():
+    # Holding a seat makes you a participant whatever your role is: alice
+    # sees her own pick because it is hers, and bob's stays hidden.
+    repo = FakeRepo(lobby=TWO_HIDDEN, applied=TWO_HIDDEN)
+    seen = watch(repo, "alice")
+    by_id = {seat["discord_id"]: seat for seat in seen["seats"]}
+    assert by_id["alice"]["pick"] == "LEADER_TRAJAN"
+    assert by_id["bob"].get("pick") is None
+
+
+def test_staff_mid_game_elsewhere_cannot_observe():
+    class Busy(FakeRepo):
+        async def is_playing_a_started_lobby(self, discord_id):
+            return True
+
+    repo = Busy(lobby=HIDDEN, applied=HIDDEN)
+    seen = watch(repo, "mod")
+    assert seen["seats"][0].get("pick") is None
