@@ -314,6 +314,16 @@ class LobbyService:
             now,
         )
 
+    @staticmethod
+    def _unready(seats: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Seats with their ready flags cleared.
+
+        Ready means finished with THIS phase. Carrying it into the next one
+        opens that phase with everybody already done, so the first write to
+        touch the lobby ends it.
+        """
+        return [{k: v for k, v in seat.items() if k != "ready"} for seat in seats]
+
     async def _resolve_settings(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
         """Tally the ballots and move to `bans`. None if the lobby moved."""
         now = datetime.now(UTC)
@@ -332,6 +342,7 @@ class LobbyService:
                     ),
                 },
                 "phase": BANS,
+                "seats": self._unready(lobby.get("seats") or []),
                 "turn_index": 0,
                 "turn_expires_at": now + BANS_WINDOW,
             },
@@ -398,7 +409,7 @@ class LobbyService:
                 "draft_mode": mode,
             }
         return {
-            "seats": seats,
+            "seats": self._unready(seats),
             "phase": DRAFT,
             "turn_index": 0,
             "turn_expires_at": datetime.now(UTC) + DRAFT_WINDOW,
