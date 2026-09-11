@@ -156,12 +156,14 @@ class Settings(BaseSettings):
     )
 
     # TrueSkill Environment
-    ts_mu: float = Field(default=1250.0, gt=0, validation_alias=AliasChoices("TS_MU"))
+    ts_mu: float = Field(default=1200.0, gt=0, validation_alias=AliasChoices("TS_MU"))
     ts_sigma: float = Field(
         default=150.0, gt=0, validation_alias=AliasChoices("TS_SIGMA")
     )
-    ts_beta: float = Field(default=70.0, gt=0, validation_alias=AliasChoices("TS_BETA"))
-    ts_tau: float = Field(default=1.0, ge=0, validation_alias=AliasChoices("TS_TAU"))
+    ts_beta: float = Field(
+        default=400.0, gt=0, validation_alias=AliasChoices("TS_BETA")
+    )
+    ts_tau: float = Field(default=10.0, ge=0, validation_alias=AliasChoices("TS_TAU"))
     ts_draw_prob: float = Field(
         default=0.0, ge=0, le=1, validation_alias=AliasChoices("TS_DRAW_PROB")
     )
