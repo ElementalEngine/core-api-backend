@@ -17,7 +17,7 @@ COL_VALIDATED_MATCHES = "validated_matches"
 
 
 class MatchRepository:
-    """Every read and write against the match collections (D157, S6)."""
+    """Every read and write against the match collections."""
 
     def __init__(self, client: AsyncMongoClient) -> None:
         self._client = client

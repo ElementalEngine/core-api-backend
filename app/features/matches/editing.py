@@ -32,7 +32,7 @@ def _require_int(value: Any, field_name: str) -> int:
 
 
 class EditingService:
-    """The pending-document edit loop (D114, carved in S6)."""
+    """The pending-document edit loop."""
 
     def __init__(self, matches: MatchService) -> None:
         self._m = matches

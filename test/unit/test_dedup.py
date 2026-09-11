@@ -1,19 +1,8 @@
-"""Playbook Entry 12 Half B — two hashes at two strengths.
+"""Two uploads of the same save are one match, not two.
 
-save_bytes_sha256 answers "is this the same file?" and hard-blocks in BOTH
-collections; save_file_hash stays the composition hash and answers "is this the
-same game?" (D133 -- no rename in Wave 1).
+Identity is the save's own content, so a renamed file is still the same game.
 
-The tests that matter: check 6 (an approved match's save cannot be re-uploaded
-into a fresh approvable pending match -- the live double-rating path) and check
-9 (a concurrent double upload returns repeated, not a 500).
-
-Also asserted: the field is never written empty. The partial index filters on
-{$exists: true}, so a "" or None default IS indexed, and two such documents
-collide on E11000 -- which would break the second approval of any pre-C10
-match.
-
-Governed by D83, D133.
+Governed by D133.
 """
 
 from __future__ import annotations

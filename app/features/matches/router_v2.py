@@ -35,7 +35,7 @@ router = APIRouter(
 
 
 def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:
-    """D152: Mite supplies facts about the guild, core-api owns the rules."""
+    """Mite supplies facts about the guild, core-api owns the rules."""
     return x_actor_is_staff
 
 
@@ -49,7 +49,7 @@ async def _load(svc: MatchService, match_id: str) -> dict[str, Any]:
 
 
 def _require_reporter(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
-    """D91: reporter -> core-api, staff -> Mite. Two guard clauses, no policy layer."""
+    """Reporter -> core-api, staff -> Mite. Two guard clauses, no policy layer."""
     if is_staff:
         return
     if doc.get("reporter_discord_id") != actor:
@@ -57,7 +57,7 @@ def _require_reporter(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
 
 
 def _require_player(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
-    """D91: a player in the match, or staff."""
+    """A player in the match, or staff."""
     if is_staff:
         return
     if not any(p.get("discord_id") == actor for p in doc.get("players", [])):

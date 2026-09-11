@@ -1,17 +1,10 @@
-"""Entry 11's cache and seed shape, without a database.
+"""The current season resolves per edition, and its cache hands out a copy.
 
-What should break these: changing a seed label, dropping `started_at`,
-reintroducing `ended_at`, binding the wrong database or collection, making
-the cache one slot instead of one per edition, removing the cache so every
-call hits Mongo, handing out the cached document by reference, or dropping
-either index declaration. Mongo actually BUILDING and enforcing them is
-Entry 11's dev dry-run -- D60 keeps it out of here.
+Index declarations are captured here; Mongo actually building them belongs to
+the deployment dry-run rather than to CI. A test that asserts on a collection
+it never touched would be green having run nothing.
 
-`asyncio.run` rather than a pytest-asyncio marker: the plugin is not a
-dependency, and an unrecognised marker leaves the coroutine un-awaited and
-the test green having run nothing (D86 Rule 1).
-
-Governed by D59, D60, D86.
+Governed by D60, D86.
 """
 
 from __future__ import annotations
@@ -120,12 +113,7 @@ def test_clear_cache_forces_a_reread():
 
 
 class RecordingCollection(FakeCollection):
-    """
-    Captures index declarations. Mongo building them is Entry 11's dev dry-run (D60
-    forbids a DB here); what this pins is that we still ASK for them -- records the
-    risk of someone dropping the unique index to silence the E11000 that proves the
-    seed cannot double-run.
-    """
+    """Captures index declarations. Mongo building them is Entry 11's dev dry-run; what this pins is that we still ASK for them -- records the risk of someone dropping the unique index to silence the E11000 that proves the seed cannot double-run."""
 
     def __init__(self):
         super().__init__([])

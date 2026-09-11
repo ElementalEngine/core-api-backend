@@ -121,7 +121,7 @@ async def app_dependency_exception_handler(
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """D92's catch-all: INTERNAL / 500 / retryable false, never 503."""
+    """Catch-all: INTERNAL / 500 / retryable false, never 503."""
     correlation_id = str(getattr(request.state, "correlation_id", "") or "")
     logger.exception(
         "Unhandled error correlation_id=%s method=%s path=%s",

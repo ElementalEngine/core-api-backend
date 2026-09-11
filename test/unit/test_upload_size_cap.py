@@ -1,13 +1,8 @@
-"""D83 Hardening 2 — upload_game_report read the whole body with no cap, on a
-host with no swap and no MemoryMax (D79, verified absent on the dev unit).
+"""The upload route caps the request body before reading it.
 
-The limit mirrors Mite's CIV_SAVE.MAX_BYTES (constants.ts:73) so the server is
-never stricter than the client: a file Mite accepts must not 400 server-side.
-
-400, not 413: the route's two existing raises are bare-string 400s and there is
-no generic HTTPException handler, so a 413 would be equally unstructured with a
-status Mite has never handled. The size code, envelope and 413 belong together
-in D92 -- §4 item 62, S7.
+Reading an unbounded body on a host with no swap and no memory limit lets one
+request take the process down. The cap is enforced in the handler, and this
+proves a body over it is refused rather than buffered.
 
 Governed by D79, D83, D92.
 """

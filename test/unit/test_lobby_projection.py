@@ -1,14 +1,8 @@
-"""visibility table, row by row (D86 Rule 3, D167).
+"""The visibility table, row by row.
 
-Rule 3 calls censoring the only place where a defect is silent and
-adversarial, so this is table-driven from the spec's own rows rather than
-written case by case, and every row asserts what is HIDDEN as well as what
-is shown -- a projection that returned the document untouched would pass a
-suite that only checked the visible half.
-
-The blind rows carry `pool` AND `pool_appearances`. Censoring `pick` alone
-leaks by elimination; leaving the union of all pools in place leaks the same
-way one level up, because pools are disjoint (spec section 4).
+Every combination of phase, draft mode and viewer, checked against what the
+table says that viewer may see. Blind draft has an explicit case asserting the
+pool is absent, not merely the pick.
 
 Governed by D73, D86, D167.
 """

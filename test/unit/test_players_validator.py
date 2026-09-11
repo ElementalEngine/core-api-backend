@@ -1,13 +1,6 @@
-"""Fixture zone for the players-patch validator (D151-D155).
+"""The players-patch validator: what a match edit may and may not change.
 
-What should break this file: any change to validation.py's rule set, its
-deterministic ordering, or its introduced-only semantics. If a change here
-passes without touching validation.py, a fixture is asserting nothing.
-
-Fixtures are duck-typed on purpose: the validator is pure and structural,
-and these tables stay readable without a MatchModel constructor.
-
-Governed by D151, D155.
+Governed by D151, D152, D153, D154, D155.
 """
 
 from types import SimpleNamespace

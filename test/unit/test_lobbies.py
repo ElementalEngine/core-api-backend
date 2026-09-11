@@ -1,16 +1,10 @@
-"""Entry 7 Half A: the three index declarations.
+"""Lobby index declarations and the shapes they enforce.
 
-What should break these: dropping `unique` from any of the three, using the
-uncreatable `$exists: False` form, giving the seat index the same filter as
-the channel index, indexing `seats` instead of the array path
-`seats.discord_id`, giving `aggregate_key` a partial filter, losing a
-component of the aggregate key, or binding the wrong collection.
+This asserts what the repository declares, not what Mongo does with it.
+Building the indexes, and the multikey behaviour the one-seat-per-player rule
+rests on, belong to the deployment dry-run.
 
-These prove the code still ASKS for the indexes, never that Mongo builds
-or enforces them -- D60 keeps the driver out of CI. Building, and the
-multikey behaviour D71 rests on, is Entry 7's dev dry-run.
-
-Governed by D60, D71, D166, D172.
+Governed by D60, D71.
 """
 
 from __future__ import annotations

@@ -1,12 +1,8 @@
-"""The v2 stats read shape: one field renamed, nothing else changed.
+"""Response models for the v2 stats surface.
 
-`wins` counts games where the rating went up, which is about half of all
-games in every mode by construction -- it is not a win count. Measured
-across 340k games: in duel `wins == first` exactly, in teamer they agree
-99.87% of the time, and in FFA they are five times apart. So the two
-counters answer different questions only in FFA, and only `first` ever
-answers "how often did this player win" (D164, phase3-sequence section 4
-item 70).
+`wins` answers how often a player won, which is not the same question as how
+often their rating went up. The two diverge in free-for-all, where placing
+second can still gain rating.
 
 Governed by D164.
 """

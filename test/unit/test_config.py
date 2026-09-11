@@ -1,15 +1,9 @@
-"""Settings parse from the environment.
+"""Settings load, validate, and fail loudly when a required value is absent.
 
-Hermetic: without monkeypatch.chdir this reads the repo's real .env, so it
-passed locally for reasons unrelated to the env it sets and behaved differently
-in CI. That also hid a hard dependency -- LJ_SERVICE_TOKEN has no default and
-was being supplied by the file on disk. §4 item 36.
+A missing secret must stop the process at startup rather than surface as a
+401 hours later.
 
-The ts_sigma_free / ts_teamer_boost assertions are gone with the fields: they
-could only fail when the dead config was removed, which is the correct change.
-D55a, D86 Rule 1.
-
-Governed by D86.
+Governed by D55a, D86.
 """
 
 import importlib

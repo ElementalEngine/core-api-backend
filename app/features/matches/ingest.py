@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class IngestService:
-    """The upload path: dedup and persist (D114, carved in S6)."""
+    """The upload path: dedup and persist."""
 
     def __init__(self, matches: MatchService) -> None:
         self._m = matches

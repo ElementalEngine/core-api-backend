@@ -1,13 +1,10 @@
-"""Fixture tests for the post-migration reconciliation arithmetic.
+"""The ledger sums to the stat movement it claims to explain.
 
-D60 leaves the three transactional flows with no CI coverage, and D86 offers
-these as the cheap partial mitigation: the calculation itself is trusted even
-though the transaction is not. Pure -- no database.
+The transactional flows have no database-backed coverage, so this checks the
+arithmetic in isolation: every ledger entry for a scope must account for the
+change in that scope's stats, within a tolerance for float rounding.
 
-Fixture 7 is the one that proves the test can fail. Without it, 1-6 all pass
-on a query that returns "no divergence" unconditionally.
-
-Governed by D59, D60, D86.
+Governed by D60, D86.
 """
 
 from __future__ import annotations
@@ -106,7 +103,7 @@ def test_fixture_6_scopes_reconcile_independently():
 
 
 def test_fixture_7_broken_set_is_reported():
-    """D86 Rule 1: a test must be able to fail for the reason it exists."""
+    """: a test must be able to fail for the reason it exists."""
     events = [
         ev(1, FFA, 1250.0, 1263.0, 0),
         ev(1, FFA, 1263.0, 1280.0, 1),

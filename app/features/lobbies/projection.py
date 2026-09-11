@@ -1,24 +1,15 @@
-"""per-recipient visibility projection.
+"""What each viewer is allowed to see of a lobby.
 
-The server projects a different document per recipient. **Hidden information
-never leaves core-api** -- it is never filtered client-side.
+The projection strips fields rather than building a response from an
+allow-list, so anything added to a lobby document is exposed unless something
+removes it. A guard test fails on any field the builder writes that is not
+explicitly classified.
 
-Two censored surfaces in the whole lobby, and no others:
+Two surfaces are censored: a blind draft's pools and picks stay hidden until
+every seat has picked. A leak here is silent -- the response looks correct to
+everyone except the player whose pick was shown early.
 
-settings own ballot only, no tallies; observers see nothing until close
- blind draft own pool AND own pick only; observers nothing until reveal
-
-The blind row is the one that is easy to get wrong: **the pool is secret,
-not just the pick.** Censoring `pick` alone leaks by elimination -- and so
-does leaving `pool_appearances` in place, since pools are disjoint across
-players (spec section 4), making that array the union of every pool.
-
-Default-deny: a phase this module does not recognise is censored, not shown.
-An over-censoring bug is visible and gets reported; an under-censoring one is
-silent, which is why D86 Rule 3 calls this the only place where a defect is
-adversarial.
-
-Governed by D73, D86.
+Governed by D73, D86, D167.
 """
 
 from __future__ import annotations

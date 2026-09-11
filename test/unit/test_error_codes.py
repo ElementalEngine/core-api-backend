@@ -1,11 +1,6 @@
-"""On the surfaces D92 governs, every code is one of its eight.
+"""Every error code emitted on a v2 surface is one of the eight in the envelope.
 
-A closed set is what lets a client branch exhaustively. It stays closed
-only if something checks, because nothing else does: the envelope never
-reaches the OpenAPI spec, so no generated type constrains it (section 4
-item 96).
-
-What should break this file: a v2 route inventing a ninth transport code.
+A ninth code reaching a client means a generated type does not cover it.
 
 Governed by D92.
 """

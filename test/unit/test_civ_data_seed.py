@@ -1,7 +1,8 @@
-"""Entry 9's integrity test: the authored table validates itself, no database.
+"""The seeded leader and civ data is internally consistent.
 
-D49 puts this test with the data rather than in a bot-side copy -- a test that
-passes while the source is broken is worse than no test. Pure, per D59/D60.
+The test lives with the data rather than in a bot-side copy: one that passes
+while the source is broken is worse than no test at all. Pure -- it reads the
+seed files and never opens a connection.
 
 Governed by D49, D59, D60.
 """
