@@ -238,6 +238,30 @@ class LobbyService:
         except Exception:
             logger.exception("lobby stats not counted. lobby=%s", lobby_id)
 
+    async def _seated_in(
+        self, lobby_id: str, phase: str, actor: str, expected_revision: int, verb: str
+    ) -> tuple[Any, dict[str, Any], list[dict[str, Any]]]:
+        """Load a lobby, apply expired timers, and check the actor may act.
+
+        Every phase submission opens this way. Returns the object id, the
+        lobby as it stands after any advance, and its seats.
+        """
+        oid = as_lobby_id(lobby_id)
+        found = await self._repository.find_by_id(oid)
+        if found is None:
+            raise LobbyNotFound(lobby_id)
+        found = await self._advanced(found)
+        if found["phase"] != phase:
+            raise SeatChangeRefused(
+                f"{verb} is not open at {found['phase']}",
+                expected_revision,
+                found["revision"],
+            )
+        seats = found.get("seats") or []
+        if not any(seat.get("discord_id") == actor for seat in seats):
+            raise NotSeated(f"Only a seated player {verb.split()[-1]}s")
+        return oid, found, seats
+
     async def _advanced(self, lobby: dict[str, Any]) -> dict[str, Any]:
         """The lobby, with any expired deadline already applied."""
         expires = lobby.get("turn_expires_at")
@@ -437,22 +461,10 @@ class LobbyService:
         self, lobby_id: str, actor_discord_id: str, request: SubmitPickRequest
     ) -> dict[str, Any]:
         """One seat's pick. Completes the lobby once every seat has picked."""
-        oid = as_lobby_id(lobby_id)
-        found = await self._repository.find_by_id(oid)
-        if found is None:
-            raise LobbyNotFound(lobby_id)
-        found = await self._advanced(found)
-        if found["phase"] != DRAFT:
-            raise SeatChangeRefused(
-                f"The draft is not open at {found['phase']}",
-                request.expected_revision,
-                found["revision"],
-            )
-
-        seats = found.get("seats") or []
-        mine = next((s for s in seats if s.get("discord_id") == actor_discord_id), None)
-        if mine is None:
-            raise NotSeated("Only a seated player picks")
+        oid, found, seats = await self._seated_in(
+            lobby_id, DRAFT, actor_discord_id, request.expected_revision, "The draft"
+        )
+        mine = next(s for s in seats if s.get("discord_id") == actor_discord_id)
         mode = (found.get("settings") or {}).get("draft_mode")
         order = found.get("pick_order") or []
         turn_index = found.get("turn_index") or 0
@@ -549,21 +561,9 @@ class LobbyService:
         self, lobby_id: str, actor_discord_id: str, request: SubmitBansRequest
     ) -> dict[str, Any]:
         """One seat's bans. Resolves the phase once every seat has submitted."""
-        oid = as_lobby_id(lobby_id)
-        found = await self._repository.find_by_id(oid)
-        if found is None:
-            raise LobbyNotFound(lobby_id)
-        found = await self._advanced(found)
-        if found["phase"] != BANS:
-            raise SeatChangeRefused(
-                f"Bans are not open at {found['phase']}",
-                request.expected_revision,
-                found["revision"],
-            )
-
-        seats = found.get("seats") or []
-        if not any(seat.get("discord_id") == actor_discord_id for seat in seats):
-            raise NotSeated("Only a seated player bans")
+        oid, found, seats = await self._seated_in(
+            lobby_id, BANS, actor_discord_id, request.expected_revision, "The ban"
+        )
 
         payload = await self._civ_data.fetch(found["edition"])
         legal = {
@@ -607,21 +607,9 @@ class LobbyService:
         self, lobby_id: str, actor_discord_id: str, request: SubmitBallotRequest
     ) -> dict[str, Any]:
         """One seat's ballot. Resolves the phase once every seat has voted."""
-        oid = as_lobby_id(lobby_id)
-        found = await self._repository.find_by_id(oid)
-        if found is None:
-            raise LobbyNotFound(lobby_id)
-        found = await self._advanced(found)
-        if found["phase"] != SETTINGS:
-            raise SeatChangeRefused(
-                f"The settings vote is not open at {found['phase']}",
-                request.expected_revision,
-                found["revision"],
-            )
-
-        seats = found.get("seats") or []
-        if not any(seat.get("discord_id") == actor_discord_id for seat in seats):
-            raise NotSeated("Only a seated player votes")
+        oid, found, seats = await self._seated_in(
+            lobby_id, SETTINGS, actor_discord_id, request.expected_revision, "The vote"
+        )
 
         catalogue = {
             question["id"]: question
