@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from fastapi import Header, HTTPException, Request, status
 from pymongo import AsyncMongoClient
-from pymongo.asynchronous.database import AsyncDatabase
 
 from app.core.config import settings
 from app.core.errors import AppDependencyError, ErrorDetail, ErrorResponse
@@ -14,13 +13,6 @@ def get_database(request: Request) -> AsyncMongoClient:
     if client is None:
         raise AppDependencyError("Mongo client not initialized")
     return client
-
-
-def get_mongo_database(request: Request) -> AsyncDatabase:
-    database = getattr(request.app.state, "mongodb", None)
-    if database is None:
-        raise AppDependencyError("Mongo database not initialized")
-    return database
 
 
 def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:

@@ -355,31 +355,10 @@ class LobbyService:
         payload = await self._civ_data.fetch(lobby["edition"])
         landed = lobby.get("bans") or {}
         seated = [seat for seat in lobby.get("seats") or [] if seat.get("discord_id")]
-        players = len(seated)
         mode = (lobby.get("settings") or {}).get("draft_mode")
 
-        captains: list[str] = []
-        if mode == DRAFT_CWC:
-            lowest: dict[int, dict[str, Any]] = {}
-            for seat in seated:
-                team = seat.get("team")
-                if team is None:
-                    continue
-                if (
-                    team not in lowest
-                    or seat["seat_index"] < lowest[team]["seat_index"]
-                ):
-                    lowest[team] = seat
-            captains = [lowest[key]["discord_id"] for key in sorted(lowest)]
-            try:
-                cwc_order(captains, (lobby.get("team_size") or 0) * 2)
-            except ValueError as exc:
-                logger.warning(
-                    "cwc unavailable, falling back to standard. lobby=%s %s",
-                    lobby["_id"],
-                    exc,
-                )
-                mode = DRAFT_STANDARD
+        captains = self._captains(seated)
+        mode = self._workable_mode(lobby, mode, captains)
 
         kinds = {
             "leader": remaining_after_bans(
@@ -391,33 +370,7 @@ class LobbyService:
             ),
         }
 
-        shared: dict[str, Any] = {}
-        if mode == DRAFT_CWC:
-            shared["pool"] = list(kinds["leader"])
-            if kinds["civ"]:
-                shared["civ_pool"] = list(kinds["civ"])
-
-        per_seat: dict[str, dict[str, Any]] = {
-            seat["discord_id"]: {} for seat in seated
-        }
-        for kind, pool in ({} if mode == DRAFT_CWC else kinds).items():
-            if not pool:
-                continue
-            field = "pick" if mode == DRAFT_RANDOM else "pool"
-            suffix = "" if kind == "leader" else "civ_"
-            if mode == DRAFT_RANDOM:
-                allotted: list[Any] = list(assign_one_each(pool, players))
-            elif kind == "civ":
-                # Civs are dealt to a target and may repeat across pools;
-                # leaders are split and never do.
-                groups = lobby.get("number_teams") or players
-                allotted = list(
-                    deal_civs(pool, players, civ_target(lobby["game_type"], groups))
-                )
-            else:
-                allotted = list(deal(pool, players))
-            for seat, share in zip(seated, allotted, strict=True):
-                per_seat[seat["discord_id"]][f"{suffix}{field}"] = share
+        shared, per_seat = self._dealt_pools(lobby, mode, kinds, seated)
 
         seats = [
             {**seat, **per_seat[seat["discord_id"]]} if seat.get("discord_id") else seat
@@ -452,6 +405,66 @@ class LobbyService:
             **shared,
             **ordered,
         }
+
+    def _workable_mode(
+        self, lobby: dict[str, Any], mode: str | None, captains: list[str]
+    ) -> str | None:
+        """The voted mode, or standard when cwc cannot run in this shape.
+
+        Decided before anything is dealt: a fallback needs per-seat pools
+        where cwc needs one shared pool.
+        """
+        if mode != DRAFT_CWC:
+            return mode
+        try:
+            cwc_order(captains, (lobby.get("team_size") or 0) * 2)
+        except ValueError as exc:
+            logger.warning(
+                "cwc unavailable, falling back to standard. lobby=%s %s",
+                lobby["_id"],
+                exc,
+            )
+            return DRAFT_STANDARD
+        return mode
+
+    def _dealt_pools(
+        self,
+        lobby: dict[str, Any],
+        mode: str | None,
+        kinds: dict[str, list[str]],
+        seated: list[dict[str, Any]],
+    ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+        """What each seat is offered, and what the lobby holds in common.
+
+        cwc draws from one shared pool; every other mode deals per seat.
+        """
+        players = len(seated)
+        if mode == DRAFT_CWC:
+            shared: dict[str, Any] = {"pool": list(kinds["leader"])}
+            if kinds["civ"]:
+                shared["civ_pool"] = list(kinds["civ"])
+            return shared, {seat["discord_id"]: {} for seat in seated}
+
+        per_seat: dict[str, dict[str, Any]] = {s["discord_id"]: {} for s in seated}
+        for kind, pool in kinds.items():
+            if not pool:
+                continue
+            field = "pick" if mode == DRAFT_RANDOM else "pool"
+            suffix = "" if kind == "leader" else "civ_"
+            if mode == DRAFT_RANDOM:
+                allotted: list[Any] = list(assign_one_each(pool, players))
+            elif kind == "civ":
+                # Civs are dealt to a target and may repeat across pools;
+                # leaders are split and never do.
+                groups = lobby.get("number_teams") or players
+                allotted = list(
+                    deal_civs(pool, players, civ_target(lobby["game_type"], groups))
+                )
+            else:
+                allotted = list(deal(pool, players))
+            for seat, share in zip(seated, allotted, strict=True):
+                per_seat[seat["discord_id"]][f"{suffix}{field}"] = share
+        return {}, per_seat
 
     async def _ban_in_turn(
         self,
@@ -511,19 +524,25 @@ class LobbyService:
     ) -> dict[str, Any] | None:
         """The ban order is spent, so the draft is dealt from what is left."""
         now = datetime.now(UTC)
+        changes = await self._deal_or_cancel(lobby, now)
+        return await self._repository.apply_changes(
+            lobby["_id"], lobby["revision"], changes, now
+        )
+
+    async def _deal_or_cancel(
+        self, lobby: dict[str, Any], now: datetime
+    ) -> dict[str, Any]:
+        """The draft, or a cancellation when the bans left too small a pool."""
         try:
-            changes = await self._deal_the_draft(lobby)
+            return await self._deal_the_draft(lobby)
         except NotEnoughPool as exc:
             logger.warning("lobby banned itself out. lobby=%s %s", lobby["_id"], exc)
-            changes = {
+            return {
                 "phase": CANCELLED,
                 "cancel_reason": CANCEL_NO_POOL,
                 "closed_at": now,
                 "turn_expires_at": None,
             }
-        return await self._repository.apply_changes(
-            lobby["_id"], lobby["revision"], changes, now
-        )
 
     async def _resolve_bans(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
         """Tally the bans and move to `draft`. None if the lobby moved."""
@@ -536,16 +555,7 @@ class LobbyService:
                 lobby.get("starting_age"),
             ),
         }
-        try:
-            changes = await self._deal_the_draft(tallied)
-        except NotEnoughPool as exc:
-            logger.warning("lobby banned itself out. lobby=%s %s", lobby["_id"], exc)
-            changes = {
-                "phase": CANCELLED,
-                "cancel_reason": CANCEL_NO_POOL,
-                "closed_at": now,
-                "turn_expires_at": None,
-            }
+        changes = await self._deal_or_cancel(tallied, now)
         written = await self._repository.apply_changes(
             lobby["_id"],
             lobby["revision"],
