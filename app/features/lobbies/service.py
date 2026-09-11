@@ -1,8 +1,9 @@
 """Creating and resolving lobbies.
 
-Half B of playbook Entry 7 begins here. Creation is one insert: the shape is
-derived, the season stamped, the roster seated when it fits, and the two
-unique indexes do the rest.
+Creation is one insert: the shape is derived from the game type and the size
+the host chose, the season is stamped, the host takes the first seat, and the
+two unique indexes stop a second lobby in the channel or a player holding two
+seats at once. Everyone else joins through the seat route.
 """
 
 from __future__ import annotations
@@ -130,15 +131,15 @@ def for_the_wire(
     }
 
 
-def seat_the_roster(roster: Sequence[str], shape: LobbyShape) -> list[dict[str, Any]]:
-    """Seats for the roster, or none at all."""
-    unique = list(dict.fromkeys(player for player in roster if player))
-    if not unique or len(unique) > shape.seat_count:
-        return []
-    return [
-        {"seat_index": index, "discord_id": player, "team": None}
-        for index, player in enumerate(unique)
-    ]
+def seat_the_host(host_discord_id: str) -> list[dict[str, Any]]:
+    """The one seat a lobby opens with.
+
+    Everyone else joins through the seat route, so the lobby fills by
+    self-selection rather than by whoever happened to be in voice when the
+    command ran. `team` is null even in a teamer: seating means you are in
+    this lobby, never that you are on a particular side.
+    """
+    return [{"seat_index": 0, "discord_id": host_discord_id, "team": None}]
 
 
 def build_lobby_document(
@@ -161,7 +162,8 @@ def build_lobby_document(
         "team_size": shape.team_size,
         "seat_count": shape.seat_count,
         "min_seats": shape.min_seats,
-        "seats": seat_the_roster(request.roster, shape),
+        "seats": seat_the_host(request.host_discord_id),
+        "voice_channel_id": request.voice_channel_id,
         "phase": LOBBY,
         "revision": 1,
         "created_at": now,
@@ -171,6 +173,8 @@ def build_lobby_document(
         document["instance_id"] = request.instance_id
     if request.starting_age is not None:
         document["starting_age"] = request.starting_age
+    if request.host_rules:
+        document["host_rules"] = request.host_rules
     if request.draft_mode is not None:
         document["settings"] = {"draft_mode": request.draft_mode}
     return document
@@ -188,22 +192,23 @@ class LobbyService:
         index says the channel or a player is already taken.
         """
         shape = resolve_shape(
-            request.game_type, request.number_teams, request.team_size
+            request.game_type,
+            request.number_teams,
+            request.team_size,
+            request.size,
         )
         season = await self._seasons.get_current_season(request.edition)
         now = datetime.now(UTC)
 
-        roster = [player for player in dict.fromkeys(request.roster) if player]
-        if roster:
-            for evicted in await self._repository.evict_stale(
-                roster, now - STALE_AFTER, now
-            ):
-                logger.info(
-                    "evicted stale lobby. lobby=%s channel=%s updated_at=%s",
-                    evicted["_id"],
-                    evicted.get("channel_id"),
-                    evicted.get("updated_at"),
-                )
+        for evicted in await self._repository.evict_stale(
+            [request.host_discord_id], now - STALE_AFTER, now
+        ):
+            logger.info(
+                "evicted stale lobby. lobby=%s channel=%s updated_at=%s",
+                evicted["_id"],
+                evicted.get("channel_id"),
+                evicted.get("updated_at"),
+            )
 
         document = build_lobby_document(request, shape, season, now)
         return for_the_wire(await self._repository.insert_lobby(document), None)
@@ -746,7 +751,12 @@ class LobbyService:
         validate_seats(
             arrangement,
             resolve_shape(
-                found["game_type"], found.get("number_teams"), found.get("team_size")
+                found["game_type"],
+                found.get("number_teams"),
+                found.get("team_size"),
+                # An ffa's seat count is the size the host chose, so it is read
+                # back from the lobby rather than re-derived.
+                found.get("seat_count"),
             ),
         )
 
@@ -826,5 +836,5 @@ __all__ = [
     "build_lobby_document",
     "for_the_wire",
     "rearranged",
-    "seat_the_roster",
+    "seat_the_host",
 ]

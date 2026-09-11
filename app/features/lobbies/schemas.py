@@ -32,11 +32,14 @@ class CreateLobbyRequest(BaseModel):
     game_type: str
     number_teams: int | None = None
     team_size: int | None = None
-    # Teamers choose between standard and cwc here rather than on the ballot:
-    # cwc needs captains identified before the ban phase, and a ballot answer
-    # arrives too late to seat them.
+    # Chosen here rather than on the ballot: cwc needs captains seated
+    # before the ban phase, which a ballot answer arrives too late for.
     draft_mode: Literal["standard", "cwc"] | None = None
-    roster: list[str] = Field(default_factory=list, max_length=99)
+    size: int | None = None
+    host_rules: str | None = Field(default=None, max_length=500)
+    # The backend cannot see Discord voice state, so it records the channel
+    # and the bot decides who may press join.
+    voice_channel_id: str = Field(min_length=1, max_length=32)
     instance_id: str | None = Field(default=None, max_length=64)
     starting_age: Literal["AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"] | None = (
         Field(default=None)

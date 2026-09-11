@@ -30,6 +30,9 @@ GAME_TYPES: tuple[str, ...] = (FFA, TEAMER, DUEL)
 # FFA fills to a ceiling rather than an exact count, so it needs a floor or
 # a lobby that stops at nine never advances.
 FFA_MIN_SEATS = 6
+# min_seats stays a floor rather than a target: the host starts the lobby
+# by hand, so it only has to stop a game beginning with two people.
+FFA_SIZES: tuple[int, ...] = (8, 10, 12)
 
 MIN_TEAMS, MAX_TEAMS = 2, 4
 MIN_TEAM_SIZE, MAX_TEAM_SIZE = 2, 6
@@ -78,6 +81,7 @@ def resolve_shape(
     game_type: str,
     number_teams: int | None = None,
     team_size: int | None = None,
+    size: int | None = None,
 ) -> LobbyShape:
     """Validate the mode fields and fill in what follows from them."""
     if game_type not in GAME_TYPES:
@@ -87,12 +91,21 @@ def resolve_shape(
 
     if game_type == FFA:
         _reject_team_fields(game_type, number_teams, team_size)
-        return LobbyShape(FFA, None, None, MAX_SEATS, FFA_MIN_SEATS)
+        if size is None:
+            # A lobby created before sizes existed seats the old maximum.
+            size = MAX_SEATS
+        elif size not in FFA_SIZES:
+            raise InvalidLobbyShape(
+                "size", f"an ffa seats one of {', '.join(map(str, FFA_SIZES))}"
+            )
+        return LobbyShape(FFA, None, None, size, FFA_MIN_SEATS)
 
     if game_type == DUEL:
         _reject_team_fields(game_type, number_teams, team_size)
         return LobbyShape(DUEL, 2, 1, 2, 2)
 
+    # A teamer and a duel derive their seat count, so any size sent with
+    # one is ignored.
     teams = _require("number_teams", number_teams, MIN_TEAMS, MAX_TEAMS)
     size = _require("team_size", team_size, MIN_TEAM_SIZE, MAX_TEAM_SIZE)
     seats = teams * size

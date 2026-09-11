@@ -30,7 +30,6 @@ from app.features.lobbies.schemas import (
     SubmitPickRequest,
 )
 from app.features.lobbies.service import (
-    STALE_AFTER,
     InvalidLobbyId,
     LobbyNotFound,
     LobbyService,
@@ -43,7 +42,7 @@ from app.features.lobbies.service import (
     build_lobby_document,
     for_the_wire,
     rearranged,
-    seat_the_roster,
+    seat_the_host,
 )
 
 NOW = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
@@ -59,10 +58,13 @@ def request(**overrides):
         "game_type": "ffa",
     }
     body.update(overrides)
-    # A teamer chooses its draft mode at creation, so every teamer fixture
-    # needs one. standard, because cwc constrains the shape as well.
+    body.setdefault("voice_channel_id", "v1")
+    # A teamer chooses its draft mode at creation and derives its own seat
+    # count; an ffa is sized by the host.
     if body["game_type"] == "teamer":
         body.setdefault("draft_mode", "standard")
+    elif body["game_type"] == "ffa":
+        body.setdefault("size", 8)
     return CreateLobbyRequest(**body)
 
 
@@ -151,49 +153,6 @@ class FakeRepo:
 # --- seating ------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "roster,seats",
-    [
-        (["a", "b", "c"], 3),
-        ([], 0),
-        (["a"] * 3, 1),  # deduplicated
-        (["a", "b", "a"], 2),
-        (["", "a"], 1),  # empty ids dropped
-    ],
-)
-def test_seating_dedupes_and_drops_blanks(roster, seats):
-    shape = resolve_shape("ffa")
-    assert len(seat_the_roster(roster, shape)) == seats
-
-
-def test_a_roster_that_does_not_fit_seats_nobody():
-    # Seven in voice, a 3v3. Seating an arbitrary first six would exclude
-    # people by list order.
-    shape = resolve_shape("teamer", 2, 3)
-    assert seat_the_roster([f"p{i}" for i in range(7)], shape) == []
-    assert len(seat_the_roster([f"p{i}" for i in range(6)], shape)) == 6
-
-
-def test_seats_are_indexed_from_zero_with_no_team():
-    shape = resolve_shape("teamer", 3, 3)
-    seats = seat_the_roster(["a", "b", "c"], shape)
-    assert [s["seat_index"] for s in seats] == [0, 1, 2]
-    # Seating means "you are in this lobby", never "you are on red".
-    assert all(s["team"] is None for s in seats)
-    assert all(s["discord_id"] for s in seats)
-
-
-def test_duplicates_never_produce_two_seats_for_one_player():
-    shape = resolve_shape("ffa")
-    seats = seat_the_roster(["a", "b", "a", "b", "c"], shape)
-    ids = [s["discord_id"] for s in seats]
-    assert ids == ["a", "b", "c"]
-    assert len(ids) == len(set(ids))
-
-
-# --- the document -------------------------------------------------------
-
-
 def test_document_stamps_the_season_and_derived_shape():
     shape = resolve_shape("teamer", 3, 3)
     doc = build_lobby_document(request(game_type="teamer"), shape, SEASON, NOW)
@@ -205,7 +164,7 @@ def test_document_stamps_the_season_and_derived_shape():
 
 
 def test_undecided_fields_are_absent_not_null():
-    doc = build_lobby_document(request(), resolve_shape("ffa"), SEASON, NOW)
+    doc = build_lobby_document(request(), resolve_shape("ffa", size=8), SEASON, NOW)
     for field in (
         "closed_at",
         "draft_mode",
@@ -225,7 +184,7 @@ def test_undecided_fields_are_absent_not_null():
 
 
 def test_instance_id_is_omitted_when_absent_and_kept_when_given():
-    shape = resolve_shape("ffa")
+    shape = resolve_shape("ffa", size=8)
     assert "instance_id" not in build_lobby_document(request(), shape, SEASON, NOW)
     with_id = build_lobby_document(request(instance_id="i9"), shape, SEASON, NOW)
     assert with_id["instance_id"] == "i9"
@@ -490,6 +449,7 @@ PUBLIC_LOBBY_FIELDS = {
     "created_at",
     "updated_at",
     "settings",
+    "voice_channel_id",
 }
 PUBLIC_SEAT_FIELDS = {"seat_index", "discord_id", "team"}
 
@@ -501,7 +461,6 @@ def built_document():
             number_teams=3,
             team_size=3,
             instance_id="i9",
-            roster=["alice", "bob", "carol"],
         ),
         resolve_shape("teamer", 3, 3),
         SEASON,
@@ -652,37 +611,7 @@ def test_a_lost_race_at_the_same_revision_names_the_seat_not_the_revision():
     assert "already holds a seat" in str(exc.value)
 
 
-def test_creation_evicts_stale_lobbies_holding_the_roster():
-    repo = FakeRepo(stale=[{"_id": "OLD", "channel_id": "c9", "updated_at": NOW}])
-    asyncio.run(
-        LobbyService(repo, FakeSeasons()).create(request(roster=["alice", "bob"]))
-    )
-    assert repo.evictions[0][0] == ["alice", "bob"]
-    assert repo.inserted is not None, "creation proceeds after the eviction"
-
-
-def test_the_cutoff_is_an_hour_behind_the_creation():
-    repo = FakeRepo()
-    asyncio.run(LobbyService(repo, FakeSeasons()).create(request(roster=["alice"])))
-    _, cutoff = repo.evictions[0]
-    assert repo.inserted["created_at"] - cutoff == STALE_AFTER
-
-
-def test_an_empty_roster_evicts_nothing():
-    # Nobody is being seated, so no seat can be held elsewhere -- and a
-    # query per empty create would be a round trip for no reason.
-    repo = FakeRepo()
-    asyncio.run(LobbyService(repo, FakeSeasons()).create(request()))
-    assert repo.evictions == []
-
-
-def test_eviction_asks_about_deduplicated_players_only():
-    repo = FakeRepo()
-    asyncio.run(
-        LobbyService(repo, FakeSeasons()).create(request(roster=["a", "a", "", "b"]))
-    )
-    assert repo.evictions[0][0] == ["a", "b"]
-
+# --- starting the vote and resolving it ---------------------------------
 
 VOTING = {
     **OPEN_LOBBY,
@@ -1178,3 +1107,28 @@ def test_a_seat_that_already_picked_is_refused_outright():
     with pytest.raises(PickIsFinal):
         pick(repo, "alice", "LEADER_TRAJAN")
     assert repo.changes == []
+
+
+def test_the_host_takes_the_first_seat_and_nobody_else_is_seated():
+    # A lobby opens with one seat filled. Everyone else presses join, so the
+    # lobby fills by self-selection rather than by who happened to be in
+    # voice when the command ran.
+    seats = seat_the_host("alice")
+    assert seats == [{"seat_index": 0, "discord_id": "alice", "team": None}]
+
+
+def test_creation_evicts_a_stale_lobby_holding_the_host():
+    # The host is the only player being seated, so they are the only one who
+    # can be holding a seat somewhere else.
+    repo = FakeRepo(stale=[{"_id": "OLD", "channel_id": "c9", "updated_at": NOW}])
+    asyncio.run(LobbyService(repo, FakeSeasons()).create(request()))
+    assert repo.evictions
+    players, _ = repo.evictions[0]
+    assert players == ["alice"]
+
+
+def test_the_cutoff_is_an_hour_behind_the_creation():
+    repo = FakeRepo()
+    asyncio.run(LobbyService(repo, FakeSeasons()).create(request()))
+    _, cutoff = repo.evictions[0]
+    assert timedelta(minutes=59) < datetime.now(UTC) - cutoff < timedelta(minutes=61)

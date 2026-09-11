@@ -54,7 +54,7 @@ REFUSAL_MESSAGES = {
         "This channel already has an open lobby. Cancel it or use another channel."
     ),
     "one_active_seat_per_player": (
-        "Someone in the roster is already seated in another open lobby."
+        "That player is already seated in another open lobby."
     ),
 }
 

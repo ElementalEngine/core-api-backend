@@ -20,9 +20,24 @@ from app.features.lobbies.modes import (
 )
 
 
-def test_ffa_fills_to_a_ceiling_with_a_floor():
+def test_an_ffa_seats_the_size_the_host_chose():
+    # min_seats is a floor, not a target: the host starts the lobby by hand,
+    # so it only has to stop a game beginning with two people.
+    assert resolve_shape("ffa", size=8).seat_count == 8
+    assert resolve_shape("ffa", size=12).seat_count == 12
+    assert resolve_shape("ffa", size=10).min_seats == 6
+
+
+def test_an_ffa_size_outside_the_offered_set_is_refused():
+    with pytest.raises(InvalidLobbyShape):
+        resolve_shape("ffa", size=7)
+
+
+def test_an_ffa_with_no_size_seats_the_old_maximum():
+    # Lobbies written before sizes existed carry no seat_count, and a seat
+    # change on one must not fail.
     shape = resolve_shape("ffa")
-    assert (shape.seat_count, shape.min_seats) == (12, 6)
+    assert shape.seat_count == 12
     # No teams at all -- not "one team of twelve".
     assert (shape.number_teams, shape.team_size) == (None, None)
 
@@ -116,7 +131,7 @@ def test_shapes_are_frozen():
         shape.seat_count = 99  # type: ignore[misc]
 
 
-FFA_SHAPE = resolve_shape("ffa")
+FFA_SHAPE = resolve_shape("ffa", size=12)
 TEAMER_SHAPE = resolve_shape("teamer", 3, 3)
 
 

@@ -591,6 +591,18 @@
             "title": "Host Discord Id",
             "type": "string"
           },
+          "host_rules": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Rules"
+          },
           "instance_id": {
             "anyOf": [
               {
@@ -614,13 +626,16 @@
             ],
             "title": "Number Teams"
           },
-          "roster": {
-            "items": {
-              "type": "string"
-            },
-            "maxItems": 99,
-            "title": "Roster",
-            "type": "array"
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
           },
           "starting_age": {
             "anyOf": [
@@ -648,6 +663,12 @@
               }
             ],
             "title": "Team Size"
+          },
+          "voice_channel_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Voice Channel Id",
+            "type": "string"
           }
         },
         "required": [
@@ -655,7 +676,8 @@
           "channel_id",
           "host_discord_id",
           "edition",
-          "game_type"
+          "game_type",
+          "voice_channel_id"
         ],
         "title": "CreateLobbyRequest",
         "type": "object"
