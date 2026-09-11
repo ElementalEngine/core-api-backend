@@ -48,6 +48,43 @@ def deal(tokens: Sequence[str], players: int, rng: Any = _RANDOM) -> list[list[s
     ]
 
 
+CIV_TARGET_PER_PLAYER = 4
+CIV_TARGET_BY_TEAM_COUNT = {2: 7, 3: 5, 4: 5}
+
+
+def civ_target(game_type: str, groups: int) -> int:
+    """How many civs each player or team is offered.
+
+    A target rather than a division: there are few enough civs that splitting
+    them by player count would leave almost no choice. In a teamer the team is
+    the unit, so a 3v3 is two groups of seven rather than six of two.
+    """
+    if game_type == "teamer":
+        return CIV_TARGET_BY_TEAM_COUNT.get(groups, CIV_TARGET_PER_PLAYER)
+    return CIV_TARGET_PER_PLAYER
+
+
+def deal_civs(
+    tokens: Sequence[str], groups: int, target: int, rng: Any = _RANDOM
+) -> list[list[str]]:
+    """Civ pools, disjoint while the remaining set allows it.
+
+    Once the set is too small to give every group its target without reuse,
+    each group draws independently and the same civ can appear in several
+    pools. A twelve-player game, or any game with a chosen starting age,
+    lands in that case.
+    """
+    if target < 1:
+        raise NotEnoughPool(f"a civ target of {target} offers nothing")
+    if not tokens:
+        raise NotEnoughPool("no civs remain after bans")
+    if len(tokens) >= target * groups:
+        shuffled = list(tokens)
+        rng.shuffle(shuffled)
+        return [shuffled[i * target : (i + 1) * target] for i in range(groups)]
+    return [rng.sample(list(tokens), min(target, len(tokens))) for _ in range(groups)]
+
+
 def assign_one_each(
     tokens: Sequence[str], players: int, rng: Any = _RANDOM
 ) -> list[str]:
@@ -70,7 +107,9 @@ def remaining_after_bans(tokens: Sequence[str], banned: Sequence[str]) -> list[s
 __all__ = [
     "NotEnoughPool",
     "assign_one_each",
+    "civ_target",
     "deal",
+    "deal_civs",
     "even_split",
     "remaining_after_bans",
 ]

@@ -14,7 +14,9 @@ import pytest
 from app.features.lobbies.pools import (
     NotEnoughPool,
     assign_one_each,
+    civ_target,
     deal,
+    deal_civs,
     even_split,
     remaining_after_bans,
 )
@@ -74,3 +76,56 @@ def test_bans_are_removed_and_the_rest_keeps_its_order():
 
 def test_banning_nothing_removes_nothing():
     assert remaining_after_bans(TOKENS, []) == TOKENS
+
+
+CIVS = [f"CIVILIZATION_{i:02d}" for i in range(44)]
+
+
+@pytest.mark.parametrize(
+    ("game_type", "groups", "expected"),
+    [
+        ("ffa", 10, 4),
+        ("duel", 2, 4),
+        ("teamer", 2, 7),
+        ("teamer", 3, 5),
+        ("teamer", 4, 5),
+        ("teamer", 5, 4),
+    ],
+)
+def test_the_civ_target_is_a_target_not_a_division(game_type, groups, expected):
+    # Dividing forty-four civs by twelve players would leave three each.
+    assert civ_target(game_type, groups) == expected
+
+
+def test_civ_pools_are_disjoint_while_the_set_allows_it():
+    pools = deal_civs(CIVS, 10, 4, random.Random(7))
+    flat = [token for pool in pools for token in pool]
+    assert len(flat) == len(set(flat))
+    assert all(len(pool) == 4 for pool in pools)
+
+
+def test_a_set_too_small_to_go_round_is_dealt_with_overlap():
+    # Twelve players at four civs each needs forty-eight from forty-four, so
+    # some civ lands in more than one pool. This is the normal case for a
+    # full lobby and for any game with a chosen starting age.
+    pools = deal_civs(CIVS, 12, 4, random.Random(7))
+    flat = [token for pool in pools for token in pool]
+    assert len(flat) > len(set(flat))
+    assert all(len(pool) == 4 for pool in pools)
+
+
+def test_no_pool_ever_repeats_a_civ_within_itself():
+    # Overlap is between pools. A pool offering the same civ twice would be
+    # offering a smaller choice than it claims.
+    for pools in (deal_civs(CIVS, 12, 4), deal_civs(CIVS[:6], 4, 4)):
+        assert all(len(pool) == len(set(pool)) for pool in pools)
+
+
+def test_a_pool_smaller_than_the_target_deals_what_is_left():
+    pools = deal_civs(CIVS[:3], 4, 5, random.Random(7))
+    assert all(len(pool) == 3 for pool in pools)
+
+
+def test_no_civs_at_all_is_refused():
+    with pytest.raises(NotEnoughPool):
+        deal_civs([], 4, 4)

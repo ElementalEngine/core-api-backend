@@ -35,7 +35,9 @@ from app.features.lobbies.phases import (
 from app.features.lobbies.pools import (
     NotEnoughPool,
     assign_one_each,
+    civ_target,
     deal,
+    deal_civs,
     remaining_after_bans,
 )
 from app.features.lobbies.projection import project_lobby
@@ -358,6 +360,13 @@ class LobbyService:
             suffix = "" if kind == "leader" else "civ_"
             if mode == DRAFT_RANDOM:
                 allotted: list[Any] = list(assign_one_each(pool, players))
+            elif kind == "civ":
+                # Civs are dealt to a target and may repeat across pools;
+                # leaders are split and never do.
+                groups = lobby.get("number_teams") or players
+                allotted = list(
+                    deal_civs(pool, players, civ_target(lobby["game_type"], groups))
+                )
             else:
                 allotted = list(deal(pool, players))
             for seat, share in zip(seated, allotted, strict=True):
