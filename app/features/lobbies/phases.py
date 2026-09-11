@@ -28,6 +28,9 @@ CANCEL_BY_HOST = "host"
 CANCEL_TIMEOUT = "timeout"
 CANCEL_ABANDONED = "abandoned"
 CANCEL_NO_POOL = "no_pool"
+# A draft that expires with picks missing cannot be defaulted: there is no
+# safe leader to assign on a player's behalf.
+CANCEL_NO_PICK = "no_pick"
 
 SOURCE_COMMAND = "command"
 SOURCE_ACTIVITY = "activity"
@@ -37,6 +40,7 @@ __all__ = [
     "CANCELLED",
     "CANCEL_ABANDONED",
     "CANCEL_BY_HOST",
+    "CANCEL_NO_PICK",
     "CANCEL_NO_POOL",
     "CANCEL_TIMEOUT",
     "COMPLETE",

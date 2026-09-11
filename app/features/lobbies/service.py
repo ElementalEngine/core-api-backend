@@ -45,6 +45,7 @@ from app.features.lobbies.projection import project_lobby
 from app.features.lobbies.questions import questions_for
 from app.features.lobbies.schemas import (
     ChangeSeatRequest,
+    MarkReadyRequest,
     CreateLobbyRequest,
     SeatAction,
     SubmitBallotRequest,
@@ -444,6 +445,79 @@ class LobbyService:
             await self._count_the_lobby(written["_id"])
         return written
 
+    async def mark_ready(
+        self, lobby_id: str, actor_discord_id: str, request: MarkReadyRequest
+    ) -> dict[str, Any]:
+        """A seat declares it has finished with the current phase.
+
+        Before the draft a player may be ready without submitting, and the
+        unanswered questions take their defaults. In the draft a pick is
+        required, so this refuses a seat that holds none.
+        """
+        oid = as_lobby_id(lobby_id)
+        found = await self._repository.find_by_id(oid)
+        if found is None:
+            raise LobbyNotFound(lobby_id)
+        found = await self._advanced(found)
+        phase = found["phase"]
+        if phase not in (SETTINGS, BANS, DRAFT):
+            raise SeatChangeRefused(
+                f"There is nothing to be ready for at {phase}",
+                request.expected_revision,
+                found["revision"],
+            )
+
+        seats = found.get("seats") or []
+        mine = next((s for s in seats if s.get("discord_id") == actor_discord_id), None)
+        if mine is None:
+            raise NotSeated("Only a seated player can be ready")
+        if phase == DRAFT and mine.get("pick") is None:
+            raise InvalidSeating("pick", "choose a leader before finishing")
+
+        ready = [
+            {**seat, "ready": True}
+            if seat.get("discord_id") == actor_discord_id
+            else seat
+            for seat in seats
+        ]
+        now = datetime.now(UTC)
+        written = await self._repository.replace_seats(
+            oid, request.expected_revision, ready, now
+        )
+        if written is None:
+            latest = await self._repository.find_by_id(oid)
+            raise SeatChangeRefused(
+                *self._why_refused(latest, request.expected_revision)
+            )
+
+        occupied = [seat for seat in ready if seat.get("discord_id")]
+        if all(seat.get("ready") for seat in occupied):
+            written = await self._finish(phase, written) or written
+        return for_the_wire(written, actor_discord_id)
+
+    async def _complete(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
+        """Close a finished draft. `revealed_at` un-censors a blind one."""
+        now = datetime.now(UTC)
+        return await self._repository.apply_changes(
+            lobby["_id"],
+            lobby["revision"],
+            {
+                "phase": COMPLETE,
+                "revealed_at": now,
+                "closed_at": now,
+                "turn_expires_at": None,
+            },
+            now,
+        )
+
+    async def _finish(self, phase: str, lobby: dict[str, Any]) -> dict[str, Any] | None:
+        """Resolve whichever phase every seat has just finished."""
+        if phase == SETTINGS:
+            return await self._resolve_settings(lobby)
+        if phase == BANS:
+            return await self._resolve_bans(lobby)
+        return await self._complete(lobby)
+
     async def cancel(
         self, lobby_id: str, actor_discord_id: str, expected_revision: int
     ) -> dict[str, Any]:
@@ -521,6 +595,7 @@ class LobbyService:
                 raise InvalidSeating(field, f"{token} is not in your pool")
             chosen[field] = token
 
+        chosen["ready"] = True
         picked = [
             {**seat, **chosen} if seat.get("discord_id") == actor_discord_id else seat
             for seat in seats
@@ -558,23 +633,10 @@ class LobbyService:
         finished = (
             whose_turn(order, turn_index + 1) is None
             if order
-            else all(seat.get("pick") is not None for seat in occupied)
+            else all(seat.get("ready") for seat in occupied)
         )
         if finished:
-            written = (
-                await self._repository.apply_changes(
-                    oid,
-                    written["revision"],
-                    {
-                        "phase": COMPLETE,
-                        "revealed_at": now,
-                        "closed_at": now,
-                        "turn_expires_at": None,
-                    },
-                    now,
-                )
-                or written
-            )
+            written = await self._complete(written) or written
             await self._count_the_lobby(oid)
         return for_the_wire(written, actor_discord_id)
 
@@ -620,7 +682,7 @@ class LobbyService:
             )
 
         occupied = [seat for seat in banned if seat.get("discord_id")]
-        if all(seat.get("bans") is not None for seat in occupied):
+        if all(seat.get("ready") for seat in occupied):
             written = await self._resolve_bans(written) or written
         return for_the_wire(written, actor_discord_id)
 
@@ -668,7 +730,7 @@ class LobbyService:
             )
 
         occupied = [seat for seat in voted if seat.get("discord_id")]
-        if all(seat.get("ballot") for seat in occupied):
+        if all(seat.get("ready") for seat in occupied):
             written = await self._resolve_settings(written) or written
         return for_the_wire(written, actor_discord_id)
 

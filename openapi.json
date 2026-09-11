@@ -1253,6 +1253,22 @@
         "title": "ManualRegistrationRequest",
         "type": "object"
       },
+      "MarkReadyRequest": {
+        "additionalProperties": false,
+        "description": "A seat declaring it has finished with the current phase.",
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "MarkReadyRequest",
+        "type": "object"
+      },
       "MatchResponse": {
         "properties": {
           "affected_players": {
@@ -6282,6 +6298,82 @@
           }
         },
         "summary": "Submit Pick",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
+    "/api/v2/lobbies/{lobby_id}/ready": {
+      "put": {
+        "description": "A seat finishes the current phase, whether or not it submitted.\n\nThe phase advances as soon as every seated player is ready, so a lobby\nthat agrees quickly does not wait out its timer.",
+        "operationId": "mark_ready_api_v2_lobbies__lobby_id__ready_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Ready",
         "tags": [
           "lobbies"
         ]

@@ -32,6 +32,7 @@ from app.features.lobbies.modes import InvalidLobbyShape, InvalidSeating
 from app.features.lobbies.repository import LobbyInsertRefused, LobbyRepository
 from app.features.lobbies.schemas import (
     ChangeSeatRequest,
+    MarkReadyRequest,
     CreateLobbyRequest,
     SubmitBallotRequest,
     SubmitBansRequest,
@@ -402,6 +403,45 @@ async def claim_post(
         response.status_code = status.HTTP_204_NO_CONTENT
         return None
     logger.info("lobby claimed for posting. lobby=%s guild=%s", lobby["_id"], guild_id)
+    return lobby
+
+
+@activity_router.put("/{lobby_id}/ready", response_model=None)
+async def mark_ready(
+    lobby_id: str,
+    request: MarkReadyRequest = Body(),
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """A seat finishes the current phase, whether or not it submitted.
+
+    The phase advances as soon as every seated player is ready, so a lobby
+    that agrees quickly does not wait out its timer.
+    """
+    try:
+        lobby = await _service(db).mark_ready(lobby_id, actor, request)
+    except InvalidLobbyId as exc:
+        raise invalid_request(str(exc)) from exc
+    except LobbyNotFound as exc:
+        raise not_found("Lobby not found") from exc
+    except NotSeated as exc:
+        raise forbidden(str(exc)) from exc
+    except InvalidSeating as exc:
+        raise invalid_request(str(exc)) from exc
+    except SeatChangeRefused as exc:
+        raise conflict(
+            str(exc),
+            details={
+                "expected_revision": exc.expected,
+                "current_revision": exc.current,
+            },
+        ) from exc
+    logger.info(
+        "seat ready. lobby=%s actor=%s phase=%s",
+        lobby_id,
+        actor,
+        lobby["phase"],
+    )
     return lobby
 
 

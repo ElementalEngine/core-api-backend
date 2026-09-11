@@ -25,6 +25,7 @@ from app.features.lobbies.projection import BALLOT, PICK, POOL, POOL_APPEARANCES
 from app.features.lobbies.schemas import (
     ChangeSeatRequest,
     CreateLobbyRequest,
+    MarkReadyRequest,
     SubmitBallotRequest,
     SubmitBansRequest,
     SubmitPickRequest,
@@ -128,6 +129,7 @@ class FakeRepo:
         self.writes.append((expected_revision, seats, absent_player))
         if self._written is None:
             return None
+        self._lobby = {**(self._lobby or self._written), "seats": seats}
         return {**self._written, "seats": seats}
 
     async def claim_for_stats(self, lobby_id, now):
@@ -451,7 +453,7 @@ PUBLIC_LOBBY_FIELDS = {
     "settings",
     "voice_channel_id",
 }
-PUBLIC_SEAT_FIELDS = {"seat_index", "discord_id", "team"}
+PUBLIC_SEAT_FIELDS = {"seat_index", "discord_id", "team", "ready"}
 
 
 def built_document():
@@ -698,8 +700,9 @@ def test_a_ballot_is_stored_on_the_voting_seat_only():
 
 
 def test_the_last_ballot_tallies_and_moves_to_bans():
-    # Both seats have voted, so the phase resolves in the same call the
-    # final ballot arrives in -- the caller never waits for a poll tick.
+    # A seat finishing is what ends the phase, not a seat submitting. The
+    # resolution happens in the same call, so the caller never waits for a
+    # poll tick.
     voted = {
         **VOTING,
         "seats": [
@@ -707,20 +710,33 @@ def test_the_last_ballot_tallies_and_moves_to_bans():
                 "seat_index": 0,
                 "discord_id": "alice",
                 "ballot": {"duration": "unlimited"},
+                "ready": True,
             },
             {"seat_index": 1, "discord_id": "bob", "team": None},
         ],
     }
     repo = FakeRepo(lobby=voted, written=voted, applied=voted)
     vote(repo, actor="bob", duration="unlimited")
+    ready(repo, actor="bob")
     _, changes = repo.changes[0]
     assert changes["phase"] == "bans"
     assert changes["settings"]["duration"] == "unlimited"
 
 
-def test_a_ballot_short_of_everyone_does_not_advance():
+def test_one_seat_finishing_does_not_advance_the_phase():
+    # The property readiness introduces: alice is done, bob is not, so the
+    # lobby waits for him or for the timer.
     repo = FakeRepo(lobby=VOTING, written=VOTING, applied=VOTING)
     vote(repo, actor="alice", duration="unlimited")
+    ready(repo, actor="alice")
+    assert repo.changes == []
+
+
+def test_submitting_a_ballot_is_not_finishing_with_it():
+    # A seat may answer and keep thinking. Nothing advances until it says so.
+    repo = FakeRepo(lobby=VOTING, written=VOTING, applied=VOTING)
+    vote(repo, actor="alice", duration="unlimited")
+    vote(repo, actor="bob", duration="unlimited")
     assert repo.changes == []
 
 
@@ -797,13 +813,19 @@ def test_banning_nothing_still_counts_as_submitting():
     voted = {
         **BANNING,
         "seats": [
-            {"seat_index": 0, "discord_id": "alice", "bans": {"leader_keys": []}},
+            {
+                "seat_index": 0,
+                "discord_id": "alice",
+                "bans": {"leader_keys": []},
+                "ready": True,
+            },
             {"seat_index": 1, "discord_id": "bob", "team": None},
         ],
     }
     repo = FakeRepo(lobby=voted, written=voted, applied=voted)
     ban(repo, actor="bob")
-    assert repo.changes, "the empty submission completed the phase"
+    ready(repo, actor="bob")
+    assert repo.changes, "an empty submission still counts as having banned"
 
 
 def test_an_unseated_player_cannot_ban():
@@ -846,12 +868,15 @@ def test_the_last_submission_tallies_and_moves_to_draft():
                 "seat_index": 0,
                 "discord_id": "alice",
                 "bans": {"leader_keys": ["LEADER_TRAJAN"], "civ_keys": []},
+                "ready": True,
             },
             {"seat_index": 1, "discord_id": "bob", "team": None},
         ],
     }
     repo = FakeRepo(lobby=both, written=both, applied=both)
     ban(repo, actor="bob", leader_keys=["LEADER_TRAJAN"])
+    assert repo.changes == [], "submitting bans is not finishing"
+    ready(repo, actor="bob")
     _, changes = repo.changes[0]
     assert changes["phase"] == "draft"
     assert changes["bans"]["leader"] == ["LEADER_TRAJAN"]
@@ -881,12 +906,14 @@ def test_a_lobby_that_bans_itself_out_is_cancelled():
                 "seat_index": 0,
                 "discord_id": "alice",
                 "bans": {"leader_keys": keys, "civ_keys": []},
+                "ready": True,
             },
             {"seat_index": 1, "discord_id": "bob", "team": None},
         ],
     }
     repo = FakeRepo(lobby=both, written=both, applied=both)
     ban(repo, actor="bob", leader_keys=keys)
+    ready(repo, actor="bob")
     _, changes = repo.changes[0]
     assert changes["phase"] == "cancelled"
     assert changes["cancel_reason"] == "no_pool"
@@ -1132,3 +1159,11 @@ def test_the_cutoff_is_an_hour_behind_the_creation():
     asyncio.run(LobbyService(repo, FakeSeasons()).create(request()))
     _, cutoff = repo.evictions[0]
     assert timedelta(minutes=59) < datetime.now(UTC) - cutoff < timedelta(minutes=61)
+
+
+def ready(repo, actor="alice", revision=3):
+    return asyncio.run(
+        LobbyService(repo, FakeSeasons(), FakeCivData()).mark_ready(
+            HEX_ID, actor, MarkReadyRequest(expected_revision=revision)
+        )
+    )

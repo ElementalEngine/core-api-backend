@@ -111,6 +111,14 @@ class SubmitBansRequest(BaseModel):
     civ_keys: list[str] = Field(default_factory=list, max_length=40)
 
 
+class MarkReadyRequest(BaseModel):
+    """A seat declaring it has finished with the current phase."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+
+
 class SubmitPickRequest(BaseModel):
     """One seat's pick, from the pool that seat was dealt."""
 
@@ -129,6 +137,7 @@ class SubmitPickRequest(BaseModel):
 
 __all__ = [
     "ChangeSeatRequest",
+    "MarkReadyRequest",
     "CreateLobbyRequest",
     "SeatAction",
     "SubmitBallotRequest",
