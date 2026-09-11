@@ -287,6 +287,8 @@ async def submit_bans(
         raise not_found("Lobby not found") from exc
     except NotSeated as exc:
         raise forbidden(str(exc)) from exc
+    except NotYourTurn as exc:
+        raise forbidden(str(exc)) from exc
     except InvalidSeating as exc:
         raise invalid_request(str(exc)) from exc
     except SeatChangeRefused as exc:

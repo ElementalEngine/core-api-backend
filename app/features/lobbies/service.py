@@ -154,6 +154,23 @@ def seat_the_host(host_discord_id: str) -> list[dict[str, Any]]:
     return [{"seat_index": 0, "discord_id": host_discord_id, "team": None}]
 
 
+def shape_of(lobby: Mapping[str, Any]) -> LobbyShape:
+    """The shape of a lobby that already exists.
+
+    Only a teamer's team fields came from the caller; a duel's are values
+    resolve_shape itself derived and the builder stored, so handing them back
+    would look like a caller sending team fields for a duel. An ffa's seat
+    count did come from the caller and is read back.
+    """
+    teamer = lobby["game_type"] == "teamer"
+    return resolve_shape(
+        lobby["game_type"],
+        lobby.get("number_teams") if teamer else None,
+        lobby.get("team_size") if teamer else None,
+        lobby.get("seat_count"),
+    )
+
+
 def build_lobby_document(
     request: CreateLobbyRequest,
     shape: LobbyShape,
@@ -988,14 +1005,7 @@ class LobbyService:
         arrangement = rearranged(seated, target, request)
         validate_seats(
             arrangement,
-            resolve_shape(
-                found["game_type"],
-                found.get("number_teams"),
-                found.get("team_size"),
-                # An ffa's seat count is the size the host chose, so it is read
-                # back from the lobby rather than re-derived.
-                found.get("seat_count"),
-            ),
+            shape_of(found),
         )
 
         written = await self._repository.replace_seats(
