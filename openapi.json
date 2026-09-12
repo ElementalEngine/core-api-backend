@@ -237,20 +237,6 @@
         "title": "BatchStatsResponseV2",
         "type": "object"
       },
-      "Body_cancel_lobby_api_v2_lobbies__lobby_id__cancel_post": {
-        "properties": {
-          "expected_revision": {
-            "minimum": 1.0,
-            "title": "Expected Revision",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "expected_revision"
-        ],
-        "title": "Body_cancel_lobby_api_v2_lobbies__lobby_id__cancel_post",
-        "type": "object"
-      },
       "Body_get_match_api_v1_get_match__put": {
         "properties": {
           "match_id": {
@@ -262,20 +248,6 @@
           "match_id"
         ],
         "title": "Body_get_match_api_v1_get_match__put",
-        "type": "object"
-      },
-      "Body_start_lobby_api_v2_lobbies__lobby_id__start_post": {
-        "properties": {
-          "expected_revision": {
-            "minimum": 1.0,
-            "title": "Expected Revision",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "expected_revision"
-        ],
-        "title": "Body_start_lobby_api_v2_lobbies__lobby_id__start_post",
         "type": "object"
       },
       "Body_upload_game_report_api_v1_upload_game_report__post": {
@@ -329,6 +301,22 @@
           "discord_message_id"
         ],
         "title": "Body_upload_match_api_v2_matches_post",
+        "type": "object"
+      },
+      "CancelLobbyRequest": {
+        "additionalProperties": false,
+        "description": "The host ends the lobby.",
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "CancelLobbyRequest",
         "type": "object"
       },
       "ChangeOrder": {
@@ -2384,6 +2372,22 @@
           "discord_message_id"
         ],
         "title": "SetPlayerOrder",
+        "type": "object"
+      },
+      "StartLobbyRequest": {
+        "additionalProperties": false,
+        "description": "The host closes seating and opens the settings vote.",
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "StartLobbyRequest",
         "type": "object"
       },
       "StatRow": {
@@ -6163,7 +6167,7 @@
     },
     "/api/v2/lobbies/{lobby_id}/cancel": {
       "post": {
-        "description": "The host ends the lobby. Frees the channel and every seat at once.",
+        "description": "The host ends the lobby, freeing every seat at once.",
         "operationId": "cancel_lobby_api_v2_lobbies__lobby_id__cancel_post",
         "parameters": [
           {
@@ -6205,7 +6209,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_cancel_lobby_api_v2_lobbies__lobby_id__cancel_post"
+                "$ref": "#/components/schemas/CancelLobbyRequest"
               }
             }
           },
@@ -6509,7 +6513,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_start_lobby_api_v2_lobbies__lobby_id__start_post"
+                "$ref": "#/components/schemas/StartLobbyRequest"
               }
             }
           },
