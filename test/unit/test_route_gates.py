@@ -130,7 +130,10 @@ def test_resolution_finds_a_route_for_an_unambiguous_path():
 
 
 def test_a_literal_path_is_not_captured_by_its_parameterised_sibling():
-    assert resolve("GET", "/api/v2/lobbies/active").path == "/api/v2/lobbies/active"
+    assert (
+        resolve("POST", "/api/v2/lobbies/claim-post").path
+        == "/api/v2/lobbies/claim-post"
+    )
     assert (
         resolve("GET", "/api/v2/matches/leaderboard").path
         == "/api/v2/matches/leaderboard"
@@ -138,7 +141,7 @@ def test_a_literal_path_is_not_captured_by_its_parameterised_sibling():
 
 
 def test_the_parameterised_sibling_still_resolves():
-    # Proving /active wins is worthless if /{lobby_id} matches nothing.
+    # Proving a literal wins is worthless if /{lobby_id} matches nothing.
     assert resolve("GET", LOBBY_PATH).path == "/api/v2/lobbies/{lobby_id}"
 
 
@@ -149,7 +152,6 @@ def test_each_lobby_route_carries_its_own_gate_not_merely_a_gate():
         assert require_activity_token not in mite_gates, mite_path
     for method, path in (
         ("GET", "/api/v2/lobbies"),
-        ("GET", "/api/v2/lobbies/active"),
         ("GET", LOBBY_PATH),
         ("PATCH", f"{LOBBY_PATH}/seats"),
         ("POST", f"{LOBBY_PATH}/start"),
@@ -157,6 +159,7 @@ def test_each_lobby_route_carries_its_own_gate_not_merely_a_gate():
         ("PUT", f"{LOBBY_PATH}/bans"),
         ("PUT", f"{LOBBY_PATH}/picks"),
         ("POST", f"{LOBBY_PATH}/cancel"),
+        ("PUT", f"{LOBBY_PATH}/ready"),
     ):
         gates = gate_callables(resolve(method, path))
         assert require_activity_token in gates, f"{method} {path}"

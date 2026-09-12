@@ -243,13 +243,6 @@ class LobbyService:
         document = build_lobby_document(request, shape, season, now)
         return for_the_wire(await self._repository.insert_lobby(document), None)
 
-    async def resolve_active(
-        self, guild_id: str, channel_id: str, viewer_discord_id: str
-    ) -> dict[str, Any] | None:
-        """The open lobby for a channel -- one or none, by the index."""
-        found = await self._repository.find_open(guild_id, channel_id=channel_id)
-        return for_the_wire(found[0], viewer_discord_id) if found else None
-
     async def claim_post(self, guild_id: str) -> dict[str, Any] | None:
         """The next finished lobby Mite should post, or None for 204."""
         claimed = await self._repository.claim_for_posting(guild_id, datetime.now(UTC))
@@ -1078,10 +1071,11 @@ class LobbyService:
         viewer_discord_id: str,
         edition: str | None = None,
         game_type: str | None = None,
+        channel_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Open lobbies for a guild, optionally filtered."""
         found = await self._repository.find_open(
-            guild_id, edition=edition, game_type=game_type
+            guild_id, channel_id=channel_id, edition=edition, game_type=game_type
         )
         return [for_the_wire(lobby, viewer_discord_id) for lobby in found]
 

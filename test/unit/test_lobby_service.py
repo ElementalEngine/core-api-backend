@@ -218,16 +218,6 @@ def test_create_refuses_a_bad_shape_before_touching_the_database():
     assert seasons.asked == []
 
 
-def test_resolve_active_passes_the_channel_and_returns_one_or_none():
-    repo = FakeRepo(open_lobbies=[{"_id": "L1"}])
-    assert asyncio.run(
-        LobbyService(repo, FakeSeasons()).resolve_active("g1", "c1", "alice")
-    )
-    assert repo.queries == [("g1", "c1", None, None)]
-    empty = LobbyService(FakeRepo(), FakeSeasons())
-    assert asyncio.run(empty.resolve_active("g1", "c1", "alice")) is None
-
-
 class FakeObjectId:
     """
     Stands in for bson.ObjectId: str()s to a hex string and is otherwise not
@@ -285,10 +275,15 @@ async def _returns(value):
     return value
 
 
-def test_browse_passes_its_filters_and_never_a_channel():
+def test_browse_passes_every_filter_including_the_channel():
     repo = FakeRepo()
     asyncio.run(LobbyService(repo, FakeSeasons()).browse("g1", "alice", "civ6", "ffa"))
     assert repo.queries == [("g1", None, "civ6", "ffa")]
+    narrowed = FakeRepo()
+    asyncio.run(
+        LobbyService(narrowed, FakeSeasons()).browse("g1", "alice", channel_id="c1")
+    )
+    assert narrowed.queries == [("g1", "c1", None, None)]
 
 
 SETTINGS_LOBBY = {
@@ -316,16 +311,6 @@ def test_an_observer_sees_participation_but_no_ballot():
     assert all("ballot" not in seat for seat in wire["seats"])
     # Counted before the ballots are removed, or it would always be 0 or 1.
     assert wire["ballots_submitted"] == 2
-
-
-def test_resolve_active_censors_the_lobby_it_returns():
-    repo = FakeRepo(open_lobbies=[SETTINGS_LOBBY])
-    lobby = asyncio.run(
-        LobbyService(repo, FakeSeasons()).resolve_active("g1", "c1", "bob")
-    )
-    seats = seats_by_id(lobby)
-    assert seats["bob"]["ballot"] == {"map": "continents"}
-    assert "ballot" not in seats["alice"]
 
 
 def test_browse_censors_every_lobby_not_only_the_first():

@@ -5686,7 +5686,7 @@
     },
     "/api/v2/lobbies": {
       "get": {
-        "description": "Open lobbies for a guild.",
+        "description": "Open lobbies for a guild, optionally narrowed to one channel.",
         "operationId": "browse_lobbies_api_v2_lobbies_get",
         "parameters": [
           {
@@ -5697,6 +5697,24 @@
               "minLength": 1,
               "title": "Guild Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channel_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel Id"
             }
           },
           {
@@ -5844,94 +5862,6 @@
           }
         },
         "summary": "Create Lobby",
-        "tags": [
-          "lobbies"
-        ]
-      }
-    },
-    "/api/v2/lobbies/active": {
-      "get": {
-        "description": "One open lobby or none, by the index.",
-        "operationId": "resolve_active_api_v2_lobbies_active_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "guild_id",
-            "required": true,
-            "schema": {
-              "minLength": 1,
-              "title": "Guild Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "channel_id",
-            "required": true,
-            "schema": {
-              "minLength": 1,
-              "title": "Channel Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-actor-discord-id",
-            "required": true,
-            "schema": {
-              "title": "X-Actor-Discord-Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "additionalProperties": true,
-                      "type": "object"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "title": "Response Resolve Active Api V2 Lobbies Active Get"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Resolve Active",
         "tags": [
           "lobbies"
         ]

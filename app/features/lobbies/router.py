@@ -96,27 +96,23 @@ async def create_lobby(
         raise conflict(REFUSAL_MESSAGES.get(exc.index, str(exc))) from exc
 
 
-@activity_router.get("/active")
-async def resolve_active(
-    guild_id: str = Query(min_length=1),
-    channel_id: str = Query(min_length=1),
-    actor: str = Depends(actor_discord_id),
-    db: AsyncMongoClient = Depends(get_database),
-) -> dict[str, Any] | None:
-    """One open lobby or none, by the index."""
-    return await _service(db).resolve_active(guild_id, channel_id, actor)
-
-
 @activity_router.get("")
 async def browse_lobbies(
     guild_id: str = Query(min_length=1),
+    channel_id: str | None = Query(default=None, min_length=1, max_length=32),
     edition: str | None = Query(default=None),
     game_type: str | None = Query(default=None),
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> list[dict[str, Any]]:
-    """Open lobbies for a guild."""
-    return await _service(db).browse(guild_id, actor, edition, game_type)
+    """Open lobbies for a guild, optionally narrowed to one channel."""
+    return await _service(db).browse(
+        guild_id,
+        actor,
+        edition=edition,
+        game_type=game_type,
+        channel_id=channel_id,
+    )
 
 
 @activity_router.get("/{lobby_id}", response_model=None)
