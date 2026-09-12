@@ -481,6 +481,55 @@ async def cleanup() -> None:
         await client.close()
 
 
+def two_in_one_channel() -> None:
+    """Entry 13: a channel takes several lobbies, a player still takes one."""
+    print("\n-- two open lobbies in one text channel --")
+    channel = f"c-{ObjectId()}"
+
+    def create(host: str, label: str, want: int) -> Any:
+        return step(
+            label,
+            want,
+            "POST",
+            "/api/v2/lobbies",
+            MITO,
+            body={
+                "guild_id": "smoke",
+                "channel_id": channel,
+                "voice_channel_id": "v-smoke",
+                "host_discord_id": host,
+                "edition": "civ6",
+                "game_type": "ffa",
+                "size": 8,
+                "host_rules": "entry 13",
+            },
+        )
+
+    for host, label in (
+        ("quinn", "first in the channel"),
+        ("rosa", "second, same channel"),
+    ):
+        lobby = create(host, label, 201)
+        if isinstance(lobby, dict) and "_id" in lobby:
+            made.append(lobby["_id"])
+
+    # The host takes seat zero (D207), so quinn is seated in the first one.
+    create("quinn", "a seated host cannot open another", 409)
+
+    found = step(
+        "browse narrows to the channel",
+        200,
+        "GET",
+        f"/api/v2/lobbies?guild_id=smoke&channel_id={channel}",
+        ACTIVITY,
+        actor="quinn",
+    )
+    count = len(found) if isinstance(found, list) else -1
+    print(f"     lobbies in that channel: {count}")
+    if count != 2:
+        failures.append("browse should have found exactly two")
+
+
 def main() -> int:
     global BASE
     parser = argparse.ArgumentParser()
@@ -492,6 +541,7 @@ def main() -> int:
     ffa_lifecycle()
     cwc_turns()
     observer_read()
+    two_in_one_channel()
     asyncio.run(cleanup())
     print(f"\n{len(failures)} failed" if failures else "\nall steps passed")
     for name in failures:

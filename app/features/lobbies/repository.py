@@ -50,8 +50,6 @@ def _refusing_index(exc: DuplicateKeyError) -> str:
     pattern = (exc.details or {}).get("keyPattern") or {}
     if "seats.discord_id" in pattern:
         return "one_active_seat_per_player"
-    if "channel_id" in pattern:
-        return "one_active_lobby_per_channel"
     return "unknown"
 
 
@@ -64,12 +62,6 @@ class LobbyRepository:
     async def ensure_indexes(self) -> None:
         # create_index creates the collection; both are empty at creation, so
         # the builds are free and index-first is trivially safe.
-        await self._lobbies.create_index(
-            [("guild_id", ASCENDING), ("channel_id", ASCENDING)],
-            unique=True,
-            partialFilterExpression=OPEN_LOBBY,
-            name="one_active_lobby_per_channel",
-        )
         await self._lobbies.create_index(
             [("seats.discord_id", ASCENDING)],
             unique=True,

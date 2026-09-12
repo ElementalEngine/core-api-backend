@@ -42,21 +42,10 @@ def _declared():
     )
 
 
-def test_lobbies_declares_exactly_the_two_partial_uniques():
+def test_lobbies_declares_exactly_the_one_partial_unique():
     lobbies, _ = _declared()
-    assert set(lobbies) == {
-        "one_active_lobby_per_channel",
-        "one_active_seat_per_player",
-    }
+    assert set(lobbies) == {"one_active_seat_per_player"}
     assert all(i["unique"] is True for i in lobbies.values())
-
-
-def test_one_active_lobby_per_channel_is_keyed_on_guild_and_channel():
-    lobbies, _ = _declared()
-    assert lobbies["one_active_lobby_per_channel"]["keys"] == [
-        ("guild_id", 1),
-        ("channel_id", 1),
-    ]
 
 
 def test_the_seat_index_is_on_the_array_path_not_the_array():
@@ -79,13 +68,11 @@ def test_no_filter_uses_the_uncreatable_exists_false_form():
             assert clause != {"$exists": False}
 
 
-def test_the_two_lobby_filters_are_not_the_same():
+def test_the_seat_filter_narrows_open_to_seated():
     lobbies, _ = _declared()
-    channel = lobbies["one_active_lobby_per_channel"]["partial"]
     seat = lobbies["one_active_seat_per_player"]["partial"]
-    assert channel != seat
     assert seat["seats.discord_id"] == {"$exists": True}
-    assert "seats.discord_id" not in channel
+    assert seat["closed_at"] is None
 
 
 def test_aggregate_key_is_the_full_four_field_key_and_unpartialled():

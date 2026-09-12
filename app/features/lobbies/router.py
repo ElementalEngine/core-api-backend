@@ -54,9 +54,6 @@ from app.features.lobbies.service import (
 from app.features.seasons.repository import SeasonsRepository
 
 REFUSAL_MESSAGES = {
-    "one_active_lobby_per_channel": (
-        "This channel already has an open lobby. Cancel it or use another channel."
-    ),
     "one_active_seat_per_player": (
         "That player is already seated in another open lobby."
     ),
