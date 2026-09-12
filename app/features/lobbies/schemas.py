@@ -63,6 +63,22 @@ class CreateLobbyRequest(BaseModel):
         return self
 
 
+class StartLobbyRequest(BaseModel):
+    """The host closes seating and opens the settings vote."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+
+
+class CancelLobbyRequest(BaseModel):
+    """The host ends the lobby."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+
+
 class SeatAction(StrEnum):
     PLACE = "place"
     LEAVE = "leave"

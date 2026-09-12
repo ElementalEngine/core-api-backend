@@ -32,9 +32,11 @@ from app.features.civdata.repository import CivDataRepository
 from app.features.lobbies.modes import InvalidLobbyShape, InvalidSeating
 from app.features.lobbies.repository import LobbyInsertRefused, LobbyRepository
 from app.features.lobbies.schemas import (
+    CancelLobbyRequest,
     ChangeSeatRequest,
     CreateLobbyRequest,
     MarkReadyRequest,
+    StartLobbyRequest,
     SubmitBallotRequest,
     SubmitBansRequest,
     SubmitPickRequest,
@@ -189,13 +191,13 @@ async def change_seat(
 @activity_router.post("/{lobby_id}/start", response_model=None)
 async def start_lobby(
     lobby_id: str,
-    expected_revision: int = Body(embed=True, ge=1),
+    request: StartLobbyRequest = Body(),
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     """Close seating, open the settings vote."""
     try:
-        lobby = await _service(db).start(lobby_id, actor, expected_revision)
+        lobby = await _service(db).start(lobby_id, actor, request.expected_revision)
     except InvalidLobbyId as exc:
         raise invalid_request(str(exc)) from exc
     except LobbyNotFound as exc:
@@ -221,7 +223,7 @@ async def start_lobby(
         "lobby started. lobby=%s actor=%s expected=%s current=%s",
         lobby_id,
         actor,
-        expected_revision,
+        request.expected_revision,
         lobby["revision"],
     )
     return lobby
@@ -368,13 +370,13 @@ async def submit_pick(
 @activity_router.post("/{lobby_id}/cancel", response_model=None)
 async def cancel_lobby(
     lobby_id: str,
-    expected_revision: int = Body(embed=True, ge=1),
+    request: CancelLobbyRequest = Body(),
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """The host ends the lobby. Frees the channel and every seat at once."""
+    """The host ends the lobby, freeing every seat at once."""
     try:
-        lobby = await _service(db).cancel(lobby_id, actor, expected_revision)
+        lobby = await _service(db).cancel(lobby_id, actor, request.expected_revision)
     except InvalidLobbyId as exc:
         raise invalid_request(str(exc)) from exc
     except LobbyNotFound as exc:
