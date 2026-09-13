@@ -275,6 +275,17 @@ async def _returns(value):
     return value
 
 
+def test_the_settings_phase_carries_its_questions_and_no_other_phase_does():
+    from app.features.lobbies.questions import questions_for
+
+    asked = for_the_wire(SETTINGS_LOBBY, "bob")["questions"]
+    assert asked == questions_for(
+        SETTINGS_LOBBY["edition"], SETTINGS_LOBBY["game_type"]
+    )
+    assert asked[-1]["id"] == "draft_mode"
+    assert "questions" not in for_the_wire({**SETTINGS_LOBBY, "phase": "lobby"}, "bob")
+
+
 def test_browse_passes_every_filter_including_the_channel():
     repo = FakeRepo()
     asyncio.run(LobbyService(repo, FakeSeasons()).browse("g1", "alice", "civ6", "ffa"))

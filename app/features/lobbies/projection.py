@@ -18,6 +18,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from app.features.lobbies.phases import DRAFT, SETTINGS
+from app.features.lobbies.questions import questions_for
 
 DRAFT_BLIND = "blind"
 
@@ -66,6 +67,11 @@ def project_lobby(
         # The union of every pool. Disjoint pools mean a viewer who knows
         # the union and their own pool knows what the others were dealt.
         projected.pop(POOL_APPEARANCES, None)
+
+    # The ballot's questions travel with the phase that asks them, so the
+    # client renders from one catalogue rather than carrying a copy.
+    if lobby.get("phase") == SETTINGS:
+        projected["questions"] = questions_for(lobby["edition"], lobby["game_type"])
 
     projected["seats"] = seats
     return projected
