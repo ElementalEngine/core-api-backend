@@ -70,8 +70,9 @@ def project_lobby(
 
     # The ballot's questions travel with the phase that asks them, so the
     # client renders from one catalogue rather than carrying a copy.
-    if lobby.get("phase") == SETTINGS:
-        projected["questions"] = questions_for(lobby["edition"], lobby["game_type"])
+    edition, game_type = lobby.get("edition"), lobby.get("game_type")
+    if lobby.get("phase") == SETTINGS and edition and game_type:
+        projected["questions"] = questions_for(edition, game_type)
 
     projected["seats"] = seats
     return projected

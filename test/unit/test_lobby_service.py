@@ -278,12 +278,13 @@ async def _returns(value):
 def test_the_settings_phase_carries_its_questions_and_no_other_phase_does():
     from app.features.lobbies.questions import questions_for
 
-    asked = for_the_wire(SETTINGS_LOBBY, "bob")["questions"]
-    assert asked == questions_for(
-        SETTINGS_LOBBY["edition"], SETTINGS_LOBBY["game_type"]
-    )
+    shaped = {**SETTINGS_LOBBY, "edition": "civ6", "game_type": "ffa"}
+    asked = for_the_wire(shaped, "bob")["questions"]
+    assert asked == questions_for("civ6", "ffa")
     assert asked[-1]["id"] == "draft_mode"
-    assert "questions" not in for_the_wire({**SETTINGS_LOBBY, "phase": "lobby"}, "bob")
+    assert "questions" not in for_the_wire({**shaped, "phase": "lobby"}, "bob")
+    # A fixture without an edition is served, not crashed.
+    assert "questions" not in for_the_wire(SETTINGS_LOBBY, "bob")
 
 
 def test_browse_passes_every_filter_including_the_channel():
