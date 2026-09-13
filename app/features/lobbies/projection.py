@@ -17,7 +17,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from app.features.lobbies.phases import DRAFT, SETTINGS
+from app.features.lobbies.bans import ban_caps
+from app.features.lobbies.phases import BANS, DRAFT, SETTINGS
 from app.features.lobbies.questions import questions_for
 
 DRAFT_BLIND = "blind"
@@ -73,6 +74,8 @@ def project_lobby(
     edition, game_type = lobby.get("edition"), lobby.get("game_type")
     if lobby.get("phase") == SETTINGS and edition and game_type:
         projected["questions"] = questions_for(edition, game_type)
+    if lobby.get("phase") == BANS and edition:
+        projected["ban_caps"] = ban_caps(edition, lobby.get("starting_age"))
 
     projected["seats"] = seats
     return projected

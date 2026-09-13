@@ -287,6 +287,29 @@ def test_the_settings_phase_carries_its_questions_and_no_other_phase_does():
     assert "questions" not in for_the_wire(SETTINGS_LOBBY, "bob")
 
 
+def test_the_bans_phase_carries_its_caps():
+    civ6 = for_the_wire(
+        {**SETTINGS_LOBBY, "phase": "bans", "edition": "civ6", "game_type": "ffa"},
+        "bob",
+    )
+    assert civ6["ban_caps"] == {"leader": 20, "civ": 0}
+    civ7 = for_the_wire(
+        {
+            **SETTINGS_LOBBY,
+            "phase": "bans",
+            "edition": "civ7",
+            "game_type": "ffa",
+            "starting_age": "AGE_ANTIQUITY",
+        },
+        "bob",
+    )
+    assert civ7["ban_caps"] == {"leader": 10, "civ": 3}
+    assert "ban_caps" not in for_the_wire(
+        {**SETTINGS_LOBBY, "phase": "settings", "edition": "civ6", "game_type": "ffa"},
+        "bob",
+    )
+
+
 def test_browse_passes_every_filter_including_the_channel():
     repo = FakeRepo()
     asyncio.run(LobbyService(repo, FakeSeasons()).browse("g1", "alice", "civ6", "ffa"))
