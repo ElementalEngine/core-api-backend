@@ -20,6 +20,11 @@ def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:
     return x_actor_is_staff
 
 
+def actor_name(x_actor_name: str = Header(default="")) -> str:
+    """What the guild calls this player. Display only: nothing keys on it."""
+    return x_actor_name[:64]
+
+
 def actor_discord_id(x_actor_discord_id: str = Header()) -> str:
     """The single identity header every activity route requires."""
     return x_actor_discord_id

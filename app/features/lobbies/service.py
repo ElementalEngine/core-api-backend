@@ -1009,7 +1009,11 @@ class LobbyService:
         }
 
     async def change_seat(
-        self, lobby_id: str, actor_discord_id: str, request: ChangeSeatRequest
+        self,
+        lobby_id: str,
+        actor_discord_id: str,
+        request: ChangeSeatRequest,
+        actor_name: str = "",
     ) -> dict[str, Any]:
         """One seat change, returning the updated censored snapshot."""
         oid = as_lobby_id(lobby_id)
@@ -1030,7 +1034,7 @@ class LobbyService:
             raise NotTheHost("Only the host can move another player's seat")
 
         seated = found.get("seats") or []
-        arrangement = rearranged(seated, target, request)
+        arrangement = rearranged(seated, target, request, actor_name)
         validate_seats(
             arrangement,
             shape_of(found),
@@ -1094,7 +1098,10 @@ class LobbyService:
 
 
 def rearranged(
-    seats: Sequence[Mapping[str, Any]], target: str, request: ChangeSeatRequest
+    seats: Sequence[Mapping[str, Any]],
+    target: str,
+    request: ChangeSeatRequest,
+    name: str = "",
 ) -> list[dict[str, Any]]:
     """The seat array the request asks for, sorted by `seat_index`."""
     others = [dict(seat) for seat in seats if seat.get("discord_id") != target]
@@ -1109,6 +1116,9 @@ def rearranged(
         "seat_index": request.seat_index,
         "team": request.team,
     }
+    # Display only, and an empty one never erases a name already there.
+    if name:
+        moved["name"] = name
     return sorted([*others, moved], key=lambda seat: seat["seat_index"])
 
 

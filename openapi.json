@@ -6196,6 +6196,16 @@
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-name",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "X-Actor-Name",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -6667,6 +6677,16 @@
             "required": true,
             "schema": {
               "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-name",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "X-Actor-Name",
               "type": "string"
             }
           }

@@ -23,6 +23,7 @@ from pymongo import AsyncMongoClient
 from app.core.dependencies import (
     actor_discord_id,
     actor_is_staff,
+    actor_name,
     get_database,
     require_activity_token,
     require_mito_token,
@@ -143,6 +144,7 @@ async def change_seat(
     lobby_id: str,
     request: ChangeSeatRequest = Body(),
     actor: str = Depends(actor_discord_id),
+    name: str = Depends(actor_name),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     """
@@ -150,7 +152,7 @@ async def change_seat(
     snapshot so the caller never waits for a poll tick.
     """
     try:
-        lobby = await _service(db).change_seat(lobby_id, actor, request)
+        lobby = await _service(db).change_seat(lobby_id, actor, request, name)
     except InvalidLobbyId as exc:
         raise invalid_request(str(exc)) from exc
     except LobbyNotFound as exc:
@@ -454,13 +456,14 @@ async def leave_for_mite(
     lobby_id: str,
     request: ChangeSeatRequest = Body(),
     actor: str = Depends(actor_discord_id),
+    name: str = Depends(actor_name),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     """A player leaves their seat from a command, freeing them at once."""
     if request.action is not SeatAction.LEAVE:
         raise invalid_request("Mite may only leave a seat, not take one")
     try:
-        lobby = await _service(db).change_seat(lobby_id, actor, request)
+        lobby = await _service(db).change_seat(lobby_id, actor, request, name)
     except InvalidLobbyId as exc:
         raise invalid_request(str(exc)) from exc
     except LobbyNotFound as exc:
