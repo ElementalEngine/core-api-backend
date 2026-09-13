@@ -5917,6 +5917,16 @@
               ],
               "title": "Authorization"
             }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-name",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "X-Actor-Name",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {

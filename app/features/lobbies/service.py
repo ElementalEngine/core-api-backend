@@ -144,7 +144,7 @@ def for_the_wire(
     }
 
 
-def seat_the_host(host_discord_id: str) -> list[dict[str, Any]]:
+def seat_the_host(host_discord_id: str, name: str = "") -> list[dict[str, Any]]:
     """The one seat a lobby opens with.
 
     Everyone else joins through the seat route, so the lobby fills by
@@ -152,7 +152,15 @@ def seat_the_host(host_discord_id: str) -> list[dict[str, Any]]:
     command ran. `team` is null even in a teamer: seating means you are in
     this lobby, never that you are on a particular side.
     """
-    return [{"seat_index": 0, "discord_id": host_discord_id, "team": None}]
+    seat: dict[str, Any] = {
+        "seat_index": 0,
+        "discord_id": host_discord_id,
+        "team": None,
+    }
+    if name:
+        seat["name"] = name
+
+    return [seat]
 
 
 def shape_of(lobby: Mapping[str, Any]) -> LobbyShape:
@@ -177,6 +185,7 @@ def build_lobby_document(
     shape: LobbyShape,
     season: dict[str, Any],
     now: datetime,
+    actor_name: str = "",
 ) -> dict[str, Any]:
     """The document as it exists at creation."""
     document: dict[str, Any] = {
@@ -192,7 +201,7 @@ def build_lobby_document(
         "team_size": shape.team_size,
         "seat_count": shape.seat_count,
         "min_seats": shape.min_seats,
-        "seats": seat_the_host(request.host_discord_id),
+        "seats": seat_the_host(request.host_discord_id, actor_name),
         "voice_channel_id": request.voice_channel_id,
         "phase": LOBBY,
         "revision": 1,
@@ -216,7 +225,9 @@ class LobbyService:
         self._seasons = seasons
         self._civ_data = civ_data
 
-    async def create(self, request: CreateLobbyRequest) -> dict[str, Any]:
+    async def create(
+        self, request: CreateLobbyRequest, actor_name: str = ""
+    ) -> dict[str, Any]:
         """
         Raises InvalidLobbyShape for a bad mode, LobbyInsertRefused when a unique
         index says the channel or a player is already taken.
@@ -240,7 +251,7 @@ class LobbyService:
                 evicted.get("updated_at"),
             )
 
-        document = build_lobby_document(request, shape, season, now)
+        document = build_lobby_document(request, shape, season, now, actor_name)
         return for_the_wire(await self._repository.insert_lobby(document), None)
 
     async def claim_post(self, guild_id: str) -> dict[str, Any] | None:

@@ -87,10 +87,11 @@ def _service(db: AsyncMongoClient) -> LobbyService:
 @mite_router.post("", status_code=status.HTTP_201_CREATED)
 async def create_lobby(
     body: CreateLobbyRequest,
+    name: str = Depends(actor_name),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     try:
-        return await _service(db).create(body)
+        return await _service(db).create(body, name)
     except InvalidLobbyShape as exc:
         raise invalid_request(str(exc)) from exc
     except LobbyInsertRefused as exc:
