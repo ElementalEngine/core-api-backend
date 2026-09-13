@@ -31,6 +31,7 @@ from app.features.lobbies.schemas import (
     SubmitPickRequest,
 )
 from app.features.lobbies.service import (
+    STALE_AFTER,
     InvalidLobbyId,
     LobbyNotFound,
     LobbyService,
@@ -108,7 +109,9 @@ class FakeRepo:
         return {**document, "_id": "L1"}
 
     async def evict_stale(self, players, cutoff, now):
-        self.evictions.append((sorted(players), cutoff))
+        self.evictions.append(
+            (sorted(players) if players is not None else None, cutoff)
+        )
         return self._stale
 
     async def find_open(self, guild_id, channel_id=None, edition=None, game_type=None):
@@ -308,6 +311,23 @@ def test_the_bans_phase_carries_its_caps():
         {**SETTINGS_LOBBY, "phase": "settings", "edition": "civ6", "game_type": "ffa"},
         "bob",
     )
+
+
+def test_the_sweep_asks_for_every_stale_lobby_not_one_player_s():
+    repo = FakeRepo()
+    closed = asyncio.run(LobbyService(repo, FakeSeasons()).sweep_stale(NOW))
+    assert closed == 0
+    players, cutoff = repo.evictions[0]
+    assert players is None
+    assert cutoff == NOW - STALE_AFTER
+
+
+def test_creation_still_evicts_only_the_host_s_own_stale_lobbies():
+    repo = FakeRepo()
+    body = request()
+    asyncio.run(LobbyService(repo, FakeSeasons()).create(body))
+    players, _ = repo.evictions[0]
+    assert players == [body.host_discord_id]
 
 
 def test_browse_passes_every_filter_including_the_channel():

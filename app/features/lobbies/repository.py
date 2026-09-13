@@ -186,16 +186,17 @@ class LobbyRepository:
         return await self._lobbies.find_one({"_id": lobby_id})
 
     async def evict_stale(
-        self, players: list[str], cutoff: datetime, now: datetime
+        self, players: list[str] | None, cutoff: datetime, now: datetime
     ) -> list[dict[str, Any]]:
         """
         Close open lobbies holding any of `players` and untouched since `cutoff`.
         Returns the ones closed.
         """
         stale = {**OPEN_LOBBY, "updated_at": {"$lt": cutoff}}
-        found = await self._lobbies.find(
-            {**stale, "seats.discord_id": {"$in": players}}
-        ).to_list(None)
+        # `players` narrows the sweep to lobbies holding one of them, which is
+        # what creation does. None sweeps every stale lobby in the guild.
+        holding = {"seats.discord_id": {"$in": players}} if players is not None else {}
+        found = await self._lobbies.find({**stale, **holding}).to_list(None)
         if not found:
             return []
         await self._lobbies.update_many(

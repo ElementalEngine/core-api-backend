@@ -1065,6 +1065,19 @@ class LobbyService:
             return ("The lobby has moved on", expected, current)
         return ("That player already holds a seat", expected, current)
 
+    async def sweep_stale(self, now: datetime | None = None) -> int:
+        """Close every open lobby untouched since STALE_AFTER. Returns the count."""
+        moment = now or datetime.now(UTC)
+        evicted = await self._repository.evict_stale(None, moment - STALE_AFTER, moment)
+        for lobby in evicted:
+            logger.info(
+                "swept stale lobby. lobby=%s phase=%s updated_at=%s",
+                lobby["_id"],
+                lobby.get("phase"),
+                lobby.get("updated_at"),
+            )
+        return len(evicted)
+
     async def browse(
         self,
         guild_id: str,

@@ -36,6 +36,7 @@ from app.features.lobbies.schemas import (
     ChangeSeatRequest,
     CreateLobbyRequest,
     MarkReadyRequest,
+    SeatAction,
     StartLobbyRequest,
     SubmitBallotRequest,
     SubmitBansRequest,
@@ -61,8 +62,10 @@ REFUSAL_MESSAGES = {
 
 logger = logging.getLogger(__name__)
 
+# Everything the bot may reach lives under one prefix, so "under /mite needs
+# the Mito token" is true by construction rather than by a test.
 mite_router = APIRouter(
-    prefix="/api/v2/lobbies",
+    prefix="/api/v2/lobbies/mite",
     tags=["lobbies"],
     dependencies=[Depends(require_mito_token)],
 )
@@ -391,6 +394,97 @@ async def cancel_lobby(
         lobby["revision"],
     )
     return lobby
+
+
+@mite_router.get("")
+async def browse_for_mite(
+    guild_id: str = Query(min_length=1),
+    channel_id: str | None = Query(default=None, min_length=1, max_length=32),
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> list[dict[str, Any]]:
+    """Open lobbies for a guild, for the command that lists them."""
+    return await _service(db).browse(guild_id, actor, channel_id=channel_id)
+
+
+@mite_router.post("/{lobby_id}/cancel", response_model=None)
+async def cancel_for_mite(
+    lobby_id: str,
+    request: CancelLobbyRequest = Body(),
+    actor: str = Depends(actor_discord_id),
+    is_staff: bool = Depends(actor_is_staff),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """The host cancels from a command; staff may cancel anyone's."""
+    service = _service(db)
+    try:
+        if is_staff:
+            # Staff cancel on the host's behalf: the service allows the host
+            # alone, and the bot has already asserted the staff claim.
+            found = await service.read(lobby_id, actor, is_staff=True)
+            if found is not None:
+                actor = str(found["host_discord_id"])
+        lobby = await service.cancel(lobby_id, actor, request.expected_revision)
+    except InvalidLobbyId as exc:
+        raise invalid_request(str(exc)) from exc
+    except LobbyNotFound as exc:
+        raise not_found("Lobby not found") from exc
+    except NotTheHost as exc:
+        raise forbidden(str(exc)) from exc
+    except SeatChangeRefused as exc:
+        raise conflict(
+            str(exc),
+            details={
+                "expected_revision": exc.expected,
+                "current_revision": exc.current,
+            },
+        ) from exc
+    logger.info(
+        "lobby cancelled from a command. lobby=%s actor=%s staff=%s current=%s",
+        lobby_id,
+        actor,
+        is_staff,
+        lobby["revision"],
+    )
+    return lobby
+
+
+@mite_router.patch("/{lobby_id}/leave", response_model=None)
+async def leave_for_mite(
+    lobby_id: str,
+    request: ChangeSeatRequest = Body(),
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """A player leaves their seat from a command, freeing them at once."""
+    if request.action is not SeatAction.LEAVE:
+        raise invalid_request("Mite may only leave a seat, not take one")
+    try:
+        lobby = await _service(db).change_seat(lobby_id, actor, request)
+    except InvalidLobbyId as exc:
+        raise invalid_request(str(exc)) from exc
+    except LobbyNotFound as exc:
+        raise not_found("Lobby not found") from exc
+    except NotSeated as exc:
+        raise forbidden(str(exc)) from exc
+    except SeatChangeRefused as exc:
+        raise conflict(
+            str(exc),
+            details={
+                "expected_revision": exc.expected,
+                "current_revision": exc.current,
+            },
+        ) from exc
+    logger.info("seat left from a command. lobby=%s actor=%s", lobby_id, actor)
+    return lobby
+
+
+@mite_router.post("/sweep")
+async def sweep_for_mite(
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, int]:
+    """Close every lobby untouched past the stale cutoff."""
+    return {"closed": await _service(db).sweep_stale()}
 
 
 @mite_router.post("/claim-post", response_model=None)

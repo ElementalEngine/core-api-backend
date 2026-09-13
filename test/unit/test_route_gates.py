@@ -122,18 +122,21 @@ def test_the_check_fails_on_a_router_that_forgot_its_gate():
 
 
 LOBBY_PATH = "/api/v2/lobbies/652f1a2b3c4d5e6f7a8b9c0d"
+MITE = "/api/v2/lobbies/mite"
+MITE_LOBBY_PATH = f"{MITE}/652f1a2b3c4d5e6f7a8b9c0d"
 
 
 def test_resolution_finds_a_route_for_an_unambiguous_path():
-    route = resolve("POST", "/api/v2/lobbies")
-    assert route is not None and route.path == "/api/v2/lobbies"
+    route = resolve("POST", MITE)
+    assert route is not None and route.path == MITE
 
 
 def test_a_literal_path_is_not_captured_by_its_parameterised_sibling():
-    assert (
-        resolve("POST", "/api/v2/lobbies/claim-post").path
-        == "/api/v2/lobbies/claim-post"
-    )
+    assert resolve("POST", f"{MITE}/claim-post").path == f"{MITE}/claim-post"
+    # `mite` is a literal under /lobbies, where {lobby_id} also lives. If the
+    # router ever preferred the parameter, every bot call would read a lobby
+    # whose id is the word "mite".
+    assert resolve("GET", MITE).path == MITE
     assert (
         resolve("GET", "/api/v2/matches/leaderboard").path
         == "/api/v2/matches/leaderboard"
@@ -146,13 +149,21 @@ def test_the_parameterised_sibling_still_resolves():
 
 
 def test_each_lobby_route_carries_its_own_gate_not_merely_a_gate():
-    for mite_path in ("/api/v2/lobbies", "/api/v2/lobbies/claim-post"):
-        mite_gates = gate_callables(resolve("POST", mite_path))
+    for method, mite_path in (
+        ("POST", MITE),
+        ("GET", MITE),
+        ("POST", f"{MITE}/claim-post"),
+        ("POST", f"{MITE}/sweep"),
+        ("POST", f"{MITE_LOBBY_PATH}/cancel"),
+        ("PATCH", f"{MITE_LOBBY_PATH}/leave"),
+    ):
+        mite_gates = gate_callables(resolve(method, mite_path))
         assert require_mito_token in mite_gates, mite_path
         assert require_activity_token not in mite_gates, mite_path
     for method, path in (
         ("GET", "/api/v2/lobbies"),
         ("GET", LOBBY_PATH),
+        ("POST", f"{LOBBY_PATH}/cancel"),
         ("PATCH", f"{LOBBY_PATH}/seats"),
         ("POST", f"{LOBBY_PATH}/start"),
         ("PUT", f"{LOBBY_PATH}/votes"),
