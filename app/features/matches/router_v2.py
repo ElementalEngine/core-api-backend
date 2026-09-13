@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, Header, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.core.dependencies import (
     actor_discord_id,
+    actor_is_staff,
     get_database,
     require_mito_token,
 )
@@ -32,11 +33,6 @@ router = APIRouter(
     tags=["matches-v2"],
     dependencies=[Depends(require_mito_token)],
 )
-
-
-def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:
-    """Mite supplies facts about the guild, core-api owns the rules."""
-    return x_actor_is_staff
 
 
 async def _load(svc: MatchService, match_id: str) -> dict[str, Any]:

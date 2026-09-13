@@ -275,7 +275,7 @@ def test_update_match_whitelist_excludes_match_id():
     )
     update_data = {
         key: value
-        for key, value in payload.dict(exclude_unset=True).items()
+        for key, value in payload.model_dump(exclude_unset=True).items()
         if key in MATCH_UPDATE_SETTABLE_FIELDS
     }
     assert update_data == {"confirmed": True, "flagged": True}
