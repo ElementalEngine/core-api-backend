@@ -79,13 +79,24 @@ def test_no_token_collides_within_an_edition():
         assert len(set(tokens)) == len(tokens)
 
 
+def test_every_row_but_dai_viet_has_a_portrait():
+    """The grid shows faces; a missing one is a hole worth failing over."""
+    without = [
+        doc["token"]
+        for edition in EDITIONS
+        for doc in to_documents(edition)
+        if not doc.get("emoji_id")
+    ]
+    assert without == ["CIVILIZATION_DAI_VIET"]
+
+
 def test_to_documents_shape():
     docs = to_documents("civ6") + to_documents("civ7")
     assert len(docs) == 89 + 33 + 44
     for doc in docs:
         assert doc["edition"] in EDITIONS
         assert doc["kind"] in {"leader", "civ"}
-        assert doc["leader_data_version"] == 1
+        assert doc["leader_data_version"] == 2
         assert doc["token"]
     # {edition, token} is the collection's unique index.
     keys = [(doc["edition"], doc["token"]) for doc in docs]

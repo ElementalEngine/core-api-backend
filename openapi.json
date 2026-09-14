@@ -439,6 +439,17 @@
             "title": "Age Pool",
             "type": "string"
           },
+          "emoji_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emoji Id"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -1031,6 +1042,17 @@
               }
             ],
             "title": "Civ"
+          },
+          "emoji_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emoji Id"
           },
           "name": {
             "title": "Name",
