@@ -162,6 +162,8 @@ async def change_seat(
         raise forbidden(str(exc)) from exc
     except InvalidSeating as exc:
         raise invalid_request(str(exc)) from exc
+    except LobbyInsertRefused as exc:
+        raise conflict(REFUSAL_MESSAGES.get(exc.index, str(exc))) from exc
     except SeatChangeRefused as exc:
         logger.warning(
             "seat change refused. lobby=%s actor=%s expected=%s current=%s",
