@@ -230,8 +230,8 @@ class LobbyRepository:
             query["edition"] = edition
         if game_type is not None:
             query["game_type"] = game_type
-        cursor = self._lobbies.find(query).sort("created_at", DESCENDING)
-        return await cursor.to_list(None)
+        cursor = self._lobbies.find(query).sort("created_at", DESCENDING).limit(100)
+        return await cursor.to_list(100)
 
 
 __all__ = [

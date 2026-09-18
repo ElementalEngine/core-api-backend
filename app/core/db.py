@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from pymongo import AsyncMongoClient
 
 from app.core.config import settings
-from app.core.logging import configure_logging
+from app.core.constants import DB_SERVER_MEMBERS, GAMES_DB
 from app.features.auth.repository import AuthRepository
 from app.features.civdata.repository import CivDataRepository
 from app.features.infractions.repository import (
@@ -18,7 +18,6 @@ from app.features.matches.repository import MatchRepository
 from app.features.ratings.repository import RatingsRepository
 from app.features.seasons.repository import SeasonsRepository
 
-configure_logging()
 logger = logging.getLogger("app.db")
 
 
@@ -46,10 +45,10 @@ async def db_lifespan(app: FastAPI):
 
         await client.admin.command("ping")
 
-        db = client[settings.mongo_db_name]
         app.state.mongodb_client = client
-        app.state.mongodb = db
-        logger.info("🟢 MongoDB connected (db=%s)", db.name)
+        logger.info(
+            "🟢 MongoDB connected (games=%s, members=%s)", GAMES_DB, DB_SERVER_MEMBERS
+        )
 
         await AuthRepository(client).ensure_indexes()
         logger.info("🟢 Auth indexes ensured")
@@ -75,11 +74,8 @@ async def db_lifespan(app: FastAPI):
         yield
     except Exception:
         logger.exception("🔴 Failed to connect to MongoDB")
-        if client is not None:
-            await client.close()
         raise
     finally:
-        existing_client = getattr(app.state, "mongodb_client", None)
-        if existing_client is not None:
-            await existing_client.close()
+        if client is not None:
+            await client.close()
             logger.info("🟠 MongoDB connection closed")

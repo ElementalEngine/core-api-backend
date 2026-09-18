@@ -31,6 +31,7 @@ from app.features.matches.service import (
     NotFoundError,
     ParseError,
 )
+from app.features.matches.upload import read_capped
 
 logger = logging.getLogger(__name__)
 
@@ -46,27 +47,6 @@ upload_router = APIRouter(
 )
 
 
-MAX_SAVE_BYTES = 12 * 1024 * 1024
-_READ_CHUNK = 1024 * 1024
-
-
-async def _read_capped(file: UploadFile) -> bytes:
-    """Read the upload without ever holding more than the cap in memory."""
-    chunks: list[bytes] = []
-    total = 0
-    while chunk := await file.read(_READ_CHUNK):
-        total += len(chunk)
-        if total > MAX_SAVE_BYTES:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Save file too large (limit {MAX_SAVE_BYTES // (1024 * 1024)} MiB)"
-                ),
-            )
-        chunks.append(chunk)
-    return b"".join(chunks)
-
-
 @upload_router.post("/upload-game-report/")
 async def upload_game_report(
     file: UploadFile = File(...),
@@ -75,7 +55,7 @@ async def upload_game_report(
     discord_message_id: str = Form(...),
     db=Depends(get_database),
 ):
-    raw = await _read_capped(file)
+    raw = await read_capped(file)
     is_cloud_game = is_cloud == "1"
     svc = MatchService(db)
     try:

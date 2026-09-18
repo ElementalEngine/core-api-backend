@@ -39,7 +39,7 @@ def main(argv: list[str]) -> int:
         print(f"unknown argument(s): {unknown}. only --apply is accepted.")
         return 2
     apply = "--apply" in argv
-    client = MongoClient(settings.mongodb_uri.get_secret_value())
+    client = MongoClient(settings.mongo_url.get_secret_value())
     try:
         db = client[GAMES_DB]
         mapping = {

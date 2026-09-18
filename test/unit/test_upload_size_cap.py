@@ -48,15 +48,16 @@ def _post(client, payload):
 
 
 def test_oversized_upload_is_rejected_for_size(monkeypatch):
-    from app.features.matches.router import MAX_SAVE_BYTES
+    from app.features.matches.upload import MAX_SAVE_BYTES
 
     res = _post(_client(monkeypatch), b"X" * (MAX_SAVE_BYTES + 1))
     assert res.status_code == 400
+    assert res.json()["detail"]["error"]["code"] == "INVALID_REQUEST"
     assert "too large" in str(res.json()).lower()
 
 
 def test_body_at_the_limit_is_not_rejected_for_size(monkeypatch):
-    from app.features.matches.router import MAX_SAVE_BYTES
+    from app.features.matches.upload import MAX_SAVE_BYTES
 
     res = _post(_client(monkeypatch), b"X" * MAX_SAVE_BYTES)
     assert "too large" not in res.text.lower()

@@ -29,7 +29,7 @@ def test_config_loads_env(monkeypatch, tmp_path):
 
     s = cfg.settings
     # not inside the assert -- pytest prints subexpressions on failure
-    uri_scheme_ok = s.mongodb_uri.get_secret_value().startswith("mongodb://")
+    uri_scheme_ok = s.mongo_url.get_secret_value().startswith("mongodb://")
     assert uri_scheme_ok
     assert s.ts_mu == 1250
     assert s.ts_sigma == 150

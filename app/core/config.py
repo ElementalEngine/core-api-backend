@@ -28,10 +28,6 @@ class Settings(BaseSettings):
         default=SecretStr("mongodb://localhost:27017"),
         validation_alias=AliasChoices("MONGO_URL", "MONGO_URI"),
     )
-    mongo_db_name: str = Field(
-        default="match_reporter",
-        validation_alias=AliasChoices("MONGO_DB_NAME", "MONGO_DB"),
-    )
     mongodb_timeout_ms: int = Field(
         default=5000,
         ge=1000,
@@ -203,11 +199,6 @@ class Settings(BaseSettings):
                 seen.add(origin)
                 origins.append(origin)
         return origins
-
-    @property
-    def mongodb_uri(self) -> SecretStr:
-        """Backward-compatible alias used by older tests and tooling."""
-        return self.mongo_url
 
     @model_validator(mode="after")
     def _ensure_mongo_uri_scheme(self) -> Settings:

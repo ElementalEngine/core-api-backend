@@ -32,7 +32,7 @@ def main(argv: list[str]) -> int:
     if "--epsilon" in argv:
         epsilon = float(argv[argv.index("--epsilon") + 1])
 
-    client = MongoClient(settings.mongodb_uri.get_secret_value(), tz_aware=True)
+    client = MongoClient(settings.mongo_url.get_secret_value(), tz_aware=True)
     try:
         events = list(client[GAMES_DB]["rating_events"].find())
         wanted = {(int(e["player_id"]), str(e["scope"])) for e in events}

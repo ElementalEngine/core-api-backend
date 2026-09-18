@@ -63,10 +63,8 @@ def api_error(
     retryable: bool = False,
     details: Any | None = None,
 ) -> HTTPException:
-    """
-    Raise through's envelope. S6 uses three codes on /api/v2/matches; S7 adds the
-    closed enum, the INTERNAL catch-all and correlation_id.
-    """
+    """The D92 envelope: a closed code enum, INTERNAL as the catch-all, and a
+    correlation id on anything unhandled."""
     return HTTPException(
         status_code=status_code,
         detail=_error_envelope(

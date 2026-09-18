@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import unquote
+
 from fastapi import Header, HTTPException, Request, status
 from pymongo import AsyncMongoClient
 
@@ -21,8 +23,9 @@ def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:
 
 
 def actor_name(x_actor_name: str = Header(default="")) -> str:
-    """What the guild calls this player. Display only: nothing keys on it."""
-    return x_actor_name[:64]
+    """What the guild calls this player, percent-encoded because a header is
+    Latin-1 and a nickname is not. Display only: nothing keys on it."""
+    return unquote(x_actor_name)[:64]
 
 
 def actor_discord_id(x_actor_discord_id: str = Header()) -> str:
@@ -92,7 +95,7 @@ def require_mito_token(authorization: str | None = Header(default=None)) -> None
 
 
 def require_activity_token(authorization: str | None = Header(default=None)) -> None:
-    """The Activity server's own credential, separate from Mito's by."""
+    """The Activity server's own credential, separate from Mito's by design (D17)."""
     _require_bearer(
         authorization,
         configured=settings.activity_service_token.get_secret_value(),

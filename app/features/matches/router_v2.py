@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from pymongo import AsyncMongoClient
 
 from app.core.dependencies import (
     actor_discord_id,
@@ -21,10 +22,10 @@ from app.features.matches.errors import (
 )
 from app.features.matches.ingest import IngestService
 from app.features.matches.leaderboard import LeaderboardService
-from app.features.matches.router import _read_capped
 from app.features.matches.schemas import LeaderboardRankingResponse, MatchResponse
 from app.features.matches.schemas_v2 import ContestBody, PlayersPatch
 from app.features.matches.service import MatchService
+from app.features.matches.upload import read_capped
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +67,9 @@ async def upload_match(
     is_cloud: str = Form(...),
     discord_message_id: str = Form(...),
     actor: str = Depends(actor_discord_id),
-    db=Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    raw = await _read_capped(file)
+    raw = await read_capped(file)
     svc = MatchService(db)
     try:
         created = await IngestService(svc).create_from_save(
@@ -89,7 +90,7 @@ async def get_leaderboard(
     game_mode: str,
     is_seasonal: bool = False,
     is_combined: bool = False,
-    db=Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> Any:
     svc = LeaderboardService(db)
     try:
@@ -119,7 +120,7 @@ async def patch_players(
     body: PlayersPatch,
     actor: str = Depends(actor_discord_id),
     is_staff: bool = Depends(actor_is_staff),
-    db=Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     svc = MatchService(db)
     _require_reporter(await _load(svc, match_id), actor, is_staff)
@@ -137,7 +138,7 @@ async def patch_players(
 async def approve_match(
     match_id: str,
     actor: str = Depends(actor_discord_id),
-    db=Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     svc = MatchService(db)
     try:
@@ -154,7 +155,7 @@ async def contest_match(
     body: ContestBody,
     actor: str = Depends(actor_discord_id),
     is_staff: bool = Depends(actor_is_staff),
-    db=Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     svc = MatchService(db)
     _require_player(await _load(svc, match_id), actor, is_staff)
@@ -182,7 +183,7 @@ async def delete_match(
     match_id: str,
     actor: str = Depends(actor_discord_id),
     is_staff: bool = Depends(actor_is_staff),
-    db=Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     svc = MatchService(db)
     _require_reporter(await _load(svc, match_id), actor, is_staff)

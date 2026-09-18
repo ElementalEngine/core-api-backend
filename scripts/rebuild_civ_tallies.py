@@ -148,7 +148,7 @@ def main(argv: list[str]) -> int:
         print(f"unknown edition: {edition}")
         return 2
 
-    client = MongoClient(settings.mongodb_uri.get_secret_value())
+    client = MongoClient(settings.mongo_url.get_secret_value())
     try:
         for name in editions:
             collected = collect(client[GAMES_DB], name)
