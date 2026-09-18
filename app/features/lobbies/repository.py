@@ -100,14 +100,17 @@ class LobbyRepository:
         query: dict[str, Any] = {"_id": lobby_id, "revision": expected_revision}
         if absent_player is not None:
             query["seats.discord_id"] = {"$ne": absent_player}
-        return await self._lobbies.find_one_and_update(
-            query,
-            {
-                "$set": {"seats": seats, "updated_at": now},
-                "$inc": {"revision": 1},
-            },
-            return_document=ReturnDocument.AFTER,
-        )
+        try:
+            return await self._lobbies.find_one_and_update(
+                query,
+                {
+                    "$set": {"seats": seats, "updated_at": now},
+                    "$inc": {"revision": 1},
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+        except DuplicateKeyError as exc:
+            raise LobbyInsertRefused(_refusing_index(exc)) from exc
 
     async def apply_changes(
         self,

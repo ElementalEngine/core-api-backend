@@ -390,6 +390,8 @@ async def cancel_lobby(
                 "current_revision": exc.current,
             },
         ) from exc
+    except LobbyInsertRefused as exc:
+        raise conflict(REFUSAL_MESSAGES.get(exc.index, str(exc))) from exc
     logger.info(
         "lobby cancelled. lobby=%s actor=%s current=%s",
         lobby_id,
@@ -442,6 +444,8 @@ async def cancel_for_mite(
                 "current_revision": exc.current,
             },
         ) from exc
+    except LobbyInsertRefused as exc:
+        raise conflict(REFUSAL_MESSAGES.get(exc.index, str(exc))) from exc
     logger.info(
         "lobby cancelled from a command. lobby=%s actor=%s staff=%s current=%s",
         lobby_id,
@@ -479,6 +483,8 @@ async def leave_for_mite(
                 "current_revision": exc.current,
             },
         ) from exc
+    except LobbyInsertRefused as exc:
+        raise conflict(REFUSAL_MESSAGES.get(exc.index, str(exc))) from exc
     logger.info("seat left from a command. lobby=%s actor=%s", lobby_id, actor)
     return lobby
 
@@ -536,6 +542,8 @@ async def mark_ready(
                 "current_revision": exc.current,
             },
         ) from exc
+    except LobbyInsertRefused as exc:
+        raise conflict(REFUSAL_MESSAGES.get(exc.index, str(exc))) from exc
     logger.info(
         "seat ready. lobby=%s actor=%s phase=%s",
         lobby_id,
