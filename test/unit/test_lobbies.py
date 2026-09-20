@@ -42,10 +42,36 @@ def _declared():
     )
 
 
-def test_lobbies_declares_exactly_the_one_partial_unique():
+def test_lobbies_declares_the_seat_rule_and_the_three_query_indexes():
     lobbies, _ = _declared()
-    assert set(lobbies) == {"one_active_seat_per_player"}
-    assert all(i["unique"] is True for i in lobbies.values())
+    assert set(lobbies) == {
+        "one_active_seat_per_player",
+        "browse_open_by_guild",
+        "claim_unposted_by_guild",
+        "sweep_stale_open",
+    }
+    assert [i["name"] for i in lobbies.values() if i["unique"]] == [
+        "one_active_seat_per_player"
+    ]
+
+
+def test_each_query_index_puts_equality_first_then_the_sort_key():
+    lobbies, _ = _declared()
+    assert lobbies["browse_open_by_guild"]["keys"] == [
+        ("guild_id", 1),
+        ("closed_at", 1),
+        ("created_at", -1),
+    ]
+    assert lobbies["claim_unposted_by_guild"]["keys"] == [
+        ("guild_id", 1),
+        ("phase", 1),
+        ("posted_at", 1),
+        ("closed_at", 1),
+    ]
+    assert lobbies["sweep_stale_open"]["keys"] == [
+        ("closed_at", 1),
+        ("updated_at", 1),
+    ]
 
 
 def test_the_seat_index_is_on_the_array_path_not_the_array():
@@ -58,7 +84,8 @@ def test_every_filter_keys_off_closed_at_never_phase():
     # `cancelled` -- and drift the moment one is forgotten.
     lobbies, _ = _declared()
     for index in lobbies.values():
-        assert index["partial"]["closed_at"] is None
+        if index["partial"] is not None:
+            assert index["partial"]["closed_at"] is None
 
 
 def test_no_filter_uses_the_uncreatable_exists_false_form():

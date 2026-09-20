@@ -68,6 +68,32 @@ class LobbyRepository:
             partialFilterExpression=SEATED_OPEN_LOBBY,
             name="one_active_seat_per_player",
         )
+        # Equality keys first, then the sort key. Browse, the claim poll and
+        # the sweep each read one of these end to end.
+        await self._lobbies.create_index(
+            [
+                ("guild_id", ASCENDING),
+                ("closed_at", ASCENDING),
+                ("created_at", DESCENDING),
+            ],
+            name="browse_open_by_guild",
+        )
+        await self._lobbies.create_index(
+            [
+                ("guild_id", ASCENDING),
+                ("phase", ASCENDING),
+                ("posted_at", ASCENDING),
+                ("closed_at", ASCENDING),
+            ],
+            name="claim_unposted_by_guild",
+        )
+        await self._lobbies.create_index(
+            [
+                ("closed_at", ASCENDING),
+                ("updated_at", ASCENDING),
+            ],
+            name="sweep_stale_open",
+        )
         await self._lobby_stats.create_index(
             [
                 ("season_id", ASCENDING),
