@@ -439,6 +439,17 @@
             "title": "Age Pool",
             "type": "string"
           },
+          "display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display"
+          },
           "emoji_id": {
             "anyOf": [
               {
@@ -1042,6 +1053,28 @@
               }
             ],
             "title": "Civ"
+          },
+          "civ_display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Civ Display"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display"
           },
           "emoji_id": {
             "anyOf": [

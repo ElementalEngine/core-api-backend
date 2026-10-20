@@ -278,16 +278,24 @@ async def _returns(value):
     return value
 
 
-def test_the_settings_phase_carries_its_questions_and_no_other_phase_does():
+def test_settings_and_complete_carry_the_questions_and_no_other_phase_does():
     from app.features.lobbies.questions import questions_for
 
     shaped = {**SETTINGS_LOBBY, "edition": "civ6", "game_type": "ffa"}
     asked = for_the_wire(shaped, "bob")["questions"]
     assert asked == questions_for("civ6", "ffa")
     assert asked[-1]["id"] == "draft_mode"
+    # The finished lobby carries them too, so its summary reads as titles.
+    assert for_the_wire({**shaped, "phase": "complete"}, None)["questions"] == asked
     assert "questions" not in for_the_wire({**shaped, "phase": "lobby"}, "bob")
+    assert "questions" not in for_the_wire({**shaped, "phase": "draft"}, "bob")
     # A fixture without an edition is served, not crashed.
     assert "questions" not in for_the_wire(SETTINGS_LOBBY, "bob")
+
+
+def test_a_staff_observer_still_gets_the_questions():
+    shaped = {**SETTINGS_LOBBY, "edition": "civ6", "game_type": "ffa"}
+    assert for_the_wire(shaped, "staff", uncensored=True)["questions"]
 
 
 def test_the_bans_phase_carries_its_caps():

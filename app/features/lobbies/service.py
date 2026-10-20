@@ -133,9 +133,7 @@ def for_the_wire(
     `uncensored` is for staff observers, who need a blind draft's picks to
     adjudicate it. The secrecy is between players.
     """
-    projected = (
-        dict(document) if uncensored else project_lobby(document, viewer_discord_id)
-    )
+    projected = project_lobby(document, viewer_discord_id, censored=not uncensored)
     return {
         key: str(value)
         if key in OBJECT_ID_FIELDS and value is not None

@@ -4,7 +4,7 @@ The test lives with the data rather than in a bot-side copy: one that passes
 while the source is broken is worse than no test at all. Pure -- it reads the
 seed files and never opens a connection.
 
-Governed by D49, D59, D60.
+Governed by D49, D59, D60, D235.
 """
 
 from app.features.civdata.seeds import (
@@ -96,7 +96,7 @@ def test_to_documents_shape():
     for doc in docs:
         assert doc["edition"] in EDITIONS
         assert doc["kind"] in {"leader", "civ"}
-        assert doc["leader_data_version"] == 2
+        assert doc["leader_data_version"] == 3
         assert doc["token"]
     # {edition, token} is the collection's unique index.
     keys = [(doc["edition"], doc["token"]) for doc in docs]
@@ -109,3 +109,26 @@ def test_documents_carry_no_authoring_fields():
     assert leaked == set()
     # ...and it is still in the file, which is the record.
     assert all("civ_source" in row for row in load_seed("civ6")["leaders"])
+
+
+def test_every_row_has_a_display_name():
+    """Clients show `display`; `name` is an emoji id name, not for people."""
+    missing = [
+        doc["token"]
+        for edition in EDITIONS
+        for doc in to_documents(edition)
+        if not (doc.get("display") or "").strip()
+    ]
+    assert missing == []
+    civ6 = load_seed("civ6")["leaders"]
+    assert [r["token"] for r in civ6 if not (r.get("civ_display") or "").strip()] == []
+
+
+def test_display_names_are_unique_where_players_choose_between_them():
+    """Two tiles reading the same is a wrong pick waiting to happen."""
+    for edition in EDITIONS:
+        seed = load_seed(edition)
+        for key in ("leaders", "civs"):
+            rows = seed.get(key, [])
+            labels = [(r["display"], r.get("civ_display")) for r in rows]
+            assert len(set(labels)) == len(labels), (edition, key)
