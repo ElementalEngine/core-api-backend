@@ -1168,6 +1168,69 @@ def test_civ7_picks_a_leader_and_a_civ_in_one_submission():
     assert seat["civ_pick"] == "CIVILIZATION_ROME"
 
 
+CIV7_DRAFT = {
+    **DRAFTING,
+    "edition": "civ7",
+    "settings": {"draft_mode": "standard"},
+    "pick_order": [],
+    "seats": [
+        {
+            "seat_index": 0,
+            "discord_id": "alice",
+            "pool": ["LEADER_TRAJAN"],
+            "civ_pool": ["CIVILIZATION_ROME"],
+        }
+    ],
+}
+
+
+def test_civ7_refuses_a_leader_without_its_civ():
+    # The first submission locks the seat, so a leader alone would leave the
+    # seat without a civ for the rest of the game.
+    repo = FakeRepo(lobby=CIV7_DRAFT, applied=CIV7_DRAFT)
+    with pytest.raises(InvalidSeating, match="civ"):
+        pick(repo, "alice", "LEADER_TRAJAN")
+    assert repo.changes == []
+
+
+def test_a_civ_without_a_leader_never_locks_a_seat():
+    repo = FakeRepo(lobby=CIV7_DRAFT, applied=CIV7_DRAFT)
+    with pytest.raises(InvalidSeating, match="leader"):
+        pick(repo, "alice", civ_token="CIVILIZATION_ROME")
+    assert repo.changes == []
+
+
+def test_a_cwc_turn_in_civ7_takes_a_leader_and_a_civ():
+    cwc7 = {
+        **DRAFTING,
+        "edition": "civ7",
+        "settings": {"draft_mode": "cwc"},
+        "pick_order": ["alice", "bob"],
+        "pool": ["LEADER_TRAJAN", "LEADER_AMINA"],
+        "civ_pool": ["CIVILIZATION_ROME", "CIVILIZATION_AKSUM"],
+        "teams": [
+            {"team_index": 0, "leaders": [], "civs": []},
+            {"team_index": 1, "leaders": [], "civs": []},
+        ],
+    }
+    repo = FakeRepo(lobby=cwc7, applied=cwc7)
+    with pytest.raises(InvalidSeating, match="civ"):
+        pick(repo, "alice", "LEADER_TRAJAN")
+    pick(repo, "alice", "LEADER_TRAJAN", civ_token="CIVILIZATION_ROME")
+    team = repo.changes[0][1]["teams"][0]
+    assert team == {
+        "team_index": 0,
+        "leaders": ["LEADER_TRAJAN"],
+        "civs": ["CIVILIZATION_ROME"],
+    }
+
+
+def test_a_civ6_pick_needs_only_its_leader():
+    repo = FakeRepo(lobby=DRAFTING, applied=DRAFTING)
+    pick(repo, "alice", "LEADER_TRAJAN")
+    assert repo.changes
+
+
 def test_a_seat_that_already_picked_is_refused_outright():
     # One lock, one field. Snake was the only reason it was ever per-field.
     already = {

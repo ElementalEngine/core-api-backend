@@ -776,6 +776,13 @@ class LobbyService:
             wanted["civ_pick"] = (request.civ_token, available["civ_pick"])
         if mode != DRAFT_CWC and mine.get("pick") is not None:
             raise PickIsFinal("Your pick is already locked in")
+        # A pick is a leader, plus a civ wherever civs were dealt (civ7). One
+        # submission carries both: the first locks the seat, so a civ sent
+        # later is refused and a seat locked on a civ alone has no leader.
+        if request.token is None:
+            raise InvalidSeating("token", "choose a leader")
+        if available["civ_pick"] and request.civ_token is None:
+            raise InvalidSeating("civ_token", "choose a civ as well")
         chosen: dict[str, Any] = {}
         for field, (token, pool) in wanted.items():
             if token not in (pool or []):
