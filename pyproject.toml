@@ -60,9 +60,16 @@ combine-as-imports = true
 [tool.mypy]
 python_version = "3.14"
 files = ["app"]
-ignore_missing_imports = true
+# A missing first-party module must fail the check. With this true, mypy
+# passed on a tree that could not be imported (item 43). Only trueskill
+# ships without types, and it is named below.
+ignore_missing_imports = false
 # Permissive baseline, deliberately -- D108. Strictness rises per module as
 # each is rewritten.
+
+[[tool.mypy.overrides]]
+module = ["trueskill", "trueskill.*"]
+ignore_missing_imports = true
 
 # Quarantine: three entries. Each entry is deleted by the sub-phase that
 # rewrites its file, and that removal is part of that sub-phase's acceptance.
