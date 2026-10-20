@@ -17,6 +17,7 @@ from bson import ObjectId
 
 from app.features.lobbies.bans import bannable_civs, resolve_bans
 from app.features.lobbies.modes import (
+    TEAMER,
     InvalidSeating,
     LobbyShape,
     resolve_shape,
@@ -142,18 +143,20 @@ def for_the_wire(
     }
 
 
-def seat_the_host(host_discord_id: str, name: str = "") -> list[dict[str, Any]]:
+def seat_the_host(
+    host_discord_id: str, name: str = "", team: int | None = None
+) -> list[dict[str, Any]]:
     """The one seat a lobby opens with.
 
     Everyone else joins through the seat route, so the lobby fills by
     self-selection rather than by whoever happened to be in voice when the
-    command ran. `team` is null even in a teamer: seating means you are in
-    this lobby, never that you are on a particular side.
+    command ran. A teamer seats its host on the first team, so the lobby
+    opens with a captain on a side; the host switches like anyone else.
     """
     seat: dict[str, Any] = {
         "seat_index": 0,
         "discord_id": host_discord_id,
-        "team": None,
+        "team": team,
     }
     if name:
         seat["name"] = name
@@ -199,7 +202,11 @@ def build_lobby_document(
         "team_size": shape.team_size,
         "seat_count": shape.seat_count,
         "min_seats": shape.min_seats,
-        "seats": seat_the_host(request.host_discord_id, actor_name),
+        "seats": seat_the_host(
+            request.host_discord_id,
+            actor_name,
+            team=0 if shape.game_type == TEAMER else None,
+        ),
         "voice_channel_id": request.voice_channel_id,
         "phase": LOBBY,
         "revision": 1,

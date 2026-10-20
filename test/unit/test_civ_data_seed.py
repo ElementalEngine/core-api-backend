@@ -96,7 +96,7 @@ def test_to_documents_shape():
     for doc in docs:
         assert doc["edition"] in EDITIONS
         assert doc["kind"] in {"leader", "civ"}
-        assert doc["leader_data_version"] == 3
+        assert doc["leader_data_version"] == 4
         assert doc["token"]
     # {edition, token} is the collection's unique index.
     keys = [(doc["edition"], doc["token"]) for doc in docs]

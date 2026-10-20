@@ -171,6 +171,22 @@ def test_document_stamps_the_season_and_derived_shape():
     assert doc["created_at"] == doc["updated_at"] == NOW
 
 
+def test_a_teamer_seats_its_host_on_the_first_team():
+    # So the lobby opens with a captain on a side; the host can still switch.
+    shape = resolve_shape("teamer", 2, 2)
+    doc = build_lobby_document(request(game_type="teamer"), shape, SEASON, NOW)
+    assert doc["seats"] == [{"seat_index": 0, "discord_id": "alice", "team": 0}]
+
+
+def test_an_ffa_or_duel_host_takes_no_side():
+    ffa = build_lobby_document(request(), resolve_shape("ffa", size=8), SEASON, NOW)
+    duel = build_lobby_document(
+        request(game_type="duel"), resolve_shape("duel"), SEASON, NOW
+    )
+    assert ffa["seats"][0]["team"] is None
+    assert duel["seats"][0]["team"] is None
+
+
 def test_undecided_fields_are_absent_not_null():
     doc = build_lobby_document(request(), resolve_shape("ffa", size=8), SEASON, NOW)
     for field in (
