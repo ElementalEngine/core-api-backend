@@ -20,13 +20,16 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from bson import ObjectId
 
 from app.features.matches.models import MatchModel
 from app.features.matches.router import MATCH_UPDATE_SETTABLE_FIELDS
 from app.features.matches.schemas import MatchUpdate
 from app.features.matches.service import MatchService, MatchServiceError, _require_int
+from app.features.seasons.repository import SeasonNotSeededError
 
 OID = "652f1a2b3c4d5e6f7a8b9c0d"
+SEASON_ID = ObjectId("652f1a2b3c4d5e6f7a8b9c0e")
 
 
 def make_player(**overrides):
@@ -101,6 +104,7 @@ class FakeRepo:
         self.sub_events_removed = []
         self.claims = []
         self.releases = []
+        self.validated = None
 
     async def find_pending_by_id(self, oid):
         return dict(self.match_doc) if self.match_doc else None
@@ -125,6 +129,7 @@ class FakeRepo:
         self.upserts.append(kwargs)
 
     async def insert_validated_match(self, doc, session=None):
+        self.validated = doc
         return OID
 
     async def delete_pending_match(self, oid, session=None):
@@ -143,12 +148,27 @@ class FakeRepo:
         self.events.extend(events)
 
 
-def make_service(repo, ratings=None) -> MatchService:
+class FakeSeasons:
+    def __init__(self, seasons=None):
+        if seasons is None:
+            seasons = {"civ6": {"_id": SEASON_ID, "label": "Season 6"}}
+        self.seasons = seasons
+        self.asked = []
+
+    async def get_current_season(self, edition):
+        self.asked.append(edition)
+        if edition not in self.seasons:
+            raise SeasonNotSeededError(f"no season row for edition {edition!r}")
+        return dict(self.seasons[edition])
+
+
+def make_service(repo, ratings=None, seasons=None) -> MatchService:
     svc = MatchService.__new__(MatchService)
     svc.q = repo
     # One fake for both: the stat reads and writes moved to RatingsRepository,
     # so the upsert assertions below still read from the same object.
     svc.ratings = ratings if ratings is not None else repo
+    svc.seasons = seasons if seasons is not None else FakeSeasons()
     return svc
 
 
@@ -210,6 +230,44 @@ def test_approve_match_accumulates_counters_from_stored_doc():
         assert doc["subbedIn"] == 3  # preserved, not clobbered to 0
         assert doc["subbedOut"] == 1
         assert "civs" in doc and "leaders" in doc
+
+
+# --- a validated match carries the season it was approved in ---
+
+
+def _two_player_match():
+    return make_match_doc(
+        [
+            make_player(discord_id="123", team=0, placement=0),
+            make_player(
+                discord_id="456", team=1, placement=1, steam_id="76561190000000002"
+            ),
+        ]
+    )
+
+
+def test_approve_stamps_the_current_season_of_the_matchs_edition():
+    repo = FakeRepo(match_doc=_two_player_match())
+    seasons = FakeSeasons()
+
+    asyncio.run(make_service(repo, seasons=seasons).approve_match(OID, "a-1"))
+
+    assert seasons.asked == ["civ6"]
+    assert repo.validated["season_id"] == SEASON_ID
+
+
+def test_approve_without_a_season_writes_nothing_and_releases_the_claim():
+    repo = FakeRepo(match_doc=_two_player_match())
+    svc = make_service(repo, seasons=FakeSeasons({}))
+
+    with pytest.raises(SeasonNotSeededError):
+        asyncio.run(svc.approve_match(OID, "a-1"))
+
+    assert repo.upserts == []
+    assert repo.events == []
+    assert repo.validated is None
+    assert not repo.session.committed
+    assert len(repo.releases) == 1
 
 
 # --- revert_match: legacy None deltas + negative-counter clamp ---

@@ -30,6 +30,7 @@ from app.features.matches.parsers import parse_civ6_save, parse_civ7_save
 from app.features.matches.repository import MatchRepository
 from app.features.ratings.repository import RatingsRepository
 from app.features.ratings.skill import make_ts_env
+from app.features.seasons.repository import SeasonsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class MatchService:
     def __init__(self, client: AsyncMongoClient):
         self.q = MatchRepository(client)
         self.ratings = RatingsRepository(client)
+        self.seasons = SeasonsRepository(client)
 
     def _to_oid(self, match_id: str) -> ObjectId:
         if not ObjectId.is_valid(match_id):

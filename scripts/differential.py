@@ -55,6 +55,7 @@ NOT_CLONED = (
     "approver_discord_id",
     "approving_at",
     "save_bytes_sha256",
+    "season_id",
 )
 
 Doc = dict[str, Any]

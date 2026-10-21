@@ -234,6 +234,10 @@ class ApprovalService:
                         "All players must have a placement before approving"
                     )
 
+            # Read before the transaction opens: a season is cached reference
+            # data, and a missing row must fail the approve before any write.
+            season = await self._m.seasons.get_current_season(match.game)
+
             session = await self._m.q.start_session()
             async with session:
                 async with await session.start_transaction():
@@ -353,6 +357,7 @@ class ApprovalService:
                         validated_doc["_id"] = oid
                         validated_doc["created_at"] = res.get("created_at", now)
                         validated_doc["approved_at"] = now
+                        validated_doc["season_id"] = season["_id"]
                         validated_doc["reporter_discord_id"] = res.get(
                             "reporter_discord_id"
                         )
