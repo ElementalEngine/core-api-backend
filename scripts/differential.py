@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""differential <v1_url> [<validated_match_id> ...]
+"""differential <v1_url> [<validated_match_id> ... | --source <file.jsonl>]
 
 The same approve through v1 (production's code) and through v2, compared on
 the numbers that rate a player. Dev only; run before cutover, on the final
 code, with v1 serving at <v1_url> against the dev cluster.
 
-Each validated match in games, or each id given, is cloned as a pending match
+Each validated match in games, each id given, or each match in a file of
+extended JSON (one match per line, e.g. sampled from production to cover what
+dev has never played) is cloned as a pending match
 and approved twice: by v1, which reads match_reporter, and by v2, which reads
 games. Everything either approve wrote is put back before the next one,
 including v2's rating events and sub events, so the stat documents and the
@@ -32,7 +34,7 @@ from typing import Any
 # the repo root on sys.path -- running a file in scripts/ puts scripts/ there.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from bson import ObjectId
+from bson import ObjectId, json_util
 from bson.int64 import Int64
 from pymongo import MongoClient
 
@@ -208,6 +210,8 @@ def one(c: MongoClient[Doc], base: str, source: Doc) -> bool | None:
     label += " cloud" if source.get("is_cloud") else ""
     pending = {k: v for k, v in source.items() if k not in NOT_CLONED}
     pending["_id"] = ObjectId()
+    # Every pending match carries this; matches validated before it existed do not.
+    pending.setdefault("contest_report_list", [])
     if len(rated(pending)) < 2:
         print(f"skip {label}: fewer than two rated players")
         return None
@@ -253,11 +257,15 @@ def one(c: MongoClient[Doc], base: str, source: Doc) -> bool | None:
 def main(argv: list[str]) -> int:
     if not argv:
         sys.exit(__doc__)
-    base, ids = argv[0].rstrip("/"), argv[1:]
+    base, rest = argv[0].rstrip("/"), argv[1:]
     c = connect()
     try:
-        query = {"_id": {"$in": [ObjectId(i) for i in ids]}} if ids else {}
-        sources = list(c[GAMES_DB].validated_matches.find(query).sort("_id", 1))
+        if rest[:1] == ["--source"]:
+            lines = Path(rest[1]).read_text(encoding="utf-8").splitlines()
+            sources = [json_util.loads(line) for line in lines if line.strip()]
+        else:
+            query = {"_id": {"$in": [ObjectId(i) for i in rest]}} if rest else {}
+            sources = list(c[GAMES_DB].validated_matches.find(query).sort("_id", 1))
         results = [one(c, base, s) for s in sources]
     finally:
         c.close()
