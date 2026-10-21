@@ -33,7 +33,7 @@ from app.features.lobbies.phases import (
     DRAFT,
     LOBBY,
     SETTINGS,
-    SOURCE_COMMAND,
+    SOURCE_ACTIVITY,
 )
 from app.features.lobbies.pools import (
     NotEnoughPool,
@@ -193,7 +193,7 @@ def build_lobby_document(
         "guild_id": request.guild_id,
         "channel_id": request.channel_id,
         "host_discord_id": request.host_discord_id,
-        "source": SOURCE_COMMAND,
+        "source": SOURCE_ACTIVITY,
         "season_id": season["_id"],
         "season_label": season["label"],
         "edition": request.edition,

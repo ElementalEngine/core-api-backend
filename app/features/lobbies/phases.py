@@ -32,7 +32,6 @@ CANCEL_NO_POOL = "no_pool"
 # safe leader to assign on a player's behalf.
 CANCEL_NO_PICK = "no_pick"
 
-SOURCE_COMMAND = "command"
 SOURCE_ACTIVITY = "activity"
 
 __all__ = [
@@ -50,6 +49,5 @@ __all__ = [
     "SEQUENCE",
     "SETTINGS",
     "SOURCE_ACTIVITY",
-    "SOURCE_COMMAND",
     "TERMINAL_PHASES",
 ]

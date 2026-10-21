@@ -1125,6 +1125,7 @@ def test_a_finished_lobby_is_counted_once_and_only_once():
     done = {
         **DRAFTING,
         "settings": {"draft_mode": "standard"},
+        "bans": {"leader": ["LEADER_AMINA"], "civ": []},
         "pick_order": [],
         "seats": [
             {
@@ -1139,7 +1140,7 @@ def test_a_finished_lobby_is_counted_once_and_only_once():
     assert len(repo.counted) == 1
     key, counts = repo.counted[0]
     assert key["edition"] == "civ6"
-    assert counts["LEADER_TRAJAN"]["picks"] == 1
+    assert counts == {"LEADER_AMINA": {"bans": 1}}
 
     # A second completion claims nothing, so nothing is counted again.
     asyncio.run(LobbyService(repo, FakeSeasons(), FakeCivData())._count_the_lobby("L1"))
