@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-GAMES_DB = "match_reporter"
+GAMES_DB = "games"
 
 COL_CIV_DATA = "civ_data"
 COL_LOBBIES = "lobbies"
