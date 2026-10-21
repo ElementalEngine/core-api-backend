@@ -13,7 +13,9 @@ matches were all reverted must end up empty, not stale.
 
 A record still holding a LEADER_* token in civ has not been through the
 Entry 10 migration, or its leader has no civ token yet. The leader is known
-there and the civ is not, so it counts once, in leaders.
+there and the civ is not, so it counts once, in leaders. A value that is not
+a token at all -- 'Unknown', 'None', a name key from before Entry 10 --
+counts nowhere.
 
 Never creates a stat document. A player with matches and no document was
 reset; the reset deleted their tally with it and that is correct.
@@ -68,11 +70,14 @@ def all_scopes(edition: str) -> list[str]:
 
 def read_tokens(player: dict[str, Any]) -> tuple[str | None, str | None]:
     """civ and leader for one player entry, or None where a token is unknown."""
-    civ = player.get("civ") or None
-    leader = player.get("leader") or None
-    if civ and civ.startswith("LEADER_"):
-        return None, leader or civ
-    return civ, leader
+    civ = player.get("civ") or ""
+    leader = player.get("leader") or ""
+    if civ.startswith("LEADER_") and not leader:
+        return None, civ
+    return (
+        civ if civ.startswith("CIVILIZATION_") else None,
+        leader if leader.startswith("LEADER_") else None,
+    )
 
 
 def collect(db: Any, edition: str) -> dict[str, dict[int, dict[str, Any]]]:

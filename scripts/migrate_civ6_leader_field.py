@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
 """migrate_civ6_leader_field [--apply]
 
-Playbook Entry 10 Half B. Civ6 match records hold the LEADER_* token in
-players[].civ and leave players[].leader unset. This moves the token to
-leader and writes the mapped CIVILIZATION_* token into civ.
+Playbook Entry 10 Half B. Civ6 match records reach this in three shapes, and
+every one is corrected to a CIVILIZATION_* token in civ and a LEADER_* token
+in leader:
 
-The mapping is read from civ_data, so a leader with no civ yet is left
-alone -- its records keep matching the filter, which is also how a later
-run picks them up once a save supplies the token.
+  leader token in civ   civ='LEADER_TRAJAN', no leader
+  name key in both      civ='RomeTrajan', leader='RomeTrajan'
+  no information        civ='Unknown' or 'None', no leader -- left as written
 
-Idempotent: a second run matches nothing, because the filter selects on the
-shape being corrected. Dry run unless --apply is passed; this rewrites the
-match store in place and there is no PITR (D61). Export first, D115.
+The mapping is civ_data's: a name key gives the leader token, the leader token
+gives the civ token. A leader with no civ token yet keeps its leader token in
+civ and no leader -- the first shape -- so a later run, once a save has
+supplied the civ, picks it up like any other. Nothing that carries no
+information is rewritten.
+
+Idempotent: every update is filtered on the shape it corrects. Dry run unless
+--apply is passed; this rewrites the match store in place and there is no
+PITR. Export first.
 """
 
 from __future__ import annotations
 
 import sys
-from collections import Counter
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 # The repo is not installed as a package, so `app` is importable only with
 # the repo root on sys.path -- running a file in scripts/ puts scripts/ there.
@@ -30,7 +37,102 @@ from app.core.config import settings
 from app.core.constants import COL_CIV_DATA, GAMES_DB
 
 COL = "validated_matches"
-FILTER = {"game": "civ6", "players.civ": {"$regex": "^LEADER_"}}
+CIV6 = {"game": "civ6"}
+
+Row = Mapping[str, Any]
+Pair = tuple[str, str | None]
+
+
+def correction(
+    civ: str,
+    leader: str | None,
+    by_name: Mapping[str, Row],
+    by_token: Mapping[str, Row],
+) -> Pair | None:
+    """The (civ, leader) an entry should hold, or None to leave it as it is."""
+    if civ.startswith("LEADER_") and not leader:
+        row = by_token.get(civ)
+        return (row["civ"], civ) if row and row.get("civ") else None
+    if civ and civ == leader and civ in by_name:
+        row = by_name[civ]
+        if row.get("civ"):
+            return row["civ"], row["token"]
+        return row["token"], None
+    return None
+
+
+def distinct_pairs(db: Any) -> dict[Pair, int]:
+    """Every (civ, leader) a civ6 player entry holds, with its count."""
+    rows = db[COL].aggregate(
+        [
+            {"$match": CIV6},
+            {"$unwind": "$players"},
+            {
+                "$group": {
+                    "_id": {
+                        "civ": {"$ifNull": ["$players.civ", ""]},
+                        "leader": {"$ifNull": ["$players.leader", ""]},
+                    },
+                    "n": {"$sum": 1},
+                }
+            },
+        ],
+        allowDiskUse=True,
+    )
+    return {(r["_id"]["civ"], r["_id"]["leader"] or None): r["n"] for r in rows}
+
+
+def report(pairs: Mapping[Pair, int], plan: Mapping[Pair, Pair]) -> None:
+    corrected = sum(n for p, n in pairs.items() if p in plan)
+    tokens = sum(
+        n
+        for (civ, leader), n in pairs.items()
+        if civ.startswith("CIVILIZATION_") and (leader or "").startswith("LEADER_")
+    )
+    left = {
+        p: n
+        for p, n in pairs.items()
+        if p not in plan and not p[0].startswith("CIVILIZATION_")
+    }
+    print(f"{sum(pairs.values())} civ6 player entries: {tokens} already tokens")
+    print(f"  {corrected} to correct, in {len(plan)} distinct (civ, leader) pairs")
+    for (civ, leader), n in sorted(left.items(), key=lambda kv: -kv[1]):
+        print(f"  left alone: civ={civ!r} leader={leader!r} x{n}")
+
+
+def build_plan(db: Any) -> tuple[dict[Pair, int], dict[Pair, Pair]]:
+    """The entries as they are, and the correction for each pair that has one."""
+    rows = list(db[COL_CIV_DATA].find({"edition": "civ6", "kind": "leader"}))
+    if not rows:
+        raise SystemExit("civ_data holds no civ6 leaders -- run seed_civ_data first")
+    by_token = {r["token"]: r for r in rows}
+    by_name = {r["name"]: r for r in rows if r.get("name")}
+    pairs = distinct_pairs(db)
+    plan: dict[Pair, Pair] = {}
+    for civ, leader in pairs:
+        fixed = correction(civ, leader, by_name, by_token)
+        if fixed is not None:
+            plan[(civ, leader)] = fixed
+    return pairs, plan
+
+
+def apply_plan(db: Any, plan: Mapping[Pair, Pair]) -> int:
+    """One update per pair, filtered on the shape it corrects."""
+    modified = 0
+    for (civ, leader), (new_civ, new_leader) in sorted(
+        plan.items(), key=lambda kv: (kv[0][0], kv[0][1] or "")
+    ):
+        shape = {"civ": civ, "leader": leader}
+        result = db[COL].update_many(
+            {**CIV6, "players": {"$elemMatch": shape}},
+            {"$set": {"players.$[p].civ": new_civ, "players.$[p].leader": new_leader}},
+            array_filters=[{"p.civ": civ, "p.leader": leader}],
+        )
+        modified += result.modified_count
+        print(
+            f"  {civ!r:34} -> {new_civ!r:30} {new_leader!r:30} {result.modified_count}"
+        )
+    return modified
 
 
 def main(argv: list[str]) -> int:
@@ -38,65 +140,19 @@ def main(argv: list[str]) -> int:
     if unknown:
         print(f"unknown argument(s): {unknown}. only --apply is accepted.")
         return 2
-    apply = "--apply" in argv
     client = MongoClient(settings.mongo_url.get_secret_value())
     try:
         db = client[GAMES_DB]
-        mapping = {
-            row["token"]: row["civ"]
-            for row in db[COL_CIV_DATA].find({"edition": "civ6", "kind": "leader"})
-            if row.get("civ")
-        }
-        if not mapping:
-            print("civ_data holds no civ6 mapping -- run seed_civ_data first")
-            return 1
-
-        tokens: Counter[str] = Counter()
-        for match in db[COL].find(FILTER, {"players.civ": 1}):
-            for player in match.get("players", []):
-                civ = player.get("civ")
-                if isinstance(civ, str) and civ.startswith("LEADER_"):
-                    tokens[civ] += 1
-
-        mapped = {t: n for t, n in tokens.items() if t in mapping}
-        unmapped = {t: n for t, n in tokens.items() if t not in mapping}
-        print(f"{db[COL].count_documents(FILTER)} documents match the filter")
-        print(
-            f"{sum(tokens.values())} player entries: "
-            f"{sum(mapped.values())} mappable, {sum(unmapped.values())} unmapped"
-        )
-        for token, count in sorted(unmapped.items()):
-            print(f"  left alone: {token} x{count}")
-
-        if not apply:
+        pairs, plan = build_plan(db)
+        report(pairs, plan)
+        if "--apply" not in argv:
             print("\ndry run -- nothing written. pass --apply to write.")
             return 0
-
-        matched = modified = 0
-        for token in sorted(mapped):
-            result = db[COL].update_many(
-                {"game": "civ6", "players.civ": token},
-                {
-                    "$set": {
-                        "players.$[p].civ": mapping[token],
-                        "players.$[p].leader": token,
-                    }
-                },
-                array_filters=[{"p.civ": token}],
-            )
-            matched += result.matched_count
-            modified += result.modified_count
-            print(
-                f"  {token:32} -> {mapping[token]:28} "
-                f"matched {result.matched_count}, modified {result.modified_count}"
-            )
-
-        print(f"\n{matched} matched, {modified} modified")
-        print(f"check 2 -- documents still matching: {db[COL].count_documents(FILTER)}")
-        print(
-            "check 3 -- documents with an unset player leader: "
-            f"{db[COL].count_documents({'game': 'civ6', 'players.leader': None})}"
-        )
+        print(f"\n{apply_plan(db, plan)} documents modified")
+        after = distinct_pairs(db)
+        still = sum(n for p, n in after.items() if p in plan)
+        print(f"check: entries still in a corrected shape: {still}")
+        report(after, {})
     finally:
         client.close()
     return 0
