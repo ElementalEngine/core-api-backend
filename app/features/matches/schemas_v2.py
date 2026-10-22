@@ -46,4 +46,11 @@ class ContestBody(BaseModel):
     reason: str
 
 
-__all__ = ["ContestBody", "PlayersPatch", "SeatPatchIn"]
+class SubQuotaResponse(BaseModel):
+    discord_id: str
+    count: int
+    limit: int
+    window_days: int
+
+
+__all__ = ["ContestBody", "PlayersPatch", "SeatPatchIn", "SubQuotaResponse"]

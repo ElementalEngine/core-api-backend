@@ -2627,6 +2627,34 @@
         "title": "StatSetV2",
         "type": "object"
       },
+      "SubQuotaResponse": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "discord_id": {
+            "title": "Discord Id",
+            "type": "string"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "window_days": {
+            "title": "Window Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "discord_id",
+          "count",
+          "limit",
+          "window_days"
+        ],
+        "title": "SubQuotaResponse",
+        "type": "object"
+      },
       "SubmitBallotRequest": {
         "additionalProperties": false,
         "description": "One seat's settings ballot.",
@@ -7103,6 +7131,65 @@
           }
         },
         "summary": "Get Leaderboard",
+        "tags": [
+          "matches-v2"
+        ]
+      }
+    },
+    "/api/v2/matches/sub-quota": {
+      "get": {
+        "operationId": "get_sub_quota_api_v2_matches_sub_quota_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "discord_id",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{15,20}$",
+              "title": "Discord Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubQuotaResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Sub Quota",
         "tags": [
           "matches-v2"
         ]

@@ -7,7 +7,7 @@ malformed-ObjectId 500. This is a property of the assembled table, not of
 any handler, so no handler test can catch it.
 
 What should break this file: reordering the decorators in router_v2.py, or
-adding a ninth route without amending C1.
+adding a route without amending C1.
 
 The filter is scoped to /api/v2/matches: the v2 prefix already carries
 civ-data from S5, and a bare /api/v2 filter would count it.
@@ -20,6 +20,7 @@ from app.main import app
 EXPECTED = {
     ("POST", "/api/v2/matches"),
     ("GET", "/api/v2/matches/leaderboard"),
+    ("GET", "/api/v2/matches/sub-quota"),
     ("GET", "/api/v2/matches/{match_id}"),
     ("PATCH", "/api/v2/matches/{match_id}/players"),
     ("POST", "/api/v2/matches/{match_id}/approve"),
@@ -52,13 +53,20 @@ def _scope(method, path):
     }
 
 
-def test_c1_declares_exactly_eight_v2_routes():
+def test_c1_declares_exactly_its_v2_routes():
     assert set(_v2_routes()) == EXPECTED
 
 
 def test_leaderboard_is_declared_before_the_id_route():
     paths = [p for _, p in _v2_routes()]
     assert paths.index("/api/v2/matches/leaderboard") < paths.index(
+        "/api/v2/matches/{match_id}"
+    )
+
+
+def test_sub_quota_is_declared_before_the_id_route():
+    paths = [p for _, p in _v2_routes()]
+    assert paths.index("/api/v2/matches/sub-quota") < paths.index(
         "/api/v2/matches/{match_id}"
     )
 
@@ -75,6 +83,18 @@ def test_leaderboard_resolves_to_its_own_handler():
     ]
     assert matched, "no v2 route matched /api/v2/matches/leaderboard"
     assert matched[0].name == "get_leaderboard", matched[0].name
+
+
+def test_sub_quota_resolves_to_its_own_handler():
+    scope = _scope("GET", "/api/v2/matches/sub-quota")
+    matched = [
+        route
+        for route in app.routes
+        if getattr(route, "path", "").startswith("/api/v2/matches")
+        and route.matches(scope)[0] == Match.FULL
+    ]
+    assert matched, "no v2 route matched /api/v2/matches/sub-quota"
+    assert matched[0].name == "get_sub_quota", matched[0].name
 
 
 def test_an_id_still_resolves_to_the_id_handler():

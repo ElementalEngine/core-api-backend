@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from pymongo import AsyncMongoClient
 
 from app.core.dependencies import (
@@ -23,8 +23,9 @@ from app.features.matches.errors import (
 from app.features.matches.ingest import IngestService
 from app.features.matches.leaderboard import LeaderboardService
 from app.features.matches.schemas import LeaderboardRankingResponse, MatchResponse
-from app.features.matches.schemas_v2 import ContestBody, PlayersPatch
+from app.features.matches.schemas_v2 import ContestBody, PlayersPatch, SubQuotaResponse
 from app.features.matches.service import MatchService
+from app.features.matches.sub_quota import sub_quota
 from app.features.matches.upload import read_capped
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,15 @@ async def get_leaderboard(
         raise not_found(str(exc)) from exc
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc
+
+
+# A literal path too, so it is also declared before /matches/{id}.
+@router.get("/matches/sub-quota", response_model=SubQuotaResponse)
+async def get_sub_quota(
+    discord_id: str = Query(pattern=r"^\d{15,20}$"),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    return await sub_quota(MatchService(db).q, discord_id)
 
 
 @router.get("/matches/{match_id}", response_model=MatchResponse)

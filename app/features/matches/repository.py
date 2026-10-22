@@ -149,6 +149,13 @@ class MatchRepository:
             session=session,
         )
 
+    async def count_sub_ins_since(self, discord_id: str, since: datetime) -> int:
+        # Served by sub_events_player_recent_idx; bounded by the window, not
+        # by the TTL monitor, which can lag.
+        return await self._sub_events.count_documents(
+            {"discord_id": Int64(discord_id), "occurred_at": {"$gte": since}}
+        )
+
     async def remove_sub_in(
         self,
         discord_id: str,
