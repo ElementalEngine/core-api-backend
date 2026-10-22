@@ -2977,6 +2977,174 @@
         "title": "TriggerQuit",
         "type": "object"
       },
+      "UploadResponse": {
+        "description": "A response model drops undeclared keys, so the duplicate flags are declared.",
+        "properties": {
+          "affected_players": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AffectedPlayerRating"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affected Players"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "approver_discord_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approver Discord Id"
+          },
+          "contest_report_list": {
+            "items": {
+              "$ref": "#/components/schemas/ContestReport"
+            },
+            "title": "Contest Report List",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "discord_messages_id_list": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Discord Messages Id List",
+            "type": "array"
+          },
+          "flagged": {
+            "title": "Flagged",
+            "type": "boolean"
+          },
+          "flagged_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flagged By"
+          },
+          "game": {
+            "title": "Game",
+            "type": "string"
+          },
+          "game_mode": {
+            "title": "Game Mode",
+            "type": "string"
+          },
+          "is_cloud": {
+            "title": "Is Cloud",
+            "type": "boolean"
+          },
+          "map_type": {
+            "title": "Map Type",
+            "type": "string"
+          },
+          "match_id": {
+            "title": "Match Id",
+            "type": "string"
+          },
+          "parser_version": {
+            "title": "Parser Version",
+            "type": "string"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerSchema"
+            },
+            "title": "Players",
+            "type": "array"
+          },
+          "repeated": {
+            "default": false,
+            "title": "Repeated",
+            "type": "boolean"
+          },
+          "repeated_by": {
+            "anyOf": [
+              {
+                "enum": [
+                  "file",
+                  "composition"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeated By"
+          },
+          "reporter_discord_id": {
+            "title": "Reporter Discord Id",
+            "type": "string"
+          },
+          "save_file_hash": {
+            "title": "Save File Hash",
+            "type": "string"
+          },
+          "turn": {
+            "title": "Turn",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "match_id",
+          "game",
+          "turn",
+          "map_type",
+          "game_mode",
+          "is_cloud",
+          "players",
+          "parser_version",
+          "discord_messages_id_list",
+          "created_at",
+          "flagged",
+          "save_file_hash",
+          "reporter_discord_id",
+          "contest_report_list"
+        ],
+        "title": "UploadResponse",
+        "type": "object"
+      },
       "UserStatsResponse": {
         "properties": {
           "civ_version": {
@@ -7017,7 +7185,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MatchResponse"
+                  "$ref": "#/components/schemas/UploadResponse"
                 }
               }
             },

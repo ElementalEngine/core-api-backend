@@ -15,6 +15,7 @@ civ-data from S5, and a bare /api/v2 filter would count it.
 
 from starlette.routing import Match
 
+from app.features.matches.schemas_v2 import UploadResponse
 from app.main import app
 
 EXPECTED = {
@@ -118,3 +119,16 @@ def test_v1_matches_surface_is_untouched():
         if p.startswith("/api/v1") and "match" in p
     ]
     assert v1, "the v1 matches surface disappeared"
+
+
+def test_the_upload_answer_keeps_its_duplicate_flags():
+    # Mite words a duplicate upload by these two fields; a response model
+    # that does not declare them strips them silently.
+    upload = next(
+        route
+        for route in app.routes
+        if getattr(route, "path", "") == "/api/v2/matches"
+        and "POST" in (getattr(route, "methods", None) or set())
+    )
+    assert upload.response_model is UploadResponse
+    assert {"repeated", "repeated_by"} <= set(UploadResponse.model_fields)

@@ -23,7 +23,12 @@ from app.features.matches.errors import (
 from app.features.matches.ingest import IngestService
 from app.features.matches.leaderboard import LeaderboardService
 from app.features.matches.schemas import LeaderboardRankingResponse, MatchResponse
-from app.features.matches.schemas_v2 import ContestBody, PlayersPatch, SubQuotaResponse
+from app.features.matches.schemas_v2 import (
+    ContestBody,
+    PlayersPatch,
+    SubQuotaResponse,
+    UploadResponse,
+)
 from app.features.matches.service import MatchService
 from app.features.matches.sub_quota import sub_quota
 from app.features.matches.upload import read_capped
@@ -62,7 +67,7 @@ def _require_player(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
         raise forbidden("Only a player in this match, or staff, may contest it.")
 
 
-@router.post("/matches", response_model=MatchResponse)
+@router.post("/matches", response_model=UploadResponse)
 async def upload_match(
     file: UploadFile = File(...),
     is_cloud: str = Form(...),

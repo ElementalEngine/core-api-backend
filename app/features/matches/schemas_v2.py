@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.features.matches.schemas import MatchResponse
 from app.features.matches.validation import SeatPatch
 
 
@@ -46,6 +47,13 @@ class ContestBody(BaseModel):
     reason: str
 
 
+class UploadResponse(MatchResponse):
+    """A response model drops undeclared keys, so the duplicate flags are declared."""
+
+    repeated: bool = False
+    repeated_by: Literal["file", "composition"] | None = None
+
+
 class SubQuotaResponse(BaseModel):
     discord_id: str
     count: int
@@ -53,4 +61,10 @@ class SubQuotaResponse(BaseModel):
     window_days: int
 
 
-__all__ = ["ContestBody", "PlayersPatch", "SeatPatchIn", "SubQuotaResponse"]
+__all__ = [
+    "ContestBody",
+    "PlayersPatch",
+    "SeatPatchIn",
+    "SubQuotaResponse",
+    "UploadResponse",
+]
