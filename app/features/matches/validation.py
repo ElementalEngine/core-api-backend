@@ -35,6 +35,7 @@ class Rule(StrEnum):
     UNPAIRED_SUB = "unpaired_sub"
     QUIT_ON_PLACEHOLDER = "quit_on_placeholder"
     TOO_FEW_TEAMS = "too_few_teams"
+    DUPLICATE_PLAYER = "duplicate_player"
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +113,27 @@ def _split_teams(seats: Sequence[_Seat]) -> set[int]:
         if s.placement is not None:
             by_team[s.team].add(s.placement)
     return {t for t, ps in by_team.items() if len(ps) > 1}
+
+
+def _held(seats: Sequence[_Seat]) -> Counter[str]:
+    """How many places each player takes, counting who a sub replaced."""
+    return Counter(
+        p
+        for s in seats
+        for p in (s.discord_id, s.leaver)
+        if p is not None and not is_placeholder(p)
+    )
+
+
+def _ordinal(n: int) -> str:
+    if 11 <= n % 100 <= 13:
+        return f"{n}th"
+    return f"{n}{ {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th') }"
+
+
+def _listed(numbers: Sequence[int]) -> str:
+    words = [str(n) for n in numbers]
+    return words[0] if len(words) == 1 else f"{', '.join(words[:-1])} and {words[-1]}"
 
 
 def validate_players_patch(
@@ -194,7 +216,7 @@ def validate_players_patch(
                 Violation(
                     Rule.PLACEMENT_OUT_OF_RANGE,
                     seat,
-                    f"Placement {e.placement} is outside 0-{t_count - 1}.",
+                    f"Seat {seat_index[seat] + 1}'s place must be 1 to {t_count}.",
                 )
             )
         if e.quit is True and is_placeholder(s.discord_id):
@@ -202,7 +224,8 @@ def validate_players_patch(
                 Violation(
                     Rule.QUIT_ON_PLACEHOLDER,
                     seat,
-                    f"Seat {seat} is unassigned; quit cannot be flagged for it.",
+                    f"Seat {seat_index[seat] + 1} is unassigned; assign its player "
+                    "before marking a quit.",
                 )
             )
 
@@ -213,12 +236,13 @@ def validate_players_patch(
                 for seat, k in sorted(seat_index.items())
                 if merged[k].placement == value
             ]
+            numbers = [seat_index[seat] + 1 for seat in holders]
             out.append(
                 Violation(
                     Rule.DUPLICATE_PLACEMENT,
                     holders[0],
-                    f"Placement {value} would be shared by seats "
-                    f"{', '.join(map(str, holders))}; only staff may set a tie.",
+                    f"Seats {_listed(numbers)} would share {_ordinal(value + 1)} "
+                    "place, and only staff can set a tie.",
                 )
             )
 
@@ -227,7 +251,7 @@ def validate_players_patch(
             Violation(
                 Rule.TEAM_PLACEMENT_MISMATCH,
                 None,
-                f"Team {team}'s members would hold different placements.",
+                f"Team {team + 1}'s players would finish in different places.",
             )
         )
 
@@ -236,9 +260,21 @@ def validate_players_patch(
             Violation(
                 Rule.UNPAIRED_SUB,
                 None,
-                f"Team {team}'s substitutions are unpaired.",
+                f"Team {team + 1} has a sub with no player named as the one who left.",
             )
         )
+
+    before, after = _held(pre), _held(merged)
+    for player in sorted(p for p, n in after.items() if n > 1 and n > before[p]):
+        numbers = [
+            k + 1 for k, s in enumerate(merged) if player in (s.discord_id, s.leaver)
+        ]
+        message = (
+            f"<@{player}> cannot come in for themselves in seat {numbers[0]}."
+            if len(numbers) == 1
+            else f"<@{player}> would be in seats {_listed(numbers)}."
+        )
+        out.append(Violation(Rule.DUPLICATE_PLAYER, None, message))
 
     out.sort(key=lambda v: (v.seat if v.seat is not None else -1, v.rule.value))
     return out

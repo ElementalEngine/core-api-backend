@@ -185,3 +185,31 @@ def test_canary_the_validator_can_actually_fail():
     violating = check(ffa(), [SeatPatch(9, quit=True)])
     assert violating, "a violating patch produced no violations"
     assert check(ffa(), [SeatPatch(0, discord_id="ok")]) == []
+
+
+def test_one_player_per_seat():
+    assert rules(check(ffa(), [SeatPatch(0, discord_id="b")])) == [
+        Rule.DUPLICATE_PLAYER
+    ]
+    swap = [SeatPatch(0, discord_id="b"), SeatPatch(1, discord_id="a")]
+    assert check(ffa(), swap) == []
+    assert rules(check(paired_duel(), [SeatPatch(2, discord_id="x")])) == [
+        Rule.DUPLICATE_PLAYER
+    ]
+    assert rules(check(ffa(), [SeatPatch(1, sub_out="c")])) == [Rule.DUPLICATE_PLAYER]
+    doubled = M(P(0, 0, "a"), P(1, 1, "a"), P(2, 2, "c"))
+    assert check(doubled, [SeatPatch(0, quit=True)]) == []
+    assert rules(check(doubled, [SeatPatch(2, discord_id="a")])) == [
+        Rule.DUPLICATE_PLAYER
+    ]
+
+
+def test_messages_number_seats_as_players_see_them():
+    (tie,) = check(paired_duel(), [SeatPatch(2, placement=0)])
+    assert tie.message == (
+        "Seats 1 and 2 would share 1st place, and only staff can set a tie."
+    )
+    (dup,) = check(ffa(), [SeatPatch(0, discord_id="b")])
+    assert dup.message == "<@b> would be in seats 1 and 2."
+    (own,) = check(ffa(), [SeatPatch(2, sub_out="c")])
+    assert own.message == "<@c> cannot come in for themselves in seat 3."
