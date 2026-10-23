@@ -18,6 +18,8 @@ wins, first, subbedIn, subbedOut; per player: delta, season_delta,
 combined_delta; and the affected players returned. Not compared, because they
 changed on purpose: civ and leader tallies (token keys), the sub counter
 (replaced by sub events), and the seasonal documents v1 writes for cloud games.
+Skipped, with the reason: a match v2's approve rules refuse, such as one with
+a seat no registered player holds, since v2 writes no ratings for it.
 """
 
 from __future__ import annotations
@@ -36,11 +38,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from bson import ObjectId, json_util
 from bson.int64 import Int64
+from pydantic import ValidationError
 from pymongo import MongoClient
 
 from app.core.config import settings
 from app.core.constants import DB_SERVER_MEMBERS, GAMES_DB
+from app.features.matches.models import MatchModel
 from app.features.matches.tallies import stat_legs
+from app.features.matches.validation import approval_refusal
 from app.features.ratings.scope import stats_collection_name, stats_db_name
 
 V1_DB = "match_reporter"
@@ -206,6 +211,14 @@ def differences(a: Doc, b: Doc) -> list[str]:
     ]
 
 
+def refused(pending: Doc) -> str | None:
+    """Why v2's approve refuses the match, by the rule approve applies."""
+    try:
+        return approval_refusal(MatchModel(**pending))
+    except ValidationError:
+        return None
+
+
 def one(c: MongoClient[Doc], base: str, source: Doc) -> bool | None:
     label = f"{source['_id']} {source['game']} {source['game_mode']}"
     label += " cloud" if source.get("is_cloud") else ""
@@ -215,6 +228,9 @@ def one(c: MongoClient[Doc], base: str, source: Doc) -> bool | None:
     pending.setdefault("contest_report_list", [])
     if len(rated(pending)) < 2:
         print(f"skip {label}: fewer than two rated players")
+        return None
+    if refusal := refused(pending):
+        print(f"skip {label}: v2 refuses it: {refusal}")
         return None
 
     stats, subs = read_stats(c, pending), read_subs(c, pending)
