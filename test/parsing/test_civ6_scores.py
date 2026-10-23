@@ -5,10 +5,12 @@ ignores who was knocked out, or a history that does not line up being used.
 """
 
 import os
+import random
+import zlib
 
 import pytest
 
-from app.features.matches.parsers import civ6
+from app.features.matches.parsers import civ6, civ6_scores
 from app.features.matches.parsers.civ6_scores import final_scores
 
 _SAVES = os.path.join(os.path.dirname(__file__), "..", "data", "civ6TestSaves")
@@ -72,3 +74,19 @@ def test_a_history_that_does_not_line_up_is_not_used():
     assert final_scores(data, alive, 100) is None
     assert final_scores(data[:200_000], alive, 106) is None
     assert final_scores(b"CIV6", alive, 106) is None
+
+
+def _state(payload):
+    """A save's compressed state: 64 KiB blocks of one zlib stream, then a stop."""
+    z = zlib.compress(payload)
+    blocks = [z[i : i + 65536] for i in range(0, len(z), 65536)]
+    return (
+        b"CIV6" + b"".join(len(b).to_bytes(4, "little") + b for b in blocks) + bytes(4)
+    )
+
+
+def test_a_state_that_inflates_past_the_cap_is_not_read(monkeypatch):
+    monkeypatch.setattr(civ6_scores, "_MAX_STATE", 200_000)
+    noise = random.Random(1).randbytes(70_000)
+    assert civ6_scores._inflate(_state(noise + bytes(50_000))) == noise + bytes(50_000)
+    assert civ6_scores._inflate(_state(noise + bytes(500_000))) is None

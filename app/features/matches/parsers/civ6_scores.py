@@ -11,6 +11,8 @@ import zlib
 _STATE = bytes([0x00, 0x00, 0x01, 0x00, 0x78, 0x9C])
 # A series is named by a length-prefixed string; "Score" is the score's.
 _SERIES = b"\x05\x00\x00\x00Score"
+# Real states inflate about 11 to 1; an upload is at most 12 MiB.
+_MAX_STATE = 256 * 1024 * 1024
 
 
 def _inflate(data: bytes) -> bytes | None:
@@ -27,10 +29,12 @@ def _inflate(data: bytes) -> bytes | None:
             break
         size = int.from_bytes(data[pos : pos + 4], "little")
         pos += 4
+    inflater = zlib.decompressobj()
     try:
-        return zlib.decompressobj().decompress(b"".join(blocks))
+        state = inflater.decompress(b"".join(blocks), _MAX_STATE)
     except zlib.error:
         return None
+    return None if inflater.unconsumed_tail else state
 
 
 def final_scores(
