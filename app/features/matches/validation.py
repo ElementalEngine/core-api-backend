@@ -146,6 +146,16 @@ def _listed(numbers: Sequence[int]) -> str:
     return words[0] if len(words) == 1 else f"{', '.join(words[:-1])} and {words[-1]}"
 
 
+def unassigned_refusal(match: MatchModel) -> str | None:
+    """Why a match cannot be approved yet: a seat with no player on it."""
+    missing = [
+        n for n, s in enumerate(_seats(match), 1) if is_placeholder(s.discord_id)
+    ]
+    if not missing:
+        return None
+    return f"Assign seat{'s' if len(missing) > 1 else ''} {_listed(missing)} before approving."
+
+
 def validate_players_patch(
     match: MatchModel, patch: Sequence[SeatPatch], *, actor_is_staff: bool
 ) -> list[Violation]:

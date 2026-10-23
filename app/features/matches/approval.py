@@ -10,6 +10,7 @@ from app.core.coerce import as_float
 from app.features.matches.errors import MatchServiceError, NotFoundError
 from app.features.matches.models import MatchModel, PlayerModel, StatModel
 from app.features.matches.tallies import bump, stat_legs
+from app.features.matches.validation import unassigned_refusal
 from app.features.ratings.events import build_match_event
 from app.features.ratings.scope import stat_scope
 
@@ -234,6 +235,8 @@ class ApprovalService:
                     raise MatchServiceError(
                         "All players must have a placement before approving"
                     )
+            if refusal := unassigned_refusal(match):
+                raise MatchServiceError(refusal)
 
             # Read before the transaction opens: a season is cached reference
             # data, and a missing row must fail the approve before any write.

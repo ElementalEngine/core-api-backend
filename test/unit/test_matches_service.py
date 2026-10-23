@@ -272,6 +272,39 @@ def test_approve_without_a_season_writes_nothing_and_releases_the_claim():
     assert len(repo.releases) == 1
 
 
+def test_approve_refuses_a_seat_without_a_player_and_writes_nothing():
+    doc = make_match_doc(
+        [
+            make_player(discord_id="1", placement=0, team=0),
+            make_player(discord_id="-2", placement=1, team=1),
+            make_player(discord_id=None, placement=2, team=2),
+        ]
+    )
+    repo = FakeRepo(match_doc=doc)
+
+    with pytest.raises(
+        MatchServiceError, match="Assign seats 2 and 3 before approving."
+    ):
+        asyncio.run(make_service(repo).approve_match(OID, "a-1"))
+
+    assert repo.validated is None
+    assert repo.events == []
+    assert len(repo.releases) == 1
+
+
+def test_a_leaver_row_is_not_a_seat_to_assign():
+    from app.features.matches.validation import unassigned_refusal
+
+    sub = make_player(discord_id="1", is_sub=True)
+    leaver = make_player(discord_id="-9", subbed_out=True)
+    other = make_player(discord_id="-3", placement=1, team=1)
+    assert unassigned_refusal(MatchModel(**make_match_doc([sub, leaver]))) is None
+    assert (
+        unassigned_refusal(MatchModel(**make_match_doc([sub, leaver, other])))
+        == "Assign seat 2 before approving."
+    )
+
+
 # --- revert_match: legacy None deltas + negative-counter clamp ---
 
 
