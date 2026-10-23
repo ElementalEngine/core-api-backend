@@ -20,7 +20,11 @@ GAME_DATA_MARKERS = {
     "USER_ID": bytes([0x20, 0x61, 0xF1, 0x26]),
     "MAP_TYPE": bytes([0x27, 0x60, 0x4C, 0x58]),
     "TEAM_ID": bytes([0xDE, 0xF6, 0x2D, 0x9B]),
+    "CIV_LEVEL": bytes([0x7A, 0x9C, 0xA0, 0x19]),
 }
+
+# City-states and independents carry a leader and civ too; only a full civ is a seat.
+FULL_CIV = "CIVILIZATION_LEVEL_FULL_CIV"
 
 
 class ChunkType:
@@ -88,9 +92,13 @@ def parse_chunks(data: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
                 ),
                 None,
             )
+            full_civ = any(
+                y["marker"] == GAME_DATA_MARKERS["CIV_LEVEL"] and y["value"] == FULL_CIV
+                for y in x["value"]
+            )
             # Only player arrays carry a user id; keep a human seat even if
             # its leader or civ is missing, so the report still lists it.
-            if (leader and civ) or user_id:
+            if (leader and civ and full_civ) or user_id:
                 players.append(
                     {
                         "leader": leader,
@@ -114,28 +122,38 @@ def parse_raw(data: bytes) -> dict[str, list[dict[str, Any]]]:
     if data[0:4] != b"CIV7":
         raise Exception("Not a CIV 7 save file!")
 
-    def last_end_offset(chunks):
-        return chunks[-1]["endOffset"]
+    def last_end_offset(chunks, fallback):
+        return chunks[-1]["endOffset"] if chunks else fallback
 
     log("Group 1:")
     group1_len = struct.unpack_from("<I", data, 8)[0]
     group1 = read_n_chunks(data, 12, group1_len)
+    off = last_end_offset(group1, 12)
 
     log("Group 2:")
-    group2_len = struct.unpack_from("<I", data, last_end_offset(group1) + 8)[0]
-    group2 = read_n_chunks(data, last_end_offset(group1) + 12, group2_len)
+    group2_len = struct.unpack_from("<I", data, off + 8)[0]
+    group2 = read_n_chunks(data, off + 12, group2_len)
+    off = last_end_offset(group2, off)
 
     log("Group 3")
-    group3_len = struct.unpack_from("<I", data, last_end_offset(group2) + 4)[0]
-    group3 = read_n_chunks(data, last_end_offset(group2) + 8, group3_len)
+    group3_len = struct.unpack_from("<I", data, off + 4)[0]
+    group3 = read_n_chunks(data, off + 8, group3_len)
+    off = last_end_offset(group3, off)
 
     log("Group 4")
-    group4_len = struct.unpack_from("<I", data, last_end_offset(group3) + 16)[0]
-    group4 = read_n_chunks(data, last_end_offset(group3) + 20, group4_len)
+    # The separator counts its own chunks; realtime saves have none, hotseat saves some.
+    between_len = struct.unpack_from("<I", data, off + 4)[0]
+    between = read_n_chunks(data, off + 8, between_len)
+    group4_at = last_end_offset(between, off + 8) + 8
+    group4_len = struct.unpack_from("<I", data, group4_at)[0]
+    group4 = read_n_chunks(data, group4_at + 4, group4_len)
 
     log("Group 5")
-    group5_len = struct.unpack_from("<I", data, last_end_offset(group4))[0]
-    group5 = read_n_chunks(data, last_end_offset(group4) + 4, group5_len)
+    # Its header varies and nothing here reads it, so a miss leaves it empty.
+    try:
+        group5 = _next_group(data, last_end_offset(group4, group4_at + 4))
+    except Exception:
+        group5 = []
 
     return {
         "group1": group1,
@@ -144,6 +162,16 @@ def parse_raw(data: bytes) -> dict[str, list[dict[str, Any]]]:
         "group4": group4,
         "group5": group5,
     }
+
+
+def _next_group(data: bytes, offset: int) -> list[dict[str, Any]]:
+    """The group starting at the first plausible marker after `offset` (a hash
+    of at least 256, then a type of 1 to 32); its length is the word before."""
+    for at in range(offset, min(offset + 64, len(data) - 7), 4):
+        marker, type_ = struct.unpack_from("<II", data, at)
+        if marker >= 256 and 0 < type_ <= 32:
+            return read_n_chunks(data, at, struct.unpack_from("<I", data, at - 4)[0])
+    raise ValueError(f"No group after offset {offset}")
 
 
 def read_n_chunks(data: bytes, offset: int, num_chunks: int) -> list[dict[str, Any]]:
@@ -156,10 +184,11 @@ def read_n_chunks(data: bytes, offset: int, num_chunks: int) -> list[dict[str, A
     return chunks
 
 
-def parse_chunk(data: bytes, offset: int) -> dict[str, Any]:
-    marker = data[offset : offset + 4]
-    type_ = struct.unpack_from("<I", data, offset + 4)[0]
-    data_start_offset = offset + 12
+def parse_chunk(data: bytes, offset: int, has_marker: bool = True) -> dict[str, Any]:
+    # A nested array's items have no marker: just the type, then the body.
+    marker = data[offset : offset + 4] if has_marker else b""
+    type_ = struct.unpack_from("<I", data, offset + 4 if has_marker else offset)[0]
+    data_start_offset = offset + 12 if has_marker else offset + 8
 
     if type_ == ChunkType.Unknown_1 or type_ == ChunkType.Unknown_12:
         end_offset = data_start_offset + 12
@@ -245,11 +274,12 @@ def parse_chunk(data: bytes, offset: int) -> dict[str, Any]:
         item_count = struct.unpack_from("<I", data, data_start_offset + 8)[0]
         result = []
         end_offset = data_start_offset + 12
-        for i in range(item_count):
-            len_ = struct.unpack_from("<I", data, end_offset + 16)[0]
-            sub_chunks = read_n_chunks(data, end_offset + 20, len_)
-            result.append(sub_chunks)
-            end_offset = sub_chunks[-1]["endOffset"]
+        for _ in range(item_count):
+            # Usually a record, kept as its chunks; sometimes a lone value.
+            item = parse_chunk(data, end_offset, has_marker=False)
+            chunk_array = item["type"] == ChunkType.ChunkArray
+            result.append(item["value"] if chunk_array else [item])
+            end_offset = item["endOffset"]
         return {
             "offset": offset,
             "dataStartOffset": data_start_offset,

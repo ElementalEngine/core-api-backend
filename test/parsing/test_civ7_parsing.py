@@ -1,4 +1,5 @@
 import os
+import struct
 
 import pytest
 
@@ -457,3 +458,78 @@ def test_a_human_seat_without_a_leader_or_civ_is_kept():
         ("1", "LEADER_AUGUSTUS", "CIVILIZATION_ROME"),
         ("2", "LEADER_NONE", "CIVILIZATION_NONE"),
     ]
+
+
+def _duel():
+    with open(os.path.join(_SAVES, "duel.Civ7Save"), "rb") as f:
+        return f.read()
+
+
+@pytest.mark.skipif(_missing("duel.Civ7Save"), reason="test save not present")
+def test_a_cloud_or_hotseat_separator_before_group_4_reads_the_same():
+    # Those saves count chunks in the separator where realtime saves hold 0.
+    raw = _duel()
+    at = civ7.parse_raw(raw)["group3"][-1]["endOffset"]
+    assert raw[at + 4 : at + 8] == bytes(4)
+    chunk = bytes.fromhex("326673de") + struct.pack("<5I", 8, 0, 1, 4, 0)
+    cloud = raw[: at + 4] + struct.pack("<I", 1) + chunk + raw[at + 8 :]
+    assert civ7.parse_civ7_save(cloud) == civ7.parse_civ7_save(raw)
+
+
+@pytest.mark.skipif(_missing("duel.Civ7Save"), reason="test save not present")
+def test_an_unreadable_group_5_does_not_fail_the_parse():
+    raw = _duel()
+    end = civ7.parse_raw(raw)["group4"][-1]["endOffset"]
+    damaged = raw[:end] + b"\xff" * 72 + raw[end + 72 :]
+    assert civ7.parse_raw(damaged)["group5"] == []
+    assert civ7.parse_civ7_save(damaged) == civ7.parse_civ7_save(raw)
+
+
+def test_only_a_full_civ_is_a_seat():
+    m = civ7.GAME_DATA_MARKERS
+
+    def record(leader, civ, level):
+        return {
+            "type": civ7.ChunkType.ChunkArray,
+            "value": [
+                {"marker": m["LEADER_NAME"], "value": leader},
+                {"marker": m["CIV_NAME"], "value": civ},
+                {"marker": m["CIV_LEVEL"], "value": level},
+            ],
+        }
+
+    data = {
+        "group1": [],
+        "group3": [
+            record("LEADER_XERXES", "CIVILIZATION_CARTHAGE", civ7.FULL_CIV),
+            record(
+                "LEADER_INDEPENDENT",
+                "CIVILIZATION_INDEPENDENT",
+                "CIVILIZATION_LEVEL_INDEPENDENT",
+            ),
+            record(
+                "LEADER_MINOR_CIV_DEFAULT",
+                "CIVILIZATION_PLACEHOLDER_CITYSTATE",
+                "CIVILIZATION_LEVEL_CITY_STATE",
+            ),
+        ],
+    }
+    players = civ7.extract_player_info(civ7.parse_chunks(data))
+    assert [p["leader"] for p in players] == ["LEADER_XERXES"]
+
+
+def test_a_nested_array_of_plain_values_parses():
+    # Some saves list age crises as bare strings rather than records.
+    def item(text):
+        body = text.encode() + b"\0"
+        return struct.pack("<IIH6x", 2, 0, len(body)) + body
+
+    items = [item("ANTIQUITY_CRISIS_PLAGUE"), item("ANTIQUITY_CRISIS_REVOLT")]
+    head = b"\x01\x02\x03\x04" + struct.pack("<IIQI", 30, 0, 0, len(items))
+    blob = head + b"".join(items)
+    chunk = civ7.parse_chunk(blob, 0)
+    assert [[x["value"] for x in group] for group in chunk["value"]] == [
+        ["ANTIQUITY_CRISIS_PLAGUE"],
+        ["ANTIQUITY_CRISIS_REVOLT"],
+    ]
+    assert chunk["endOffset"] == len(blob)
