@@ -27,8 +27,13 @@ def extract_player_info(root):
         if team not in teams_dict:
             teams_dict[team] = len(teams_dict)
         team = teams_dict[team]
-        steam_id = p["USER_ID"]["data"].split("@")[-1] if "USER_ID" in p else None
-        user_name = p["USER_ID"]["data"].split("@")[0] if "USER_ID" in p else None
+        # Realtime seats hold "name@steamid"; a cloud save's first seat holds a bare
+        # name and the rest none, so the in-game name names the seat.
+        user_id = p["USER_ID"]["data"] if "USER_ID" in p else ""
+        name, at, steam = user_id.rpartition("@")
+        steam_id = steam if at else None
+        in_game = p["PLAYER_NAME"]["data"] if "PLAYER_NAME" in p else None
+        user_name = (name if at else user_id) or in_game or None
         player_alive = bool(p["PLAYER_ALIVE"]["data"])
         players.append(
             {

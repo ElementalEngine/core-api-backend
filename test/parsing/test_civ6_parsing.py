@@ -42,7 +42,7 @@ def _test_parse_civ6_save(
 def test_parse_civ6_save_teamer():
     expected_players = [
         {
-            "steam_id": "Calcifer",
+            "steam_id": None,
             "user_name": "Calcifer",
             "leader": "LEADER_DIDO",
             "civ": "CIVILIZATION_PHOENICIA",
@@ -51,7 +51,7 @@ def test_parse_civ6_save_teamer():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Randomouse",
             "leader": "LEADER_POUNDMAKER",
             "civ": "CIVILIZATION_CREE",
             "team": 0,
@@ -59,7 +59,7 @@ def test_parse_civ6_save_teamer():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "p53",
             "leader": "LEADER_TOMYRIS",
             "civ": "CIVILIZATION_SCYTHIA",
             "team": 0,
@@ -67,7 +67,7 @@ def test_parse_civ6_save_teamer():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "stephenbe",
             "leader": "LEADER_GENGHIS_KHAN",
             "civ": "CIVILIZATION_MONGOLIA",
             "team": 0,
@@ -75,7 +75,7 @@ def test_parse_civ6_save_teamer():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "kanga",
             "leader": "LEADER_WILHELMINA",
             "civ": "CIVILIZATION_NETHERLANDS",
             "team": 1,
@@ -83,7 +83,7 @@ def test_parse_civ6_save_teamer():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Somnax",
             "leader": "LEADER_VICTORIA",
             "civ": "CIVILIZATION_ENGLAND",
             "team": 1,
@@ -91,7 +91,7 @@ def test_parse_civ6_save_teamer():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Daethern",
             "leader": "LEADER_SULEIMAN",
             "civ": "CIVILIZATION_OTTOMAN",
             "team": 1,
@@ -99,7 +99,7 @@ def test_parse_civ6_save_teamer():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "platypus",
             "leader": "LEADER_SHAKA",
             "civ": "CIVILIZATION_ZULU",
             "team": 1,
@@ -214,8 +214,8 @@ def test_parse_civ6_save_10player_ffa():
 def test_parse_civ6_save_5team():
     expected_players = [
         {
-            "steam_id": "",
-            "user_name": "",
+            "steam_id": None,
+            "user_name": "Pla1",
             "leader": "LEADER_ALEXANDER",
             "civ": "CIVILIZATION_MACEDON",
             "team": 0,
@@ -223,7 +223,7 @@ def test_parse_civ6_save_5team():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Pla10",
             "leader": "LEADER_YONGLE",
             "civ": "CIVILIZATION_CHINA",
             "team": 0,
@@ -231,7 +231,7 @@ def test_parse_civ6_save_5team():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Pla2",
             "leader": "LEADER_NADER_SHAH",
             "civ": "CIVILIZATION_PERSIA",
             "team": 1,
@@ -239,7 +239,7 @@ def test_parse_civ6_save_5team():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Pla9",
             "leader": "LEADER_TAMAR",
             "civ": "CIVILIZATION_GEORGIA",
             "team": 1,
@@ -247,7 +247,7 @@ def test_parse_civ6_save_5team():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Pla3",
             "leader": "LEADER_KUBLAI_KHAN_MONGOLIA",
             "civ": "CIVILIZATION_MONGOLIA",
             "team": 2,
@@ -255,7 +255,7 @@ def test_parse_civ6_save_5team():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Pla8",
             "leader": "LEADER_MONTEZUMA",
             "civ": "CIVILIZATION_AZTEC",
             "team": 2,
@@ -263,7 +263,7 @@ def test_parse_civ6_save_5team():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Pla4",
             "leader": "LEADER_JOAO_III",
             "civ": "CIVILIZATION_PORTUGAL",
             "team": 3,
@@ -271,7 +271,7 @@ def test_parse_civ6_save_5team():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Pla7",
             "leader": "LEADER_VICTORIA_ALT",
             "civ": "CIVILIZATION_ENGLAND",
             "team": 3,
@@ -279,7 +279,7 @@ def test_parse_civ6_save_5team():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Pla5",
             "leader": "LEADER_AMANITORE",
             "civ": "CIVILIZATION_NUBIA",
             "team": 4,
@@ -287,7 +287,7 @@ def test_parse_civ6_save_5team():
         },
         {
             "steam_id": None,
-            "user_name": None,
+            "user_name": "Pla6",
             "leader": "LEADER_SHAKA",
             "civ": "CIVILIZATION_ZULU",
             "team": 4,
