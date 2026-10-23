@@ -403,9 +403,12 @@ class ApprovalService:
                     and player.discord_id not in ("-1", "-2")
                     and not str(player.discord_id).startswith("-")
                 ]
+            # The answer is the approved match, so it says who approved it and when.
             return {
                 "match_id": str(validated_insert_id),
                 **match.model_dump(),
+                "approved_at": validated_doc["approved_at"],
+                "approver_discord_id": approver_discord_id,
                 "affected_players": affected_players,
             }
         except Exception:

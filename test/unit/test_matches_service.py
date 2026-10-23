@@ -221,6 +221,8 @@ def test_approve_match_accumulates_counters_from_stored_doc():
     result = asyncio.run(make_service(repo).approve_match(OID, "approver-1"))
 
     assert result["match_id"] == OID
+    assert result["approved_at"] is not None
+    assert result["approver_discord_id"] == "approver-1"
     assert repo.session.committed
     # 2 players x (lifetime + seasonal + combined)
     assert len(repo.upserts) == 6
