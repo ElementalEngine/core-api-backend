@@ -88,7 +88,9 @@ def parse_chunks(data: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
                 ),
                 None,
             )
-            if leader and civ:
+            # Only player arrays carry a user id; keep a human seat even if
+            # its leader or civ is missing, so the report still lists it.
+            if (leader and civ) or user_id:
                 players.append(
                     {
                         "leader": leader,
@@ -290,8 +292,8 @@ def extract_player_info(root):
     players = []
     teams_dict = {}
     for p in root["players"]:
-        civ = p["civ"]["value"]
-        leader = p["leader"]["value"]
+        civ = p["civ"]["value"] if p["civ"] is not None else "CIVILIZATION_NONE"
+        leader = p["leader"]["value"] if p["leader"] is not None else "LEADER_NONE"
         team = int(p["team_id"]["value"]) if p["team_id"] is not None else 0
         # normalize team ids to 0..n-1 where n is the number of teams
         if team not in teams_dict:

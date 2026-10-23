@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from bson import ObjectId
@@ -173,11 +174,10 @@ class EditingService:
 
     async def delete_pending_match(self, match_id: str) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
-        res = await self._m.q.find_pending_by_id(oid)
-        if not res:
-            raise NotFoundError("Match not found")
+        res = await self._m.q.take_pending_match(oid, now=datetime.now(UTC))
+        if res is None:
+            raise await self._m.refusal(oid)
         res["match_id"] = str(res.pop("_id"))
-        await self._m.q.delete_pending_match(oid)
         logger.info("✅ 🔄 Match %s removed", match_id)
         return res
 
@@ -364,21 +364,12 @@ class EditingService:
         discord_message_id: str | None = None,
     ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
-        res = await self._m.q.find_pending_by_id(oid)
-        if not res:
-            raise NotFoundError("Match not found")
-
-        match = MatchModel(**res)
-        contest_report_entry = ContestReport(
-            contestor_discord_id=contestor_discord_id, reason=reason
+        entry = ContestReport(contestor_discord_id=contestor_discord_id, reason=reason)
+        pushed = await self._m.q.push_contest(
+            oid, entry.model_dump(), discord_message_id, now=datetime.now(UTC)
         )
-        match.contest_report_list.append(contest_report_entry)
-        if discord_message_id is not None:
-            match.discord_messages_id_list = match.discord_messages_id_list + [
-                discord_message_id
-            ]
-
-        await self._m.q.replace_pending_match(oid, match.model_dump())
+        if not pushed:
+            raise await self._m.refusal(oid)
         logger.info("✅ 🔄 Match %s contested by %s", match_id, contestor_discord_id)
         return await self._reload_pending(oid)
 
@@ -416,7 +407,9 @@ class EditingService:
         apply_players_patch(match, patch, steam_ids)
         match = await self._m._recompute_deltas(match)
 
-        await self._m.q.replace_pending_match(oid, match.model_dump())
+        players = match.model_dump()["players"]
+        if not await self._m.q.set_pending_players(oid, players, now=datetime.now(UTC)):
+            raise await self._m.refusal(oid)
         logger.info(
             "PATCH applied to %d seat(s) on match %s",
             len({e.seat for e in patch}),

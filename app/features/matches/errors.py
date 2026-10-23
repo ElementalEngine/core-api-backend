@@ -13,8 +13,18 @@ class InvalidIDError(MatchServiceError):
     pass
 
 
+class ApprovingError(MatchServiceError):
+    """An approve holds the match, so it cannot change now."""
+
+
 class ParseError(MatchServiceError):
     pass
 
 
-__all__ = ["InvalidIDError", "MatchServiceError", "NotFoundError", "ParseError"]
+__all__ = [
+    "ApprovingError",
+    "InvalidIDError",
+    "MatchServiceError",
+    "NotFoundError",
+    "ParseError",
+]

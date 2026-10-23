@@ -220,9 +220,10 @@ class ApprovalService:
         self, match_id: str, approver_discord_id: str
     ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
-        res = await self._m.q.claim_pending_match(oid, now=datetime.now(UTC))
+        claimed_at = datetime.now(UTC)
+        res = await self._m.q.claim_pending_match(oid, now=claimed_at)
         if res is None:
-            raise NotFoundError("Match not found")
+            raise await self._m.refusal(oid)
 
         try:
             match = MatchModel(**res)
@@ -414,7 +415,7 @@ class ApprovalService:
         except Exception:
             # A write conflict is an ordinary transaction outcome; leaving the
             # claim set would make the match permanently unapprovable.
-            await self._m.q.release_pending_claim(oid)
+            await self._m.q.release_pending_claim(oid, claimed_at=claimed_at)
             raise
 
 

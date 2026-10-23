@@ -113,7 +113,7 @@ class FakeRepo:
         self.claims.append(oid)
         return dict(self.match_doc) if self.match_doc else None
 
-    async def release_pending_claim(self, oid):
+    async def release_pending_claim(self, oid, *, claimed_at):
         self.releases.append(oid)
 
     async def find_validated_by_id(self, oid):

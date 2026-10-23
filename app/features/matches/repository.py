@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from bson import ObjectId
@@ -9,11 +10,27 @@ from bson.int64 import Int64
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
 from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.collection import AsyncCollection
+from pymongo.errors import OperationFailure
 
 from app.core.constants import COL_SUB_EVENTS, COL_USERS, DB_SERVER_MEMBERS, GAMES_DB
 
+logger = logging.getLogger(__name__)
+
 COL_PENDING_MATCHES = "pending_matches"
 COL_VALIDATED_MATCHES = "validated_matches"
+
+# An approve takes seconds; a claim older than this was left by a crash.
+CLAIM_TTL = timedelta(minutes=5)
+
+
+def _editable(now: datetime) -> dict[str, Any]:
+    """Filter for a pending match that no live approve holds."""
+    return {
+        "$or": [
+            {"approving_at": {"$exists": False}},
+            {"approving_at": {"$lt": now - CLAIM_TTL}},
+        ]
+    }
 
 
 class MatchRepository:
@@ -72,12 +89,17 @@ class MatchRepository:
     ) -> dict[str, Any] | None:
         """Claim a pending match for approval; None means already claimed or gone."""
         return await self._pending.find_one_and_update(
-            {"_id": oid, "approving_at": {"$exists": False}},
+            {"_id": oid, **_editable(now)},
             {"$set": {"approving_at": now}},
         )
 
-    async def release_pending_claim(self, oid: ObjectId) -> None:
-        await self._pending.update_one({"_id": oid}, {"$unset": {"approving_at": ""}})
+    async def release_pending_claim(
+        self, oid: ObjectId, *, claimed_at: datetime
+    ) -> None:
+        # Only its own claim: a later approve may have taken over a lapsed one.
+        await self._pending.update_one(
+            {"_id": oid, "approving_at": claimed_at}, {"$unset": {"approving_at": ""}}
+        )
 
     async def insert_pending_match(
         self, match_doc: Mapping[str, Any], *, session: AsyncClientSession | None = None
@@ -93,7 +115,9 @@ class MatchRepository:
         session: AsyncClientSession | None = None,
     ) -> bool:
         res = await self._pending.update_one(
-            {"_id": oid}, {"$set": dict(changes)}, session=session
+            {"_id": oid, **_editable(datetime.now(UTC))},
+            {"$set": dict(changes)},
+            session=session,
         )
         return res.matched_count == 1
 
@@ -108,8 +132,44 @@ class MatchRepository:
         # A null hash would collide in the unique index, whose filter is $exists.
         if doc.get("save_bytes_sha256") is None:
             doc.pop("save_bytes_sha256", None)
-        res = await self._pending.replace_one({"_id": oid}, doc, session=session)
+        # Guarded too: the model has no approving_at, so a replace would drop a claim.
+        res = await self._pending.replace_one(
+            {"_id": oid, **_editable(datetime.now(UTC))}, doc, session=session
+        )
         return res.matched_count == 1
+
+    # The three guarded writes below miss (None or False) when the match is
+    # gone or an approve holds it; the caller asks which.
+
+    async def set_pending_players(
+        self, oid: ObjectId, players: list[dict[str, Any]], *, now: datetime
+    ) -> bool:
+        # Players only, so a contest written meanwhile is kept.
+        res = await self._pending.update_one(
+            {"_id": oid, **_editable(now)}, {"$set": {"players": players}}
+        )
+        return res.matched_count == 1
+
+    async def push_contest(
+        self,
+        oid: ObjectId,
+        entry: Mapping[str, Any],
+        message_id: str | None,
+        *,
+        now: datetime,
+    ) -> bool:
+        push: dict[str, Any] = {"contest_report_list": dict(entry)}
+        if message_id is not None:
+            push["discord_messages_id_list"] = message_id
+        res = await self._pending.update_one(
+            {"_id": oid, **_editable(now)}, {"$push": push}
+        )
+        return res.matched_count == 1
+
+    async def take_pending_match(
+        self, oid: ObjectId, *, now: datetime
+    ) -> dict[str, Any] | None:
+        return await self._pending.find_one_and_delete({"_id": oid, **_editable(now)})
 
     async def delete_pending_match(
         self, oid: ObjectId, *, session: AsyncClientSession | None = None
@@ -183,11 +243,7 @@ class MatchRepository:
                 partialFilterExpression={"save_bytes_sha256": {"$exists": True}},
                 name=name,
             )
-        # find_pending_by_hash's composition lookup, a collection scan today.
-        await self._pending.create_index(
-            [("save_file_hash", ASCENDING)],
-            name="pending_matches_save_file_hash_idx",
-        )
+        await self._ensure_composition_index()
         # 30 days. The TTL is storage hygiene, not the rule -- the quota
         # query has to be time-bounded anyway, because the monitor can lag.
         await self._sub_events.create_index(
@@ -201,6 +257,37 @@ class MatchRepository:
             [("discord_id", ASCENDING), ("occurred_at", DESCENDING)],
             name="sub_events_player_recent_idx",
         )
+
+    async def _ensure_composition_index(self) -> None:
+        # One pending report per game, so two uploads at once cannot both get
+        # in. If repeats are already stored, the plain index stays.
+        plain, unique = (
+            "pending_matches_save_file_hash_idx",
+            "pending_matches_save_file_hash_uq",
+        )
+        held = await self._pending.index_information()
+        if unique in held:
+            return
+        if plain in held:
+            try:
+                await self._pending.drop_index(plain)
+            except OperationFailure as exc:
+                if exc.code != 27:  # IndexNotFound: another process dropped it
+                    raise
+        try:
+            await self._pending.create_index(
+                [("save_file_hash", ASCENDING)],
+                unique=True,
+                partialFilterExpression={"save_file_hash": {"$exists": True}},
+                name=unique,
+            )
+        except OperationFailure as exc:
+            if exc.code != 11000:
+                raise
+            logger.error("Repeated save_file_hash in pending_matches; index not unique")
+            await self._pending.create_index(
+                [("save_file_hash", ASCENDING)], name=plain
+            )
 
 
 __all__ = ["MatchRepository"]

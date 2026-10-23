@@ -134,6 +134,25 @@ def test_insert_race_returns_repeated_not_500(monkeypatch):
     assert res["repeated_by"] == "file"
 
 
+def test_a_composition_race_returns_repeated_not_500(monkeypatch):
+    """Two different saves of one game, uploaded at once: the unique
+    composition index refuses the second insert."""
+    from bson import ObjectId
+
+    q = _Q(insert_raises=True)
+    winner = {"_id": ObjectId(), "save_file_hash": "x"}
+    calls = {"n": 0}
+
+    async def _find(h):
+        calls["n"] += 1
+        return winner if calls["n"] > 1 else None
+
+    q.find_pending_by_hash = _find
+    res = asyncio.run(_upload(_svc(q, monkeypatch)))
+    assert res["repeated"] is True
+    assert res["repeated_by"] == "composition"
+
+
 def test_fresh_upload_stores_a_non_empty_byte_hash(monkeypatch):
     q = _Q()
     res = asyncio.run(_upload(_svc(q, monkeypatch)))

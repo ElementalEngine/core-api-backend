@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.features.matches.approval import ApprovalService
 from app.features.matches.editing import EditingService, _require_int as _require_int
 from app.features.matches.errors import (
+    ApprovingError,
     InvalidIDError,
     MatchServiceError,
     NotFoundError,
@@ -47,6 +48,12 @@ class MatchService:
         if not ObjectId.is_valid(match_id):
             raise InvalidIDError("Invalid match id")
         return ObjectId(match_id)
+
+    async def refusal(self, oid: ObjectId) -> Exception:
+        """Why a guarded write on a pending match changed nothing."""
+        if await self.q.find_pending_by_id(oid) is None:
+            return NotFoundError("Match not found")
+        return ApprovingError("This report is being approved.")
 
     def _parse_save(self, file_bytes: bytes) -> dict[str, Any]:
         if file_bytes.startswith(b"CIV6"):

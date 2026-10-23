@@ -12,10 +12,11 @@ from app.core.dependencies import (
     get_database,
     require_mito_token,
 )
-from app.core.errors import forbidden, invalid_request, not_found
+from app.core.errors import conflict, forbidden, invalid_request, not_found
 from app.features.civdata.repository import CivDataRepository
 from app.features.matches.editing import EditingService
 from app.features.matches.errors import (
+    ApprovingError,
     InvalidIDError,
     MatchServiceError,
     NotFoundError,
@@ -173,6 +174,8 @@ async def patch_players(
         )
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
+    except ApprovingError as exc:
+        raise conflict(str(exc)) from exc
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc
 
@@ -188,6 +191,8 @@ async def approve_match(
         return await svc.approve_match(match_id, actor)
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
+    except ApprovingError as exc:
+        raise conflict(str(exc)) from exc
     except (InvalidIDError, MatchServiceError) as exc:
         raise invalid_request(str(exc)) from exc
 
@@ -206,6 +211,8 @@ async def contest_match(
         return await EditingService(svc).contest_report(match_id, actor, body.reason)
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
+    except ApprovingError as exc:
+        raise conflict(str(exc)) from exc
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc
 
@@ -234,5 +241,7 @@ async def delete_match(
         return await EditingService(svc).delete_pending_match(match_id)
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
+    except ApprovingError as exc:
+        raise conflict(str(exc)) from exc
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc

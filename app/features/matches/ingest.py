@@ -78,8 +78,12 @@ class IngestService:
         try:
             inserted_id = await self._m.q.insert_pending_match(doc)
         except DuplicateKeyError:
+            # Another upload of this game got in between the checks above.
             winner = await self._m.q.find_pending_by_bytes(save_bytes_sha256)
+            if winner is not None:
+                return self._repeated(winner, "file")
+            winner = await self._m.q.find_pending_by_hash(save_file_hash)
             if winner is None:
                 raise
-            return self._repeated(winner, "file")
+            return self._repeated(winner, "composition")
         return {"match_id": str(inserted_id), "repeated": False, **match.model_dump()}

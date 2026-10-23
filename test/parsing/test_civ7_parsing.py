@@ -429,3 +429,31 @@ def test_parse_civ7_save_modernGame():
         expected_map_type="Pangaea and Islands",
         expected_players=expected_players,
     )
+
+
+def test_a_human_seat_without_a_leader_or_civ_is_kept():
+    m = civ7.GAME_DATA_MARKERS
+    array = civ7.ChunkType.ChunkArray
+    data = {
+        "group1": [],
+        "group3": [
+            {
+                "type": array,
+                "value": [
+                    {"marker": m["LEADER_NAME"], "value": "LEADER_AUGUSTUS"},
+                    {"marker": m["CIV_NAME"], "value": "CIVILIZATION_ROME"},
+                    {"marker": m["USER_ID"], "value": "a@1"},
+                ],
+            },
+            {"type": array, "value": [{"marker": m["USER_ID"], "value": "b@2"}]},
+            {
+                "type": array,
+                "value": [{"marker": m["CIV_NAME"], "value": "CIVILIZATION_NONE"}],
+            },
+        ],
+    }
+    players = civ7.extract_player_info(civ7.parse_chunks(data))
+    assert [(p["steam_id"], p["leader"], p["civ"]) for p in players] == [
+        ("1", "LEADER_AUGUSTUS", "CIVILIZATION_ROME"),
+        ("2", "LEADER_NONE", "CIVILIZATION_NONE"),
+    ]
