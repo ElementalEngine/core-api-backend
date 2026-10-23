@@ -385,8 +385,8 @@ class ApprovalService:
                         )
                         await session.abort_transaction()
                         raise MatchServiceError(
-                            f"An error occured during writing to DB: {e}"
-                        )
+                            "The approval could not be saved. Try again."
+                        ) from e
 
             logger.info("✅ ✅ Approved match %s", match_id)
             affected_players = []

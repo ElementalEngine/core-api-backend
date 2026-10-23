@@ -49,6 +49,8 @@ class EditingService:
     async def _reload_pending(self, oid: ObjectId) -> dict[str, Any]:
         """Re-fetch a pending match and rename _id -> match_id for the response."""
         updated = await self._m.q.find_pending_by_id(oid)
+        if updated is None:
+            raise NotFoundError("Match not found")
         updated["match_id"] = str(updated.pop("_id"))
         return updated
 
@@ -475,11 +477,11 @@ def _apply_sub(
     row = match.players[seat]
     leaver = _leaver_index(match, seat)
 
+    # The seat's flag follows the patch, whatever shape the row arrived in.
+    row.is_sub = sub_out is not None
     if sub_out is None:
-        if leaver is None:
-            return
-        row.is_sub = False
-        match.players.pop(leaver)
+        if leaver is not None:
+            match.players.pop(leaver)
         return
 
     if leaver is not None:
@@ -487,7 +489,6 @@ def _apply_sub(
         match.players[leaver].steam_id = steam_ids.get(sub_out)
         return
 
-    row.is_sub = True
     match.players.insert(
         seat + 1,
         PlayerModel(

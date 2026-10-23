@@ -104,9 +104,11 @@ class MatchRepository:
         *,
         session: AsyncClientSession | None = None,
     ) -> bool:
-        res = await self._pending.replace_one(
-            {"_id": oid}, dict(match_doc), session=session
-        )
+        doc = dict(match_doc)
+        # A null hash would collide in the unique index, whose filter is $exists.
+        if doc.get("save_bytes_sha256") is None:
+            doc.pop("save_bytes_sha256", None)
+        res = await self._pending.replace_one({"_id": oid}, doc, session=session)
         return res.matched_count == 1
 
     async def delete_pending_match(

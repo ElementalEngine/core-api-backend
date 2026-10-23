@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -31,6 +32,13 @@ class SeatPatchIn(BaseModel):
 
 class PlayersPatch(BaseModel):
     players: list[SeatPatchIn] = Field(default_factory=list)
+
+    def fill_civs(self, leader_civs: Mapping[str, str | None]) -> None:
+        """A leader set without a civ brings its own, where the civ data names one."""
+        for entry in self.players:
+            civ = leader_civs.get(entry.leader) if entry.leader is not None else None
+            if entry.civ is None and civ:
+                entry.civ = civ
 
     def to_seat_patches(self) -> list[SeatPatch]:
         """Wire model to domain patch."""

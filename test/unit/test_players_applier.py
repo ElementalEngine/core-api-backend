@@ -178,3 +178,19 @@ def test_a_leader_and_civ_set_by_hand_reach_the_leaver_row_too():
         ("LEADER_X", "CIV_Y"),
         (None, "Rome"),
     ]
+
+
+def test_clearing_a_sub_clears_the_flag_even_without_a_leaver_row():
+    legacy = M(P(0, 0, "A", is_sub=True), P(1, 1, "B"))
+    apply_players_patch(legacy, [SeatPatch(0, sub_out=None)], STEAM)
+    assert shape(legacy) == [("A", 0, 0, False, False), ("B", 1, 1, False, False)]
+
+
+def test_repointing_marks_the_seat_a_sub_whatever_its_flag_said():
+    match = M(P(0, 0, "A"), P(0, 0, "X", subbed_out=True), P(1, 1, "B"))
+    apply_players_patch(match, [SeatPatch(0, sub_out="y")], STEAM)
+    assert shape(match) == [
+        ("A", 0, 0, True, False),
+        ("y", 0, 0, False, True),
+        ("B", 1, 1, False, False),
+    ]

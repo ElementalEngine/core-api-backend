@@ -15,7 +15,7 @@ civ-data from S5, and a bare /api/v2 filter would count it.
 
 from starlette.routing import Match
 
-from app.features.matches.schemas_v2 import UploadResponse
+from app.features.matches.schemas_v2 import PlayersPatch, SeatPatchIn, UploadResponse
 from app.main import app
 
 EXPECTED = {
@@ -132,3 +132,17 @@ def test_the_upload_answer_keeps_its_duplicate_flags():
     )
     assert upload.response_model is UploadResponse
     assert {"repeated", "repeated_by"} <= set(UploadResponse.model_fields)
+
+
+def test_a_leader_set_without_a_civ_brings_its_own():
+    body = PlayersPatch(
+        players=[
+            SeatPatchIn(seat=0, leader="LEADER_A"),
+            SeatPatchIn(seat=1, leader="LEADER_B", civ="CIVILIZATION_KEPT"),
+            SeatPatchIn(seat=2, leader="LEADER_UNMAPPED"),
+        ]
+    )
+    body.fill_civs({"LEADER_A": "CIVILIZATION_A", "LEADER_UNMAPPED": None})
+    civs = [p.civ for p in body.to_seat_patches()]
+    assert civs[:2] == ["CIVILIZATION_A", "CIVILIZATION_KEPT"]
+    assert str(civs[2]) == "UNSET"

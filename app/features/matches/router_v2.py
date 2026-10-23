@@ -83,7 +83,8 @@ async def upload_match(
             raw, actor, is_cloud == "1", discord_message_id
         )
     except ParseError as exc:
-        raise invalid_request(f"Unrecognized save file format: {exc}") from exc
+        logger.warning("Save not parsed: %s", exc)
+        raise invalid_request("That file could not be read as a Civ save.") from exc
     logger.info("Stored match %s", created["match_id"])
     return created
 
@@ -133,7 +134,8 @@ async def get_match(match_id: str, db=Depends(get_database)) -> dict[str, Any]:
 async def _require_known_civs(
     db: AsyncMongoClient, doc: dict[str, Any], body: PlayersPatch
 ) -> None:
-    """A leader or civ set by hand must be one the civ data knows, as that kind."""
+    """A leader or civ set by hand must be one the civ data knows, as that kind.
+    Civ6 has no civ list, so a civ6 leader brings the civ it belongs to."""
     if all(e.leader is None and e.civ is None for e in body.players):
         return
     data = await CivDataRepository(db).fetch(str(doc.get("game", "")).lower())
@@ -149,6 +151,7 @@ async def _require_known_civs(
     )
     if unknown:
         raise invalid_request(f"Unknown leader or civ: {', '.join(unknown)}.")
+    body.fill_civs({row["token"]: row.get("civ") for row in data["leaders"]})
 
 
 @router.patch("/matches/{match_id}/players", response_model=MatchResponse)
@@ -162,7 +165,8 @@ async def patch_players(
     svc = MatchService(db)
     doc = await _load(svc, match_id)
     _require_reporter(doc, actor, is_staff)
-    await _require_known_civs(db, doc, body)
+    if is_staff:  # for anyone else, the validator refuses a leader or civ
+        await _require_known_civs(db, doc, body)
     try:
         return await EditingService(svc).patch_players(
             match_id, body.to_seat_patches(), actor_is_staff=is_staff
