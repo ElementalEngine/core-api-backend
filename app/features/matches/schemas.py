@@ -20,6 +20,8 @@ class PlayerSchema(BaseModel):
     combined_delta: float | None = None
     is_sub: bool = False
     subbed_out: bool = False
+    # The in-game score when the save was read, where the save records it.
+    score: int | None = None
 
 
 class ContestReport(BaseModel):

@@ -1696,6 +1696,17 @@
             "title": "Quit",
             "type": "boolean"
           },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
           "season_delta": {
             "anyOf": [
               {

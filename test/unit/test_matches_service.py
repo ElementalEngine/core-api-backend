@@ -128,6 +128,9 @@ class FakeRepo:
     async def get_player_stat_doc(self, **kwargs):
         return dict(self.stat_doc) if self.stat_doc else None
 
+    async def get_player_stat_docs_batch(self, *, discord_ids, **kwargs):
+        return {d: dict(self.stat_doc) for d in discord_ids} if self.stat_doc else {}
+
     async def start_session(self):
         return self.session
 

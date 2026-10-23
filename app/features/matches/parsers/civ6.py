@@ -2,6 +2,8 @@ import argparse
 import json
 import struct
 
+from app.features.matches.parsers.civ6_scores import final_scores
+
 
 def determine_game_mode(players):
     teams = [p["team"] for p in players]
@@ -13,10 +15,11 @@ def determine_game_mode(players):
     return "teamer"
 
 
-def extract_player_info(root):
+def extract_player_info(root, scores=None):
     players = []
+    outs = []
     teams_dict = {}
-    for p in root["parsed"]["CIVS"]:
+    for i, p in enumerate(root["parsed"]["CIVS"]):
         leader = p["LEADER_NAME"]["data"]
         if leader == "LEADER_SPECTATOR":
             continue
@@ -44,10 +47,32 @@ def extract_player_info(root):
                 "team": team,
                 "player_alive": player_alive,
                 "placement": team,
+                "score": scores[i][1] if scores else None,
             }
         )
+        outs.append(scores[i][0] if scores else 0)
+    if scores:
+        _place_by_score(players, outs)
     players = sorted(players, key=lambda p: p["team"])
     return players
+
+
+def _place_by_score(players, outs):
+    """Sides still in the game first, by score (a team by its total), then sides
+    knocked out, the last to go first. Equal sides keep their team order."""
+    sides = {}
+    for p, out in zip(players, outs):
+        side = sides.setdefault(p["team"], {"alive": False, "out": 0, "score": 0})
+        side["alive"] = side["alive"] or p["player_alive"]
+        side["out"] = max(side["out"], out)
+        side["score"] += p["score"]
+    order = sorted(
+        sides,
+        key=lambda t: (not sides[t]["alive"], -sides[t]["out"], -sides[t]["score"]),
+    )
+    place = {team: n for n, team in enumerate(order)}
+    for p in players:
+        p["placement"] = place[p["team"]]
 
 
 def extract_turn(root):
@@ -61,8 +86,11 @@ def extract_map_type(root):
 def parse_civ6_save(file_bytes: bytes, version: str = "1.1"):
     root = parse(file_bytes)
 
-    players = extract_player_info(root)
     turn = extract_turn(root)
+    civs = root["parsed"]["CIVS"]
+    alive = [bool(c["PLAYER_ALIVE"]["data"]) for c in civs if "PLAYER_ALIVE" in c]
+    scores = final_scores(file_bytes, alive, turn) if len(alive) == len(civs) else None
+    players = extract_player_info(root, scores)
     map_type = extract_map_type(root)
     game_mode = determine_game_mode(players)
 

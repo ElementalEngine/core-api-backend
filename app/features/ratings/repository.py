@@ -118,6 +118,7 @@ class RatingsRepository:
         is_cloud: bool,
         is_combined: bool,
         discord_ids: list[str],
+        session: AsyncClientSession | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Batch fetch stat docs by discord id."""
         if not discord_ids:
@@ -132,7 +133,7 @@ class RatingsRepository:
         )
 
         ids = [Int64(did) for did in discord_ids]
-        cursor = col.find({"_id": {"$in": ids}})
+        cursor = col.find({"_id": {"$in": ids}}, session=session)
         docs = await cursor.to_list(length=len(ids))
 
         out: dict[str, dict[str, Any]] = {}

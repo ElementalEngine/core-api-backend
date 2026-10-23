@@ -60,6 +60,31 @@ class MatchRepository:
             }
         )
 
+    async def get_users_by_steam_ids(
+        self, steam_ids: list[str]
+    ) -> dict[str, dict[str, Any]]:
+        """The registered user for each Steam id found, in one query."""
+        cursor = self._users.find(
+            {
+                "$or": [
+                    {"steam_id": {"$in": steam_ids}},
+                    {
+                        "linked_platform": "steam",
+                        "linked_account_id": {"$in": steam_ids},
+                    },
+                ]
+            }
+        )
+        found: dict[str, dict[str, Any]] = {}
+        async for doc in cursor:
+            keys = [doc.get("steam_id")]
+            if doc.get("linked_platform") == "steam":
+                keys.append(doc.get("linked_account_id"))
+            for key in keys:
+                if key in steam_ids and key not in found:
+                    found[key] = doc
+        return found
+
     async def find_pending_by_hash(self, save_file_hash: str) -> dict[str, Any] | None:
         return await self._pending.find_one({"save_file_hash": save_file_hash})
 

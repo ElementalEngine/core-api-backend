@@ -24,7 +24,6 @@ from app.features.matches.errors import (
 from app.features.matches.ingest import IngestService
 from app.features.matches.models import (
     MatchModel,
-    PlayerModel,
     StatModel,
 )
 from app.features.matches.parsers import parse_civ6_save, parse_civ7_save
@@ -35,7 +34,61 @@ from app.features.seasons.repository import SeasonsRepository
 
 logger = logging.getLogger(__name__)
 
-RANKING_CONCURRENCY_LIMIT = 8
+
+def _placeholder(discord_id: str) -> bool:
+    """A seat with no player: empty, or "-1", "-2" or "-<steam id>"."""
+    return not discord_id or discord_id in ("-1", "-2") or discord_id.startswith("-")
+
+
+def _unrated(discord_id: str | None, index: int) -> StatModel:
+    return StatModel(
+        discord_id=discord_id,
+        index=index,
+        id=0,
+        mu=settings.ts_mu,
+        sigma=settings.ts_sigma,
+        games=0,
+        wins=0,
+        first=0,
+        subbedIn=0,
+        subbedOut=0,
+        civs={},
+        leaders={},
+    )
+
+
+def _stat_of(discord_id: str, index: int, doc: dict[str, Any] | None) -> StatModel:
+    """A player's stored rating, or the starting one before their first game."""
+    if not doc:
+        return StatModel(
+            discord_id=discord_id,
+            index=index,
+            id=discord_id,
+            mu=settings.ts_mu,
+            sigma=settings.ts_sigma,
+            games=0,
+            wins=0,
+            first=0,
+            subbedIn=0,
+            subbedOut=0,
+            civs={},
+            leaders={},
+        )
+    return StatModel(
+        discord_id=discord_id,
+        index=index,
+        mu=as_float(doc.get("mu"), settings.ts_mu),
+        sigma=as_float(doc.get("sigma"), settings.ts_sigma),
+        games=as_int(doc.get("games"), 0),
+        wins=as_int(doc.get("wins"), 0),
+        first=as_int(doc.get("first"), 0),
+        subbedIn=as_int(doc.get("subbedIn"), 0),
+        subbedOut=as_int(doc.get("subbedOut"), 0),
+        civs=dict(doc.get("civs", {})) if isinstance(doc.get("civs", {}), dict) else {},
+        leaders=dict(doc.get("leaders", {}))
+        if isinstance(doc.get("leaders", {}), dict)
+        else {},
+    )
 
 
 class MatchService:
@@ -91,20 +144,23 @@ class MatchService:
             )
         return steam_id
 
-    async def steam_to_discord_id(self, steam_id: str) -> str:
-        player = await self.q.get_user_by_steam_id(steam_id)
-        if not player:
-            return f"-{steam_id}"
-        return str(player["discord_id"])
-
     async def match_id_to_discord(self, match: MatchModel) -> MatchModel:
+        """Each seat's player from its Steam id, read in one query; a Steam id
+        nobody registered marks the seat unassigned as "-<steam id>"."""
+        wanted = [
+            p.steam_id
+            for p in match.players
+            if p.steam_id and p.steam_id != "-1" and not p.steam_id.startswith("-")
+        ]
+        if not wanted:
+            return match
+        users = await self.q.get_users_by_steam_ids(list(dict.fromkeys(wanted)))
         for player in match.players:
-            if (
-                player.steam_id
-                and player.steam_id != "-1"
-                and player.steam_id.startswith("-") == False
-            ):
-                player.discord_id = await self.steam_to_discord_id(player.steam_id)
+            sid = player.steam_id
+            if sid in users:
+                player.discord_id = str(users[sid]["discord_id"])
+            elif sid and sid in wanted:
+                player.discord_id = f"-{sid}"
         return match
 
     async def get_player_ranking(
@@ -116,23 +172,8 @@ class MatchService:
         is_combined: bool = False,
         session: AsyncClientSession | None = None,
     ) -> StatModel:
-        # Missing / placeholder IDs
-        if not discord_id or discord_id in ("-1", "-2") or discord_id.startswith("-"):
-            return StatModel(
-                discord_id=discord_id,
-                index=player_index,
-                id=0,
-                mu=settings.ts_mu,
-                sigma=settings.ts_sigma,
-                games=0,
-                wins=0,
-                first=0,
-                subbedIn=0,
-                subbedOut=0,
-                civs={},
-                leaders={},
-            )
-
+        if discord_id is None or _placeholder(discord_id):
+            return _unrated(discord_id, player_index)
         doc = await self.ratings.get_player_stat_doc(
             civ_version=match.game,
             is_seasonal=is_seasonal,
@@ -142,40 +183,7 @@ class MatchService:
             discord_id=discord_id,
             session=session,
         )
-
-        if not doc:
-            return StatModel(
-                discord_id=discord_id,
-                index=player_index,
-                id=discord_id,
-                mu=settings.ts_mu,
-                sigma=settings.ts_sigma,
-                games=0,
-                wins=0,
-                first=0,
-                subbedIn=0,
-                subbedOut=0,
-                civs={},
-                leaders={},
-            )
-
-        return StatModel(
-            discord_id=discord_id,
-            index=player_index,
-            mu=as_float(doc.get("mu"), settings.ts_mu),
-            sigma=as_float(doc.get("sigma"), settings.ts_sigma),
-            games=as_int(doc.get("games"), 0),
-            wins=as_int(doc.get("wins"), 0),
-            first=as_int(doc.get("first"), 0),
-            subbedIn=as_int(doc.get("subbedIn"), 0),
-            subbedOut=as_int(doc.get("subbedOut"), 0),
-            civs=dict(doc.get("civs", {}))
-            if isinstance(doc.get("civs", {}), dict)
-            else {},
-            leaders=dict(doc.get("leaders", {}))
-            if isinstance(doc.get("leaders", {}), dict)
-            else {},
-        )
+        return _stat_of(discord_id, player_index, doc)
 
     async def get_players_ranking(
         self,
@@ -184,28 +192,28 @@ class MatchService:
         is_combined: bool = False,
         session: AsyncClientSession | None = None,
     ) -> list[StatModel]:
-        if not match.players:
-            return []
-
-        if session is not None:
-            return [
-                await self.get_player_ranking(
-                    match, p.discord_id, i, is_seasonal, is_combined, session
-                )
-                for i, p in enumerate(match.players)
-            ]
-
-        # Bounded concurrency, preserve order
-        sem = asyncio.Semaphore(min(RANKING_CONCURRENCY_LIMIT, len(match.players)))
-
-        async def _one(i: int, p: PlayerModel) -> StatModel:
-            async with sem:
-                return await self.get_player_ranking(
-                    match, p.discord_id, i, is_seasonal, is_combined
-                )
-
-        tasks = [asyncio.create_task(_one(i, p)) for i, p in enumerate(match.players)]
-        return await asyncio.gather(*tasks)
+        """Every seat's rating in one scope, read in one query, in seat order."""
+        ids = [p.discord_id for p in match.players]
+        real = [i for i in ids if i is not None and not _placeholder(i)]
+        docs = (
+            await self.ratings.get_player_stat_docs_batch(
+                civ_version=match.game,
+                is_seasonal=is_seasonal,
+                match_type=match.game_mode,
+                is_cloud=match.is_cloud,
+                is_combined=is_combined,
+                discord_ids=list(dict.fromkeys(real)),
+                session=session,
+            )
+            if real
+            else {}
+        )
+        return [
+            _stat_of(i, n, docs.get(i))
+            if i is not None and not _placeholder(i)
+            else _unrated(i, n)
+            for n, i in enumerate(ids)
+        ]
 
     def update_player_stats(
         self, match: MatchModel, players_ranking: list[StatModel], delta_value_name: str
@@ -315,10 +323,15 @@ class MatchService:
 
     async def _recompute_deltas(self, match: MatchModel) -> MatchModel:
         """Recompute the delta/season_delta/combined_delta triple on match.players."""
-        players_ranking = await self.get_players_ranking(match)
-        players_season_ranking = await self.get_players_ranking(match, is_seasonal=True)
-        players_combined_ranking = await self.get_players_ranking(
-            match, is_combined=True
+        # Three reads, one per scope, at once: none depends on another.
+        (
+            players_ranking,
+            players_season_ranking,
+            players_combined_ranking,
+        ) = await asyncio.gather(
+            self.get_players_ranking(match),
+            self.get_players_ranking(match, is_seasonal=True),
+            self.get_players_ranking(match, is_combined=True),
         )
 
         match, _ = self.update_player_stats(match, players_ranking, "delta")

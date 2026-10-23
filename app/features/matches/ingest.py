@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from typing import TYPE_CHECKING, Any
 
@@ -39,15 +40,17 @@ class IngestService:
     ) -> dict[str, Any]:
         save_bytes_sha256 = hashlib.sha256(file_bytes).hexdigest()
 
-        for finder in (
-            self._m.q.find_pending_by_bytes,
-            self._m.q.find_validated_by_bytes,
-        ):
-            existing = await finder(save_bytes_sha256)
-            if existing:
-                return self._repeated(existing, "file")
+        # Both stores at once; a pending copy answers before an approved one.
+        pending, validated = await asyncio.gather(
+            self._m.q.find_pending_by_bytes(save_bytes_sha256),
+            self._m.q.find_validated_by_bytes(save_bytes_sha256),
+        )
+        existing = pending or validated
+        if existing:
+            return self._repeated(existing, "file")
 
-        parsed = self._m._parse_save(file_bytes)
+        # Parsing is CPU work: off the event loop, so other requests go on.
+        parsed = await asyncio.to_thread(self._m._parse_save, file_bytes)
         # Rating needs two sides; one would fail deep in TrueSkill as a 500.
         if len({p["team"] for p in parsed["players"]}) < 2:
             raise MatchServiceError("A report needs at least two players or teams.")

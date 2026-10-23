@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
@@ -401,11 +402,17 @@ class EditingService:
         )
         steam_ids: dict[str, str | None] = {}
         unregistered: list[str] = []
-        for discord_id in wanted:
-            try:
-                steam_ids[discord_id] = await self._m.seat_steam_id(discord_id)
-            except MatchServiceError:
+        # Every player looked up at once; a large assign is one wait, not twelve.
+        found = await asyncio.gather(
+            *(self._m.seat_steam_id(d) for d in wanted), return_exceptions=True
+        )
+        for discord_id, got in zip(wanted, found):
+            if isinstance(got, MatchServiceError):
                 unregistered.append(f"<@{discord_id}>")
+            elif isinstance(got, BaseException):
+                raise got
+            else:
+                steam_ids[discord_id] = got
         if unregistered:
             who = ", ".join(unregistered)
             verb = "is" if len(unregistered) == 1 else "are"
