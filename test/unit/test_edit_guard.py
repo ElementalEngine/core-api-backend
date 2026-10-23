@@ -125,6 +125,27 @@ def test_a_patch_during_an_approve_is_refused(monkeypatch):
         _patch(_svc(_Q(_doc(), held=True), monkeypatch))
 
 
+def test_every_unregistered_player_is_named_and_nothing_is_written(monkeypatch):
+    from app.features.matches.errors import MatchServiceError
+
+    q = _Q(_doc())
+    svc = _svc(q, monkeypatch)
+
+    async def _unlinked(discord_id):
+        raise MatchServiceError(f"User {discord_id} not found")
+
+    monkeypatch.setattr(svc, "discord_to_steam_id", _unlinked)
+    a, b = "100000000000000003", "100000000000000004"
+    edit = EditingService(svc).patch_players(
+        OID,
+        [SeatPatch(seat=0, discord_id=a), SeatPatch(seat=1, discord_id=b)],
+        actor_is_staff=False,
+    )
+    with pytest.raises(MatchServiceError, match=f"<@{a}>, <@{b}> are not registered"):
+        asyncio.run(edit)
+    assert q.players is None
+
+
 def test_a_contest_is_pushed_not_rewritten(monkeypatch):
     q = _Q(_doc())
     asyncio.run(
