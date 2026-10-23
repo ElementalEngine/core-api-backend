@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 from bson import ObjectId
@@ -89,6 +90,9 @@ class _Q:
     async def claim_pending_match(self, oid, *, now):
         return None
 
+    async def find_validated_by_id(self, oid):
+        return getattr(self, "validated", None)
+
 
 def _svc(q, monkeypatch):
     svc = MatchService.__new__(MatchService)
@@ -101,7 +105,7 @@ def _svc(q, monkeypatch):
         return "1"
 
     monkeypatch.setattr(svc, "_recompute_deltas", _same)
-    monkeypatch.setattr(svc, "discord_to_steam_id", _steam)
+    monkeypatch.setattr(svc, "seat_steam_id", _steam)
     return svc
 
 
@@ -134,14 +138,16 @@ def test_every_unregistered_player_is_named_and_nothing_is_written(monkeypatch):
     async def _unlinked(discord_id):
         raise MatchServiceError(f"User {discord_id} not found")
 
-    monkeypatch.setattr(svc, "discord_to_steam_id", _unlinked)
+    monkeypatch.setattr(svc, "seat_steam_id", _unlinked)
     a, b = "100000000000000003", "100000000000000004"
     edit = EditingService(svc).patch_players(
         OID,
         [SeatPatch(seat=0, discord_id=a), SeatPatch(seat=1, discord_id=b)],
         actor_is_staff=False,
     )
-    with pytest.raises(MatchServiceError, match=f"<@{a}>, <@{b}> are not registered"):
+    with pytest.raises(
+        MatchServiceError, match=f"<@{a}>, <@{b}> are not registered yet"
+    ):
         asyncio.run(edit)
     assert q.players is None
 
@@ -178,6 +184,29 @@ def test_a_delete_during_an_approve_is_refused(monkeypatch):
 def test_a_second_approve_says_it_is_being_approved(monkeypatch):
     with pytest.raises(ApprovingError):
         asyncio.run(_svc(_Q(_doc()), monkeypatch).approve_match(OID, "1"))
+
+
+def test_an_approve_repeated_after_it_landed_gets_the_same_answer(monkeypatch):
+    q = _Q(None)
+    when = datetime(2026, 10, 23, 12, 0, tzinfo=UTC)
+    q.validated = {**_doc(), "approved_at": when, "approver_discord_id": "7"}
+    svc = _svc(q, monkeypatch)
+
+    async def _ratings(match, **_):
+        return [SimpleNamespace(mu=31.0), SimpleNamespace(mu=19.0)]
+
+    monkeypatch.setattr(svc, "get_players_ranking", _ratings)
+    out = asyncio.run(svc.approve_match(OID, "1"))
+    assert (out["match_id"], out["approved_at"], out["approver_discord_id"]) == (
+        OID,
+        when,
+        "7",
+    )
+    # Rank roles follow a repeat too, from the ratings as they stand.
+    assert out["affected_players"] == [
+        {"discord_id": "100000000000000001", "rating_mu": 31.0},
+        {"discord_id": "100000000000000002", "rating_mu": 19.0},
+    ]
 
 
 def test_a_claim_older_than_the_ttl_no_longer_holds():
@@ -247,3 +276,35 @@ def test_a_plain_index_dropped_by_another_process_is_not_an_error():
     col.index_information = _gone
     col.indexes = {"_id_": {}}
     assert _ensure(col)["pending_matches_save_file_hash_uq"] == {"unique": True}
+
+
+def test_a_clashing_rating_write_can_be_retried_and_nothing_leaks():
+    from app.features.matches.approval import _write_failure
+    from app.features.matches.errors import MatchServiceError, RetryLaterError
+
+    clash = OperationFailure(
+        "WriteConflict",
+        code=112,
+        details={"errorLabels": ["TransientTransactionError"]},
+    )
+    assert isinstance(_write_failure("approval", clash), RetryLaterError)
+    other = _write_failure("revert", RuntimeError("secret internals"))
+    assert type(other) is MatchServiceError
+    assert "secret" not in str(other)
+
+
+def test_form_and_query_values_the_schema_cannot_bound_are_refused():
+    from fastapi import HTTPException
+
+    from app.features.matches import router_v2
+
+    with pytest.raises(HTTPException) as quota:
+        asyncio.run(router_v2.get_sub_quota(discord_id="99999999999999999999", db=None))
+    assert quota.value.status_code == 400
+    with pytest.raises(HTTPException) as upload:
+        asyncio.run(
+            router_v2.upload_match(
+                file=None, is_cloud="true", discord_message_id="1", actor="1", db=None
+            )
+        )
+    assert upload.value.status_code == 400

@@ -17,6 +17,10 @@ class ApprovingError(MatchServiceError):
     """An approve holds the match, so it cannot change now."""
 
 
+class RetryLaterError(MatchServiceError):
+    """A write that clashed with another one; the same request may be sent again."""
+
+
 class ParseError(MatchServiceError):
     pass
 
@@ -27,4 +31,5 @@ __all__ = [
     "MatchServiceError",
     "NotFoundError",
     "ParseError",
+    "RetryLaterError",
 ]

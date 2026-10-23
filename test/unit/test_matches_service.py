@@ -71,9 +71,11 @@ def make_match_doc(players, *, is_cloud=False):
 
 
 class FakeSession:
-    def __init__(self):
+    def __init__(self, commit_error=None):
         self.committed = False
         self.aborted = False
+        self.in_transaction = True
+        self.commit_error = commit_error
 
     async def __aenter__(self):
         return self
@@ -85,6 +87,10 @@ class FakeSession:
         return self
 
     async def commit_transaction(self):
+        # As pymongo does: a commit ends the transaction, even one that fails.
+        self.in_transaction = False
+        if self.commit_error:
+            raise self.commit_error
         self.committed = True
 
     async def abort_transaction(self):
@@ -137,6 +143,7 @@ class FakeRepo:
 
     async def delete_validated_match(self, oid, session=None):
         self.deleted_validated.append(oid)
+        return True
 
     async def record_sub_in(self, discord_id, match_id, session=None):
         self.sub_events_written.append((discord_id, match_id))
@@ -293,14 +300,14 @@ def test_approve_refuses_a_seat_without_a_player_and_writes_nothing():
 
 
 def test_a_leaver_row_is_not_a_seat_to_assign():
-    from app.features.matches.validation import unassigned_refusal
+    from app.features.matches.validation import approval_refusal
 
     sub = make_player(discord_id="1", is_sub=True)
     leaver = make_player(discord_id="-9", subbed_out=True)
     other = make_player(discord_id="-3", placement=1, team=1)
-    assert unassigned_refusal(MatchModel(**make_match_doc([sub, leaver]))) is None
+    assert approval_refusal(MatchModel(**make_match_doc([sub, leaver]))) is None
     assert (
-        unassigned_refusal(MatchModel(**make_match_doc([sub, leaver, other])))
+        approval_refusal(MatchModel(**make_match_doc([sub, leaver, other])))
         == "Assign seat 2 before approving."
     )
 
@@ -497,3 +504,64 @@ def test_paired_duel_with_one_sub_approves():
     result = asyncio.run(make_service(repo).approve_match(OID, "approver-1"))
     assert result["match_id"]
     assert [d for d, _ in repo.sub_events_written] == ["111"]
+
+
+def test_approve_refuses_a_seat_without_a_leader_or_civ():
+    doc = make_match_doc(
+        [
+            make_player(discord_id="1", placement=0, team=0),
+            make_player(discord_id="2", placement=1, team=1, leader="LEADER_NONE"),
+        ]
+    )
+    repo = FakeRepo(match_doc=doc)
+    with pytest.raises(MatchServiceError, match="leader and civ of seat 2"):
+        asyncio.run(make_service(repo).approve_match(OID, "a-1"))
+    assert repo.validated is None
+
+
+def test_reverting_an_earlier_seasons_match_leaves_this_season_alone():
+    stored = {"_id": 123, "mu": 30.0, "sigma": 5.0, "games": 10, "wins": 4, "first": 2}
+    doc = make_match_doc([make_player(delta=5.0, season_delta=3.0)])
+    repo = FakeRepo(match_doc={**doc, "season_id": ObjectId()}, stat_doc=stored)
+
+    asyncio.run(make_service(repo).revert_match(OID))
+
+    assert {(u["is_seasonal"], u["is_combined"]) for u in repo.upserts} == {
+        (False, False),
+        (False, True),
+    }
+
+
+def test_a_player_linked_to_another_platform_can_take_a_seat():
+    class Users:
+        def __init__(self, user):
+            self.user = user
+
+        async def get_user_by_discord_id(self, discord_id):
+            return self.user
+
+    svc = MatchService.__new__(MatchService)
+    svc.q = Users({"discord_id": "1", "linked_platform": "epic"})
+    assert asyncio.run(svc.seat_steam_id("1")) is None
+    with pytest.raises(MatchServiceError, match="linked Steam account"):
+        asyncio.run(svc.discord_to_steam_id("1"))
+    svc.q = Users(None)
+    with pytest.raises(MatchServiceError, match="not found"):
+        asyncio.run(svc.seat_steam_id("1"))
+
+
+def test_a_commit_that_clashes_is_retryable_and_is_not_aborted_twice():
+    from pymongo.errors import OperationFailure
+
+    from app.features.matches.errors import RetryLaterError
+
+    repo = FakeRepo(match_doc=_two_player_match())
+    repo.session = FakeSession(
+        OperationFailure(
+            "NoSuchTransaction", 251, {"errorLabels": ["TransientTransactionError"]}
+        )
+    )
+    with pytest.raises(RetryLaterError):
+        asyncio.run(make_service(repo).approve_match(OID, "a-1"))
+    assert not repo.session.aborted
+    assert len(repo.releases) == 1

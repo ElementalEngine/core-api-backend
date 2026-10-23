@@ -399,19 +399,19 @@ class EditingService:
                 if isinstance(value, str)
             }
         )
-        steam_ids: dict[str, str] = {}
-        unlinked: list[str] = []
+        steam_ids: dict[str, str | None] = {}
+        unregistered: list[str] = []
         for discord_id in wanted:
             try:
-                steam_ids[discord_id] = await self._m.discord_to_steam_id(discord_id)
+                steam_ids[discord_id] = await self._m.seat_steam_id(discord_id)
             except MatchServiceError:
-                unlinked.append(f"<@{discord_id}>")
-        if unlinked:
-            who = ", ".join(unlinked)
-            verb = "is" if len(unlinked) == 1 else "are"
+                unregistered.append(f"<@{discord_id}>")
+        if unregistered:
+            who = ", ".join(unregistered)
+            verb = "is" if len(unregistered) == 1 else "are"
             raise MatchServiceError(
-                f"{who} {verb} not registered with a linked Steam account yet, "
-                "so cannot take a seat. Pick someone else, or have them register first."
+                f"{who} {verb} not registered yet, so cannot take a seat. "
+                "Pick someone else, or have them register first."
             )
 
         apply_players_patch(match, patch, steam_ids)

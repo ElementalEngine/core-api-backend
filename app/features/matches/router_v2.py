@@ -12,7 +12,7 @@ from app.core.dependencies import (
     get_database,
     require_mito_token,
 )
-from app.core.errors import conflict, forbidden, invalid_request, not_found
+from app.core.errors import api_error, conflict, forbidden, invalid_request, not_found
 from app.features.civdata.repository import CivDataRepository
 from app.features.matches.editing import EditingService
 from app.features.matches.errors import (
@@ -21,6 +21,7 @@ from app.features.matches.errors import (
     MatchServiceError,
     NotFoundError,
     ParseError,
+    RetryLaterError,
 )
 from app.features.matches.ingest import IngestService
 from app.features.matches.leaderboard import LeaderboardService
@@ -61,6 +62,10 @@ def _require_reporter(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
         raise forbidden("Only the reporter or staff may edit this match.")
 
 
+def _retry_later(exc: RetryLaterError) -> Exception:
+    return api_error(code="CONFLICT", message=str(exc), status_code=409, retryable=True)
+
+
 def _require_player(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
     """A player in the match, or staff."""
     if is_staff:
@@ -77,6 +82,9 @@ async def upload_match(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
+    # A form field, so checked here rather than in the schema the bots share.
+    if is_cloud not in ("0", "1"):
+        raise invalid_request("is_cloud must be 0 or 1.")
     raw = await read_capped(file)
     svc = MatchService(db)
     try:
@@ -86,6 +94,8 @@ async def upload_match(
     except ParseError as exc:
         logger.warning("Save not parsed: %s", exc)
         raise invalid_request("That file could not be read as a Civ save.") from exc
+    except MatchServiceError as exc:
+        raise invalid_request(str(exc)) from exc
     logger.info("Stored match %s", created["match_id"])
     return created
 
@@ -124,6 +134,9 @@ async def get_sub_quota(
     discord_id: str = Query(pattern=r"^\d{15,20}$"),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
+    # Ids are stored as Int64; a larger number is no Discord id.
+    if int(discord_id) >= 2**63:
+        raise invalid_request("That is not a Discord id.")
     return await sub_quota(MatchService(db).q, discord_id)
 
 
@@ -193,6 +206,8 @@ async def approve_match(
         raise not_found("Match not found") from exc
     except ApprovingError as exc:
         raise conflict(str(exc)) from exc
+    except RetryLaterError as exc:
+        raise _retry_later(exc) from exc
     except (InvalidIDError, MatchServiceError) as exc:
         raise invalid_request(str(exc)) from exc
 
@@ -224,6 +239,8 @@ async def revert_match(match_id: str, db=Depends(get_database)) -> dict[str, Any
         return await svc.revert_match(match_id)
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
+    except RetryLaterError as exc:
+        raise _retry_later(exc) from exc
     except (InvalidIDError, MatchServiceError) as exc:
         raise invalid_request(str(exc)) from exc
 

@@ -5,19 +5,48 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from bson.int64 import Int64
+from pymongo.errors import PyMongoError
 
 from app.core.coerce import as_float
-from app.features.matches.errors import MatchServiceError, NotFoundError
+from app.features.matches.errors import (
+    MatchServiceError,
+    NotFoundError,
+    RetryLaterError,
+)
 from app.features.matches.models import MatchModel, PlayerModel, StatModel
 from app.features.matches.tallies import bump, stat_legs
-from app.features.matches.validation import unassigned_refusal
+from app.features.matches.validation import approval_refusal
 from app.features.ratings.events import build_match_event
 from app.features.ratings.scope import stat_scope
+from app.features.seasons.repository import SeasonNotSeededError
 
 if TYPE_CHECKING:
     from app.features.matches.service import MatchService
 
 logger = logging.getLogger(__name__)
+
+
+def _write_failure(what: str, exc: Exception) -> MatchServiceError | NotFoundError:
+    """A failed rating transaction, said without its internals: a clash with
+    another write can be retried as is; anything else cannot."""
+    if isinstance(exc, NotFoundError):
+        return exc
+    if isinstance(exc, PyMongoError) and exc.has_error_label(
+        "TransientTransactionError"
+    ):
+        return RetryLaterError(f"The {what} clashed with another change. Try again.")
+    return MatchServiceError(f"The {what} could not be saved.")
+
+
+def _affected(match: MatchModel, ratings: list[StatModel]) -> list[dict[str, Any]]:
+    """The players whose rank roles follow this match, with their rating now."""
+    if match.game_mode.lower() != "ffa" and not match.is_cloud:
+        return []
+    return [
+        {"discord_id": str(p.discord_id), "rating_mu": float(ratings[i].mu)}
+        for i, p in enumerate(match.players)
+        if p.discord_id and not str(p.discord_id).startswith("-")
+    ]
 
 
 class ApprovalService:
@@ -118,16 +147,28 @@ class ApprovalService:
             raise NotFoundError("Match not found")
 
         match = MatchModel(**res)
-
-        # Pre-states
-        pre_lifetime = await self._m.get_players_ranking(match)
-        pre_season = await self._m.get_players_ranking(match, is_seasonal=True)
-        pre_combined = await self._m.get_players_ranking(match, is_combined=True)
+        # A match from an earlier season leaves this season's records alone.
+        try:
+            season = (await self._m.seasons.get_current_season(match.game))["_id"]
+        except SeasonNotSeededError:
+            season = None
+        past_season = res.get("season_id") not in (None, season)
 
         session = await self._m.q.start_session()
         async with session:
             async with await session.start_transaction():
                 try:
+                    # Read inside the transaction, so an approve committed
+                    # meanwhile is a write conflict, not a lost update.
+                    pre_lifetime = await self._m.get_players_ranking(
+                        match, session=session
+                    )
+                    pre_season = await self._m.get_players_ranking(
+                        match, is_seasonal=True, session=session
+                    )
+                    pre_combined = await self._m.get_players_ranking(
+                        match, is_combined=True, session=session
+                    )
                     occurred_at = datetime.now(UTC)
                     events: list[dict[str, Any]] = []
 
@@ -155,6 +196,8 @@ class ApprovalService:
                             (pre_combined[i], combined_delta, False, True),
                         ):
                             if (is_seasonal, is_combined) not in legs:
+                                continue
+                            if is_seasonal and past_season:
                                 continue
                             mu_after = pre.mu - delta_value
                             sigma_after = pre.sigma + 2
@@ -206,15 +249,15 @@ class ApprovalService:
 
                     await self._m.ratings.insert_events(events, session=session)
 
-                    await self._m.q.delete_validated_match(oid, session=session)
+                    if not await self._m.q.delete_validated_match(oid, session=session):
+                        raise NotFoundError("Match not found")
 
                     await session.commit_transaction()
                 except Exception as e:
                     logger.exception("Transaction failed while writing to DB; aborting")
-                    await session.abort_transaction()
-                    raise MatchServiceError(
-                        f"An error occured during writing to DB: {e}"
-                    )
+                    if session.in_transaction:
+                        await session.abort_transaction()
+                    raise _write_failure("revert", e) from e
         return {"match_id": str(match_id), **match.model_dump()}
 
     async def approve_match(
@@ -224,6 +267,21 @@ class ApprovalService:
         claimed_at = datetime.now(UTC)
         res = await self._m.q.claim_pending_match(oid, now=claimed_at)
         if res is None:
+            # Approved already, perhaps by a request whose answer was lost: the
+            # same answer again lets the bot finish posting the result.
+            done = await self._m.q.find_validated_by_id(oid)
+            if done is not None:
+                approved = MatchModel(**done)
+                ratings = await self._m.get_players_ranking(
+                    approved, is_combined=approved.is_cloud
+                )
+                return {
+                    "match_id": str(oid),
+                    **approved.model_dump(),
+                    "approved_at": done.get("approved_at"),
+                    "approver_discord_id": done.get("approver_discord_id"),
+                    "affected_players": _affected(approved, ratings),
+                }
             raise await self._m.refusal(oid)
 
         try:
@@ -235,7 +293,7 @@ class ApprovalService:
                     raise MatchServiceError(
                         "All players must have a placement before approving"
                     )
-            if refusal := unassigned_refusal(match):
+            if refusal := approval_refusal(match):
                 raise MatchServiceError(refusal)
 
             # Read before the transaction opens: a season is cached reference
@@ -387,26 +445,15 @@ class ApprovalService:
                         logger.exception(
                             "Transaction failed while writing to DB; aborting"
                         )
-                        await session.abort_transaction()
-                        raise MatchServiceError(
-                            "The approval could not be saved. Try again."
-                        ) from e
+                        # A failed commit has ended the transaction already.
+                        if session.in_transaction:
+                            await session.abort_transaction()
+                        raise _write_failure("approval", e) from e
 
             logger.info("✅ ✅ Approved match %s", match_id)
-            affected_players = []
-            if match.game_mode.lower() == "ffa" or match.is_cloud:
-                affected_players = [
-                    {
-                        "discord_id": str(player.discord_id),
-                        "rating_mu": float(post_combined[index].mu)
-                        if match.is_cloud
-                        else post_lifetime[index].mu,
-                    }
-                    for index, player in enumerate(match.players)
-                    if player.discord_id
-                    and player.discord_id not in ("-1", "-2")
-                    and not str(player.discord_id).startswith("-")
-                ]
+            affected_players = _affected(
+                match, post_combined if match.is_cloud else post_lifetime
+            )
             # The answer is the approved match, so it says who approved it and when.
             return {
                 "match_id": str(validated_insert_id),

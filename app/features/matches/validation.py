@@ -37,6 +37,7 @@ class Rule(StrEnum):
     TOO_FEW_TEAMS = "too_few_teams"
     DUPLICATE_PLAYER = "duplicate_player"
     STAFF_ONLY_CIV = "staff_only_civ"
+    PLACE_GAP = "place_gap"
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,14 +147,28 @@ def _listed(numbers: Sequence[int]) -> str:
     return words[0] if len(words) == 1 else f"{', '.join(words[:-1])} and {words[-1]}"
 
 
-def unassigned_refusal(match: MatchModel) -> str | None:
-    """Why a match cannot be approved yet: a seat with no player on it."""
-    missing = [
-        n for n, s in enumerate(_seats(match), 1) if is_placeholder(s.discord_id)
-    ]
-    if not missing:
-        return None
-    return f"Assign seat{'s' if len(missing) > 1 else ''} {_listed(missing)} before approving."
+# What a save holds where a civ7 seat had no leader or civ.
+_NO_CIV = frozenset({"LEADER_NONE", "CIVILIZATION_NONE"})
+
+
+def approval_refusal(match: MatchModel) -> str | None:
+    """Why a match cannot be approved yet: a seat with no player, or no civ."""
+    rows = [p for p in match.players if not p.subbed_out]
+    missing = [n for n, p in enumerate(rows, 1) if is_placeholder(p.discord_id)]
+    if missing:
+        plural = "s" if len(missing) > 1 else ""
+        return f"Assign seat{plural} {_listed(missing)} before approving."
+    no_civ = [n for n, p in enumerate(rows, 1) if {p.leader, p.civ} & _NO_CIV]
+    if no_civ:
+        plural = "s" if len(no_civ) > 1 else ""
+        return f"Set the leader and civ of seat{plural} {_listed(no_civ)} before approving."
+    return None
+
+
+def _first_gap(seats: Sequence[_Seat]) -> int | None:
+    """The first place nobody holds below the lowest one held, if any."""
+    held = {s.placement for s in seats if s.placement is not None}
+    return next((k for k in range(len(held)) if k not in held), None)
 
 
 def validate_players_patch(
@@ -275,6 +290,23 @@ def validate_players_patch(
                     "place, and only staff can set a tie.",
                 )
             )
+
+    # Said alone: a place out of range or a refused tie already explains a gap.
+    placed = {Rule.PLACEMENT_OUT_OF_RANGE, Rule.DUPLICATE_PLACEMENT}
+    gap = _first_gap(merged)
+    if (
+        gap is not None
+        and _first_gap(pre) is None
+        and not placed & {v.rule for v in out}
+    ):
+        out.append(
+            Violation(
+                Rule.PLACE_GAP,
+                None,
+                f"Nobody would finish {_ordinal(gap + 1)}; places run 1st, 2nd, "
+                "3rd with no gaps.",
+            )
+        )
 
     for team in sorted(_split_teams(merged) - _split_teams(pre)):
         out.append(

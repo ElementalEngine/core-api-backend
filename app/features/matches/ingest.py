@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from pymongo.errors import DuplicateKeyError
 
+from app.features.matches.errors import MatchServiceError
 from app.features.matches.models import MatchModel
 
 if TYPE_CHECKING:
@@ -47,6 +48,9 @@ class IngestService:
                 return self._repeated(existing, "file")
 
         parsed = self._m._parse_save(file_bytes)
+        # Rating needs two sides; one would fail deep in TrueSkill as a 500.
+        if len({p["team"] for p in parsed["players"]}) < 2:
+            raise MatchServiceError("A report needs at least two players or teams.")
 
         m = hashlib.sha256()
         unique_data = ",".join(

@@ -77,9 +77,16 @@ def test_placement_range_is_team_count_not_player_count():
 
 
 def test_tie_requires_staff_and_staff_may_set_one():
-    patch = [SeatPatch(0, placement=2)]
+    patch = [SeatPatch(2, placement=1)]
     assert rules(check(ffa(), patch)) == [Rule.DUPLICATE_PLACEMENT]
     assert check(ffa(), patch, staff=True) == []
+
+
+def test_places_stay_dense_even_for_staff():
+    # 1st, 2nd, 2nd is a tie; 2nd, 2nd, 3rd leaves nobody first.
+    assert rules(check(ffa(), [SeatPatch(0, placement=2)], staff=True)) == [
+        Rule.PLACE_GAP
+    ]
 
 
 def test_tie_against_an_unpatched_seat_is_caught():

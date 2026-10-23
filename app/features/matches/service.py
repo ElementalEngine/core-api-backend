@@ -71,18 +71,25 @@ class MatchService:
         except Exception as e:
             raise ParseError(f"Parse attempt failed: {e}")
 
-    async def discord_to_steam_id(self, discord_id: str) -> str:
+    async def seat_steam_id(self, discord_id: str) -> str | None:
+        """A registered player's Steam id, or None for one who linked another
+        platform. Someone not registered at all cannot take a seat."""
         player = await self.q.get_user_by_discord_id(discord_id)
         if not player:
             raise MatchServiceError(f"User {discord_id} not found")
-        steam_id = player.get("steam_id")
-        if steam_id:
-            return str(steam_id)
+        if player.get("steam_id"):
+            return str(player["steam_id"])
         if player.get("linked_platform") == "steam" and player.get("linked_account_id"):
             return str(player["linked_account_id"])
-        raise MatchServiceError(
-            f"User {discord_id} does not have a linked Steam account"
-        )
+        return None
+
+    async def discord_to_steam_id(self, discord_id: str) -> str:
+        steam_id = await self.seat_steam_id(discord_id)
+        if steam_id is None:
+            raise MatchServiceError(
+                f"User {discord_id} does not have a linked Steam account"
+            )
+        return steam_id
 
     async def steam_to_discord_id(self, steam_id: str) -> str:
         player = await self.q.get_user_by_steam_id(steam_id)

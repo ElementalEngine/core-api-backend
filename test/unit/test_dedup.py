@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 
+import pytest
 from pymongo.errors import DuplicateKeyError
 
 from app.features.matches.service import MatchService
@@ -30,7 +31,14 @@ PARSED = {
             "civ": "LEADER_DIDO",
             "team": 0,
             "placement": 0,
-        }
+        },
+        {
+            "steam_id": "2",
+            "user_name": "b",
+            "civ": "LEADER_SHAKA",
+            "team": 1,
+            "placement": 1,
+        },
     ],
 }
 
@@ -151,6 +159,18 @@ def test_a_composition_race_returns_repeated_not_500(monkeypatch):
     res = asyncio.run(_upload(_svc(q, monkeypatch)))
     assert res["repeated"] is True
     assert res["repeated_by"] == "composition"
+
+
+def test_a_save_with_one_side_is_refused_before_rating(monkeypatch):
+    from app.features.matches.errors import MatchServiceError
+
+    q = _Q()
+    svc = _svc(q, monkeypatch)
+    one = {**PARSED, "players": PARSED["players"][:1]}
+    monkeypatch.setattr(svc, "_parse_save", lambda b: dict(one))
+    with pytest.raises(MatchServiceError, match="at least two"):
+        asyncio.run(_upload(svc))
+    assert q.inserted is None
 
 
 def test_fresh_upload_stores_a_non_empty_byte_hash(monkeypatch):
