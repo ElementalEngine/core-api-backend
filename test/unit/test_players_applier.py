@@ -167,3 +167,14 @@ def test_leaver_index_reads_adjacency_rather_than_assuming_it():
     match = M(P(0, 0, "A", is_sub=True), P(0, 0, "X", subbed_out=True), P(1, 1, "B"))
     assert _leaver_index(match, 0) == 1
     assert _leaver_index(match, 2) is None
+
+
+def test_a_leader_and_civ_set_by_hand_reach_the_leaver_row_too():
+    match = M(P(0, 0, "A", is_sub=True), P(0, 0, "X", subbed_out=True), P(1, 1, "B"))
+    patch = [SeatPatch(0, leader="LEADER_X", civ="CIV_Y")]
+    apply_players_patch(match, patch, STEAM)
+    assert [(p.leader, p.civ) for p in match.players] == [
+        ("LEADER_X", "CIV_Y"),
+        ("LEADER_X", "CIV_Y"),
+        (None, "Rome"),
+    ]

@@ -440,11 +440,14 @@ def apply_players_patch(
             row.steam_id = steam_ids.get(entry.discord_id, row.steam_id)
         if not isinstance(entry.quit, UnsetType):
             row.quit = entry.quit
-        if not isinstance(entry.placement, UnsetType):
-            row.placement = entry.placement
-            leaver = _leaver_index(match, seat)
-            if leaver is not None:
-                match.players[leaver].placement = entry.placement
+        # The leaver's row is derived from its seat, so it mirrors these.
+        leaver = _leaver_index(match, seat)
+        for name in ("placement", "leader", "civ"):
+            value = getattr(entry, name)
+            if not isinstance(value, UnsetType):
+                setattr(row, name, value)
+                if leaver is not None:
+                    setattr(match.players[leaver], name, value)
 
     structural = [
         (seat, entry.sub_out)

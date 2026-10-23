@@ -36,6 +36,7 @@ class Rule(StrEnum):
     QUIT_ON_PLACEHOLDER = "quit_on_placeholder"
     TOO_FEW_TEAMS = "too_few_teams"
     DUPLICATE_PLAYER = "duplicate_player"
+    STAFF_ONLY_CIV = "staff_only_civ"
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,11 +55,20 @@ class SeatPatch:
     discord_id: str | UnsetType = UNSET
     quit: bool | UnsetType = UNSET
     sub_out: str | None | UnsetType = UNSET
+    leader: str | UnsetType = UNSET
+    civ: str | UnsetType = UNSET
 
     def is_empty(self) -> bool:
         return all(
             isinstance(v, UnsetType)
-            for v in (self.placement, self.discord_id, self.quit, self.sub_out)
+            for v in (
+                self.placement,
+                self.discord_id,
+                self.quit,
+                self.sub_out,
+                self.leader,
+                self.civ,
+            )
         )
 
 
@@ -217,6 +227,16 @@ def validate_players_patch(
                     Rule.PLACEMENT_OUT_OF_RANGE,
                     seat,
                     f"Seat {seat_index[seat] + 1}'s place must be 1 to {t_count}.",
+                )
+            )
+        if not actor_is_staff and not (
+            isinstance(e.leader, UnsetType) and isinstance(e.civ, UnsetType)
+        ):
+            out.append(
+                Violation(
+                    Rule.STAFF_ONLY_CIV,
+                    seat,
+                    f"Only staff can change seat {seat_index[seat] + 1}'s leader or civ.",
                 )
             )
         if e.quit is True and is_placeholder(s.discord_id):

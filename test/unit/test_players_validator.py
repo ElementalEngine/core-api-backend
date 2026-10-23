@@ -213,3 +213,11 @@ def test_messages_number_seats_as_players_see_them():
     assert dup.message == "<@b> would be in seats 1 and 2."
     (own,) = check(ffa(), [SeatPatch(2, sub_out="c")])
     assert own.message == "<@c> cannot come in for themselves in seat 3."
+
+
+def test_only_staff_change_a_leader_or_civ():
+    (refused,) = check(ffa(), [SeatPatch(1, leader="LEADER_X")])
+    assert refused.rule == Rule.STAFF_ONLY_CIV
+    assert refused.message == "Only staff can change seat 2's leader or civ."
+    staff = check(ffa(), [SeatPatch(1, leader="LEADER_X", civ="CIV_Y")], staff=True)
+    assert staff == []

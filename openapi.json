@@ -2288,6 +2288,17 @@
       "SeatPatchIn": {
         "description": "One seat's requested changes. Absent means unchanged.",
         "properties": {
+          "civ": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Civ"
+          },
           "discord_id": {
             "anyOf": [
               {
@@ -2298,6 +2309,17 @@
               }
             ],
             "title": "Discord Id"
+          },
+          "leader": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leader"
           },
           "placement": {
             "anyOf": [

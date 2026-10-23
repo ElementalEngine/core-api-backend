@@ -13,6 +13,7 @@ from app.core.dependencies import (
     require_mito_token,
 )
 from app.core.errors import forbidden, invalid_request, not_found
+from app.features.civdata.repository import CivDataRepository
 from app.features.matches.editing import EditingService
 from app.features.matches.errors import (
     InvalidIDError,
@@ -129,6 +130,27 @@ async def get_match(match_id: str, db=Depends(get_database)) -> dict[str, Any]:
     return await _load(MatchService(db), match_id)
 
 
+async def _require_known_civs(
+    db: AsyncMongoClient, doc: dict[str, Any], body: PlayersPatch
+) -> None:
+    """A leader or civ set by hand must be one the civ data knows, as that kind."""
+    if all(e.leader is None and e.civ is None for e in body.players):
+        return
+    data = await CivDataRepository(db).fetch(str(doc.get("game", "")).lower())
+    leaders = {row["token"] for row in data["leaders"]}
+    civs = {row["token"] for row in data["civs"]}
+    unknown = sorted(
+        {
+            e.leader
+            for e in body.players
+            if e.leader is not None and e.leader not in leaders
+        }
+        | {e.civ for e in body.players if e.civ is not None and e.civ not in civs}
+    )
+    if unknown:
+        raise invalid_request(f"Unknown leader or civ: {', '.join(unknown)}.")
+
+
 @router.patch("/matches/{match_id}/players", response_model=MatchResponse)
 async def patch_players(
     match_id: str,
@@ -138,7 +160,9 @@ async def patch_players(
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     svc = MatchService(db)
-    _require_reporter(await _load(svc, match_id), actor, is_staff)
+    doc = await _load(svc, match_id)
+    _require_reporter(doc, actor, is_staff)
+    await _require_known_civs(db, doc, body)
     try:
         return await EditingService(svc).patch_players(
             match_id, body.to_seat_patches(), actor_is_staff=is_staff
