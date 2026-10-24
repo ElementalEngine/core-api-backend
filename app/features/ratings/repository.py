@@ -172,8 +172,8 @@ class RatingsRepository:
         async with session:
             async with await session.start_transaction():
                 try:
-                    # Its own collection since Entry 6, so no marker flag
-                    # and a real date rather than one hidden in the ObjectId.
+                    # Its own collection, so no marker flag and a real date
+                    # rather than one hidden in the ObjectId.
                     await self._resets.insert_one(
                         {
                             "occurred_at": occurred_at,

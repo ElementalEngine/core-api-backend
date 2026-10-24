@@ -1,18 +1,3 @@
-"""The v2 route table (C1, contract-set §6b).
-
-A literal path and a parameterised path at the same depth are resolved in
-registration order, so `/matches/leaderboard` must be declared before
-`/matches/{match_id}` or it is captured as an id and answers 404 -- or a
-malformed-ObjectId 500. This is a property of the assembled table, not of
-any handler, so no handler test can catch it.
-
-What should break this file: reordering the decorators in router_v2.py, or
-adding a route without amending C1.
-
-The filter is scoped to /api/v2/matches: the v2 prefix already carries
-civ-data from S5, and a bare /api/v2 filter would count it.
-"""
-
 from starlette.routing import Match
 
 from app.features.matches.schemas_v2 import PlayersPatch, SeatPatchIn, UploadResponse
@@ -73,8 +58,7 @@ def test_sub_quota_is_declared_before_the_id_route():
 
 
 def test_leaderboard_resolves_to_its_own_handler():
-    # Declaration order is the mechanism; resolution is the property. This
-    # is the assertion contract-set §6b actually asks for.
+    # Declaration order is the mechanism; resolution is the property.
     scope = _scope("GET", "/api/v2/matches/leaderboard")
     matched = [
         route

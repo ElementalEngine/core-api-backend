@@ -1,12 +1,3 @@
-"""Lobby index declarations and the shapes they enforce.
-
-This asserts what the repository declares, not what Mongo does with it.
-Building the indexes, and the multikey behaviour the one-seat-per-player rule
-rests on, belong to the deployment dry-run.
-
-Governed by D60, D71.
-"""
-
 from __future__ import annotations
 
 import asyncio

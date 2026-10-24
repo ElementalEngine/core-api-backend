@@ -1,17 +1,5 @@
-"""What each viewer is allowed to see of a lobby.
-
-The projection strips fields rather than building a response from an
-allow-list, so anything added to a lobby document is exposed unless something
-removes it. A guard test fails on any field the builder writes that is not
-explicitly classified.
-
-Four things are private until everyone has acted: a settings ballot, a set of
-bans submitted together, a pick, and a blind draft's pools. A leak here is
-silent -- the response looks correct to everyone except the player whose
-choice was shown early.
-
-Governed by D73, D86, D167, D235.
-"""
+"""What each viewer may see of a lobby. Fields are removed rather than allowed,
+so a test fails on any new field not marked public or private."""
 
 from __future__ import annotations
 

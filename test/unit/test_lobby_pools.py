@@ -1,10 +1,3 @@
-"""Dealing draft pools.
-
-Two properties matter more than the arithmetic: pools must be disjoint, or
-two players draft the same leader; and a deal must NOT be reproducible from
-the lobby id, or a blind pool can be computed before it is dealt.
-"""
-
 from __future__ import annotations
 
 import random
@@ -106,8 +99,7 @@ def test_civ_pools_are_disjoint_while_the_set_allows_it():
 
 def test_a_set_too_small_to_go_round_is_dealt_with_overlap():
     # Twelve players at four civs each needs forty-eight from forty-four, so
-    # some civ lands in more than one pool. This is the normal case for a
-    # full lobby and for any game with a chosen starting age.
+    # some civ lands in more than one pool.
     pools = deal_civs(CIVS, 12, 4, random.Random(7))
     flat = [token for pool in pools for token in pool]
     assert len(flat) > len(set(flat))

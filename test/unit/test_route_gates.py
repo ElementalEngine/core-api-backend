@@ -1,18 +1,3 @@
-"""Every mounted route carries a service-token gate, or is public on purpose.
-
-Derived from `app.routes` instead, so a new router without a gate fails here
-by construction rather than by recollection. Adding a route to PUBLIC_PATHS
-is the only way to exempt one, and that is a visible, reviewable act.
-
-C5 puts two routers on ONE prefix under DIFFERENT tokens, which is exactly
-what a per-router tuple cannot express. That is also why route RESOLUTION
-lives here rather than in its own file: section 6b's hazard is a gate
-hazard -- a path resolving to the wrong route is checked against the wrong
-token, and no handler test can see it because the wrong handler runs fine.
-
-Governed by D169.
-"""
-
 from __future__ import annotations
 
 from fastapi.routing import APIRoute
@@ -133,9 +118,8 @@ def test_resolution_finds_a_route_for_an_unambiguous_path():
 
 def test_a_literal_path_is_not_captured_by_its_parameterised_sibling():
     assert resolve("POST", f"{MITE}/claim-post").path == f"{MITE}/claim-post"
-    # `mite` is a literal under /lobbies, where {lobby_id} also lives. If the
-    # router ever preferred the parameter, every bot call would read a lobby
-    # whose id is the word "mite".
+    # `mite` is a literal where {lobby_id} also lives: if the parameter won,
+    # every bot call would read a lobby whose id is the word "mite".
     assert resolve("GET", MITE).path == MITE
     assert (
         resolve("GET", "/api/v2/matches/leaderboard").path

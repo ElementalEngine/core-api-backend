@@ -1,14 +1,5 @@
-"""Whose turn it is. CWC is the only mode that has turns.
-
-**One order table serves both phases.** CWC captains ban in turn and then
-pick in turn, sliced to `team_size * 2` each time, so a 4v4 is eight bans
-then eight picks. Every slice comes out even -- neither team ever acts more
-often than the other.
-
-**Stored, not re-derived.** The order is written onto the lobby when the
-draft is dealt, so a dispute reads what was actually used rather than a rule
-recomputed later.
-"""
+"""Whose turn it is in a CWC draft, the only mode with turns. The order is
+stored on the lobby when the draft is dealt, so a dispute reads what was used."""
 
 from __future__ import annotations
 

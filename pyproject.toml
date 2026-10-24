@@ -5,86 +5,50 @@
 target-version = "py314"
 
 [tool.ruff.lint]
-# Stated explicitly, never inherited: ruff 0.16 raised the default set from
-# 59 rules to 413, so an unset `select` moves under us on every ruff release.
-# Pre-0.16 default, plus B023 by code -- the rest of `B` is 62 false positives
-# on FastAPI's `Depends()`.
-# `UP` whole: all six rules it currently raises are wanted -- PEP 585
-# builtins, PEP 604 unions, datetime.UTC, unquoted annotations and StrEnum.
-# Taking the prefix rather than six codes means a deliberate ruff upgrade
-# reports new modernisations instead of skipping them silently.
-# `I` sorts imports -- nothing enforced an order before, so 34 files had
-# drifted. `ASYNC` was measured at the same time and returned ZERO findings
-# on 80 files, so it is not selected: a ruleset that enforces nothing today
-# is config for its own sake (D68). Re-measure when a new async path lands.
-# RUF100 removes suppressions that suppress nothing -- twenty were dead.
-# RUF022 sorts __all__. PTH prefers pathlib over os.path. B904 and TRY400
-# are NOT selected: both had only unsafe fixes, and losing a traceback is
-# worse than the lint. Reviewed by hand instead -- item 109.
-# RUF100 removes suppressions that suppress nothing -- twenty were dead.
-# RUF022 sorts __all__. PTH118/123 by code, NOT the prefix: `PTH` whole adds
-# five more rules whose only sites are the parsers' __main__ blocks and the
-# save-file harness in test/parsing, which is not in testpaths and where a
-# rewritten path silently means "no saves found" (item 109).
-# B904 and TRY400 are not selected either -- both offer only unsafe fixes,
-# and a wrongly-rewritten except clause loses a traceback.
+# Rules stated explicitly, since ruff's default set changes between releases.
+# B904 and TRY400 stay off: their only fixes are unsafe and can lose a traceback.
 select = ["E4", "E7", "E9", "F", "B023", "I", "PTH118", "PTH123", "RUF022", "RUF100", "UP"]
 
 [tool.ruff.lint.isort]
-# Keep aliased imports in the block they belong to. The default splits every
-# `X as Y` into its own statement, which turned one import from
-# infractions/repository into seven.
+# Keep aliased imports in their block, rather than one statement per `X as Y`.
 combine-as-imports = true
 
 [tool.ruff.lint.per-file-ignores]
-# Each entry names its owning sub-phase. Ignoring by file keeps the rule live
-# everywhere else, so no NEW violation can enter across S2-S12.
-"app/features/matches/service.py" = ["E711", "E712"]  # E712:550 is NOT a safe
-                                                      # fix: None == False
-                                                      # differs from not None. S6.
-"app/features/matches/editing.py" = ["E712"]  # the same set_player_order
-                                              # site, moved verbatim in S6.
-"app/features/matches/parsers/civ6.py" = ["B023", "PTH123"]  # B023 not
-                                       # firing; the closure is called inside
-                                       # its own iteration. §4 item 58.
-                                       # PTH123: the __main__ CLI block. S8.
-"app/features/matches/parsers/civ7.py" = ["PTH123"]  # the __main__ CLI
-                                       # block, same as civ6. S8.
-"test/parsing/*" = ["PTH118", "PTH123"]  # the save-file harness, which is
-                                       # NOT in testpaths -- run by hand
-                                       # against real saves. A path rewritten
-                                       # to satisfy a lint silently yields
-                                       # "no saves found", which passes with
-                                       # zero assertions. §4 item 109.
+# Ignoring by file keeps each rule live everywhere else.
+# E712 is not a safe fix here: `None == False` differs from `not None`.
+"app/features/matches/service.py" = ["E711", "E712"]
+"app/features/matches/editing.py" = ["E712"]
+# B023 misfires (the closure runs inside its own loop); PTH123 is the CLI block.
+"app/features/matches/parsers/civ6.py" = ["B023", "PTH123"]
+"app/features/matches/parsers/civ7.py" = ["PTH123"]
+# The save-file harness, run by hand: a path rewritten for lint finds no saves
+# and passes with zero assertions.
+"test/parsing/*" = ["PTH118", "PTH123"]
 
 [tool.mypy]
 python_version = "3.14"
 files = ["app"]
-# A missing first-party module must fail the check. With this true, mypy
-# passed on a tree that could not be imported (item 43). Only trueskill
-# ships without types, and it is named below.
+# A missing first-party module must fail the check; only trueskill ships
+# without types, and it is named below.
 ignore_missing_imports = false
-# Permissive baseline, deliberately -- D108. Strictness rises per module as
-# each is rewritten.
+# A permissive baseline; strictness rises per module as each is rewritten.
 
 [[tool.mypy.overrides]]
 module = ["trueskill", "trueskill.*"]
 ignore_missing_imports = true
 
-# Quarantine: three entries. Each entry is deleted by the sub-phase that
-# rewrites its file, and that removal is part of that sub-phase's acceptance.
+# Quarantine: each entry goes when its file is rewritten.
 [[tool.mypy.overrides]]
 module = [
-  "app.features.matches.approval",  # None-unsafety, moved from service. S3.
-  "app.features.matches.service",   # slimmed S6; re-measure when the applier opens it (item 66)
-  "app.features.matches.editing",   # v1 bodies moved verbatim from service (S6, D114); items 18/19 sites die with the declarative rewrite
+  "app.features.matches.approval",
+  "app.features.matches.service",
+  "app.features.matches.editing",
 ]
 ignore_errors = true
 
 [tool.pytest.ini_options]
-# The repo is not installed as a package, so `app` is only importable when
-# the repo root is on sys.path. `python -m pytest` adds CWD; bare `pytest`
-# does not -- which is why this passed locally and failed on the first CI run.
+# The repo is not installed, so `app` imports only with the root on sys.path,
+# which bare `pytest` does not add.
 pythonpath = ["."]
 testpaths = ["test"]
 markers = [

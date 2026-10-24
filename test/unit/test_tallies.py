@@ -1,10 +1,3 @@
-"""The tally rules the rebuild and the approve path both use.
-
-They have to be one implementation. If the rebuild counts differently from
-the write path, the first approve after a rebuild starts them drifting and
-nothing notices.
-"""
-
 from __future__ import annotations
 
 import pytest

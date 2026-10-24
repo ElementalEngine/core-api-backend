@@ -155,12 +155,8 @@ async def get_active_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]
 
 
 async def get_overdue_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]:
-    """
-    Suspensions whose `ends` has already passed but the flag was never cleared —
-    happens if the bot was offline (crash, restart, redeploy) when the in-memory
-    expiry timer should have fired. Mirrors get_active_suspensions exactly, with
-    the `ends` bound inverted; uses the same compound index.
-    """
+    """Suspensions past their end that were never cleared, as happens when the bot
+    was offline when the expiry timer should have fired."""
     col = suspensions_col(db)
     now = datetime.now(UTC)
     cursor = col.find(

@@ -1,8 +1,4 @@
-"""Reading a save-file upload with a hard cap.
-
-Both match routers take an upload; the cap and the chunked read belong to
-neither, and v1 is scheduled for deletion at cutover.
-"""
+"""Reads an uploaded save in chunks, refusing anything over the size cap."""
 
 from __future__ import annotations
 
@@ -21,7 +17,7 @@ async def read_capped(file: UploadFile) -> bytes:
     while chunk := await file.read(_READ_CHUNK):
         total += len(chunk)
         if total > MAX_SAVE_BYTES:
-            # The D92 envelope, not a bare string: the bots parse one shape.
+            # The error envelope, not a bare string: the bots parse one shape.
             raise invalid_request(
                 f"Save file too large (limit {MAX_SAVE_BYTES // (1024 * 1024)} MiB)"
             )

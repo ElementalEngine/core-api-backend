@@ -1,15 +1,5 @@
-"""The `lobbies` and `lobby_stats` collections: playbook Entry 7, contract C5.
-
-Half A only: the collections and their three indexes. The domain --
-creation, seats, phases, aggregation -- is Half B.
-
-One repository for both collections, following the house boundary: matches
-binds four, auth three, ratings two. `lobby_stats` is a rebuildable cache
-derived from `lobbies` (Entry 7), written in the same operation, with no
-second consumer yet -- so it is not its own feature.
-
-Governed by D13, D166.
-"""
+"""The `lobbies` and `lobby_stats` collections and their indexes. `lobby_stats`
+is rebuilt from `lobbies` and written with it, so one repository holds both."""
 
 from __future__ import annotations
 
@@ -33,8 +23,8 @@ OPEN_LOBBY = {"closed_at": None}
 
 SEATED_OPEN_LOBBY = {**OPEN_LOBBY, "seats.discord_id": {"$exists": True}}
 
-# Spec section 3: `cancelled` is a phase and the reason is a field. An
-# eviction is not a host cancelling, so it carries its own reason.
+# `cancelled` is a phase and the reason is a field. An eviction is not a host
+# cancelling, so it carries its own reason.
 
 
 class LobbyInsertRefused(RuntimeError):
@@ -195,11 +185,8 @@ class LobbyRepository:
         return written
 
     async def is_playing_a_started_lobby(self, discord_id: str) -> bool:
-        """Whether this player holds a seat in a lobby that has begun.
-
-        Covered by the same partial index as the one-seat-per-player rule, so
-        this is a point lookup rather than a scan.
-        """
+        """Whether this player holds a seat in a lobby that has begun. A point lookup
+        on the one-seat-per-player index."""
         found = await self._lobbies.find_one(
             {
                 "seats.discord_id": discord_id,

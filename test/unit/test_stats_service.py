@@ -1,12 +1,3 @@
-"""Unit tests for the stats service fixes (batch 6.2).
-
-Covers:
-- reset_user_stats 404s BEFORE resetting when the user has no stats (no stat_reset
- marker side effect), and resets exactly once when stats exist;
-- request validation rejections;
-- team generation returns a clean two-team partition of the input ids.
-"""
-
 from __future__ import annotations
 
 import asyncio

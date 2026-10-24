@@ -1,11 +1,3 @@
-"""A seat change refused by an index is a conflict, not an internal error.
-
-`one_active_seat_per_player` refuses a player already seated elsewhere.
-`insert_lobby` has always named that refusal; `replace_seats` let it escape,
-so a player joining a second lobby was told "Something went wrong on our
-side" instead of why.
-"""
-
 from __future__ import annotations
 
 import asyncio

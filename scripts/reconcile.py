@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """reconcile [--epsilon E]
 
-Phase 2 deliverable #7. Sums rating_events deltas per (player_id, scope) and
+Sums rating_events deltas per (player_id, scope) and
 compares against the stat document that scope names. The arithmetic lives in
 app.features.ratings.reconciliation and is fixture-tested; this only fetches.
 
-Exit 1 on any divergence. Run after Entry 8 Release B, after each S5 migration
-touching stats, before cutover, and periodically in prod -- the failure it
-detects has no symptom, so nobody will think to run it.
+Exit 1 on any divergence. Run after any migration touching stats, before
+cutover, and periodically in prod: the failure it detects has no symptom.
 """
 
 from __future__ import annotations

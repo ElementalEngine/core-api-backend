@@ -1,13 +1,5 @@
-"""What a finished lobby contributes to the `lobby_stats` aggregate.
-
-Bans only. What was picked comes from the saves, which record what was
-played, and the settings chosen are read from the lobby documents.
-
-Only a completed lobby contributes. A cancelled draft landed real bans, but
-no game happened.
-
-Governed by D244.
-"""
+"""What a completed lobby adds to `lobby_stats`: its bans only. Picks come from
+the saves, and settings from the lobby documents."""
 
 from __future__ import annotations
 

@@ -1,9 +1,3 @@
-"""Scores come from the save's own score history, and set the starting order.
-
-What should break this file: a score read for the wrong seat, an order that
-ignores who was knocked out, or a history that does not line up being used.
-"""
-
 import os
 import random
 import zlib

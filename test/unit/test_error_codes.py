@@ -1,10 +1,3 @@
-"""Every error code emitted on a v2 surface is one of the eight in the envelope.
-
-A ninth code reaching a client means a generated type does not cover it.
-
-Governed by D92.
-"""
-
 from __future__ import annotations
 
 import ast

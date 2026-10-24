@@ -1,14 +1,3 @@
-"""Creation: what the document carries, and who gets a seat.
-
-Pure -- a fake repository and a fake seasons cache, no database.
-What should break these: seating an over-large roster, seating duplicates,
-assigning teams at creation, forgetting the season stamp, writing a field
-the lobby has not decided yet, or resolving the shape after the season
-lookup so a malformed request reaches the database.
-
-Governed by D59, D60.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -120,7 +109,7 @@ class FakeRepo:
 
     async def find_by_id(self, lobby_id):
         self.asked_for.append(str(lobby_id))
-        # A refused write re-reads to say WHY (spec section 9), so the second
+        # A refused write re-reads to say why, so the second
         # look can legitimately see a different document.
         if self._reread is not None and len(self.asked_for) > 1:
             return self._reread
@@ -448,8 +437,7 @@ def test_a_malformed_id_is_refused_before_the_database():
     repo = FakeRepo(lobby=READ_LOBBY)
     with pytest.raises(InvalidLobbyId):
         read(repo, lobby_id="nope", viewer_discord_id="bob")
-    # C5 section 6b names the malformed-ObjectId 500. The check sits before
-    # the round trip, not around it.
+    # A malformed id is refused before the round trip, not after it.
     assert repo.asked_for == []
 
 
@@ -559,7 +547,7 @@ def test_the_guard_reports_a_field_that_is_neither_public_nor_censored():
     assert unclassified(seated) == {"unlisted_seat_field"}
 
 
-# --- changing a seat (C5 PATCH /{id}/seats) -----------------------------
+# --- changing a seat (PATCH /{id}/seats) --------------------------------
 
 OPEN_LOBBY = {
     "_id": "L1",
@@ -768,9 +756,8 @@ def test_a_ballot_is_stored_on_the_voting_seat_only():
 
 
 def test_the_last_ballot_tallies_and_moves_to_bans():
-    # A seat finishing is what ends the phase, not a seat submitting. The
-    # resolution happens in the same call, so the caller never waits for a
-    # poll tick.
+    # A seat finishing ends the phase, not a seat submitting, and the phase
+    # resolves in the same call.
     voted = {
         **VOTING,
         "seats": [
@@ -1269,9 +1256,7 @@ def test_a_seat_that_already_picked_is_refused_outright():
 
 
 def test_the_host_takes_the_first_seat_and_nobody_else_is_seated():
-    # A lobby opens with one seat filled. Everyone else presses join, so the
-    # lobby fills by self-selection rather than by who happened to be in
-    # voice when the command ran.
+    # A lobby opens with one seat filled; everyone else joins.
     seats = seat_the_host("alice")
     assert seats == [{"seat_index": 0, "discord_id": "alice", "team": None}]
 

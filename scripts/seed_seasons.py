@@ -3,7 +3,7 @@
 
 Playbook Entry 11 step 3. Creates the two seed rows in `seasons`, one per
 edition. `started_at` is the migration timestamp, recorded as the TRACKING
-start, not the true start of either season (D104).
+start, not the true start of either season.
 
 Deliberately NOT idempotent: a second run must fail with E11000 against
 unique_label_per_edition (Entry 11 checks 5 and 6). That index is what stops

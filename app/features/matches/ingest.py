@@ -21,10 +21,8 @@ class IngestService:
 
     @staticmethod
     def _repeated(doc: dict[str, Any], repeated_by: str) -> dict[str, Any]:
-        """
-        One shape for all three duplicate paths. repeated_by discriminates file
-        from composition; Mite reads it in S9.
-        """
+        """One answer shape for every duplicate. `repeated_by` says whether the file
+        or the game's composition matched."""
         out = dict(doc)
         out["match_id"] = str(out.pop("_id"))
         out["repeated"] = True

@@ -1,16 +1,5 @@
-"""Dealing draft pools from the leaders and civs left after bans.
-
-Every player gets the same number of options and the remainder is discarded:
-forty-four leaders across five players deals eight each and drops four. An
-uneven split would give somebody a wider choice than the rest.
-
-Deals use system randomness and are not seeded. A pool dealt from a
-reproducible seed could be worked out in advance by anyone holding the lobby
-id, which would defeat the blind draft. The dealt pools stored on the seats
-are the record, not the seed.
-
-Governed by D197, D198.
-"""
+"""Deals draft pools from what is left after bans. Every pool is the same size,
+and deals are unseeded so nobody can work out a blind pool in advance."""
 
 from __future__ import annotations
 
@@ -53,12 +42,8 @@ CIV_TARGET_BY_TEAM_COUNT = {2: 7, 3: 5, 4: 5}
 
 
 def civ_target(game_type: str, groups: int) -> int:
-    """How many civs each player or team is offered.
-
-    A target rather than a division: there are few enough civs that splitting
-    them by player count would leave almost no choice. In a teamer the team is
-    the unit, so a 3v3 is two groups of seven rather than six of two.
-    """
+    """How many civs each player or team is offered: a fixed target, because there
+    are too few civs to split by player count."""
     if game_type == "teamer":
         return CIV_TARGET_BY_TEAM_COUNT.get(groups, CIV_TARGET_PER_PLAYER)
     return CIV_TARGET_PER_PLAYER
@@ -67,13 +52,8 @@ def civ_target(game_type: str, groups: int) -> int:
 def deal_civs(
     tokens: Sequence[str], groups: int, target: int, rng: Any = _RANDOM
 ) -> list[list[str]]:
-    """Civ pools, disjoint while the remaining set allows it.
-
-    Once the set is too small to give every group its target without reuse,
-    each group draws independently and the same civ can appear in several
-    pools. A twelve-player game, or any game with a chosen starting age,
-    lands in that case.
-    """
+    """Civ pools, disjoint while there are enough civs; otherwise each group draws
+    on its own and a civ can be offered to more than one."""
     if target < 1:
         raise NotEnoughPool(f"a civ target of {target} offers nothing")
     if not tokens:

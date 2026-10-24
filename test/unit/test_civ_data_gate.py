@@ -1,11 +1,3 @@
-"""The civ-data gate and route.
-
-require_any_service_token widens the gate rather than naming one bot, so the
-test that matters is that each configured token is admitted and anything else
-is not. The route test also pins the ordering: the gate runs before the path
-parameter is validated, so an unknown edition is 401 and not 422.
-"""
-
 from __future__ import annotations
 
 import pytest

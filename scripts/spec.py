@@ -2,8 +2,6 @@
 
 The dump format must match CI's comparison exactly or the check is flaky:
 `indent=2`, `sort_keys=True`, one trailing newline.
-
-Governed by D98.
 """
 
 from __future__ import annotations

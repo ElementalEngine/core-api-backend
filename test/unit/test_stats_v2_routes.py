@@ -1,14 +1,3 @@
-"""C2's stats routes, and the one field that differs from v1.
-
-The route table has no path parameters, so it carries none of C1's
-ordering hazard -- what it can get wrong instead is the pair of legacy
-PUTs surviving the cutover, or `wins` leaking onto a surface that C2
-requires to say which counter it shows.
-
-What should break this file: adding a v2 stats route without amending
-C2, resurrecting either legacy PUT, or renaming rating_gains.
-"""
-
 from app.features.stats.schemas import StatRow
 from app.features.stats.schemas_v2 import StatRowV2, UserStatsResponseV2
 from app.main import app

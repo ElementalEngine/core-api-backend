@@ -1,12 +1,3 @@
-"""The upload route caps the request body before reading it.
-
-Reading an unbounded body on a host with no swap and no memory limit lets one
-request take the process down. The cap is enforced in the handler, and this
-proves a body over it is refused rather than buffered.
-
-Governed by D79, D83, D92.
-"""
-
 from __future__ import annotations
 
 import pytest

@@ -1,12 +1,3 @@
-"""The visibility table, row by row.
-
-Every combination of phase, draft mode and viewer, checked against what the
-table says that viewer may see. Blind draft has an explicit case asserting the
-pool is absent, not merely the pick.
-
-Governed by D73, D86, D167, D235.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -87,7 +78,7 @@ def test_d73_row(phase, mode, revealed, viewer, ballots, pools, picks):
     assert holders_of(projected, "ballot") == ballots
     assert holders_of(projected, "pool") == pools
     # A pick is never shown before the pool it came from: hiding the pool
-    # but not the pick is the elimination leak the spec names.
+    # but not the pick leaks it by elimination.
     assert holders_of(projected, "pick") == picks
     assert picks <= pools
 

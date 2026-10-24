@@ -13,8 +13,6 @@ code, against v2 on approve:
                 with v2's rating settings, so the comparison is of code alone
 
 Secrets arrive on stdin or from the dev .env and are never printed.
-
-Governed by D246.
 """
 
 from __future__ import annotations

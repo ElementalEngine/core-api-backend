@@ -63,8 +63,8 @@ def api_error(
     retryable: bool = False,
     details: Any | None = None,
 ) -> HTTPException:
-    """The D92 envelope: a closed code enum, INTERNAL as the catch-all, and a
-    correlation id on anything unhandled."""
+    """The error envelope: a closed set of codes, with INTERNAL and a correlation
+    id for anything unhandled."""
     return HTTPException(
         status_code=status_code,
         detail=_error_envelope(
@@ -86,7 +86,7 @@ def not_found(message: str) -> HTTPException:
 
 
 def conflict(message: str, details: Any | None = None) -> HTTPException:
-    """C5 invariant 5: 409 with code CONFLICT."""
+    """409 with code CONFLICT."""
     return api_error(code="CONFLICT", message=message, status_code=409, details=details)
 
 

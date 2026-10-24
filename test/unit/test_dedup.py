@@ -1,10 +1,3 @@
-"""Two uploads of the same save are one match, not two.
-
-Identity is the save's own content, so a renamed file is still the same game.
-
-Governed by D133.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -106,7 +99,6 @@ def test_same_bytes_in_pending_is_repeated_by_file(monkeypatch):
 
 
 def test_approved_match_blocks_reupload(monkeypatch):
-    """Entry 12 check 6 -- the live double-rating path."""
     from bson import ObjectId
 
     q = _Q(validated_bytes={"_id": ObjectId(), "save_bytes_sha256": BYTES_HASH})
@@ -125,7 +117,6 @@ def test_same_lineup_different_file_is_repeated_by_composition(monkeypatch):
 
 
 def test_insert_race_returns_repeated_not_500(monkeypatch):
-    """Entry 12 check 9 -- E11000 becomes an answer, not an error."""
     from bson import ObjectId
 
     q = _Q(insert_raises=True)

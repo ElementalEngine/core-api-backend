@@ -1,12 +1,3 @@
-"""The seeded leader and civ data is internally consistent.
-
-The test lives with the data rather than in a bot-side copy: one that passes
-while the source is broken is worse than no test at all. Pure -- it reads the
-seed files and never opens a connection.
-
-Governed by D49, D59, D60, D235.
-"""
-
 from app.features.civdata.seeds import (
     AUTHORING_ONLY,
     EDITIONS,

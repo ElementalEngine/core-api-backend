@@ -109,7 +109,7 @@ async def upload_match(
 
 
 # Declared before /matches/{id}: a literal path at the same depth as a
-# parameterised one is captured by whichever registers first (§6b).
+# parameterised one is captured by whichever registers first.
 @router.get("/matches/leaderboard", response_model=LeaderboardRankingResponse)
 async def get_leaderboard(
     game: str,

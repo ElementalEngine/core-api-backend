@@ -1,12 +1,3 @@
-"""The current season resolves per edition, and its cache hands out a copy.
-
-Index declarations are captured here; Mongo actually building them belongs to
-the deployment dry-run rather than to CI. A test that asserts on a collection
-it never touched would be green having run nothing.
-
-Governed by D60, D86.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -142,7 +133,8 @@ def test_clear_cache_forces_a_reread():
 
 
 class RecordingCollection(FakeCollection):
-    """Captures index declarations. Mongo building them is Entry 11's dev dry-run; what this pins is that we still ASK for them -- records the risk of someone dropping the unique index to silence the E11000 that proves the seed cannot double-run."""
+    """Captures the index declarations, so a test fails if the unique index that
+    stops a second seed run is dropped."""
 
     def __init__(self):
         super().__init__([])

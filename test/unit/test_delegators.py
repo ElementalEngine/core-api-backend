@@ -1,17 +1,3 @@
-"""Every delegator forwards its own parameters, unchanged.
-
-S6's carve produced eight wrong delegators; five sat on v1 routes with no
-test, and four green gate runs said nothing because the files holding them
-are mypy-quarantined. Coverage did not catch it; this shape did.
-
-A delegator is a method whose whole body is `return [await] X.<same name>(...)`.
-Name equality is the definition, not a heuristic: it is what separates a
-forward from a repository method that happens to return a single call.
-
-What should break this file: a carve that leaves a delegator forwarding
-fewer arguments than it takes, in either position or keyword form.
-"""
-
 from __future__ import annotations
 
 import ast

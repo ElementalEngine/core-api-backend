@@ -1,9 +1,3 @@
-"""Turn order. CWC is the only mode that has turns.
-
-Without this, a pick is accepted from any seat at any moment -- and nothing
-errors, the draft just stops being a draft.
-"""
-
 from __future__ import annotations
 
 import pytest

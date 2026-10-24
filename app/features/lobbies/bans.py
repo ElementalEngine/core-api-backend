@@ -1,20 +1,5 @@
-"""Resolving the ban phase.
-
-Each seated player submits a set of leader and civ keys. A key lands when it
-reaches a majority of all seats -- not of the players who submitted, since a
-timeout creates non-submitters and must not make bans easier to land.
-
-The number that can land is capped per edition, and for civ7 the civ cap
-depends on the starting age chosen when the lobby was created. At the cap,
-keys tied on the boundary all drop, but only when something below the cap
-ties with them; a cap falling in a gap keeps the full set.
-
-Bans name tokens from the civ-data catalogue. Civs are checked against the
-starting age's pool only, so a real token for a civ that is not in the game
-cannot use up one of the three slots.
-
-Governed by D195, D196.
-"""
+"""Which bans land: a key needs a majority of all seats, not of those who
+submitted, and each edition caps how many land."""
 
 from __future__ import annotations
 

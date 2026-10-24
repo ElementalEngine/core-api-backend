@@ -96,11 +96,8 @@ class MatchRepository:
     async def find_validated_by_bytes(
         self, save_bytes_sha256: str
     ) -> dict[str, Any] | None:
-        """
-        The cross-collection half of the dedup. The unique indexes are
-        per-collection, so approval moving a document out of pending_matches is
-        what reopened the double-rating path., Entry 12.
-        """
+        """The same file among approved matches. The unique indexes are per collection,
+        so approval moving a match out of pending would otherwise reopen it."""
         return await self._validated.find_one({"save_bytes_sha256": save_bytes_sha256})
 
     async def find_pending_by_id(self, oid: ObjectId) -> dict[str, Any] | None:

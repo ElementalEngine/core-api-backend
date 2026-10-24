@@ -1,10 +1,3 @@
-"""The mito gate, end to end: 401 without the header, admitted with it.
-
-Needs httpx (FastAPI's TestClient transport) and skips cleanly without it.
-
-Governed by D169.
-"""
-
 from __future__ import annotations
 
 import pytest

@@ -1,17 +1,3 @@
-"""catch-all: an unhandled error is INTERNAL/500, never a 503 costume.
-
-503 says "transient, try again". A bug is not transient, and the current
-handlers that dress one as 503 invite a client to retry it forever. The
-correlation id is what makes the 500 traceable without leaking str(exc).
-
-The structural test always runs; the functional one needs httpx.
-
-What should break this file: returning str(exc) to the client, marking
-INTERNAL retryable, or dropping the middleware that mints the id.
-
-Governed by D92.
-"""
-
 from __future__ import annotations
 
 import logging

@@ -20,7 +20,7 @@ counts nowhere.
 Never creates a stat document. A player with matches and no document was
 reset; the reset deleted their tally with it and that is correct.
 
-Dry run unless --apply. Export first, D115. mu and sigma are never written.
+Dry run unless --apply. Export first. mu and sigma are never written.
 """
 
 from __future__ import annotations

@@ -1,12 +1,3 @@
-"""What a finished lobby contributes to `lobby_stats`.
-
-These counters are a permanent record that nothing recomputes. A double
-count is invisible and lasts forever -- the same class of problem ledger
-reconciliation exists for.
-
-Governed by D60.
-"""
-
 from __future__ import annotations
 
 import pytest

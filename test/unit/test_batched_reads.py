@@ -1,9 +1,3 @@
-"""The upload and edit paths read in batches and give the same answers.
-
-What should break this file: a batched read that rates or names a seat
-differently from reading it alone, or that goes back to one query per seat.
-"""
-
 from __future__ import annotations
 
 import asyncio

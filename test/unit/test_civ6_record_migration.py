@@ -1,11 +1,3 @@
-"""Entry 10's correction of civ6 player records, and the tally rebuild's reading
-of whatever it leaves behind.
-
-Production holds three shapes the parser no longer writes. Each case here is
-one of them, measured on prod: the correction must reach tokens where the
-mapping allows, and leave alone what carries no information.
-"""
-
 from __future__ import annotations
 
 import pytest

@@ -68,7 +68,7 @@ class EditingService:
         *,
         actor_is_staff: bool,
     ) -> dict[str, Any]:
-        """C1's declarative PATCH: one request, one judgement, one recompute."""
+        """One request, one judgement, one recompute."""
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_pending_by_id(oid)
         if not res:

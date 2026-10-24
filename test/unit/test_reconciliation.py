@@ -1,12 +1,3 @@
-"""The ledger sums to the stat movement it claims to explain.
-
-The transactional flows have no database-backed coverage, so this checks the
-arithmetic in isolation: every ledger entry for a scope must account for the
-change in that scope's stats, within a tolerance for float rounding.
-
-Governed by D60, D86.
-"""
-
 from __future__ import annotations
 
 import random

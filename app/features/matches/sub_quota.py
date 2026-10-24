@@ -1,10 +1,5 @@
-"""How often a player has subbed in lately, against the league's limit.
-
-A sub-in is recorded when its match is approved. Going over the limit is
-reported to staff, who act through an infraction; nothing here refuses.
-
-Governed by D62.
-"""
+"""How often a player has subbed in over the last 30 days. Going over is
+reported to staff; nothing here refuses."""
 
 from __future__ import annotations
 

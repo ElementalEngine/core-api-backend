@@ -91,7 +91,7 @@ class ApprovalService:
         player: PlayerModel,
         existing_leaders: dict[str, Any],
     ) -> dict[str, Any]:
-        # Civ6 records written before Entry 10 have no leader; they are left
+        # Older civ6 records have no leader; they are left
         # out rather than bucketed under a placeholder key.
         return self._shift_tally(
             existing_leaders, player.leader, won=player.delta > 0, step=+1

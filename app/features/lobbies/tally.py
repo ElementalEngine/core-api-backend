@@ -1,20 +1,5 @@
-"""Resolving the settings ballot.
-
-Each question is decided by plurality, and by approval where the question
-allows more than one selection -- a seat approving two maps casts two votes,
-stored as `a|b`.
-
-A question that not every voter answered takes its default rather than the
-plurality of those who did answer. That is what makes an expired settings
-phase safe to advance: every question has a defined outcome.
-
-Ties break on sha256(lobby_id:question_id), so a disputed tie can be
-recomputed from the lobby. The tied options are sorted before indexing;
-without that the result would follow dict iteration order, which is stable
-within a process but not across a restart.
-
-Governed by D191, D192.
-"""
+"""Resolves the settings vote: plurality, or approval where a question allows
+more than one. Unanswered questions take their default; ties break on a hash."""
 
 from __future__ import annotations
 

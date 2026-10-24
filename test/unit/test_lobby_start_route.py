@@ -1,12 +1,3 @@
-"""The start route over HTTP: the host's success path and its refusals.
-
-The service has its own tests; this file proves the route hands the request
-through, returns what the service returned, and turns each refusal into its
-envelope. Needs httpx (FastAPI's TestClient transport) and skips without it.
-
-Governed by D169, D220.
-"""
-
 from __future__ import annotations
 
 import pytest

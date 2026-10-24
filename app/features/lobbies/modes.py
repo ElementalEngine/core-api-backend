@@ -1,16 +1,5 @@
-"""What a lobby's game type implies about its seats.
-
-Mite sends `game_type`, plus two numbers when it is a teamer. Everything
-else is derived here, so no client computes a seat count and there is one
-place to read when the rules change (spec section 11).
-
-`duel` derives to two teams of one. The spec already says "Duel = team of
-one" (section 4), and it is what makes `is_captain` -- the lowest seat_index
-within a team -- name both duellists with no special case. It stays a
-distinct game_type because the rating scopes are per-mode (`rt_duel`).
-
-Governed by D75.
-"""
+"""What a lobby's game type means for its seats. A duel is two teams of one,
+so each duellist is their team's captain with no special case."""
 
 from __future__ import annotations
 
@@ -154,7 +143,7 @@ def validate_seats(seats: Sequence[Mapping[str, Any]], shape: LobbyShape) -> Non
         indexes.add(index)
 
         # A seated player with no side is legal everywhere: seating means
-        # "you are in this lobby", never "you are on red" (spec section 4).
+        # "you are in this lobby", never "you are on red".
         team = seat.get("team")
         if team is None:
             continue

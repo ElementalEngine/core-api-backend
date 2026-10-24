@@ -5232,7 +5232,7 @@
     },
     "/api/v2/lobbies/{lobby_id}": {
       "get": {
-        "description": "One lobby, censored for the caller, revision-gated.\n\nStaff watching a lobby they are not playing in see it uncensored.",
+        "description": "One lobby, censored for the caller, revision-gated. Staff watching a lobby\nthey are not playing in see it uncensored.",
         "operationId": "read_lobby_api_v2_lobbies__lobby_id__get",
         "parameters": [
           {
@@ -5553,7 +5553,7 @@
     },
     "/api/v2/lobbies/{lobby_id}/ready": {
       "put": {
-        "description": "A seat finishes the current phase, whether or not it submitted.\n\nThe phase advances as soon as every seated player is ready, so a lobby\nthat agrees quickly does not wait out its timer.",
+        "description": "A seat finishes the current phase, whether or not it submitted. The phase\nadvances once every seated player is ready.",
         "operationId": "mark_ready_api_v2_lobbies__lobby_id__ready_put",
         "parameters": [
           {
@@ -5629,7 +5629,7 @@
     },
     "/api/v2/lobbies/{lobby_id}/seats": {
       "patch": {
-        "description": "Self-place, leave, move and host rearrange (C5), returning the updated censored\nsnapshot so the caller never waits for a poll tick.",
+        "description": "Take, leave or move a seat, or rearrange as host; returns the updated\nsnapshot so the caller does not wait for a poll.",
         "operationId": "change_seat_api_v2_lobbies__lobby_id__seats_patch",
         "parameters": [
           {

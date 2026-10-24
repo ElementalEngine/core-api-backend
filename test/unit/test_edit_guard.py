@@ -1,14 +1,3 @@
-"""Edits and approval do not overlap.
-
-An approve reads the match once, then moves it. A patch, contest or delete
-landing in between would be lost or would wipe the claim, so each write is
-guarded and a refused one says why.
-
-What should break this file: a write path that replaces the whole pending
-document, or a guarded write whose miss is reported as anything but 404 or
-"being approved".
-"""
-
 from __future__ import annotations
 
 import asyncio

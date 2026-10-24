@@ -63,10 +63,8 @@ class SeasonsRepository:
         )
 
     async def seed(self, documents: list[dict[str, Any]]) -> int:
-        """
-        Insert the seed rows. Deliberately not an upsert: a second run must be
-        rejected by unique_label_per_edition (Entry 11 checks 5, 6).
-        """
+        """Insert the seed rows. Not an upsert: a second run must be refused by the
+        unique label index."""
         try:
             result = await self._seasons.insert_many(documents)
         except BulkWriteError as exc:

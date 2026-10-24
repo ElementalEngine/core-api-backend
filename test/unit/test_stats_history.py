@@ -1,13 +1,3 @@
-"""A player's history and summary read their own seat, count a win as a game
-whose rating went up and a first as first place, and start the summary at
-their last reset.
-
-What should break this file: a first place counted as the only kind of win,
-a win counted where the rating fell, a sub's leaver
-seat counted, a civ6 leader read from `civ`, a summary that ignores a reset or
-cuts it on report time, or a page that claims more games when there are none.
-"""
-
 from __future__ import annotations
 
 import asyncio

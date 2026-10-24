@@ -1,14 +1,5 @@
-"""Per-request correlation id.
-
-The id is set before any handler runs, so anything logging during the
-request can carry it. Its only consumer today is INTERNAL envelope,
-which returns it to the client and writes it to the same journald line.
-
-Pure ASGI rather than BaseHTTPMiddleware: this sets one scope value and
-needs neither a task group nor a Request object to do it.
-
-Governed by D92, D117.
-"""
+"""Sets a correlation id before any handler runs, so an INTERNAL error can
+return it to the caller and log it on the same line."""
 
 from __future__ import annotations
 

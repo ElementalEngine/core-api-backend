@@ -1,11 +1,3 @@
-"""Settings load, validate, and fail loudly when a required value is absent.
-
-A missing secret must stop the process at startup rather than surface as a
-401 hours later.
-
-Governed by D55a, D86.
-"""
-
 import importlib
 
 

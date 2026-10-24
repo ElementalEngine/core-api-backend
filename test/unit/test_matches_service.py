@@ -1,20 +1,3 @@
-"""Unit tests for the matches service defect fixes (batch 6.1b).
-
-Covers:
-- stored subbedIn/subbedOut counters are read (not clobbered to 0) and accumulate on approve;
-- revert_match tolerates legacy docs with missing season/combined deltas and never writes
- negative counters;
-- client-supplied numeric fields are validated (MatchServiceError -> 400, not ValueError -> 500);
-- update-match only writes whitelisted fields (match_id never enters the $set).
-
-Scope: logic only. FakeRepo and FakeSession stand in for the driver, so these
-tests assert that approve and revert reach commit -- not that a transaction
-provides atomicity. They do not discharge the Motor -> PyMongo transactional
-risk.
-
-Governed by D84.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -369,7 +352,7 @@ def test_revert_doc_math_uses_per_scope_deltas():
     assert docs[(False, True)]["wins"] == 4
 
 
-# --- cloud games have no season row (Entry 1) ---
+# --- cloud games have no season row ---
 
 
 def _approve_and_collect_scopes(is_cloud):
@@ -414,12 +397,12 @@ def test_cloud_approve_skips_the_season_row():
     assert all(u["is_cloud"] for u in upserts)
 
 
-# --- subs are dated rows, not a counter (Entry 4b) ---
+# --- subs are dated rows, not a counter ---
 
 
 def test_approving_a_sub_writes_one_dated_row():
     # Three players, one of them a sub: TrueSkill rates the non-subs
-    # separately and needs two groups to do it (see §4 item 76).
+    # separately and needs two groups to do it.
     players = [
         make_player(discord_id="123", team=0, placement=0, is_sub=True),
         make_player(

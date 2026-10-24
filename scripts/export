@@ -2,7 +2,7 @@
 """export <db>.<collection> [...] [--out DIR]
 
 Writes one JSON document per line, plus a manifest carrying the count taken
-at export time. D61: this is the rollback mechanism for a cluster with no
+at export time. This is the rollback mechanism for a cluster with no
 PITR, so the count is recorded rather than re-queried later against a
 collection that has moved on.
 

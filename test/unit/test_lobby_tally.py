@@ -1,10 +1,3 @@
-"""The settings tally.
-
-This is arithmetic that can be wrong while every other test passes: it runs
-once per lobby, writes a result nobody re-derives, and a mistake looks like a
-game people merely disagreed with.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -58,7 +51,7 @@ def test_an_empty_lobby_resolves_entirely_to_defaults():
 
 def test_an_unseated_seat_is_not_a_voter():
     # Otherwise a gap would make unanimity unreachable and every question
-    # would default forever (section 4: gaps are legal).
+    # would default forever (gaps are legal).
     seats = [seat("x", map="b", speed="fast"), {"seat_index": 1, "discord_id": None}]
     assert resolve_settings(seats, BALLOT, LOBBY)["map"] == "b"
 

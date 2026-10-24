@@ -1,10 +1,3 @@
-"""The ban tally.
-
-Like the settings tally, this is arithmetic that runs once per lobby and
-writes a result nobody re-derives. Unlike it, a mistake here removes leaders
-from a pool people are about to draft from.
-"""
-
 from __future__ import annotations
 
 import pytest

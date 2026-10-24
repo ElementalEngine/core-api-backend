@@ -1,11 +1,3 @@
-"""A seat's quit and the quit of the player its sub came in for are two marks,
-on two rows. Either, both or neither may be set.
-
-What should break this file: a leaver's quit landing on the sub, a quit
-staying with a leaver who was replaced, an earlier seat's new sub shifting a
-later seat's mark onto the wrong row, or a quit accepted for nobody.
-"""
-
 from types import SimpleNamespace
 
 import pytest

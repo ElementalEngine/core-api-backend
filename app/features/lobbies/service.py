@@ -1,10 +1,5 @@
-"""Creating and resolving lobbies.
-
-Creation is one insert: the shape is derived from the game type and the size
-the host chose, the season is stamped, the host takes the first seat, and the
-two unique indexes stop a second lobby in the channel or a player holding two
-seats at once. Everyone else joins through the seat route.
-"""
+"""Creating and resolving lobbies. Two unique indexes stop a second lobby in a
+channel and a player holding two seats at once."""
 
 from __future__ import annotations
 
@@ -129,11 +124,8 @@ def for_the_wire(
     *,
     uncensored: bool = False,
 ) -> dict[str, Any]:
-    """A stored lobby as `viewer_discord_id` may see it, in JSON's types.
-
-    `uncensored` is for staff observers, who need a blind draft's picks to
-    adjudicate it. The secrecy is between players.
-    """
+    """A stored lobby as `viewer_discord_id` may see it, in JSON's types. Staff
+    observers see it uncensored, to adjudicate a blind draft."""
     projected = project_lobby(document, viewer_discord_id, censored=not uncensored)
     return {
         key: str(value)
@@ -146,13 +138,8 @@ def for_the_wire(
 def seat_the_host(
     host_discord_id: str, name: str = "", team: int | None = None
 ) -> list[dict[str, Any]]:
-    """The one seat a lobby opens with.
-
-    Everyone else joins through the seat route, so the lobby fills by
-    self-selection rather than by whoever happened to be in voice when the
-    command ran. A teamer seats its host on the first team, so the lobby
-    opens with a captain on a side; the host switches like anyone else.
-    """
+    """The one seat a lobby opens with; everyone else joins through the seat route.
+    A teamer seats its host on the first team."""
     seat: dict[str, Any] = {
         "seat_index": 0,
         "discord_id": host_discord_id,
@@ -165,13 +152,8 @@ def seat_the_host(
 
 
 def shape_of(lobby: Mapping[str, Any]) -> LobbyShape:
-    """The shape of a lobby that already exists.
-
-    Only a teamer's team fields came from the caller; a duel's are values
-    resolve_shape itself derived and the builder stored, so handing them back
-    would look like a caller sending team fields for a duel. An ffa's seat
-    count did come from the caller and is read back.
-    """
+    """The shape of an existing lobby. Only a teamer's team fields and an ffa's
+    seat count came from the caller; a duel's were derived."""
     teamer = lobby["game_type"] == "teamer"
     return resolve_shape(
         lobby["game_type"],
@@ -289,11 +271,8 @@ class LobbyService:
     async def _seated_in(
         self, lobby_id: str, phase: str, actor: str, expected_revision: int, verb: str
     ) -> tuple[Any, dict[str, Any], list[dict[str, Any]]]:
-        """Load a lobby, apply expired timers, and check the actor may act.
-
-        Every phase submission opens this way. Returns the object id, the
-        lobby as it stands after any advance, and its seats.
-        """
+        """Load a lobby, apply expired timers, and check the actor may act. Returns the
+        object id, the lobby after any advance, and its seats."""
         oid = as_lobby_id(lobby_id)
         found = await self._repository.find_by_id(oid)
         if found is None:
@@ -328,12 +307,8 @@ class LobbyService:
         return lobby
 
     async def _abandon_draft(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
-        """Cancel a draft nobody finished.
-
-        Unlike settings and bans there is no safe default: assigning a leader
-        on somebody's behalf decides their game for them. The reason names
-        who was still owed a pick so the embed can say why.
-        """
+        """Cancel a draft nobody finished. Nobody is given a leader they did not pick;
+        the reason names who still owed one."""
         order = lobby.get("pick_order")
         if order:
             owed = [whose_turn(order, lobby.get("turn_index") or 0)]
@@ -376,12 +351,8 @@ class LobbyService:
 
     @staticmethod
     def _unready(seats: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Seats with their ready flags cleared.
-
-        Ready means finished with THIS phase. Carrying it into the next one
-        opens that phase with everybody already done, so the first write to
-        touch the lobby ends it.
-        """
+        """Seats with their ready flags cleared. Ready means done with this phase, so
+        carrying it over would end the next phase at its first write."""
         return [{k: v for k, v in seat.items() if k != "ready"} for seat in seats]
 
     async def _resolve_settings(self, lobby: dict[str, Any]) -> dict[str, Any] | None:
@@ -480,11 +451,8 @@ class LobbyService:
     def _workable_mode(
         self, lobby: dict[str, Any], mode: str | None, captains: list[str]
     ) -> str | None:
-        """The voted mode, or standard when cwc cannot run in this shape.
-
-        Decided before anything is dealt: a fallback needs per-seat pools
-        where cwc needs one shared pool.
-        """
+        """The voted mode, or standard when cwc cannot run in this shape. Decided
+        before dealing: cwc needs one shared pool, the others a pool per seat."""
         if mode != DRAFT_CWC:
             return mode
         try:
@@ -505,10 +473,8 @@ class LobbyService:
         kinds: dict[str, list[str]],
         seated: list[dict[str, Any]],
     ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
-        """What each seat is offered, and what the lobby holds in common.
-
-        cwc draws from one shared pool; every other mode deals per seat.
-        """
+        """What each seat is offered, and what the lobby holds in common. cwc draws
+        from one shared pool; every other mode deals per seat."""
         players = len(seated)
         if mode == DRAFT_CWC:
             shared: dict[str, Any] = {"pool": list(kinds["leader"])}
@@ -544,11 +510,8 @@ class LobbyService:
         actor_discord_id: str,
         request: SubmitBansRequest,
     ) -> dict[str, Any]:
-        """One captain's turn in a cwc ban order.
-
-        A turn bans one leader, and one civ as well in civ7. The bans land on
-        the lobby rather than on a seat: nobody is banning for themselves.
-        """
+        """One captain's turn in a cwc ban order: one leader, and one civ in civ7.
+        The bans land on the lobby, since nobody bans for themselves."""
         order = lobby["ban_order"]
         turn_index = lobby.get("turn_index") or 0
         if whose_turn(order, turn_index) != actor_discord_id:
@@ -642,12 +605,8 @@ class LobbyService:
     async def mark_ready(
         self, lobby_id: str, actor_discord_id: str, request: MarkReadyRequest
     ) -> dict[str, Any]:
-        """A seat declares it has finished with the current phase.
-
-        Before the draft a player may be ready without submitting, and the
-        unanswered questions take their defaults. In the draft a pick is
-        required, so this refuses a seat that holds none.
-        """
+        """A seat declares it has finished the current phase. Before the draft that
+        needs no answer; in the draft it needs a pick."""
         oid = as_lobby_id(lobby_id)
         found = await self._repository.find_by_id(oid)
         if found is None:
@@ -783,9 +742,8 @@ class LobbyService:
             wanted["civ_pick"] = (request.civ_token, available["civ_pick"])
         if mode != DRAFT_CWC and mine.get("pick") is not None:
             raise PickIsFinal("Your pick is already locked in")
-        # A pick is a leader, plus a civ wherever civs were dealt (civ7). One
-        # submission carries both: the first locks the seat, so a civ sent
-        # later is refused and a seat locked on a civ alone has no leader.
+        # A pick is a leader, plus a civ where civs were dealt. One submission
+        # carries both, because the first one locks the seat.
         if request.token is None:
             raise InvalidSeating("token", "choose a leader")
         if available["civ_pick"] and request.civ_token is None:
@@ -962,11 +920,8 @@ class LobbyService:
     async def _observing(
         self, lobby: dict[str, Any], viewer_discord_id: str, is_staff: bool
     ) -> bool:
-        """Whether this caller watches the lobby rather than plays in it.
-
-        Staff only, and not while they are mid-game themselves: someone in a
-        lobby that has started cannot watch another one.
-        """
+        """Whether this caller watches the lobby rather than plays in it: staff only,
+        and not while they are in a lobby that has started."""
         if not is_staff:
             return False
         if any(
@@ -1083,10 +1038,8 @@ class LobbyService:
     def _why_refused(
         lobby: dict[str, Any] | None, expected: int
     ) -> tuple[str, int, int | None]:
-        """
-        Spec section 9: matched-count zero is stale revision OR already seated, and
-        only a re-read tells them apart.
-        """
+        """A write that matched nothing has a stale revision or an already seated
+        player; only a re-read tells them apart."""
         current = lobby["revision"] if lobby else None
         if current != expected:
             return ("The lobby has moved on", expected, current)

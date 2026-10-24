@@ -1,10 +1,5 @@
-"""The lobby's phase union and the reasons it can close.
-
-Forward-only (spec section 3), with one exception: `random` skips the draft
-phase entirely, so `bans -> complete` is a legal edge.
-
-Governed by D193.
-"""
+"""The lobby's phases and the reasons it can close. Phases only move forward,
+except that `random` goes straight from bans to complete."""
 
 from __future__ import annotations
 
@@ -21,7 +16,7 @@ SEQUENCE = (LOBBY, SETTINGS, BANS, DRAFT, COMPLETE)
 OPEN_PHASES = (LOBBY, SETTINGS, BANS, DRAFT)
 
 # `closed_at` is set on both terminal phases, which is why the partial indexes
-# test one field and cannot drift from `phase` (spec section 2).
+# test one field and cannot drift from `phase`.
 TERMINAL_PHASES = (COMPLETE, CANCELLED)
 
 CANCEL_BY_HOST = "host"

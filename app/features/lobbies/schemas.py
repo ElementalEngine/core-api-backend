@@ -1,16 +1,5 @@
-"""The v2 lobbies wire shapes.
-
-Pydantic answers "is this JSON the right shape"; `modes.py` answers "is this
-a lobby that can exist". Both surface as INVALID_REQUEST -- 422 from the
-registered validation handler, 400 from `invalid_request` -- so the split
-costs the caller nothing and keeps every mode rule in one file.
-
-`game_type` is a plain str, not a Literal, deliberately: it is a mode rule
-and `resolve_shape` owns it. `edition` is a Literal because it is a plain
-enum that no mode rule touches.
-
-Governed by D73.
-"""
+"""The v2 lobby request and response shapes. Mode rules live in `modes.py`,
+so `game_type` is a plain string here."""
 
 from __future__ import annotations
 

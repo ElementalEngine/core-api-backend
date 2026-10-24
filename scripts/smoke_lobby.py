@@ -454,12 +454,8 @@ def observer_read() -> None:
 
 
 async def drop_smoke_lobbies() -> int:
-    """Clear anything a previous run left behind.
-
-    A run that dies mid-lobby leaves its players seated, and the one-seat
-    rule then refuses the next run for a whole hour until the stale-eviction
-    cutoff passes. Clearing first makes the script repeatable.
-    """
+    """Clear anything a previous run left behind; a run that dies mid-lobby leaves
+    its players seated, and the one-seat rule would refuse the next run."""
     client = AsyncMongoClient(settings.mongo_url.get_secret_value())
     try:
         result = await client[GAMES_DB][COL_LOBBIES].delete_many({"guild_id": "smoke"})
@@ -482,7 +478,7 @@ async def cleanup() -> None:
 
 
 def two_in_one_channel() -> None:
-    """Entry 13: a channel takes several lobbies, a player still takes one."""
+    """A channel takes several lobbies; a player still takes one."""
     print("\n-- two open lobbies in one text channel --")
     channel = f"c-{ObjectId()}"
 
@@ -513,7 +509,7 @@ def two_in_one_channel() -> None:
         if isinstance(lobby, dict) and "_id" in lobby:
             made.append(lobby["_id"])
 
-    # The host takes seat zero (D207), so quinn is seated in the first one.
+    # The host takes seat zero, so quinn is seated in the first one.
     create("quinn", "a seated host cannot open another", 409)
 
     found = step(

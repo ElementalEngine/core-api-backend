@@ -1,11 +1,3 @@
-"""The settings ballot catalogue.
-
-Two defects in authored data are invisible until a lobby is mid-vote: a
-`default_option_id` naming no option, so the tally locks a setting to an id
-nothing recognises, and a duplicate question id, so one ballot key silently
-overwrites another. Both are cheap to assert and expensive to find later.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -63,10 +55,8 @@ def test_duel_offers_standard_and_random_only(edition):
 
 @pytest.mark.parametrize("edition", EDITIONS)
 def test_no_ballot_offers_cwc(edition):
-    # cwc is a create-time choice now; offering it on a ballot would let a
-    # lobby vote for a mode whose captains were never seated.
-    # `cwc` is also a timer option in one civ6 question, so this checks the
-    # draft-mode question specifically rather than every option on the ballot.
+    # cwc is chosen when the lobby is made, so no ballot offers it. `cwc` is
+    # also a civ6 timer option, so only the draft-mode question is checked.
     for game_type in GAME_TYPES:
         modes = [
             q for q in questions_for(edition, game_type) if q["id"] == "draft_mode"

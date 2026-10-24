@@ -78,7 +78,7 @@ class SeatPatch:
 
 
 def is_placeholder(discord_id: str | None) -> bool:
-    """The one placeholder predicate (§4 item 20; reconciliation-query §4.2)."""
+    """The one placeholder predicate, used by every writer that skips them."""
     return not discord_id or discord_id.startswith("-")
 
 

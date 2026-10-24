@@ -13,7 +13,7 @@ inside one collection, and every document here is a reset.
 
 Copy, verify, then delete. Idempotent: a re-run after a partial one finds the
 markers still in place, upserts them again for no change, and finishes the
-delete. Dry run unless --apply. Export first, D115.
+delete. Dry run unless --apply. Export first.
 """
 
 from __future__ import annotations

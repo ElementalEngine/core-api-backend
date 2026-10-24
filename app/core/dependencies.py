@@ -95,7 +95,7 @@ def require_mito_token(authorization: str | None = Header(default=None)) -> None
 
 
 def require_activity_token(authorization: str | None = Header(default=None)) -> None:
-    """The Activity server's own credential, separate from Mito's by design (D17)."""
+    """The Activity server's own credential, kept separate from Mite's."""
     _require_bearer(
         authorization,
         configured=settings.activity_service_token.get_secret_value(),

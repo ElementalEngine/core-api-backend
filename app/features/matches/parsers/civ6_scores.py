@@ -1,6 +1,5 @@
-"""Each player's score, from the history the game keeps for its end-of-game graphs:
-one series of (turn, score) per civ, in the save's civ order. It is used only when
-it lines up with the save; otherwise there is no score and nothing else changes."""
+"""Each player's score, from the save's end-of-game score history. Used only
+when it lines up with the save; otherwise there is no score."""
 
 from __future__ import annotations
 
@@ -40,9 +39,8 @@ def _inflate(data: bytes) -> bytes | None:
 def final_scores(
     data: bytes, alive: list[bool], turn: int
 ) -> list[tuple[int, int]] | None:
-    """(last turn recorded, score then) for each civ, or None unless there is one
-    series per civ, numbered in order, with rising turns no later than the save's,
-    and each civ's last turn is the latest exactly when it is still alive."""
+    """(last turn, score) for each civ, or None unless the series match the save:
+    one per civ, in order, ending last exactly for the civs still alive."""
     blob = _inflate(data)
     if blob is None:
         return None

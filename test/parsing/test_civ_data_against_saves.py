@@ -1,12 +1,3 @@
-"""Entry 9's evidence test: the seed must agree with every save on disk.
-
-The civ6 leader->civ mapping cannot be checked against either old source --
-neither held a CIVILIZATION_* token. Saves are the only evidence, so every
-pair a fixture yields must match the seed and be marked observed. Adding a
-fixture whose pair is absent turns new evidence into a red test rather than
-a silent gap.
-"""
-
 import glob
 import os
 

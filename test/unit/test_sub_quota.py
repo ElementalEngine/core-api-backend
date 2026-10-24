@@ -1,11 +1,3 @@
-"""The sub quota a report is judged against.
-
-What should break this file: counting outside the rolling window, or the
-limit drifting from the league's three sub-ins in thirty days.
-
-Governed by D62.
-"""
-
 from __future__ import annotations
 
 import asyncio

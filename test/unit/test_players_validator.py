@@ -1,8 +1,3 @@
-"""The players-patch validator: what a match edit may and may not change.
-
-Governed by D151, D152, D153, D154, D155.
-"""
-
 from types import SimpleNamespace
 
 from app.features.matches.validation import (
@@ -115,8 +110,7 @@ def test_teammates_sharing_a_placement_is_not_a_tie():
 
 
 def test_split_team_placement_rejected_with_the_tie_it_causes():
-    # Item 78: no v1 route can produce this; the collapse can. Both facts
-    # about the resulting state are reported, None-seat first.
+    # Both facts about the resulting state are reported, None-seat first.
     got = check(teamer(), [SeatPatch(1, placement=1)])
     assert [(v.seat, v.rule) for v in got] == [
         (None, Rule.TEAM_PLACEMENT_MISMATCH),
@@ -179,7 +173,6 @@ def test_all_violations_returned_in_deterministic_order():
 
 
 def test_is_placeholder_is_the_single_predicate():
-    # §4 item 20 / reconciliation-query §4.2 - the guard both writers skip by.
     assert is_placeholder(None)
     assert is_placeholder("")
     assert is_placeholder("-1")

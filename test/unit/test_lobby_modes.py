@@ -1,11 +1,3 @@
-"""Mode shapes: what game_type implies, and what it refuses.
-
-Every rejection asserts the FIELD it names, not merely that something was
-raised -- a validator that always blamed `game_type` would pass a suite that
-only checked the exception type, and the host would get an unactionable
-error.
-"""
-
 from __future__ import annotations
 
 import pytest

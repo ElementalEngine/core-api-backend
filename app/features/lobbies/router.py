@@ -1,16 +1,5 @@
-"""The v2 lobbies surface: two routers on one prefix, gated separately.
-
-The activity router serves the in-Discord app and requires an actor header on
-every route; the mite router serves the bot and passes no viewer, since the
-bot holds no seat. Both mount under `/api/v2/lobbies`, and declaration order
-matters -- a literal path registered after a parameterised one is swallowed
-by it.
-
-Handlers translate service exceptions into the error envelope. Anything not
-translated here reaches the catch-all and becomes a 500.
-
-Governed by D90, D94, D186.
-"""
+"""The v2 lobby routes: the Activity's, which need an actor, and Mite's, under
+`/mite`. Literal paths are declared first, or a parameterised path takes them."""
 
 from __future__ import annotations
 
@@ -125,10 +114,8 @@ async def read_lobby(
     is_staff: bool = Depends(actor_is_staff),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any] | Response:
-    """One lobby, censored for the caller, revision-gated.
-
-    Staff watching a lobby they are not playing in see it uncensored.
-    """
+    """One lobby, censored for the caller, revision-gated. Staff watching a lobby
+    they are not playing in see it uncensored."""
     try:
         snapshot = await _service(db).read(lobby_id, actor, since, is_staff=is_staff)
     except InvalidLobbyId as exc:
@@ -148,10 +135,8 @@ async def change_seat(
     name: str = Depends(actor_name),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """
-    Self-place, leave, move and host rearrange (C5), returning the updated censored
-    snapshot so the caller never waits for a poll tick.
-    """
+    """Take, leave or move a seat, or rearrange as host; returns the updated
+    snapshot so the caller does not wait for a poll."""
     try:
         lobby = await _service(db).change_seat(lobby_id, actor, request, name)
     except InvalidLobbyId as exc:
@@ -521,11 +506,8 @@ async def mark_ready(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """A seat finishes the current phase, whether or not it submitted.
-
-    The phase advances as soon as every seated player is ready, so a lobby
-    that agrees quickly does not wait out its timer.
-    """
+    """A seat finishes the current phase, whether or not it submitted. The phase
+    advances once every seated player is ready."""
     try:
         lobby = await _service(db).mark_ready(lobby_id, actor, request)
     except InvalidLobbyId as exc:
