@@ -7,6 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.features.matches.schemas import AffectedPlayerRating
 from app.features.stats.schemas import StatRow, StatSet, UserStatsResponse
 
 
@@ -69,6 +70,8 @@ class ResetStatsResponseV2(UserStatsResponseV2):
 
     after_lifetime: StatSetV2
     after_season: StatSetV2
+    # The player whose rank role follows the reset, at the starting rating.
+    affected_players: list[AffectedPlayerRating] | None = None
 
     @classmethod
     def of(
@@ -88,11 +91,20 @@ class ResetStatsResponseV2(UserStatsResponseV2):
                 duel=fresh if stats.duel else None,
             )
 
+        # A realtime role follows lifetime FFA; a cloud role, every cloud game.
+        life = before.lifetime
+        cloud = before.game_type == "cloud"
+        moved = (life.ffa or life.teamer or life.duel) if cloud else life.ffa
         v2 = UserStatsResponseV2.from_v1(before, season_label)
         return cls(
             **v2.model_dump(),
             after_lifetime=restarted(before.lifetime),
             after_season=restarted(before.season),
+            affected_players=(
+                [AffectedPlayerRating(discord_id=before.discord_id, rating_mu=mu)]
+                if moved
+                else []
+            ),
         )
 
 

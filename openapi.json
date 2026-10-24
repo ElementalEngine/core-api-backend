@@ -2472,6 +2472,20 @@
       "ResetStatsResponseV2": {
         "description": "A reset's answer: the stats as they stood before it, and as they start\nagain after it -- every mode that had a row, back at the starting rating.",
         "properties": {
+          "affected_players": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AffectedPlayerRating"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affected Players"
+          },
           "after_lifetime": {
             "$ref": "#/components/schemas/StatSetV2"
           },

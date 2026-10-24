@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from bson import ObjectId
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -117,6 +118,24 @@ class MatchModel(BaseModel):
     save_bytes_sha256: str | None = None
     reporter_discord_id: str
     contest_report_list: list[ContestReport]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _v1_gaps(cls, data: Any) -> Any:
+        """Matches v1 approved can lack a contest list and hold a null
+        created_at; the report time is the match id's own timestamp."""
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        if data.get("contest_report_list") is None:
+            data["contest_report_list"] = []
+        if not isinstance(data.get("created_at"), datetime):
+            oid = data.get("_id")
+            if isinstance(oid, ObjectId):
+                data["created_at"] = oid.generation_time
+            else:
+                data.pop("created_at", None)
+        return data
 
 
 __all__ = ["ContestReport", "MatchModel", "PlayerModel", "StatModel"]

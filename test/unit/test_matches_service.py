@@ -568,3 +568,32 @@ def test_a_commit_that_clashes_is_retryable_and_is_not_aborted_twice():
         asyncio.run(make_service(repo).approve_match(OID, "a-1"))
     assert not repo.session.aborted
     assert len(repo.releases) == 1
+
+
+def test_a_v1_match_without_a_contest_list_or_created_at_can_be_reverted():
+    stored = {"_id": 123, "mu": 30.0, "sigma": 5.0, "games": 10, "wins": 4, "first": 2}
+    doc = {**make_match_doc([make_player(delta=5.0)]), "_id": ObjectId(OID)}
+    doc["created_at"] = None
+    del doc["contest_report_list"]
+    repo = FakeRepo(match_doc=doc, stat_doc=stored)
+
+    result = asyncio.run(make_service(repo).revert_match(OID))
+
+    assert result["contest_report_list"] == []
+    assert result["created_at"] == ObjectId(OID).generation_time
+    # The lifetime FFA rating the rank role follows, after the revert.
+    assert result["affected_players"] == [{"discord_id": "123", "rating_mu": 25.0}]
+
+
+def test_rank_roles_follow_ffa_and_cloud_games_only():
+    from app.features.ratings.scope import drives_rank_roles
+
+    assert drives_rank_roles(game_mode="FFA", is_cloud=False)
+    assert drives_rank_roles(game_mode="teamer", is_cloud=True)
+    assert not drives_rank_roles(game_mode="teamer", is_cloud=False)
+    assert not drives_rank_roles(game_mode="duel", is_cloud=False)
+
+    stored = {"_id": 123, "mu": 30.0, "sigma": 5.0, "games": 10, "wins": 4, "first": 2}
+    teamer = {**make_match_doc([make_player()]), "game_mode": "Teamer"}
+    repo = FakeRepo(match_doc=teamer, stat_doc=stored)
+    assert asyncio.run(make_service(repo).revert_match(OID))["affected_players"] == []

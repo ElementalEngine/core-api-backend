@@ -41,6 +41,12 @@ def stats_collection_name(*, match_type: str, is_cloud: bool, is_combined: bool)
     return f"{prefix}{mt}"
 
 
+def drives_rank_roles(*, game_mode: str, is_cloud: bool) -> bool:
+    """FFA and cloud games set rank roles; a realtime teamer or duel does not,
+    though it is rated."""
+    return is_cloud or game_mode.strip().lower() == "ffa"
+
+
 def stat_scope(
     *,
     civ_version: str,
@@ -62,6 +68,7 @@ __all__ = [
     "DB_CIV6_SEASON",
     "DB_CIV7_LIFETIME",
     "DB_CIV7_SEASON",
+    "drives_rank_roles",
     "stat_scope",
     "stats_collection_name",
     "stats_db_name",

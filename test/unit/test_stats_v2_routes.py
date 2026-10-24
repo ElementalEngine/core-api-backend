@@ -90,6 +90,16 @@ def test_a_reset_answers_before_and_the_fresh_start_after():
         before, mu=1200.4, sigma=8.33, season_label="Season 6"
     )
     assert out.season_label == "Season 6"
+    # A realtime role follows lifetime FFA, which the reset moved to the start.
+    assert out.affected_players is not None
+    assert [(p.discord_id, p.rating_mu) for p in out.affected_players] == [
+        ("1", 1200.4)
+    ]
+    teamer_only = before.model_copy(update={"lifetime": StatSet(teamer=row)})
+    assert (
+        ResetStatsResponseV2.of(teamer_only, mu=1200.4, sigma=8.33).affected_players
+        == []
+    )
     assert UserStatsResponseV2.from_v1(before).season_label is None
     assert out.lifetime.ffa is not None and out.lifetime.ffa.mu == 1300
     assert out.after_lifetime.ffa is not None

@@ -17,7 +17,7 @@ from app.features.matches.models import MatchModel, PlayerModel, StatModel
 from app.features.matches.tallies import bump, stat_legs
 from app.features.matches.validation import approval_refusal
 from app.features.ratings.events import build_match_event
-from app.features.ratings.scope import stat_scope
+from app.features.ratings.scope import drives_rank_roles, stat_scope
 from app.features.seasons.repository import SeasonNotSeededError
 
 if TYPE_CHECKING:
@@ -40,7 +40,7 @@ def _write_failure(what: str, exc: Exception) -> MatchServiceError | NotFoundErr
 
 def _affected(match: MatchModel, ratings: list[StatModel]) -> list[dict[str, Any]]:
     """The players whose rank roles follow this match, with their rating now."""
-    if match.game_mode.lower() != "ffa" and not match.is_cloud:
+    if not drives_rank_roles(game_mode=match.game_mode, is_cloud=match.is_cloud):
         return []
     return [
         {"discord_id": str(p.discord_id), "rating_mu": float(ratings[i].mu)}
@@ -171,6 +171,8 @@ class ApprovalService:
                     )
                     occurred_at = datetime.now(UTC)
                     events: list[dict[str, Any]] = []
+                    # The rating each player's rank role follows, after the revert.
+                    rank_after: dict[str, float] = {}
 
                     # Stats writes
                     for i, p in enumerate(match.players):
@@ -201,6 +203,8 @@ class ApprovalService:
                                 continue
                             mu_after = pre.mu - delta_value
                             sigma_after = pre.sigma + 2
+                            if not is_seasonal and is_combined == match.is_cloud:
+                                rank_after[did] = mu_after
                             doc = self._build_stat_doc(
                                 discord_id=did,
                                 pre=pre,
@@ -226,7 +230,7 @@ class ApprovalService:
                                 build_match_event(
                                     event_type="revert",
                                     match_id=oid,
-                                    match_created_at=res.get("created_at"),
+                                    match_created_at=match.created_at,
                                     occurred_at=occurred_at,
                                     discord_id=did,
                                     scope=stat_scope(
@@ -258,7 +262,16 @@ class ApprovalService:
                     if session.in_transaction:
                         await session.abort_transaction()
                     raise _write_failure("revert", e) from e
-        return {"match_id": str(match_id), **match.model_dump()}
+        affected = (
+            [{"discord_id": d, "rating_mu": mu} for d, mu in rank_after.items()]
+            if drives_rank_roles(game_mode=match.game_mode, is_cloud=match.is_cloud)
+            else []
+        )
+        return {
+            "match_id": str(match_id),
+            **match.model_dump(),
+            "affected_players": affected,
+        }
 
     async def approve_match(
         self, match_id: str, approver_discord_id: str
