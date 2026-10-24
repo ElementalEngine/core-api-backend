@@ -461,13 +461,15 @@ def apply_players_patch(
                 if leaver is not None:
                     setattr(match.players[leaver], name, value)
 
-    structural = [
-        (seat, entry.sub_out)
-        for seat, entry in last.items()
-        if not isinstance(entry.sub_out, UnsetType)
-    ]
-    for seat, sub_out in sorted(structural, key=lambda p: p[0], reverse=True):
-        _apply_sub(match, seat, sub_out, steam_ids)
+    # Last seat first: inserting or removing a leaver's row moves only the
+    # rows after it, so every seat still to come keeps its index.
+    for seat, entry in sorted(last.items(), reverse=True):
+        if not isinstance(entry.sub_out, UnsetType):
+            _apply_sub(match, seat, entry.sub_out, steam_ids)
+        if not isinstance(entry.leaver_quit, UnsetType):
+            leaver = _leaver_index(match, seat)
+            if leaver is not None:
+                match.players[leaver].quit = entry.leaver_quit
 
 
 def _leaver_index(match: MatchModel, seat: int) -> int | None:
@@ -495,6 +497,9 @@ def _apply_sub(
         return
 
     if leaver is not None:
+        # A different player left: the quit was the old leaver's, not theirs.
+        if match.players[leaver].discord_id != sub_out:
+            match.players[leaver].quit = False
         match.players[leaver].discord_id = sub_out
         match.players[leaver].steam_id = steam_ids.get(sub_out)
         return

@@ -436,6 +436,10 @@
       "CivRecord": {
         "description": "A civ6 leader token, or a civ7 civ token, and how it went.",
         "properties": {
+          "firsts": {
+            "title": "Firsts",
+            "type": "integer"
+          },
           "games": {
             "title": "Games",
             "type": "integer"
@@ -452,7 +456,8 @@
         "required": [
           "token",
           "games",
-          "wins"
+          "wins",
+          "firsts"
         ],
         "title": "CivRecord",
         "type": "object"
@@ -1461,7 +1466,12 @@
         "type": "object"
       },
       "MapRecord": {
+        "description": "Games on a map, those whose rating went up, and first places.",
         "properties": {
+          "firsts": {
+            "title": "Firsts",
+            "type": "integer"
+          },
           "games": {
             "title": "Games",
             "type": "integer"
@@ -1478,7 +1488,8 @@
         "required": [
           "map_type",
           "games",
-          "wins"
+          "wins",
+          "firsts"
         ],
         "title": "MapRecord",
         "type": "object"
@@ -2559,6 +2570,17 @@
             ],
             "title": "Leader"
           },
+          "leaver_quit": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaver Quit"
+          },
           "placement": {
             "anyOf": [
               {
@@ -2888,7 +2910,7 @@
         "type": "object"
       },
       "StatsSummary": {
-        "description": "Games by map and the most played civs, since the last reset if any.\nA win is first place.",
+        "description": "Games by map and the most played civs, since the last reset if any.\nA win is a game whose rating went up; a first is first place.",
         "properties": {
           "civ_version": {
             "title": "Civ Version",

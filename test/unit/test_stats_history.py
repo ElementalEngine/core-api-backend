@@ -1,7 +1,9 @@
-"""A player's history and summary read their own seat, count a win as first
-place, and start the summary at their last reset.
+"""A player's history and summary read their own seat, count a win as a game
+whose rating went up and a first as first place, and start the summary at
+their last reset.
 
-What should break this file: a rating gain counted as a win, a sub's leaver
+What should break this file: a first place counted as the only kind of win,
+a win counted where the rating fell, a sub's leaver
 seat counted, a civ6 leader read from `civ`, a summary that ignores a reset or
 cuts it on report time, or a page that claims more games when there are none.
 """
@@ -100,15 +102,15 @@ def _history(matches=(), reset=None):
     return h
 
 
-def test_a_win_is_first_place_and_a_leaver_seat_does_not_count():
+def test_a_win_is_a_rating_gain_a_first_is_first_place_and_leavers_do_not_count():
     h = _history(
         [
-            _match(_seat(ME, placement=0), _seat("2", placement=1)),
+            _match(_seat(ME, placement=0, delta=20), _seat("2", placement=1)),
+            # Third of eight, rating up: a win in FFA, not a first.
+            _match(_seat(ME, placement=2, delta=4), map_type="Seven Seas"),
+            _match(_seat(ME, placement=5, delta=-11), map_type="Seven Seas"),
             _match(
-                _seat(ME, placement=2), _seat("2", placement=0), map_type="Seven Seas"
-            ),
-            _match(
-                _seat(ME, placement=0, subbed_out=True),
+                _seat(ME, placement=0, delta=9, subbed_out=True),
                 _seat("3", placement=0, is_sub=True),
             ),
         ]
@@ -116,11 +118,13 @@ def test_a_win_is_first_place_and_a_leaver_seat_does_not_count():
     out = asyncio.run(
         h.summary(civ_version="civ6", game_type="realtime", discord_id=ME)
     )
-    assert [(m.map_type, m.games, m.wins) for m in out.maps] == [
-        ("Pangaea", 1, 1),
-        ("Seven Seas", 1, 0),
+    assert [(m.map_type, m.games, m.wins, m.firsts) for m in out.maps] == [
+        ("Seven Seas", 2, 1, 0),
+        ("Pangaea", 1, 1, 1),
     ]
-    assert [(c.token, c.games, c.wins) for c in out.civs] == [("LEADER_TRAJAN", 2, 1)]
+    assert [(c.token, c.games, c.wins, c.firsts) for c in out.civs] == [
+        ("LEADER_TRAJAN", 3, 2, 1)
+    ]
 
 
 def test_civ6_counts_the_leader_and_civ7_the_civ_and_blanks_are_skipped():
@@ -278,4 +282,4 @@ def test_the_same_map_by_path_and_by_name_is_one_row():
     out = asyncio.run(
         h.summary(civ_version="civ6", game_type="realtime", discord_id=ME)
     )
-    assert [(m.map_type, m.games, m.wins) for m in out.maps] == [("Lakes", 2, 1)]
+    assert [(m.map_type, m.games, m.firsts) for m in out.maps] == [("Lakes", 2, 1)]

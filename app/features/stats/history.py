@@ -2,7 +2,8 @@
 and by civ since their stats were last reset.
 
 Reads one player's matches through `validated_matches_player_recent_idx`,
-newest first. A win is first place, as `first` is on the stat documents.
+newest first. A win is a game whose rating went up and a first is first
+place, as the stat documents count them.
 """
 
 from __future__ import annotations
@@ -70,6 +71,12 @@ def map_name(map_type: Any) -> str:
 
 
 def _won(seat: dict[str, Any]) -> bool:
+    """A win is a game whose rating went up, as the stat documents count it:
+    in team games and duels that is winning, in FFA a high enough finish."""
+    return float(seat.get("delta") or 0.0) > 0 and not seat.get("subbed_out")
+
+
+def _first(seat: dict[str, Any]) -> bool:
     return seat.get("placement") == 0 and not seat.get("subbed_out")
 
 
@@ -133,30 +140,34 @@ class MatchHistory:
         cursor = self._validated.find(flt, {"game": 1, "map_type": 1, "players.$": 1})
         maps: Counter[str] = Counter()
         map_wins: Counter[str] = Counter()
+        map_firsts: Counter[str] = Counter()
         civs: Counter[str] = Counter()
         civ_wins: Counter[str] = Counter()
+        civ_firsts: Counter[str] = Counter()
         async for match in cursor:
             seat = _seat(match, did)
             if seat is None or seat.get("subbed_out"):
                 continue
-            won = _won(seat)
+            won, first = _won(seat), _first(seat)
             map_type = map_name(match.get("map_type"))
             maps[map_type] += 1
             map_wins[map_type] += won
+            map_firsts[map_type] += first
             if (pick := _pick(match, seat)) is not None:
                 civs[pick] += 1
                 civ_wins[pick] += won
+                civ_firsts[pick] += first
         return StatsSummary(
             discord_id=did,
             civ_version=version,
             game_type="cloud" if is_cloud else "realtime",
             since=since,
             maps=[
-                MapRecord(map_type=m, games=n, wins=map_wins[m])
+                MapRecord(map_type=m, games=n, wins=map_wins[m], firsts=map_firsts[m])
                 for m, n in sorted(maps.items(), key=lambda kv: (-kv[1], kv[0]))
             ],
             civs=[
-                CivRecord(token=c, games=n, wins=civ_wins[c])
+                CivRecord(token=c, games=n, wins=civ_wins[c], firsts=civ_firsts[c])
                 for c, n in sorted(civs.items(), key=lambda kv: (-kv[1], kv[0]))[
                     :TOP_CIVS
                 ]

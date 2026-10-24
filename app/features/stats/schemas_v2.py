@@ -127,9 +127,12 @@ class HistoryPage(BaseModel):
 
 
 class MapRecord(BaseModel):
+    """Games on a map, those whose rating went up, and first places."""
+
     map_type: str
     games: int
     wins: int
+    firsts: int
 
 
 class CivRecord(BaseModel):
@@ -138,11 +141,12 @@ class CivRecord(BaseModel):
     token: str
     games: int
     wins: int
+    firsts: int
 
 
 class StatsSummary(BaseModel):
     """Games by map and the most played civs, since the last reset if any.
-    A win is first place."""
+    A win is a game whose rating went up; a first is first place."""
 
     discord_id: str
     civ_version: str

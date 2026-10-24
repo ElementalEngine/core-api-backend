@@ -38,6 +38,7 @@ class Rule(StrEnum):
     DUPLICATE_PLAYER = "duplicate_player"
     STAFF_ONLY_CIV = "staff_only_civ"
     PLACE_GAP = "place_gap"
+    NO_LEAVER = "no_leaver"
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +56,8 @@ class SeatPatch:
     placement: int | UnsetType = UNSET
     discord_id: str | UnsetType = UNSET
     quit: bool | UnsetType = UNSET
+    # The quit of the player a sub came in for, kept on their own row.
+    leaver_quit: bool | UnsetType = UNSET
     sub_out: str | None | UnsetType = UNSET
     leader: str | UnsetType = UNSET
     civ: str | UnsetType = UNSET
@@ -66,6 +69,7 @@ class SeatPatch:
                 self.placement,
                 self.discord_id,
                 self.quit,
+                self.leaver_quit,
                 self.sub_out,
                 self.leader,
                 self.civ,
@@ -271,6 +275,24 @@ def validate_players_patch(
                     seat,
                     f"Seat {seat_index[seat] + 1} is unassigned; assign its player "
                     "before marking a quit.",
+                )
+            )
+        if e.leaver_quit is True and s.leaver is None:
+            out.append(
+                Violation(
+                    Rule.NO_LEAVER,
+                    seat,
+                    f"Nobody left seat {seat_index[seat] + 1}; set who the sub "
+                    "came in for before marking their quit.",
+                )
+            )
+        elif e.leaver_quit is True and is_placeholder(s.leaver):
+            out.append(
+                Violation(
+                    Rule.QUIT_ON_PLACEHOLDER,
+                    seat,
+                    f"The player who left seat {seat_index[seat] + 1} is "
+                    "unassigned; set who the sub came in for first.",
                 )
             )
 

@@ -16,13 +16,15 @@ class SeatPatchIn(BaseModel):
     placement: int | None = None
     discord_id: str | None = None
     quit: bool | None = None
+    # Whether the player this seat's sub came in for quit.
+    leaver_quit: bool | None = None
     sub_out: str | None = None
     leader: str | None = None
     civ: str | None = None
 
     @model_validator(mode="after")
     def _only_sub_out_is_nullable(self) -> SeatPatchIn:
-        for name in ("placement", "discord_id", "quit", "leader", "civ"):
+        for name in ("placement", "discord_id", "quit", "leaver_quit", "leader", "civ"):
             if name in self.model_fields_set and getattr(self, name) is None:
                 raise ValueError(
                     f"{name} may not be null; omit it to leave it unchanged"
@@ -46,7 +48,15 @@ class PlayersPatch(BaseModel):
         for entry in self.players:
             declared = entry.model_fields_set
             fields: dict[str, Any] = {"seat": entry.seat}
-            for name in ("placement", "discord_id", "quit", "sub_out", "leader", "civ"):
+            for name in (
+                "placement",
+                "discord_id",
+                "quit",
+                "leaver_quit",
+                "sub_out",
+                "leader",
+                "civ",
+            ):
                 if name in declared:
                     fields[name] = getattr(entry, name)
             out.append(SeatPatch(**fields))
