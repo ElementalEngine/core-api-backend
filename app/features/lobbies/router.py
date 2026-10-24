@@ -42,7 +42,7 @@ from app.features.lobbies.service import (
     PickIsFinal,
     SeatChangeRefused,
 )
-from app.features.seasons.repository import SeasonsRepository
+from app.features.seasons.repository import SeasonNotSeededError, SeasonsRepository
 
 REFUSAL_MESSAGES = {
     "one_active_seat_per_player": (
@@ -83,6 +83,8 @@ async def create_lobby(
         return await _service(db).create(body, name)
     except InvalidLobbyShape as exc:
         raise invalid_request(str(exc)) from exc
+    except SeasonNotSeededError as exc:
+        raise not_found(str(exc)) from exc
     except LobbyInsertRefused as exc:
         raise conflict(REFUSAL_MESSAGES.get(exc.index, str(exc))) from exc
 

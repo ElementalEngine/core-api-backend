@@ -35,7 +35,7 @@ from app.features.matches.schemas_v2 import (
 from app.features.matches.service import MatchService
 from app.features.matches.sub_quota import sub_quota
 from app.features.matches.upload import read_capped
-from app.features.seasons.repository import SeasonsRepository
+from app.features.seasons.repository import SeasonNotSeededError, SeasonsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -213,6 +213,8 @@ async def approve_match(
         approved = await svc.approve_match(match_id, actor)
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
+    except SeasonNotSeededError as exc:
+        raise not_found(str(exc)) from exc
     except ApprovingError as exc:
         raise _retry_later(exc) from exc
     except RetryLaterError as exc:

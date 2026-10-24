@@ -94,7 +94,7 @@ class SeasonsRepository:
                 {"edition": edition}, sort=[("started_at", DESCENDING)]
             )
             if doc is None:
-                raise SeasonNotSeededError(f"no season row for edition {edition!r}")
+                raise SeasonNotSeededError(f"No season is recorded for {edition}.")
             _CACHE[edition] = doc
             cached = doc
         return dict(cached)

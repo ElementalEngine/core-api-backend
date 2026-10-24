@@ -7,6 +7,7 @@ from pydantic import SecretStr
 
 from app.features.matches.errors import ApprovingError
 from app.features.matches.service import MatchService
+from app.features.seasons.repository import SeasonNotSeededError
 
 TOKEN = "mito-test-token"
 OID = "64b7f0c2a1b2c3d4e5f60718"
@@ -52,3 +53,13 @@ def test_staff_who_did_not_play_cannot_contest(monkeypatch):
         headers={**HEADERS, "x-actor-is-staff": "true"},
     )
     assert res.status_code == 403
+
+
+def test_an_edition_with_no_season_is_refused_by_name(monkeypatch):
+    async def unseeded(*args, **kwargs):
+        raise SeasonNotSeededError("No season is recorded for civ7.")
+
+    monkeypatch.setattr(MatchService, "approve_match", unseeded)
+    res = _client(monkeypatch).post(f"/api/v2/matches/{OID}/approve", headers=HEADERS)
+    assert res.status_code == 404
+    assert res.json()["detail"]["error"]["message"] == "No season is recorded for civ7."
