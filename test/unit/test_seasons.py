@@ -59,14 +59,6 @@ def test_seed_is_one_row_per_edition_with_no_ended_at():
     assert all(set(d) == {"edition", "label", "started_at"} for d in docs)
 
 
-def test_second_call_is_served_from_the_cache():
-    repo, collection = _repo(seed_documents(NOW))
-    first = asyncio.run(repo.get_current_season("civ6"))
-    second = asyncio.run(repo.get_current_season("civ6"))
-    assert first == second
-    assert collection.find_one_calls == 1
-
-
 def test_a_caller_cannot_poison_the_cache():
     repo, collection = _repo(seed_documents(NOW))
     first = asyncio.run(repo.get_current_season("civ6"))

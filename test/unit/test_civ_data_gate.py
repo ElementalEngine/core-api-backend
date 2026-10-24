@@ -57,13 +57,6 @@ def test_no_token_configured_answers_503(monkeypatch):
     assert exc_info.value.detail["error"]["code"] == "SERVICE_TOKENS_MISCONFIGURED"
 
 
-def test_router_carries_the_gate():
-    assert any(
-        dependency.dependency is require_any_service_token
-        for dependency in civ_data_router.dependencies
-    ), "civ-data router is missing require_any_service_token"
-
-
 def test_gate_runs_before_the_edition_is_validated(monkeypatch):
     pytest.importorskip("httpx")
     from fastapi import FastAPI

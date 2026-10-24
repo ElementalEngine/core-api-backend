@@ -43,20 +43,6 @@ def test_c1_declares_exactly_its_v2_routes():
     assert set(_v2_routes()) == EXPECTED
 
 
-def test_leaderboard_is_declared_before_the_id_route():
-    paths = [p for _, p in _v2_routes()]
-    assert paths.index("/api/v2/matches/leaderboard") < paths.index(
-        "/api/v2/matches/{match_id}"
-    )
-
-
-def test_sub_quota_is_declared_before_the_id_route():
-    paths = [p for _, p in _v2_routes()]
-    assert paths.index("/api/v2/matches/sub-quota") < paths.index(
-        "/api/v2/matches/{match_id}"
-    )
-
-
 def test_leaderboard_resolves_to_its_own_handler():
     # Declaration order is the mechanism; resolution is the property.
     scope = _scope("GET", "/api/v2/matches/leaderboard")

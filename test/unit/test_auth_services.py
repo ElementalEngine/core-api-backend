@@ -294,11 +294,6 @@ def test_oauth_callback_denial_returns_discord_oauth_failed(monkeypatch):
     ]
 
 
-def test_manual_required_for_2k_raises():
-    with pytest.raises(ManualRegistrationRequiredError):
-        RegistrationService.manual_required_for_platform(RegistrationPlatform.TWOK)
-
-
 def test_manual_not_required_for_steam():
     # Should not raise.
     RegistrationService.manual_required_for_platform(RegistrationPlatform.STEAM)

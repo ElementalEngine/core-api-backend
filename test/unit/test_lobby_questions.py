@@ -5,7 +5,6 @@ import pytest
 from app.features.lobbies.questions import (
     EDITIONS,
     UnknownBallot,
-    question_ids,
     questions_for,
 )
 
@@ -91,12 +90,6 @@ def test_multi_select_is_capped_below_the_option_count():
 def test_the_catalogue_hands_out_a_copy():
     questions_for("civ6", "ffa")[0]["title"] = "MUTATED"
     assert questions_for("civ6", "ffa")[0]["title"] != "MUTATED"
-
-
-def test_question_ids_matches_the_ballot():
-    assert question_ids("civ6", "teamer") == {
-        q["id"] for q in questions_for("civ6", "teamer")
-    }
 
 
 @pytest.mark.parametrize(

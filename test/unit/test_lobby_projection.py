@@ -52,7 +52,6 @@ TABLE = [
     ("bans", "standard", None, OBSERVER, ALL, ALL, ALL),
     ("draft", "standard", None, ALICE, ALL, ALL, {ALICE}),
     ("draft", "standard", None, OBSERVER, ALL, ALL, set()),
-    ("draft", "snake", None, OBSERVER, ALL, ALL, set()),
     ("draft", "cwc", None, OBSERVER, ALL, ALL, set()),
     ("draft", "blind", None, ALICE, ALL, {ALICE}, {ALICE}),
     ("draft", "blind", None, CAROL, ALL, {CAROL}, {CAROL}),

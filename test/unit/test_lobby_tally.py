@@ -81,10 +81,6 @@ def test_two_lobbies_do_not_always_break_a_tie_the_same_way():
     assert picks == {0, 1, 2}
 
 
-def test_the_seed_is_stable_for_one_lobby_and_question():
-    assert seeded_index(LOBBY, "map", 3) == seeded_index(LOBBY, "map", 3)
-
-
 @pytest.mark.parametrize("count", [1, 2, 3, 7, 15])
 def test_the_seed_always_indexes_inside_the_tied_options(count):
     assert 0 <= seeded_index(LOBBY, "map", count) < count

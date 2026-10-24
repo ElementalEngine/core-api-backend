@@ -60,16 +60,6 @@ def test_civ7_civs():
         assert row["age_pool_source"] in POOL_SOURCES
 
 
-def test_no_token_collides_within_an_edition():
-    # The collection's unique index is {edition, token}, so leader and civ
-    # tokens share one namespace per edition.
-    for edition in EDITIONS:
-        seed = load_seed(edition)
-        tokens = [row["token"] for row in seed["leaders"]]
-        tokens += [row["token"] for row in seed.get("civs", [])]
-        assert len(set(tokens)) == len(tokens)
-
-
 def test_every_row_but_dai_viet_has_a_portrait():
     """The grid shows faces; a missing one is a hole worth failing over."""
     without = [

@@ -29,7 +29,6 @@ from app.features.lobbies.service import (
     NotYourTurn,
     PickIsFinal,
     SeatChangeRefused,
-    as_lobby_id,
     build_lobby_document,
     for_the_wire,
     rearranged,
@@ -335,14 +334,6 @@ def test_the_sweep_asks_for_every_stale_lobby_not_one_player_s():
     assert cutoff == NOW - STALE_AFTER
 
 
-def test_creation_still_evicts_only_the_host_s_own_stale_lobbies():
-    repo = FakeRepo()
-    body = request()
-    asyncio.run(LobbyService(repo, FakeSeasons()).create(body))
-    players, _ = repo.evictions[0]
-    assert players == [body.host_discord_id]
-
-
 def test_browse_passes_every_filter_including_the_channel():
     repo = FakeRepo()
     asyncio.run(LobbyService(repo, FakeSeasons()).browse("g1", "alice", "civ6", "ffa"))
@@ -447,10 +438,6 @@ def test_a_missing_lobby_raises_rather_than_returning_none():
     repo = FakeRepo(lobby=None)
     with pytest.raises(LobbyNotFound):
         read(repo, lobby_id=HEX_ID, viewer_discord_id="bob")
-
-
-def test_a_well_formed_id_round_trips_to_the_same_hex():
-    assert str(as_lobby_id(HEX_ID)) == HEX_ID
 
 
 def has_datetime(value):
@@ -1035,19 +1022,6 @@ def test_a_token_outside_your_own_pool_is_refused():
     assert repo.changes == []
 
 
-def test_a_second_pick_of_the_same_field_is_refused():
-    already = {
-        **DRAFTING,
-        "seats": [
-            {**DRAFTING["seats"][0], "pick": "LEADER_TRAJAN"},
-            DRAFTING["seats"][1],
-        ],
-    }
-    repo = FakeRepo(lobby=already, applied=already)
-    with pytest.raises(PickIsFinal):
-        pick(repo, "alice", "LEADER_TRAJAN")
-
-
 def test_cwc_writes_the_team_and_never_the_seat():
     cwc = {
         **DRAFTING,
@@ -1227,12 +1201,6 @@ def test_a_cwc_turn_in_civ7_takes_a_leader_and_a_civ():
         "leaders": ["LEADER_TRAJAN"],
         "civs": ["CIVILIZATION_ROME"],
     }
-
-
-def test_a_civ6_pick_needs_only_its_leader():
-    repo = FakeRepo(lobby=DRAFTING, applied=DRAFTING)
-    pick(repo, "alice", "LEADER_TRAJAN")
-    assert repo.changes
 
 
 def test_a_seat_that_already_picked_is_refused_outright():

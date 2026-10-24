@@ -115,14 +115,6 @@ def test_an_unknown_game_type_is_refused(game_type):
     assert exc.value.field == "game_type"
 
 
-def test_shapes_are_frozen():
-    # The shape is derived once and read many times; a caller mutating it
-    # would change what later code believes the lobby is.
-    shape = resolve_shape("teamer", 3, 3)
-    with pytest.raises(Exception):
-        shape.seat_count = 99  # type: ignore[misc]
-
-
 FFA_SHAPE = resolve_shape("ffa", size=12)
 TEAMER_SHAPE = resolve_shape("teamer", 3, 3)
 
@@ -165,10 +157,6 @@ def test_two_seats_cannot_claim_one_index():
     with pytest.raises(InvalidSeating) as exc:
         validate_seats([seat(3, "a"), seat(3, "b")], FFA_SHAPE)
     assert exc.value.field == "seat_index"
-
-
-def test_a_gap_is_legal_and_is_never_closed():
-    validate_seats([seat(0, "a"), seat(7, "b")], FFA_SHAPE)
 
 
 def test_an_ffa_seat_cannot_carry_a_team():

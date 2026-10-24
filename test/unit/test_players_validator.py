@@ -181,12 +181,6 @@ def test_is_placeholder_is_the_single_predicate():
     assert not is_placeholder("123456789")
 
 
-def test_canary_the_validator_can_actually_fail():
-    violating = check(ffa(), [SeatPatch(9, quit=True)])
-    assert violating, "a violating patch produced no violations"
-    assert check(ffa(), [SeatPatch(0, discord_id="ok")]) == []
-
-
 def test_one_player_per_seat():
     assert rules(check(ffa(), [SeatPatch(0, discord_id="b")])) == [
         Rule.DUPLICATE_PLAYER

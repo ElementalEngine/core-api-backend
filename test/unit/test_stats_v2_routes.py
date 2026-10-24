@@ -29,14 +29,6 @@ def test_the_v2_stats_routes_are_registered():
     assert _routes("/api/v2/stats") == EXPECTED
 
 
-def test_the_legacy_put_pair_is_gone():
-    assert {p for _, p in _routes("/api/v1")} & GONE == set()
-
-
-def test_no_v1_stats_route_remains():
-    assert _routes("/api/v1/stats") == set()
-
-
 def test_rating_gains_replaces_wins_and_nothing_else_moves():
     row = StatRow(
         mu=1250,

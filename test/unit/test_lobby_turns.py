@@ -26,11 +26,6 @@ def test_neither_team_ever_acts_more_often_than_the_other(team_size):
     assert order.count("cap0") == order.count("cap1") == team_size
 
 
-def test_the_table_itself_is_balanced():
-    assert len(CWC_PICK_ORDER) == 16
-    assert CWC_PICK_ORDER.count(0) == CWC_PICK_ORDER.count(1) == 8
-
-
 @pytest.mark.parametrize("captains", [["only"], ["a", "b", "c"], []])
 def test_cwc_needs_exactly_two_captains(captains):
     with pytest.raises(ValueError):

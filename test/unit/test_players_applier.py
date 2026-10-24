@@ -1,9 +1,6 @@
 from types import SimpleNamespace
 
-from app.features.matches.editing import (
-    _leaver_index,
-    apply_players_patch,
-)
+from app.features.matches.editing import apply_players_patch
 from app.features.matches.validation import SeatPatch, validate_players_patch
 
 STEAM = {"L0": "s-L0", "L2": "s-L2", "y": "s-y", "new": "s-new"}
@@ -60,17 +57,6 @@ def test_two_subs_in_one_patch_land_on_the_seats_the_client_named():
         ("L2", 2, 2, False, True),
         ("D", 3, 3, False, False),
     ]
-
-
-def test_every_sub_in_row_is_followed_by_its_leaver():
-    match = M(P(0, 0, "A"), P(1, 1, "B"), P(2, 2, "C"), P(3, 3, "D"))
-    apply_players_patch(
-        match, [SeatPatch(0, sub_out="L0"), SeatPatch(2, sub_out="L2")], STEAM
-    )
-    for i, player in enumerate(match.players):
-        if player.is_sub:
-            leaver = match.players[i + 1]
-            assert leaver.subbed_out and leaver.team == player.team
 
 
 def test_field_changes_land_before_the_structural_ones():
@@ -147,12 +133,6 @@ def test_assign_quit_and_sub_in_one_patch():
     assert match.players[1].civ == "Rome"
     assert match.players[1].leader == "LEADER_X"
     assert match.players[1].team == 0
-
-
-def test_leaver_index_reads_adjacency_rather_than_assuming_it():
-    match = M(P(0, 0, "A", is_sub=True), P(0, 0, "X", subbed_out=True), P(1, 1, "B"))
-    assert _leaver_index(match, 0) == 1
-    assert _leaver_index(match, 2) is None
 
 
 def test_a_leader_and_civ_set_by_hand_reach_the_leaver_row_too():

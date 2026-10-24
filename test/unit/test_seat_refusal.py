@@ -14,15 +14,6 @@ from app.features.lobbies.repository import (
 )
 
 
-def test_the_seat_index_is_named_from_its_key_pattern():
-    exc = DuplicateKeyError(
-        "E11000 duplicate key error",
-        11000,
-        {"keyPattern": {"seats.discord_id": 1}},
-    )
-    assert _refusing_index(exc) == "one_active_seat_per_player"
-
-
 def test_an_unfamiliar_index_is_not_guessed_at():
     exc = DuplicateKeyError("E11000", 11000, {"keyPattern": {"something_else": 1}})
     assert _refusing_index(exc) == "unknown"

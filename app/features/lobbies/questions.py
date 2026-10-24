@@ -41,9 +41,4 @@ def questions_for(edition: str, game_type: str) -> list[dict[str, Any]]:
     return json.loads(json.dumps(asked))
 
 
-def question_ids(edition: str, game_type: str) -> set[str]:
-    """The ids a ballot may name. Anything else is a 400, not a silent drop."""
-    return {question["id"] for question in questions_for(edition, game_type)}
-
-
-__all__ = ["EDITIONS", "UnknownBallot", "question_ids", "questions_for"]
+__all__ = ["EDITIONS", "UnknownBallot", "questions_for"]
