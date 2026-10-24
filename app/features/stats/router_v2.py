@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from app.core.config import settings
 from app.core.dependencies import get_database, require_mito_token
 from app.core.errors import invalid_request, not_found
+from app.features.seasons.repository import SeasonsRepository
 from app.features.stats.errors import InvalidStatsRequestError, StatsNotFoundError
 from app.features.stats.history import MatchHistory
 from app.features.stats.schemas import (
@@ -45,7 +46,8 @@ async def get_user_stats(
         raise invalid_request(str(exc)) from exc
     except StatsNotFoundError as exc:
         raise not_found(str(exc)) from exc
-    return UserStatsResponseV2.from_v1(result)
+    label = await SeasonsRepository(db).label_for(result.civ_version)
+    return UserStatsResponseV2.from_v1(result, label)
 
 
 @router.post("/stats/batch", response_model=BatchStatsResponseV2)
@@ -65,14 +67,14 @@ async def get_users_stats_batch(
     except InvalidStatsRequestError as exc:
         raise invalid_request(str(exc)) from exc
 
+    version = results[0].civ_version if results else payload.civ_version.strip().lower()
+    label = await SeasonsRepository(db).label_for(version)
     return BatchStatsResponseV2(
-        civ_version=(
-            results[0].civ_version if results else payload.civ_version.strip().lower()
-        ),
+        civ_version=version,
         game_type=(
             results[0].game_type if results else payload.game_type.strip().lower()
         ),
-        results=[UserStatsResponseV2.from_v1(r) for r in results],
+        results=[UserStatsResponseV2.from_v1(r, label) for r in results],
     )
 
 
@@ -106,7 +108,10 @@ async def reset_user_stats(
         raise invalid_request(str(exc)) from exc
     except StatsNotFoundError as exc:
         raise not_found(str(exc)) from exc
-    return ResetStatsResponseV2.of(result, mu=settings.ts_mu, sigma=settings.ts_sigma)
+    label = await SeasonsRepository(db).label_for(result.civ_version)
+    return ResetStatsResponseV2.of(
+        result, mu=settings.ts_mu, sigma=settings.ts_sigma, season_label=label
+    )
 
 
 @router.get("/stats/history", response_model=HistoryPage)

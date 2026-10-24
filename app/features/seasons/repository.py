@@ -36,10 +36,13 @@ class SeasonsAlreadySeededError(RuntimeError):
 
 
 _CACHE: dict[str, dict[str, Any]] = {}
+# Season names by id. A season's name never changes once its row exists.
+_LABELS: dict[Any, str] = {}
 
 
 def clear_cache() -> None:
     _CACHE.clear()
+    _LABELS.clear()
 
 
 def seed_documents(now: datetime) -> list[dict[str, Any]]:
@@ -97,6 +100,21 @@ class SeasonsRepository:
             _CACHE[edition] = doc
             cached = doc
         return dict(cached)
+
+    async def label_for(self, edition: str, season_id: Any = None) -> str | None:
+        """A season's name, such as "Season 6": the season with this id, or the
+        edition's open season; None when there is no such row."""
+        if season_id is None:
+            try:
+                return str((await self.get_current_season(edition))["label"])
+            except SeasonNotSeededError:
+                return None
+        if season_id not in _LABELS:
+            doc = await self._seasons.find_one({"_id": season_id}, {"label": 1})
+            if doc is None:
+                return None
+            _LABELS[season_id] = str(doc["label"])
+        return _LABELS[season_id]
 
 
 __all__ = [

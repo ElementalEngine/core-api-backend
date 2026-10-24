@@ -54,6 +54,8 @@ class MatchResponse(BaseModel):
     reporter_discord_id: str
     contest_report_list: list[ContestReport]
     affected_players: list[AffectedPlayerRating] | None = None
+    # The season it was approved in, else the open one, such as "Season 6".
+    season_label: str | None = None
 
 
 class MatchUpdate(BaseModel):

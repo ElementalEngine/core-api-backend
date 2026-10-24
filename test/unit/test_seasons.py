@@ -85,6 +85,35 @@ def test_a_caller_cannot_poison_the_cache():
     assert collection.find_one_calls == 1
 
 
+def test_the_label_names_the_open_season_or_none():
+    repo, _ = _repo(seed_documents(NOW))
+    assert asyncio.run(repo.label_for("civ6")) == "Season 6"
+    clear_cache()
+    empty, _ = _repo([])
+    assert asyncio.run(empty.label_for("civ6")) is None
+
+
+class ById:
+    """find_one by _id, counting reads."""
+
+    def __init__(self, docs):
+        self._docs = {d["_id"]: d for d in docs}
+        self.reads = 0
+
+    async def find_one(self, flt, projection=None):
+        self.reads += 1
+        return self._docs.get(flt["_id"])
+
+
+def test_a_match_s_season_is_named_by_its_id_once():
+    collection = ById([{"_id": "s5", "edition": "civ6", "label": "Season 5"}])
+    repo = SeasonsRepository({GAMES_DB: {COL_SEASONS: collection}})
+    assert asyncio.run(repo.label_for("civ6", "s5")) == "Season 5"
+    assert asyncio.run(repo.label_for("civ6", "s5")) == "Season 5"
+    assert collection.reads == 1
+    assert asyncio.run(repo.label_for("civ6", "gone")) is None
+
+
 def test_cache_holds_one_entry_per_edition():
     repo, collection = _repo(seed_documents(NOW))
     assert asyncio.run(repo.get_current_season("civ6"))["label"] == "Season 6"

@@ -35,6 +35,7 @@ from app.features.matches.schemas_v2 import (
 from app.features.matches.service import MatchService
 from app.features.matches.sub_quota import sub_quota
 from app.features.matches.upload import read_capped
+from app.features.seasons.repository import SeasonsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,15 @@ async def _load(svc: MatchService, match_id: str) -> dict[str, Any]:
         raise not_found("Match not found") from exc
     except InvalidIDError as exc:
         raise invalid_request(str(exc)) from exc
+
+
+async def _named(db: AsyncMongoClient, doc: dict[str, Any]) -> dict[str, Any]:
+    """The match with its season's name: the one it was approved in, else the
+    edition's open season."""
+    doc["season_label"] = await SeasonsRepository(db).label_for(
+        str(doc.get("game", "")).lower(), doc.get("season_id")
+    )
+    return doc
 
 
 def _require_reporter(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
@@ -97,7 +107,7 @@ async def upload_match(
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc
     logger.info("Stored match %s", created["match_id"])
-    return created
+    return await _named(db, created)
 
 
 # Declared before /matches/{id}: a literal path at the same depth as a
@@ -142,7 +152,7 @@ async def get_sub_quota(
 
 @router.get("/matches/{match_id}", response_model=MatchResponse)
 async def get_match(match_id: str, db=Depends(get_database)) -> dict[str, Any]:
-    return await _load(MatchService(db), match_id)
+    return await _named(db, await _load(MatchService(db), match_id))
 
 
 async def _require_known_civs(
@@ -182,7 +192,7 @@ async def patch_players(
     if is_staff:  # for anyone else, the validator refuses a leader or civ
         await _require_known_civs(db, doc, body)
     try:
-        return await EditingService(svc).patch_players(
+        patched = await EditingService(svc).patch_players(
             match_id, body.to_seat_patches(), actor_is_staff=is_staff
         )
     except NotFoundError as exc:
@@ -191,6 +201,7 @@ async def patch_players(
         raise conflict(str(exc)) from exc
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc
+    return await _named(db, patched)
 
 
 @router.post("/matches/{match_id}/approve", response_model=MatchResponse)
@@ -201,7 +212,7 @@ async def approve_match(
 ) -> dict[str, Any]:
     svc = MatchService(db)
     try:
-        return await svc.approve_match(match_id, actor)
+        approved = await svc.approve_match(match_id, actor)
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
     except ApprovingError as exc:
@@ -210,6 +221,7 @@ async def approve_match(
         raise _retry_later(exc) from exc
     except (InvalidIDError, MatchServiceError) as exc:
         raise invalid_request(str(exc)) from exc
+    return await _named(db, approved)
 
 
 @router.post("/matches/{match_id}/contest", response_model=MatchResponse)
@@ -223,26 +235,30 @@ async def contest_match(
     svc = MatchService(db)
     _require_player(await _load(svc, match_id), actor, is_staff)
     try:
-        return await EditingService(svc).contest_report(match_id, actor, body.reason)
+        contested = await EditingService(svc).contest_report(
+            match_id, actor, body.reason
+        )
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
     except ApprovingError as exc:
         raise conflict(str(exc)) from exc
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc
+    return await _named(db, contested)
 
 
 @router.post("/matches/{match_id}/revert", response_model=MatchResponse)
 async def revert_match(match_id: str, db=Depends(get_database)) -> dict[str, Any]:
     svc = MatchService(db)
     try:
-        return await svc.revert_match(match_id)
+        reverted = await svc.revert_match(match_id)
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
     except RetryLaterError as exc:
         raise _retry_later(exc) from exc
     except (InvalidIDError, MatchServiceError) as exc:
         raise invalid_request(str(exc)) from exc
+    return await _named(db, reverted)
 
 
 @router.delete("/matches/{match_id}", response_model=MatchResponse)
@@ -255,10 +271,11 @@ async def delete_match(
     svc = MatchService(db)
     _require_reporter(await _load(svc, match_id), actor, is_staff)
     try:
-        return await EditingService(svc).delete_pending_match(match_id)
+        deleted = await EditingService(svc).delete_pending_match(match_id)
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
     except ApprovingError as exc:
         raise conflict(str(exc)) from exc
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc
+    return await _named(db, deleted)

@@ -46,15 +46,20 @@ class UserStatsResponseV2(BaseModel):
     game_type: str
     lifetime: StatSetV2
     season: StatSetV2
+    # The open season's name, such as "Season 6"; null before any is seeded.
+    season_label: str | None = None
 
     @classmethod
-    def from_v1(cls, response: UserStatsResponse) -> UserStatsResponseV2:
+    def from_v1(
+        cls, response: UserStatsResponse, season_label: str | None = None
+    ) -> UserStatsResponseV2:
         return cls(
             discord_id=response.discord_id,
             civ_version=response.civ_version,
             game_type=response.game_type,
             lifetime=StatSetV2.from_v1(response.lifetime),
             season=StatSetV2.from_v1(response.season),
+            season_label=season_label,
         )
 
 
@@ -67,7 +72,12 @@ class ResetStatsResponseV2(UserStatsResponseV2):
 
     @classmethod
     def of(
-        cls, before: UserStatsResponse, *, mu: float, sigma: float
+        cls,
+        before: UserStatsResponse,
+        *,
+        mu: float,
+        sigma: float,
+        season_label: str | None = None,
     ) -> ResetStatsResponseV2:
         fresh = StatRowV2(mu=round(mu), sigma=sigma, games=0, first=0, rating_gains=0)
 
@@ -78,7 +88,7 @@ class ResetStatsResponseV2(UserStatsResponseV2):
                 duel=fresh if stats.duel else None,
             )
 
-        v2 = UserStatsResponseV2.from_v1(before)
+        v2 = UserStatsResponseV2.from_v1(before, season_label)
         return cls(
             **v2.model_dump(),
             after_lifetime=restarted(before.lifetime),

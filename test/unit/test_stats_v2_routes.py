@@ -86,7 +86,11 @@ def test_a_reset_answers_before_and_the_fresh_start_after():
         lifetime=StatSet(ffa=row, duel=row),
         season=StatSet(ffa=row),
     )
-    out = ResetStatsResponseV2.of(before, mu=1200.4, sigma=8.33)
+    out = ResetStatsResponseV2.of(
+        before, mu=1200.4, sigma=8.33, season_label="Season 6"
+    )
+    assert out.season_label == "Season 6"
+    assert UserStatsResponseV2.from_v1(before).season_label is None
     assert out.lifetime.ffa is not None and out.lifetime.ffa.mu == 1300
     assert out.after_lifetime.ffa is not None
     assert (out.after_lifetime.ffa.mu, out.after_lifetime.ffa.games) == (1200, 0)

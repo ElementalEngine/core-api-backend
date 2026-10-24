@@ -1633,6 +1633,17 @@
             "title": "Save File Hash",
             "type": "string"
           },
+          "season_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season Label"
+          },
           "turn": {
             "title": "Turn",
             "type": "integer"
@@ -2484,6 +2495,17 @@
           },
           "season": {
             "$ref": "#/components/schemas/StatSetV2"
+          },
+          "season_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season Label"
           }
         },
         "required": [
@@ -3455,6 +3477,17 @@
             "title": "Save File Hash",
             "type": "string"
           },
+          "season_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season Label"
+          },
           "turn": {
             "title": "Turn",
             "type": "integer"
@@ -3529,6 +3562,17 @@
           },
           "season": {
             "$ref": "#/components/schemas/StatSetV2"
+          },
+          "season_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season Label"
           }
         },
         "required": [
