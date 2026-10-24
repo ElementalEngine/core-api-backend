@@ -12,7 +12,7 @@ from app.core.dependencies import (
     get_database,
     require_mito_token,
 )
-from app.core.errors import api_error, conflict, forbidden, invalid_request, not_found
+from app.core.errors import api_error, forbidden, invalid_request, not_found
 from app.features.civdata.repository import CivDataRepository
 from app.features.matches.editing import EditingService
 from app.features.matches.errors import (
@@ -72,16 +72,14 @@ def _require_reporter(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
         raise forbidden("Only the reporter or staff may edit this match.")
 
 
-def _retry_later(exc: RetryLaterError) -> Exception:
+def _retry_later(exc: MatchServiceError) -> Exception:
     return api_error(code="CONFLICT", message=str(exc), status_code=409, retryable=True)
 
 
-def _require_player(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
-    """A player in the match, or staff."""
-    if is_staff:
-        return
+def _require_player(doc: dict[str, Any], actor: str) -> None:
+    """Only a player in the match contests it; staff edit or remove instead."""
     if not any(p.get("discord_id") == actor for p in doc.get("players", [])):
-        raise forbidden("Only a player in this match, or staff, may contest it.")
+        raise forbidden("Only a player in this match may contest it.")
 
 
 @router.post("/matches", response_model=UploadResponse)
@@ -198,7 +196,7 @@ async def patch_players(
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
     except ApprovingError as exc:
-        raise conflict(str(exc)) from exc
+        raise _retry_later(exc) from exc
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc
     return await _named(db, patched)
@@ -216,7 +214,7 @@ async def approve_match(
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
     except ApprovingError as exc:
-        raise conflict(str(exc)) from exc
+        raise _retry_later(exc) from exc
     except RetryLaterError as exc:
         raise _retry_later(exc) from exc
     except (InvalidIDError, MatchServiceError) as exc:
@@ -229,11 +227,10 @@ async def contest_match(
     match_id: str,
     body: ContestBody,
     actor: str = Depends(actor_discord_id),
-    is_staff: bool = Depends(actor_is_staff),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     svc = MatchService(db)
-    _require_player(await _load(svc, match_id), actor, is_staff)
+    _require_player(await _load(svc, match_id), actor)
     try:
         contested = await EditingService(svc).contest_report(
             match_id, actor, body.reason
@@ -241,7 +238,7 @@ async def contest_match(
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
     except ApprovingError as exc:
-        raise conflict(str(exc)) from exc
+        raise _retry_later(exc) from exc
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc
     return await _named(db, contested)
@@ -275,7 +272,7 @@ async def delete_match(
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
     except ApprovingError as exc:
-        raise conflict(str(exc)) from exc
+        raise _retry_later(exc) from exc
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc
     return await _named(db, deleted)

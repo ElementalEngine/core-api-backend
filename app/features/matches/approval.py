@@ -273,6 +273,7 @@ class ApprovalService:
             "match_id": str(match_id),
             **match.model_dump(),
             "affected_players": affected,
+            "season_id": res.get("season_id"),
         }
 
     async def approve_match(
@@ -483,6 +484,7 @@ class ApprovalService:
                 "approved_at": validated_doc["approved_at"],
                 "approver_discord_id": approver_discord_id,
                 "affected_players": affected_players,
+                "season_id": validated_doc["season_id"],
             }
         except Exception:
             # A write conflict is an ordinary transaction outcome; leaving the

@@ -54,15 +54,24 @@ def next_label(label: str) -> str:
     return f"Season {int(found.group(1)) + 1}"
 
 
+def _write_file(path: Path, text: str) -> None:
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+
+
 # One document per line in canonical Extended JSON, as mongoimport and Compass
 # read it, so a collection is restored from its file as it is.
 def _write_lines(path: Path, docs: list[dict[str, Any]]) -> None:
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        for doc in docs:
-            f.write(json_util.dumps(doc, json_options=CANONICAL_JSON_OPTIONS) + "\n")
-        f.flush()
-        os.fsync(f.fileno())
+    _write_file(
+        path,
+        "".join(
+            json_util.dumps(doc, json_options=CANONICAL_JSON_OPTIONS) + "\n"
+            for doc in docs
+        ),
+    )
 
 
 def _sync_folder(path: Path) -> None:
@@ -176,9 +185,6 @@ class SeasonRollover:
         finally:
             # Cleared whatever happened: a stale open season is never served.
             clear_cache()
-        # A folder still named .partial is a change that may not have finished.
-        folder = partial.with_name(name)
-        partial.rename(folder)
         manifest = {
             "edition": edition,
             "closed": season["label"],
@@ -186,7 +192,11 @@ class SeasonRollover:
             "started_at": at.isoformat(),
             "records": records,
         }
-        (folder / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+        _write_file(partial / "manifest.json", json.dumps(manifest, indent=2) + "\n")
+        # A folder still named .partial is a change that may not have finished.
+        folder = partial.with_name(name)
+        partial.rename(folder)
+        _sync_folder(folder.parent)
         return SeasonRolled(
             edition=edition,
             closed=season["label"],

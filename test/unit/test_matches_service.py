@@ -477,9 +477,12 @@ def test_approve_refuses_a_seat_without_a_leader_or_civ():
 def test_reverting_an_earlier_seasons_match_leaves_this_season_alone():
     stored = {"_id": 123, "mu": 30.0, "sigma": 5.0, "games": 10, "wins": 4, "first": 2}
     doc = make_match_doc([make_player(delta=5.0, season_delta=3.0)])
-    repo = FakeRepo(match_doc={**doc, "season_id": ObjectId()}, stat_doc=stored)
+    earlier = ObjectId()
+    repo = FakeRepo(match_doc={**doc, "season_id": earlier}, stat_doc=stored)
 
-    asyncio.run(make_service(repo).revert_match(OID))
+    out = asyncio.run(make_service(repo).revert_match(OID))
+
+    assert out["season_id"] == earlier
 
     assert {(u["is_seasonal"], u["is_combined"]) for u in repo.upserts} == {
         (False, False),
@@ -555,8 +558,9 @@ def test_approve_stamps_the_season_open_inside_its_transaction():
             return {"_id": "s7", "label": "Season 7"}
 
     repo = FakeRepo(match_doc=_two_player_match())
-    asyncio.run(make_service(repo, seasons=Changed()).approve_match(OID, "a-1"))
+    out = asyncio.run(make_service(repo, seasons=Changed()).approve_match(OID, "a-1"))
     assert repo.validated["season_id"] == "s7"
+    assert out["season_id"] == "s7"
 
 
 def test_a_repeated_approve_answers_with_the_season_it_was_approved_in():

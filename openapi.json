@@ -6325,16 +6325,6 @@
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
-          },
-          {
-            "in": "header",
-            "name": "x-actor-is-staff",
-            "required": false,
-            "schema": {
-              "default": false,
-              "title": "X-Actor-Is-Staff",
-              "type": "boolean"
-            }
           }
         ],
         "requestBody": {
