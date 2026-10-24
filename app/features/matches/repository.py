@@ -100,6 +100,11 @@ class MatchRepository:
         so approval moving a match out of pending would otherwise reopen it."""
         return await self._validated.find_one({"save_bytes_sha256": save_bytes_sha256})
 
+    async def find_validated_by_hash(self, save_file_hash: str) -> list[dict[str, Any]]:
+        """Approved games with this composition, newest first."""
+        cursor = self._validated.find({"save_file_hash": save_file_hash})
+        return await cursor.sort("_id", DESCENDING).limit(20).to_list()
+
     async def find_pending_by_id(self, oid: ObjectId) -> dict[str, Any] | None:
         return await self._pending.find_one({"_id": oid})
 
@@ -232,6 +237,10 @@ class MatchRepository:
                 name=name,
             )
         await self._ensure_composition_index()
+        # An upload is checked against approved games' compositions too.
+        await self._validated.create_index(
+            [("save_file_hash", ASCENDING)], name="validated_matches_save_file_hash_idx"
+        )
         # A player's games, newest first: the stats history and its summary.
         await self._validated.create_index(
             [("players.discord_id", ASCENDING), ("_id", DESCENDING)],

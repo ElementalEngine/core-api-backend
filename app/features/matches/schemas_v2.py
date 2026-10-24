@@ -71,7 +71,7 @@ class UploadResponse(MatchResponse):
     """A response model drops undeclared keys, so the duplicate flags are declared."""
 
     repeated: bool = False
-    repeated_by: Literal["file", "composition"] | None = None
+    repeated_by: Literal["file", "composition", "approved"] | None = None
 
 
 class SubQuotaResponse(BaseModel):

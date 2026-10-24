@@ -46,11 +46,13 @@ class _Q:
         pending_bytes=None,
         validated_bytes=None,
         pending_hash=None,
+        validated_hash=(),
         insert_raises=False,
     ):
         self._pending_bytes = pending_bytes
         self._validated_bytes = validated_bytes
         self._pending_hash = pending_hash
+        self._validated_hash = list(validated_hash)
         self._insert_raises = insert_raises
         self.inserted = None
 
@@ -62,6 +64,9 @@ class _Q:
 
     async def find_pending_by_hash(self, h):
         return self._pending_hash
+
+    async def find_validated_by_hash(self, h):
+        return self._validated_hash
 
     async def insert_pending_match(self, doc, *, session=None):
         self.inserted = doc
@@ -114,6 +119,65 @@ def test_same_lineup_different_file_is_repeated_by_composition(monkeypatch):
     res = asyncio.run(_upload(_svc(q, monkeypatch)))
     assert res["repeated"] is True
     assert res["repeated_by"] == "composition"
+
+
+def _registered(svc, monkeypatch):
+    async def _map(match):
+        for p in match.players:
+            p.discord_id = {"1": "11", "2": "22"}[p.steam_id]
+        return match
+
+    monkeypatch.setattr(svc, "match_id_to_discord", _map)
+    return svc
+
+
+def test_another_save_of_an_approved_game_points_to_it(monkeypatch):
+    from bson import ObjectId
+
+    approved = {
+        "_id": ObjectId(),
+        "players": [{"discord_id": "11"}, {"discord_id": "22"}],
+    }
+    q = _Q(validated_hash=[approved])
+    res = asyncio.run(_upload(_registered(_svc(q, monkeypatch), monkeypatch)))
+    assert res["repeated"] is True
+    assert res["repeated_by"] == "approved"
+    assert res["match_id"] == str(approved["_id"])
+    assert q.inserted is None
+
+
+def test_a_seat_staff_assigned_still_counts_as_the_same_game(monkeypatch):
+    from bson import ObjectId
+
+    # The save maps one seat to a registered player; staff assigned the other.
+    approved = {
+        "_id": ObjectId(),
+        "players": [{"discord_id": "11"}, {"discord_id": "77"}],
+    }
+    q = _Q(validated_hash=[approved])
+    svc = _svc(q, monkeypatch)
+
+    async def _one_registered(match):
+        match.players[0].discord_id = "11"
+        match.players[1].discord_id = "-2"
+        return match
+
+    monkeypatch.setattr(svc, "match_id_to_discord", _one_registered)
+    res = asyncio.run(_upload(svc))
+    assert res["repeated_by"] == "approved"
+
+
+def test_the_same_picks_by_other_players_are_a_new_game(monkeypatch):
+    from bson import ObjectId
+
+    approved = {
+        "_id": ObjectId(),
+        "players": [{"discord_id": "11"}, {"discord_id": "33"}],
+    }
+    q = _Q(validated_hash=[approved])
+    res = asyncio.run(_upload(_registered(_svc(q, monkeypatch), monkeypatch)))
+    assert res["repeated"] is False
+    assert q.inserted is not None
 
 
 def test_insert_race_returns_repeated_not_500(monkeypatch):

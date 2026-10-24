@@ -8,9 +8,17 @@ from pymongo.errors import DuplicateKeyError
 
 from app.features.matches.errors import MatchServiceError
 from app.features.matches.models import MatchModel
+from app.features.matches.validation import is_placeholder
 
 if TYPE_CHECKING:
     from app.features.matches.service import MatchService
+
+
+def _played_in(match: MatchModel, approved: dict[str, Any]) -> bool:
+    """Every registered player in the save played in the approved game."""
+    theirs = {str(p.get("discord_id")) for p in approved.get("players") or []}
+    ours = {p.discord_id for p in match.players if not is_placeholder(p.discord_id)}
+    return ours <= theirs
 
 
 class IngestService:
@@ -74,6 +82,10 @@ class IngestService:
 
         match = MatchModel(**parsed)
         match = await self._m.match_id_to_discord(match)
+        # Another save of a game already rated would rate it twice.
+        for approved in await self._m.q.find_validated_by_hash(save_file_hash):
+            if _played_in(match, approved):
+                return self._repeated(approved, "approved")
         match = await self._m._recompute_deltas(match)
 
         doc = match.model_dump()

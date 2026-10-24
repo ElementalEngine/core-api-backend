@@ -3049,7 +3049,8 @@
               {
                 "enum": [
                   "file",
-                  "composition"
+                  "composition",
+                  "approved"
                 ],
                 "type": "string"
               },
