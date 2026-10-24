@@ -176,7 +176,7 @@ def test_a_change_saves_clears_and_opens_the_next_season(tmp_path):
     )
     folder = tmp_path / out.backup
     assert out.backup.startswith("civ6-season-6-20261024T120000Z-")
-    saved = (folder / "civ6_season_stats.rt_ffa.jsonl").read_text().splitlines()
+    saved = (folder / "civ6_season_stats.rt_ffa.json").read_text().splitlines()
     assert len(saved) == 2 and '"$numberLong": "11"' in saved[0]
     assert json.loads((folder / "manifest.json").read_text())["opened"] == "Season 7"
     assert not list(tmp_path.glob("*.partial"))

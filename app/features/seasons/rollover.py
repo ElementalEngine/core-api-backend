@@ -54,6 +54,8 @@ def next_label(label: str) -> str:
     return f"Season {int(found.group(1)) + 1}"
 
 
+# One document per line in canonical Extended JSON, as mongoimport and Compass
+# read it, so a collection is restored from its file as it is.
 def _write_lines(path: Path, docs: list[dict[str, Any]]) -> None:
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -150,7 +152,7 @@ class SeasonRollover:
                     events: list[dict[str, Any]] = []
                     for col in names:
                         docs = [d async for d in db[col].find({}, session=session)]
-                        _write_lines(partial / f"{db_name}.{col}.jsonl", docs)
+                        _write_lines(partial / f"{db_name}.{col}.json", docs)
                         records[col] = len(docs)
                         events += _reset_events(docs, f"{db_name}.{col}", at)
                         await db[col].delete_many({}, session=session)

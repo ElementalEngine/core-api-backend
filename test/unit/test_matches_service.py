@@ -611,3 +611,17 @@ def test_approve_stamps_the_season_open_inside_its_transaction():
     repo = FakeRepo(match_doc=_two_player_match())
     asyncio.run(make_service(repo, seasons=Changed()).approve_match(OID, "a-1"))
     assert repo.validated["season_id"] == "s7"
+
+
+def test_a_repeated_approve_answers_with_the_season_it_was_approved_in():
+    class Approved(FakeRepo):
+        async def claim_pending_match(self, oid, *, now=None):
+            return None
+
+    stored = {"_id": 123, "mu": 30.0, "sigma": 5.0, "games": 10, "wins": 4, "first": 2}
+    repo = Approved(
+        match_doc={**_two_player_match(), "season_id": "s5"}, stat_doc=stored
+    )
+    assert (
+        asyncio.run(make_service(repo).approve_match(OID, "a-1"))["season_id"] == "s5"
+    )

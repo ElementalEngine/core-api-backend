@@ -296,6 +296,7 @@ class ApprovalService:
                     "approved_at": done.get("approved_at"),
                     "approver_discord_id": done.get("approver_discord_id"),
                     "affected_players": _affected(approved, ratings),
+                    "season_id": done.get("season_id"),
                 }
             raise await self._m.refusal(oid)
 
