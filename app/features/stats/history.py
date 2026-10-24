@@ -1,10 +1,5 @@
-"""A player's approved games: the latest page of them, and a summary by map
-and by civ since their stats were last reset.
-
-Reads one player's matches through `validated_matches_player_recent_idx`,
-newest first. A win is a game whose rating went up and a first is first
-place, as the stat documents count them.
-"""
+"""A player's approved games: a page of the latest, and a summary by map
+and by civ since their stats were last reset."""
 
 from __future__ import annotations
 
@@ -71,13 +66,12 @@ def map_name(map_type: Any) -> str:
 
 
 def _won(seat: dict[str, Any]) -> bool:
-    """A win is a game whose rating went up, as the stat documents count it:
-    in team games and duels that is winning, in FFA a high enough finish."""
-    return float(seat.get("delta") or 0.0) > 0 and not seat.get("subbed_out")
+    """A win is a game whose rating went up, as the stat documents count it."""
+    return float(seat.get("delta") or 0.0) > 0
 
 
 def _first(seat: dict[str, Any]) -> bool:
-    return seat.get("placement") == 0 and not seat.get("subbed_out")
+    return seat.get("placement") == 0
 
 
 class MatchHistory:

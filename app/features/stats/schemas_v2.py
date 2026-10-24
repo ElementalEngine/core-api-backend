@@ -1,11 +1,5 @@
-"""Response models for the v2 stats surface.
-
-`wins` answers how often a player won, which is not the same question as how
-often their rating went up. The two diverge in free-for-all, where placing
-second can still gain rating.
-
-Governed by D164.
-"""
+"""Response models for the v2 stats surface. A win is a game whose rating
+went up, as v1 counted it; a first is first place."""
 
 from __future__ import annotations
 

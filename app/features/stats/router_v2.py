@@ -1,15 +1,5 @@
-"""C2's stats routes on /api/v2: the four stat reads and writes, and a
-player's game history and its summary.
-
-Same shape as C1: one router, no assembly file, the Mito gate on the router
-rather than per route. The handlers catch only what they can name -- there
-is no `except Exception -> 503` here, because a bug is not a transient
-outage and catch-all in core/errors answers it as INTERNAL/500.
-
-The v1 routes stay until cutover: Mite still calls them (C2, "Replace").
-
-Governed by D92.
-"""
+"""The v2 stats routes: stat reads and resets, team generation, and a
+player's game history and its summary, behind the Mito token."""
 
 from __future__ import annotations
 
