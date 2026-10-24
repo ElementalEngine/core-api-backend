@@ -41,4 +41,14 @@ def questions_for(edition: str, game_type: str) -> list[dict[str, Any]]:
     return json.loads(json.dumps(asked))
 
 
-__all__ = ["EDITIONS", "UnknownBallot", "questions_for"]
+def command_settings(edition: str) -> list[dict[str, Any]]:
+    """Every settings question of the edition, once each: what /draft offers."""
+    catalogue = _catalogue(edition)
+    seen: dict[str, dict[str, Any]] = {}
+    for questions in catalogue["settings"].values():
+        for question in questions:
+            seen.setdefault(question["id"], question)
+    return json.loads(json.dumps(list(seen.values())))
+
+
+__all__ = ["EDITIONS", "UnknownBallot", "command_settings", "questions_for"]

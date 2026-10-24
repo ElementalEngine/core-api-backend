@@ -210,6 +210,33 @@
         "default_option_id": "2"
       },
       {
+        "id": "huts",
+        "title": "Goody Huts",
+        "options": [
+          {
+            "id": "x1",
+            "emoji": "1️⃣",
+            "label": "1x"
+          },
+          {
+            "id": "x1_25",
+            "emoji": "2️⃣",
+            "label": "1.25x"
+          },
+          {
+            "id": "x1_5",
+            "emoji": "3️⃣",
+            "label": "1.5x"
+          },
+          {
+            "id": "x1_75",
+            "emoji": "4️⃣",
+            "label": "1.75x"
+          }
+        ],
+        "default_option_id": "x1"
+      },
+      {
         "id": "barbarians",
         "title": "Barbarians Mode",
         "options": [
@@ -401,6 +428,33 @@
           }
         ],
         "default_option_id": "standard"
+      },
+      {
+        "id": "huts",
+        "title": "Goody Huts",
+        "options": [
+          {
+            "id": "x1",
+            "emoji": "1️⃣",
+            "label": "1x"
+          },
+          {
+            "id": "x1_25",
+            "emoji": "2️⃣",
+            "label": "1.25x"
+          },
+          {
+            "id": "x1_5",
+            "emoji": "3️⃣",
+            "label": "1.5x"
+          },
+          {
+            "id": "x1_75",
+            "emoji": "4️⃣",
+            "label": "1.75x"
+          }
+        ],
+        "default_option_id": "x1"
       }
     ]
   },

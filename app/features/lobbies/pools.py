@@ -26,9 +26,21 @@ def even_split(total: int, players: int) -> tuple[int, int]:
     return per_player, total % players
 
 
-def deal(tokens: Sequence[str], players: int, rng: Any = _RANDOM) -> list[list[str]]:
-    """One disjoint pool per player, every pool the same size."""
-    per_player, _ = even_split(len(tokens), players)
+def deal(
+    tokens: Sequence[str],
+    players: int,
+    rng: Any = _RANDOM,
+    per_player: int | None = None,
+) -> list[list[str]]:
+    """One disjoint pool per player, every pool the same size: `per_player`, or
+    the even split of what is left."""
+    if per_player is None:
+        per_player, _ = even_split(len(tokens), players)
+    elif per_player * players > len(tokens):
+        raise NotEnoughPool(
+            f"{len(tokens)} remain after bans and {players} pools of "
+            f"{per_player} need {per_player * players}"
+        )
     shuffled = list(tokens)
     rng.shuffle(shuffled)
     return [

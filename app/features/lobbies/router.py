@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Body, Depends, Query, Response, status
 from pymongo import AsyncMongoClient
@@ -17,14 +17,19 @@ from app.core.dependencies import (
     require_activity_token,
     require_mito_token,
 )
-from app.core.errors import conflict, forbidden, invalid_request, not_found
+from app.core.errors import api_error, conflict, forbidden, invalid_request, not_found
 from app.features.civdata.repository import CivDataRepository
+from app.features.lobbies.draft import DraftRefused, deal_draft
 from app.features.lobbies.modes import InvalidLobbyShape, InvalidSeating
+from app.features.lobbies.questions import command_settings
 from app.features.lobbies.repository import LobbyInsertRefused, LobbyRepository
 from app.features.lobbies.schemas import (
     CancelLobbyRequest,
     ChangeSeatRequest,
+    CommandSettings,
     CreateLobbyRequest,
+    DealRequest,
+    DealResponse,
     MarkReadyRequest,
     SeatAction,
     StartLobbyRequest,
@@ -87,6 +92,30 @@ async def create_lobby(
         raise not_found(str(exc)) from exc
     except LobbyInsertRefused as exc:
         raise conflict(REFUSAL_MESSAGES.get(exc.index, str(exc))) from exc
+
+
+@mite_router.get("/settings/{edition}", response_model=CommandSettings)
+async def settings_for_draft(edition: Literal["civ6", "civ7"]) -> dict[str, Any]:
+    """The settings /draft offers: every question of the edition's ballots."""
+    return {"edition": edition, "questions": command_settings(edition)}
+
+
+@mite_router.post("/deal", response_model=DealResponse)
+async def deal_for_draft(
+    request: DealRequest, db: AsyncMongoClient = Depends(get_database)
+) -> dict[str, Any]:
+    """One /draft deal. Nothing is stored."""
+    civ_data = await CivDataRepository(db).fetch(request.edition)
+    if civ_data["leader_data_version"] is None:
+        raise api_error(
+            code="CIV_DATA_NOT_SEEDED",
+            message=f"civ_data holds no documents for {request.edition}.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    try:
+        return deal_draft(civ_data, request)
+    except DraftRefused as exc:
+        raise invalid_request(str(exc)) from exc
 
 
 @activity_router.get("")

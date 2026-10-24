@@ -138,6 +138,8 @@ def test_each_lobby_route_carries_its_own_gate_not_merely_a_gate():
         ("GET", MITE),
         ("POST", f"{MITE}/claim-post"),
         ("POST", f"{MITE}/sweep"),
+        ("GET", f"{MITE}/settings/civ6"),
+        ("POST", f"{MITE}/deal"),
         ("POST", f"{MITE_LOBBY_PATH}/cancel"),
         ("PATCH", f"{MITE_LOBBY_PATH}/leave"),
     ):

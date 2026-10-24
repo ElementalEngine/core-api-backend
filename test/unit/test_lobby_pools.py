@@ -121,3 +121,10 @@ def test_a_pool_smaller_than_the_target_deals_what_is_left():
 def test_no_civs_at_all_is_refused():
     with pytest.raises(NotEnoughPool):
         deal_civs([], 4, 4)
+
+
+def test_a_chosen_pool_size_is_dealt_and_the_rest_left():
+    pools = deal(TOKENS, 3, random.Random(7), per_player=2)
+    assert [len(pool) for pool in pools] == [2, 2, 2]
+    with pytest.raises(NotEnoughPool, match="need"):
+        deal(TOKENS, 3, random.Random(7), per_player=len(TOKENS))

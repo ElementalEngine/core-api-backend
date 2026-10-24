@@ -295,6 +295,27 @@
         "title": "CivRow",
         "type": "object"
       },
+      "CommandSettings": {
+        "properties": {
+          "edition": {
+            "title": "Edition",
+            "type": "string"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/SettingQuestion"
+            },
+            "title": "Questions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "edition",
+          "questions"
+        ],
+        "title": "CommandSettings",
+        "type": "object"
+      },
       "CompleteRegistrationSessionRequest": {
         "additionalProperties": false,
         "properties": {
@@ -526,6 +547,160 @@
           "game"
         ],
         "title": "CreateRegistrationSessionRequest",
+        "type": "object"
+      },
+      "DealRequest": {
+        "additionalProperties": false,
+        "description": "/draft: how many pools, their sizes, the age and the host's bans.",
+        "properties": {
+          "civ_bans": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Civ Bans",
+            "type": "array"
+          },
+          "civs": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Civs"
+          },
+          "drafts": {
+            "maximum": 14.0,
+            "minimum": 2.0,
+            "title": "Drafts",
+            "type": "integer"
+          },
+          "edition": {
+            "enum": [
+              "civ6",
+              "civ7"
+            ],
+            "title": "Edition",
+            "type": "string"
+          },
+          "game_type": {
+            "enum": [
+              "ffa",
+              "teamer",
+              "duel"
+            ],
+            "title": "Game Type",
+            "type": "string"
+          },
+          "leader_bans": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Leader Bans",
+            "type": "array"
+          },
+          "leaders": {
+            "minimum": 1.0,
+            "title": "Leaders",
+            "type": "integer"
+          },
+          "starting_age": {
+            "anyOf": [
+              {
+                "enum": [
+                  "AGE_ANTIQUITY",
+                  "AGE_EXPLORATION",
+                  "AGE_MODERN"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starting Age"
+          }
+        },
+        "required": [
+          "edition",
+          "game_type",
+          "drafts",
+          "leaders"
+        ],
+        "title": "DealRequest",
+        "type": "object"
+      },
+      "DealResponse": {
+        "properties": {
+          "bans": {
+            "$ref": "#/components/schemas/DealtBans"
+          },
+          "pools": {
+            "items": {
+              "$ref": "#/components/schemas/DealtPool"
+            },
+            "title": "Pools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pools",
+          "bans"
+        ],
+        "title": "DealResponse",
+        "type": "object"
+      },
+      "DealtBans": {
+        "properties": {
+          "civ": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Civ",
+            "type": "array"
+          },
+          "leader": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Leader",
+            "type": "array"
+          }
+        },
+        "required": [
+          "leader",
+          "civ"
+        ],
+        "title": "DealtBans",
+        "type": "object"
+      },
+      "DealtPool": {
+        "properties": {
+          "civs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Civs",
+            "type": "array"
+          },
+          "leaders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Leaders",
+            "type": "array"
+          }
+        },
+        "required": [
+          "leaders",
+          "civs"
+        ],
+        "title": "DealtPool",
         "type": "object"
       },
       "DiscordAccountLookupHit": {
@@ -2421,6 +2596,55 @@
           "platform_account_id"
         ],
         "title": "SelfServiceRegistrationRequest",
+        "type": "object"
+      },
+      "SettingOption": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "SettingOption",
+        "type": "object"
+      },
+      "SettingQuestion": {
+        "properties": {
+          "default_option_id": {
+            "title": "Default Option Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/SettingOption"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "options",
+          "default_option_id"
+        ],
+        "title": "SettingQuestion",
         "type": "object"
       },
       "StartLobbyRequest": {
@@ -5000,6 +5224,129 @@
           }
         },
         "summary": "Claim Post",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
+    "/api/v2/lobbies/mite/deal": {
+      "post": {
+        "description": "One /draft deal. Nothing is stored.",
+        "operationId": "deal_for_draft_api_v2_lobbies_mite_deal_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deal For Draft",
+        "tags": [
+          "lobbies"
+        ]
+      }
+    },
+    "/api/v2/lobbies/mite/settings/{edition}": {
+      "get": {
+        "description": "The settings /draft offers: every question of the edition's ballots.",
+        "operationId": "settings_for_draft_api_v2_lobbies_mite_settings__edition__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edition",
+            "required": true,
+            "schema": {
+              "enum": [
+                "civ6",
+                "civ7"
+              ],
+              "title": "Edition",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Settings For Draft",
         "tags": [
           "lobbies"
         ]
