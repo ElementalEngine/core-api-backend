@@ -408,7 +408,8 @@ class LobbyService:
                 landed.get("leader") or [],
             ),
             "civ": remaining_after_bans(
-                [row["token"] for row in payload["civs"]], landed.get("civ") or []
+                bannable_civs(payload["civs"], lobby.get("starting_age")),
+                landed.get("civ") or [],
             ),
         }
 

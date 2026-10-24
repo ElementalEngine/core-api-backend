@@ -934,6 +934,19 @@ def test_an_expired_ban_phase_advances_from_a_read():
     assert changes["bans"] == {"leader": [], "civ": []}
 
 
+def test_a_starting_age_deals_only_that_age_s_civs():
+    expired = {
+        **BANNING,
+        "starting_age": "AGE_ANTIQUITY",
+        "turn_expires_at": datetime.now(UTC) - timedelta(minutes=1),
+    }
+    repo = FakeRepo(lobby=expired, applied=expired)
+    asyncio.run(LobbyService(repo, FakeSeasons(), FakeCivData()).read(HEX_ID, "alice"))
+    _, changes = repo.changes[0]
+    dealt = {civ for seat in changes["seats"] for civ in seat["civ_pool"]}
+    assert dealt == {"CIVILIZATION_ROME", "CIVILIZATION_EGYPT"}
+
+
 def test_a_lobby_that_bans_itself_out_is_cancelled():
     keys = [
         "LEADER_TRAJAN",
