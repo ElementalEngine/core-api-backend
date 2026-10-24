@@ -1,12 +1,12 @@
-"""C2's four stats routes, and the one field that differs from v1.
+"""C2's stats routes, and the one field that differs from v1.
 
 The route table has no path parameters, so it carries none of C1's
 ordering hazard -- what it can get wrong instead is the pair of legacy
 PUTs surviving the cutover, or `wins` leaking onto a surface that C2
 requires to say which counter it shows.
 
-What should break this file: adding a fifth v2 stats route without
-amending C2, resurrecting either legacy PUT, or renaming rating_gains.
+What should break this file: adding a v2 stats route without amending
+C2, resurrecting either legacy PUT, or renaming rating_gains.
 """
 
 from app.features.stats.schemas import StatRow
@@ -18,6 +18,8 @@ EXPECTED = {
     ("POST", "/api/v2/stats/batch"),
     ("POST", "/api/v2/stats/team-gen"),
     ("PUT", "/api/v2/stats/reset/user"),
+    ("GET", "/api/v2/stats/history"),
+    ("GET", "/api/v2/stats/summary"),
 }
 
 GONE = {"/api/v1/get-user-stats/", "/api/v1/get-user-stats-batch/"}
@@ -34,7 +36,7 @@ def _routes(prefix):
     return out
 
 
-def test_the_four_v2_stats_routes_are_registered():
+def test_the_v2_stats_routes_are_registered():
     assert _routes("/api/v2/stats") == EXPECTED
 
 

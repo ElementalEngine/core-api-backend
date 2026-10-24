@@ -269,6 +269,11 @@ class MatchRepository:
                 name=name,
             )
         await self._ensure_composition_index()
+        # A player's games, newest first: the stats history and its summary.
+        await self._validated.create_index(
+            [("players.discord_id", ASCENDING), ("_id", DESCENDING)],
+            name="validated_matches_player_recent_idx",
+        )
         # 30 days. The TTL is storage hygiene, not the rule -- the quota
         # query has to be time-bounded anyway, because the monitor can lag.
         await self._sub_events.create_index(

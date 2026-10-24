@@ -70,9 +70,68 @@ class BatchStatsResponseV2(BaseModel):
     results: list[UserStatsResponseV2]
 
 
+class HistoryGame(BaseModel):
+    """One approved game, as the player saw it. A placement of 0 is first;
+    in a team game it is the team's place."""
+
+    match_id: str
+    reported_at: datetime
+    game_mode: str
+    map_type: str
+    turn: int | None = None
+    civ: str | None = None
+    leader: str | None = None
+    placement: int | None = None
+    sides: int
+    delta: int
+    subbed_in: bool = False
+    subbed_out: bool = False
+
+
+class HistoryPage(BaseModel):
+    discord_id: str
+    civ_version: str
+    game_type: str
+    page: int
+    page_size: int
+    has_more: bool
+    games: list[HistoryGame]
+
+
+class MapRecord(BaseModel):
+    map_type: str
+    games: int
+    wins: int
+
+
+class CivRecord(BaseModel):
+    """A civ6 leader token, or a civ7 civ token, and how it went."""
+
+    token: str
+    games: int
+    wins: int
+
+
+class StatsSummary(BaseModel):
+    """Games by map and the most played civs, since the last reset if any.
+    A win is first place."""
+
+    discord_id: str
+    civ_version: str
+    game_type: str
+    since: datetime | None = None
+    maps: list[MapRecord]
+    civs: list[CivRecord]
+
+
 __all__ = [
     "BatchStatsResponseV2",
+    "CivRecord",
+    "HistoryGame",
+    "HistoryPage",
+    "MapRecord",
     "StatRowV2",
     "StatSetV2",
+    "StatsSummary",
     "UserStatsResponseV2",
 ]

@@ -433,6 +433,30 @@
         "title": "CivDataResponse",
         "type": "object"
       },
+      "CivRecord": {
+        "description": "A civ6 leader token, or a civ7 civ token, and how it went.",
+        "properties": {
+          "games": {
+            "title": "Games",
+            "type": "integer"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token",
+          "games",
+          "wins"
+        ],
+        "title": "CivRecord",
+        "type": "object"
+      },
       "CivRow": {
         "properties": {
           "age_pool": {
@@ -1041,6 +1065,146 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HistoryGame": {
+        "description": "One approved game, as the player saw it. A placement of 0 is first;\nin a team game it is the team's place.",
+        "properties": {
+          "civ": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Civ"
+          },
+          "delta": {
+            "title": "Delta",
+            "type": "integer"
+          },
+          "game_mode": {
+            "title": "Game Mode",
+            "type": "string"
+          },
+          "leader": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leader"
+          },
+          "map_type": {
+            "title": "Map Type",
+            "type": "string"
+          },
+          "match_id": {
+            "title": "Match Id",
+            "type": "string"
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placement"
+          },
+          "reported_at": {
+            "format": "date-time",
+            "title": "Reported At",
+            "type": "string"
+          },
+          "sides": {
+            "title": "Sides",
+            "type": "integer"
+          },
+          "subbed_in": {
+            "default": false,
+            "title": "Subbed In",
+            "type": "boolean"
+          },
+          "subbed_out": {
+            "default": false,
+            "title": "Subbed Out",
+            "type": "boolean"
+          },
+          "turn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn"
+          }
+        },
+        "required": [
+          "match_id",
+          "reported_at",
+          "game_mode",
+          "map_type",
+          "sides",
+          "delta"
+        ],
+        "title": "HistoryGame",
+        "type": "object"
+      },
+      "HistoryPage": {
+        "properties": {
+          "civ_version": {
+            "title": "Civ Version",
+            "type": "string"
+          },
+          "discord_id": {
+            "title": "Discord Id",
+            "type": "string"
+          },
+          "game_type": {
+            "title": "Game Type",
+            "type": "string"
+          },
+          "games": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryGame"
+            },
+            "title": "Games",
+            "type": "array"
+          },
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "discord_id",
+          "civ_version",
+          "game_type",
+          "page",
+          "page_size",
+          "has_more",
+          "games"
+        ],
+        "title": "HistoryPage",
+        "type": "object"
+      },
       "LeaderRow": {
         "properties": {
           "civ": {
@@ -1294,6 +1458,29 @@
           "game"
         ],
         "title": "ManualRegistrationRequest",
+        "type": "object"
+      },
+      "MapRecord": {
+        "properties": {
+          "games": {
+            "title": "Games",
+            "type": "integer"
+          },
+          "map_type": {
+            "title": "Map Type",
+            "type": "string"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "map_type",
+          "games",
+          "wins"
+        ],
+        "title": "MapRecord",
         "type": "object"
       },
       "MarkReadyRequest": {
@@ -2658,6 +2845,58 @@
           }
         },
         "title": "StatSetV2",
+        "type": "object"
+      },
+      "StatsSummary": {
+        "description": "Games by map and the most played civs, since the last reset if any.\nA win is first place.",
+        "properties": {
+          "civ_version": {
+            "title": "Civ Version",
+            "type": "string"
+          },
+          "civs": {
+            "items": {
+              "$ref": "#/components/schemas/CivRecord"
+            },
+            "title": "Civs",
+            "type": "array"
+          },
+          "discord_id": {
+            "title": "Discord Id",
+            "type": "string"
+          },
+          "game_type": {
+            "title": "Game Type",
+            "type": "string"
+          },
+          "maps": {
+            "items": {
+              "$ref": "#/components/schemas/MapRecord"
+            },
+            "title": "Maps",
+            "type": "array"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          }
+        },
+        "required": [
+          "discord_id",
+          "civ_version",
+          "game_type",
+          "maps",
+          "civs"
+        ],
+        "title": "StatsSummary",
         "type": "object"
       },
       "SubQuotaResponse": {
@@ -7887,6 +8126,92 @@
         ]
       }
     },
+    "/api/v2/stats/history": {
+      "get": {
+        "operationId": "get_history_api_v2_stats_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "civ_version",
+            "required": true,
+            "schema": {
+              "title": "Civ Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "game_type",
+            "required": true,
+            "schema": {
+              "title": "Game Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "discord_id",
+            "required": true,
+            "schema": {
+              "title": "Discord Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get History",
+        "tags": [
+          "stats-v2"
+        ]
+      }
+    },
     "/api/v2/stats/reset/user": {
       "put": {
         "operationId": "reset_user_stats_api_v2_stats_reset_user_put",
@@ -7958,6 +8283,82 @@
           }
         },
         "summary": "Reset User Stats",
+        "tags": [
+          "stats-v2"
+        ]
+      }
+    },
+    "/api/v2/stats/summary": {
+      "get": {
+        "operationId": "get_summary_api_v2_stats_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "civ_version",
+            "required": true,
+            "schema": {
+              "title": "Civ Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "game_type",
+            "required": true,
+            "schema": {
+              "title": "Game Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "discord_id",
+            "required": true,
+            "schema": {
+              "title": "Discord Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Summary",
         "tags": [
           "stats-v2"
         ]

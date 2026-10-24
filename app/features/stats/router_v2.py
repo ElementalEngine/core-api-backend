@@ -1,4 +1,5 @@
-"""C2's four stats routes on /api/v2.
+"""C2's stats routes on /api/v2: the four stat reads and writes, and a
+player's game history and its summary.
 
 Same shape as C1: one router, no assembly file, the Mito gate on the router
 rather than per route. The handlers catch only what they can name -- there
@@ -17,6 +18,7 @@ from fastapi import APIRouter, Depends
 from app.core.dependencies import get_database, require_mito_token
 from app.core.errors import invalid_request, not_found
 from app.features.stats.errors import InvalidStatsRequestError, StatsNotFoundError
+from app.features.stats.history import MatchHistory
 from app.features.stats.schemas import (
     BatchStatsRequest,
     TeamGenRequest,
@@ -24,6 +26,8 @@ from app.features.stats.schemas import (
 )
 from app.features.stats.schemas_v2 import (
     BatchStatsResponseV2,
+    HistoryPage,
+    StatsSummary,
     UserStatsResponseV2,
 )
 from app.features.stats.service import StatsService
@@ -111,6 +115,37 @@ async def reset_user_stats(
     except StatsNotFoundError as exc:
         raise not_found(str(exc)) from exc
     return UserStatsResponseV2.from_v1(result)
+
+
+@router.get("/stats/history", response_model=HistoryPage)
+async def get_history(
+    civ_version: str,
+    game_type: str,
+    discord_id: str,
+    page: int = 0,
+    db=Depends(get_database),
+) -> HistoryPage:
+    try:
+        return await MatchHistory(db).page(
+            civ_version=civ_version,
+            game_type=game_type,
+            discord_id=discord_id,
+            page=page,
+        )
+    except InvalidStatsRequestError as exc:
+        raise invalid_request(str(exc)) from exc
+
+
+@router.get("/stats/summary", response_model=StatsSummary)
+async def get_summary(
+    civ_version: str, game_type: str, discord_id: str, db=Depends(get_database)
+) -> StatsSummary:
+    try:
+        return await MatchHistory(db).summary(
+            civ_version=civ_version, game_type=game_type, discord_id=discord_id
+        )
+    except InvalidStatsRequestError as exc:
+        raise invalid_request(str(exc)) from exc
 
 
 __all__ = ["router"]
