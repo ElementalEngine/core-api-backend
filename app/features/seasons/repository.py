@@ -1,15 +1,5 @@
-"""The `seasons` collection: playbook Entry 11, contract C6.
-
-No router. `season_id` reaches clients only as a stamped field on lobby
-documents, and `season_label` from the cache below -- there is no second
-consumer, so there is no route.
-
-The open season for an edition is the row with the greatest `started_at`.
-There is no `ended_at` and no open/closed flag: season N's end *is* season
-N+1's start, one value rather than two that must agree.
-
-Governed by D95, D106.
-"""
+"""The `seasons` collection. The open season for an edition is the row with
+the greatest `started_at`: season N's end is season N+1's start."""
 
 from __future__ import annotations
 
@@ -17,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
+from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import BulkWriteError
 
@@ -88,6 +79,15 @@ class SeasonsRepository:
                 ) from exc
             raise
         return len(result.inserted_ids)
+
+    async def read_open(
+        self, edition: str, *, session: AsyncClientSession | None = None
+    ) -> dict[str, Any] | None:
+        """The open season read now, not from the cache: inside a transaction,
+        the one its writes will land in."""
+        return await self._seasons.find_one(
+            {"edition": edition}, sort=[("started_at", DESCENDING)], session=session
+        )
 
     async def get_current_season(self, edition: str) -> dict[str, Any]:
         cached = _CACHE.get(edition)

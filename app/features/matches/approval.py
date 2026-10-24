@@ -18,7 +18,6 @@ from app.features.matches.tallies import bump, stat_legs
 from app.features.matches.validation import approval_refusal
 from app.features.ratings.events import build_match_event
 from app.features.ratings.scope import drives_rank_roles, stat_scope
-from app.features.seasons.repository import SeasonNotSeededError
 
 if TYPE_CHECKING:
     from app.features.matches.service import MatchService
@@ -147,17 +146,20 @@ class ApprovalService:
             raise NotFoundError("Match not found")
 
         match = MatchModel(**res)
-        # A match from an earlier season leaves this season's records alone.
-        try:
-            season = (await self._m.seasons.get_current_season(match.game))["_id"]
-        except SeasonNotSeededError:
-            season = None
-        past_season = res.get("season_id") not in (None, season)
 
         session = await self._m.q.start_session()
         async with session:
             async with await session.start_transaction():
                 try:
+                    # A match from an earlier season leaves this season's
+                    # records alone; read here, a season change is never missed.
+                    open_season = await self._m.seasons.read_open(
+                        match.game, session=session
+                    )
+                    past_season = res.get("season_id") not in (
+                        None,
+                        open_season["_id"] if open_season else None,
+                    )
                     # Read inside the transaction, so an approve committed
                     # meanwhile is a write conflict, not a lost update.
                     pre_lifetime = await self._m.get_players_ranking(
@@ -317,6 +319,12 @@ class ApprovalService:
             async with session:
                 async with await session.start_transaction():
                     try:
+                        # Read again here: a season change since the cached read
+                        # is seen, so the stamp names the season the stats land in.
+                        season = (
+                            await self._m.seasons.read_open(match.game, session=session)
+                            or season
+                        )
                         pre_lifetime = await self._m.get_players_ranking(
                             match, session=session
                         )

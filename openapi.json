@@ -2562,6 +2562,87 @@
         "title": "RoleIntent",
         "type": "string"
       },
+      "SeasonPreview": {
+        "description": "The open season, what comes next, and the season records per collection\nthat a change would save and clear.",
+        "properties": {
+          "edition": {
+            "title": "Edition",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "next_label": {
+            "title": "Next Label",
+            "type": "string"
+          },
+          "records": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Records",
+            "type": "object"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "edition",
+          "label",
+          "started_at",
+          "next_label",
+          "records"
+        ],
+        "title": "SeasonPreview",
+        "type": "object"
+      },
+      "SeasonRolled": {
+        "description": "A season change: what closed, what opened, and the backup folder's name.",
+        "properties": {
+          "backup": {
+            "title": "Backup",
+            "type": "string"
+          },
+          "closed": {
+            "title": "Closed",
+            "type": "string"
+          },
+          "edition": {
+            "title": "Edition",
+            "type": "string"
+          },
+          "opened": {
+            "title": "Opened",
+            "type": "string"
+          },
+          "records": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Records",
+            "type": "object"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "edition",
+          "closed",
+          "opened",
+          "started_at",
+          "backup",
+          "records"
+        ],
+        "title": "SeasonRolled",
+        "type": "object"
+      },
       "SeatAction": {
         "enum": [
           "place",
@@ -2761,6 +2842,20 @@
           "expected_revision"
         ],
         "title": "StartLobbyRequest",
+        "type": "object"
+      },
+      "StartNextSeason": {
+        "description": "The season the caller saw open; the change happens only if it still is.",
+        "properties": {
+          "expected": {
+            "title": "Expected",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected"
+        ],
+        "title": "StartNextSeason",
         "type": "object"
       },
       "StatRow": {
@@ -8184,6 +8279,149 @@
         "summary": "Revert Match",
         "tags": [
           "matches-v2"
+        ]
+      }
+    },
+    "/api/v2/seasons/{edition}": {
+      "get": {
+        "operationId": "get_season_api_v2_seasons__edition__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edition",
+            "required": true,
+            "schema": {
+              "enum": [
+                "civ6",
+                "civ7"
+              ],
+              "title": "Edition",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Season",
+        "tags": [
+          "seasons-v2"
+        ]
+      }
+    },
+    "/api/v2/seasons/{edition}/next": {
+      "post": {
+        "operationId": "start_next_season_api_v2_seasons__edition__next_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edition",
+            "required": true,
+            "schema": {
+              "enum": [
+                "civ6",
+                "civ7"
+              ],
+              "title": "Edition",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartNextSeason"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonRolled"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Next Season",
+        "tags": [
+          "seasons-v2"
         ]
       }
     },

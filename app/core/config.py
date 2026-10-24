@@ -170,6 +170,10 @@ class Settings(BaseSettings):
         default="1.0",
         validation_alias=AliasChoices("CIV_SAVE_PARSER_VERSION"),
     )
+    # Where a season change saves the season it clears; unset, it refuses.
+    season_backup_dir: str = Field(
+        default="", validation_alias=AliasChoices("SEASON_BACKUP_DIR")
+    )
 
     # mypy does not support decorators stacked on @property
     @computed_field(return_type=list[str])  # type: ignore[prop-decorator]

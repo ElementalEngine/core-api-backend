@@ -171,6 +171,10 @@ class FakeSeasons:
             raise SeasonNotSeededError(f"no season row for edition {edition!r}")
         return dict(self.seasons[edition])
 
+    async def read_open(self, edition, *, session=None):
+        row = self.seasons.get(edition)
+        return dict(row) if row else None
+
 
 def make_service(repo, ratings=None, seasons=None) -> MatchService:
     svc = MatchService.__new__(MatchService)
@@ -597,3 +601,13 @@ def test_rank_roles_follow_ffa_and_cloud_games_only():
     teamer = {**make_match_doc([make_player()]), "game_mode": "Teamer"}
     repo = FakeRepo(match_doc=teamer, stat_doc=stored)
     assert asyncio.run(make_service(repo).revert_match(OID))["affected_players"] == []
+
+
+def test_approve_stamps_the_season_open_inside_its_transaction():
+    class Changed(FakeSeasons):
+        async def read_open(self, edition, *, session=None):
+            return {"_id": "s7", "label": "Season 7"}
+
+    repo = FakeRepo(match_doc=_two_player_match())
+    asyncio.run(make_service(repo, seasons=Changed()).approve_match(OID, "a-1"))
+    assert repo.validated["season_id"] == "s7"

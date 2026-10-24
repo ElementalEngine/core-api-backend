@@ -13,6 +13,7 @@ from app.features.lobbies.router import (
 )
 from app.features.matches.router import router as matches_router
 from app.features.matches.router_v2 import router as matches_v2_router
+from app.features.seasons.router import router as seasons_router
 from app.features.stats.router import router as stats_router
 from app.features.stats.router_v2 import router as stats_v2_router
 
@@ -28,3 +29,4 @@ router.include_router(infractions_router)
 router.include_router(civ_data_router)
 router.include_router(lobbies_mite_router)
 router.include_router(lobbies_activity_router)
+router.include_router(seasons_router)
