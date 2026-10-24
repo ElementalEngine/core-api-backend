@@ -64,6 +64,34 @@ class UserStatsResponseV2(BaseModel):
         )
 
 
+class ResetStatsResponseV2(UserStatsResponseV2):
+    """A reset's answer: the stats as they stood before it, and as they start
+    again after it -- every mode that had a row, back at the starting rating."""
+
+    after_lifetime: StatSetV2
+    after_season: StatSetV2
+
+    @classmethod
+    def of(
+        cls, before: UserStatsResponse, *, mu: float, sigma: float
+    ) -> ResetStatsResponseV2:
+        fresh = StatRowV2(mu=round(mu), sigma=sigma, games=0, first=0, rating_gains=0)
+
+        def restarted(stats: StatSet) -> StatSetV2:
+            return StatSetV2(
+                ffa=fresh if stats.ffa else None,
+                teamer=fresh if stats.teamer else None,
+                duel=fresh if stats.duel else None,
+            )
+
+        v2 = UserStatsResponseV2.from_v1(before)
+        return cls(
+            **v2.model_dump(),
+            after_lifetime=restarted(before.lifetime),
+            after_season=restarted(before.season),
+        )
+
+
 class BatchStatsResponseV2(BaseModel):
     civ_version: str
     game_type: str
@@ -130,6 +158,7 @@ __all__ = [
     "HistoryGame",
     "HistoryPage",
     "MapRecord",
+    "ResetStatsResponseV2",
     "StatRowV2",
     "StatSetV2",
     "StatsSummary",

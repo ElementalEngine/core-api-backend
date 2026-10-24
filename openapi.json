@@ -2447,6 +2447,46 @@
         "title": "RemoveTierResponse",
         "type": "object"
       },
+      "ResetStatsResponseV2": {
+        "description": "A reset's answer: the stats as they stood before it, and as they start\nagain after it -- every mode that had a row, back at the starting rating.",
+        "properties": {
+          "after_lifetime": {
+            "$ref": "#/components/schemas/StatSetV2"
+          },
+          "after_season": {
+            "$ref": "#/components/schemas/StatSetV2"
+          },
+          "civ_version": {
+            "title": "Civ Version",
+            "type": "string"
+          },
+          "discord_id": {
+            "title": "Discord Id",
+            "type": "string"
+          },
+          "game_type": {
+            "title": "Game Type",
+            "type": "string"
+          },
+          "lifetime": {
+            "$ref": "#/components/schemas/StatSetV2"
+          },
+          "season": {
+            "$ref": "#/components/schemas/StatSetV2"
+          }
+        },
+        "required": [
+          "discord_id",
+          "civ_version",
+          "game_type",
+          "lifetime",
+          "season",
+          "after_lifetime",
+          "after_season"
+        ],
+        "title": "ResetStatsResponseV2",
+        "type": "object"
+      },
       "RevertMatchRequest": {
         "properties": {
           "match_id": {
@@ -8265,7 +8305,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserStatsResponseV2"
+                  "$ref": "#/components/schemas/ResetStatsResponseV2"
                 }
               }
             },

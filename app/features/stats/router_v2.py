@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
+from app.core.config import settings
 from app.core.dependencies import get_database, require_mito_token
 from app.core.errors import invalid_request, not_found
 from app.features.stats.errors import InvalidStatsRequestError, StatsNotFoundError
@@ -27,6 +28,7 @@ from app.features.stats.schemas import (
 from app.features.stats.schemas_v2 import (
     BatchStatsResponseV2,
     HistoryPage,
+    ResetStatsResponseV2,
     StatsSummary,
     UserStatsResponseV2,
 )
@@ -102,10 +104,10 @@ async def get_team_gen(
         raise invalid_request(str(exc)) from exc
 
 
-@router.put("/stats/reset/user", response_model=UserStatsResponseV2)
+@router.put("/stats/reset/user", response_model=ResetStatsResponseV2)
 async def reset_user_stats(
     civ_version: str, game_type: str, discord_id: str, db=Depends(get_database)
-) -> UserStatsResponseV2:
+) -> ResetStatsResponseV2:
     try:
         result = await StatsService(db).reset_user_stats(
             civ_version=civ_version, game_type=game_type, discord_id=discord_id
@@ -114,7 +116,7 @@ async def reset_user_stats(
         raise invalid_request(str(exc)) from exc
     except StatsNotFoundError as exc:
         raise not_found(str(exc)) from exc
-    return UserStatsResponseV2.from_v1(result)
+    return ResetStatsResponseV2.of(result, mu=settings.ts_mu, sigma=settings.ts_sigma)
 
 
 @router.get("/stats/history", response_model=HistoryPage)

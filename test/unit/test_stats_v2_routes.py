@@ -72,3 +72,23 @@ def test_rating_gains_replaces_wins_and_nothing_else_moves():
 def test_the_v2_response_schema_never_says_wins():
     assert "wins" not in str(UserStatsResponseV2.model_json_schema())
     assert "rating_gains" in str(UserStatsResponseV2.model_json_schema())
+
+
+def test_a_reset_answers_before_and_the_fresh_start_after():
+    from app.features.stats.schemas import StatSet, UserStatsResponse
+    from app.features.stats.schemas_v2 import ResetStatsResponseV2
+
+    row = StatRow(mu=1300, sigma=5.0, games=9, wins=4, first=2)
+    before = UserStatsResponse(
+        discord_id="1",
+        civ_version="civ6",
+        game_type="realtime",
+        lifetime=StatSet(ffa=row, duel=row),
+        season=StatSet(ffa=row),
+    )
+    out = ResetStatsResponseV2.of(before, mu=1200.4, sigma=8.33)
+    assert out.lifetime.ffa is not None and out.lifetime.ffa.mu == 1300
+    assert out.after_lifetime.ffa is not None
+    assert (out.after_lifetime.ffa.mu, out.after_lifetime.ffa.games) == (1200, 0)
+    assert out.after_lifetime.teamer is None
+    assert out.after_season.ffa is not None and out.after_season.duel is None

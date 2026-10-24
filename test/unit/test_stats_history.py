@@ -250,3 +250,32 @@ def test_a_page_past_the_cap_is_refused():
                 civ_version="civ6", game_type="realtime", discord_id=ME, page=50
             )
         )
+
+
+@pytest.mark.parametrize(
+    ("raw", "name"),
+    [
+        ("Pangaea", "Pangaea"),
+        ("../../Assets/Maps/Pangaea_Ultima", "Pangaea_Ultima"),
+        ("..\\Assets\\Maps\\Lakes.lua", "Lakes"),
+        ("", "Unknown"),
+        (None, "Unknown"),
+    ],
+)
+def test_a_map_saved_as_a_script_path_counts_as_its_file_name(raw, name):
+    from app.features.stats.history import map_name
+
+    assert map_name(raw) == name
+
+
+def test_the_same_map_by_path_and_by_name_is_one_row():
+    h = _history(
+        [
+            _match(_seat(ME, placement=0), map_type="../../Assets/Maps/Lakes"),
+            _match(_seat(ME, placement=1), map_type="Lakes"),
+        ]
+    )
+    out = asyncio.run(
+        h.summary(civ_version="civ6", game_type="realtime", discord_id=ME)
+    )
+    assert [(m.map_type, m.games, m.wins) for m in out.maps] == [("Lakes", 2, 1)]

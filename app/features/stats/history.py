@@ -7,6 +7,7 @@ newest first. A win is first place, as `first` is on the stat documents.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from datetime import datetime
 from typing import Any
@@ -58,6 +59,14 @@ def _pick(match: dict[str, Any], seat: dict[str, Any]) -> str | None:
     value = seat.get("civ") if match.get("game") == "civ7" else seat.get("leader")
     value = value or seat.get("civ")
     return None if value in _NO_PICK else value
+
+
+def map_name(map_type: Any) -> str:
+    """A map as the summary groups it: a saved script path counts as its file
+    name, so `../../Assets/Maps/Lakes` and `Lakes` are one map."""
+    name = re.split(r"[\\/]", str(map_type or "").strip())[-1]
+    name = re.sub(r"\.(lua|civ6map|civ7map|xml)$", "", name, flags=re.IGNORECASE)
+    return name or "Unknown"
 
 
 def _won(seat: dict[str, Any]) -> bool:
@@ -131,7 +140,7 @@ class MatchHistory:
             if seat is None or seat.get("subbed_out"):
                 continue
             won = _won(seat)
-            map_type = str(match.get("map_type") or "Unknown")
+            map_type = map_name(match.get("map_type"))
             maps[map_type] += 1
             map_wins[map_type] += won
             if (pick := _pick(match, seat)) is not None:
@@ -167,7 +176,7 @@ def _game(match: dict[str, Any], did: str) -> HistoryGame | None:
         # When it was reported: the order the page is in.
         reported_at=match["_id"].generation_time,
         game_mode=str(match.get("game_mode") or ""),
-        map_type=str(match.get("map_type") or "Unknown"),
+        map_type=map_name(match.get("map_type")),
         turn=match.get("turn") if isinstance(match.get("turn"), int) else None,
         civ=seat.get("civ") if seat.get("civ") not in _NO_PICK else None,
         leader=seat.get("leader") if seat.get("leader") not in _NO_PICK else None,
