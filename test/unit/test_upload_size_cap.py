@@ -25,25 +25,21 @@ def _client(monkeypatch):
     # Patch the settings object the dependency closes over, not the module --
     # test_config.py reloads it. Same reason as test_mito_gate.py.
     from app.core.dependencies import get_database
-    from app.features.matches.router import upload_router
+    from app.features.matches.router_v2 import router
 
     monkeypatch.setattr(dependencies.settings, "mito_service_token", SecretStr(TOKEN))
     app = FastAPI()
-    app.include_router(upload_router)
+    app.include_router(router)
     app.dependency_overrides[get_database] = lambda: None
     return TestClient(app, raise_server_exceptions=False)
 
 
 def _post(client, payload):
     return client.post(
-        "/api/v1/upload-game-report/",
+        "/api/v2/matches",
         files={"file": ("save.Civ6Save", payload, "application/octet-stream")},
-        data={
-            "reporter_discord_id": "1",
-            "is_cloud": "0",
-            "discord_message_id": "1",
-        },
-        headers={"authorization": f"Bearer {TOKEN}"},
+        data={"is_cloud": "0", "discord_message_id": "1"},
+        headers={"authorization": f"Bearer {TOKEN}", "x-actor-discord-id": "1"},
     )
 
 

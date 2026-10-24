@@ -23,9 +23,7 @@ import pytest
 from bson import ObjectId
 
 from app.features.matches.models import MatchModel
-from app.features.matches.router import MATCH_UPDATE_SETTABLE_FIELDS
-from app.features.matches.schemas import MatchUpdate
-from app.features.matches.service import MatchService, MatchServiceError, _require_int
+from app.features.matches.service import MatchService, MatchServiceError
 from app.features.seasons.repository import SeasonNotSeededError
 
 OID = "652f1a2b3c4d5e6f7a8b9c0d"
@@ -189,7 +187,7 @@ def make_service(repo, ratings=None, seasons=None) -> MatchService:
 # --- stored sub counters are read, not defaulted to 0 ---
 
 
-def test_get_player_ranking_reads_stored_sub_counters():
+def test_a_players_ranking_reads_stored_sub_counters():
     repo = FakeRepo(
         stat_doc={
             "_id": 123,
@@ -205,7 +203,7 @@ def test_get_player_ranking_reads_stored_sub_counters():
     )
     match = MatchModel(**make_match_doc([make_player()]))
 
-    stat = asyncio.run(make_service(repo).get_player_ranking(match, "123", 0))
+    stat = asyncio.run(make_service(repo).get_players_ranking(match))[0]
 
     assert stat.games == 10
     assert stat.subbedIn == 3
@@ -342,57 +340,7 @@ def test_revert_match_tolerates_missing_deltas_and_clamps_counters():
 # --- numeric field validation (400, not 500) ---
 
 
-def test_require_int_parses_and_rejects():
-    assert _require_int("3", "player_id") == 3
-    assert _require_int(" 4 ", "player_id") == 4
-    for bad in ("abc", "", "1.5", None):
-        with pytest.raises(MatchServiceError):
-            _require_int(bad, "player_id")
-
-
-def test_remove_sub_rejects_non_numeric_id_as_service_error():
-    players = [make_player(), make_player(discord_id="456", subbed_out=True)]
-    repo = FakeRepo(match_doc=make_match_doc(players))
-
-    with pytest.raises(MatchServiceError, match="whole number"):
-        asyncio.run(make_service(repo).remove_sub(OID, "not-a-number", "m1"))
-
-
-def test_change_order_rejects_non_numeric_and_unmapped_teams():
-    players = [make_player(team=0), make_player(discord_id="456", team=1)]
-    repo = FakeRepo(match_doc=make_match_doc(players))
-    svc = make_service(repo)
-
-    with pytest.raises(MatchServiceError, match="whole number"):
-        asyncio.run(svc.change_order(OID, "abc 2", "m1"))
-
-    # Two distinct teams (0 and 2) pass the length check but team 2 has no list entry.
-    gapped = [make_player(team=0), make_player(discord_id="456", team=2)]
-    repo_gapped = FakeRepo(match_doc=make_match_doc(gapped))
-    with pytest.raises(MatchServiceError, match="no entry"):
-        asyncio.run(make_service(repo_gapped).change_order(OID, "1 2", "m1"))
-
-
 # --- update-match whitelist ---
-
-
-def test_update_match_whitelist_excludes_match_id():
-    payload = MatchUpdate(
-        match_id="652f1a2b3c4d5e6f7a8b9c0d", confirmed=True, flagged=True
-    )
-    update_data = {
-        key: value
-        for key, value in payload.model_dump(exclude_unset=True).items()
-        if key in MATCH_UPDATE_SETTABLE_FIELDS
-    }
-    assert update_data == {"confirmed": True, "flagged": True}
-    assert "match_id" not in update_data
-
-
-def test_update_match_rejects_empty_payload():
-    repo = FakeRepo(match_doc=make_match_doc([make_player()]))
-    with pytest.raises(MatchServiceError, match="Empty update payload"):
-        asyncio.run(make_service(repo).update_match(OID, {}))
 
 
 def test_revert_doc_math_uses_per_scope_deltas():
@@ -550,8 +498,6 @@ def test_a_player_linked_to_another_platform_can_take_a_seat():
     svc = MatchService.__new__(MatchService)
     svc.q = Users({"discord_id": "1", "linked_platform": "epic"})
     assert asyncio.run(svc.seat_steam_id("1")) is None
-    with pytest.raises(MatchServiceError, match="linked Steam account"):
-        asyncio.run(svc.discord_to_steam_id("1"))
     svc.q = Users(None)
     with pytest.raises(MatchServiceError, match="not found"):
         asyncio.run(svc.seat_steam_id("1"))

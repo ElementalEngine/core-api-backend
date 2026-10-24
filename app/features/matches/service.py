@@ -13,7 +13,6 @@ from trueskill import Rating
 from app.core.coerce import as_float, as_int
 from app.core.config import settings
 from app.features.matches.approval import ApprovalService
-from app.features.matches.editing import EditingService, _require_int as _require_int
 from app.features.matches.errors import (
     ApprovingError,
     InvalidIDError,
@@ -21,7 +20,6 @@ from app.features.matches.errors import (
     NotFoundError,
     ParseError,
 )
-from app.features.matches.ingest import IngestService
 from app.features.matches.models import (
     MatchModel,
     StatModel,
@@ -136,14 +134,6 @@ class MatchService:
             return str(player["linked_account_id"])
         return None
 
-    async def discord_to_steam_id(self, discord_id: str) -> str:
-        steam_id = await self.seat_steam_id(discord_id)
-        if steam_id is None:
-            raise MatchServiceError(
-                f"User {discord_id} does not have a linked Steam account"
-            )
-        return steam_id
-
     async def match_id_to_discord(self, match: MatchModel) -> MatchModel:
         """Each seat's player from its Steam id, read in one query; a Steam id
         nobody registered marks the seat unassigned as "-<steam id>"."""
@@ -162,28 +152,6 @@ class MatchService:
             elif sid and sid in wanted:
                 player.discord_id = f"-{sid}"
         return match
-
-    async def get_player_ranking(
-        self,
-        match: MatchModel,
-        discord_id: str | None,
-        player_index: int,
-        is_seasonal: bool = False,
-        is_combined: bool = False,
-        session: AsyncClientSession | None = None,
-    ) -> StatModel:
-        if discord_id is None or _placeholder(discord_id):
-            return _unrated(discord_id, player_index)
-        doc = await self.ratings.get_player_stat_doc(
-            civ_version=match.game,
-            is_seasonal=is_seasonal,
-            match_type=match.game_mode,
-            is_cloud=match.is_cloud,
-            is_combined=is_combined,
-            discord_id=discord_id,
-            session=session,
-        )
-        return _stat_of(discord_id, player_index, doc)
 
     async def get_players_ranking(
         self,
@@ -350,100 +318,6 @@ class MatchService:
             raise NotFoundError("Match not found")
         doc["match_id"] = str(doc.pop("_id"))
         return doc
-
-    async def create_from_save(
-        self,
-        file_bytes: bytes,
-        reporter_discord_id: str,
-        is_cloud: bool,
-        discord_message_id: str,
-    ) -> dict[str, Any]:
-        return await IngestService(self).create_from_save(
-            file_bytes, reporter_discord_id, is_cloud, discord_message_id
-        )
-
-    async def append_discord_message_id_list(
-        self, match_id: str, discord_message_id_list: list[str]
-    ) -> dict[str, Any]:
-        return await EditingService(self).append_discord_message_id_list(
-            match_id, discord_message_id_list
-        )
-
-    async def update_match(
-        self, match_id: str, update_data: dict[str, Any]
-    ) -> dict[str, Any]:
-        return await EditingService(self).update_match(match_id, update_data)
-
-    async def set_player_order(
-        self, match_id: str, player_order: str, discord_message_id: str
-    ) -> dict[str, Any]:
-        return await EditingService(self).set_player_order(
-            match_id, player_order, discord_message_id
-        )
-
-    async def change_order(
-        self, match_id: str, new_order: str, discord_message_id: str
-    ) -> dict[str, Any]:
-        return await EditingService(self).change_order(
-            match_id, new_order, discord_message_id
-        )
-
-    async def delete_pending_match(self, match_id: str) -> dict[str, Any]:
-        return await EditingService(self).delete_pending_match(match_id)
-
-    async def trigger_quit(
-        self, match_id: str, quitter_discord_id: str, discord_message_id: str
-    ) -> dict[str, Any]:
-        return await EditingService(self).trigger_quit(
-            match_id, quitter_discord_id, discord_message_id
-        )
-
-    async def assign_discord_id(
-        self,
-        match_id: str,
-        player_id: str,
-        player_discord_id: str,
-        discord_message_id: str,
-    ) -> dict[str, Any]:
-        return await EditingService(self).assign_discord_id(
-            match_id, player_id, player_discord_id, discord_message_id
-        )
-
-    async def assign_discord_id_all(
-        self, match_id: str, player_discord_id: list[str], discord_message_id: str
-    ) -> dict[str, Any]:
-        return await EditingService(self).assign_discord_id_all(
-            match_id, player_discord_id, discord_message_id
-        )
-
-    async def assign_sub(
-        self,
-        match_id: str,
-        sub_in_id: str,
-        sub_out_discord_id: str,
-        discord_message_id: str,
-    ) -> dict[str, Any]:
-        return await EditingService(self).assign_sub(
-            match_id, sub_in_id, sub_out_discord_id, discord_message_id
-        )
-
-    async def remove_sub(
-        self, match_id: str, sub_out_id: str, discord_message_id: str
-    ) -> dict[str, Any]:
-        return await EditingService(self).remove_sub(
-            match_id, sub_out_id, discord_message_id
-        )
-
-    async def contest_report(
-        self,
-        match_id: str,
-        contestor_discord_id: str,
-        reason: str,
-        discord_message_id: str,
-    ) -> dict[str, Any]:
-        return await EditingService(self).contest_report(
-            match_id, contestor_discord_id, reason, discord_message_id
-        )
 
     async def revert_match(self, match_id: str) -> dict[str, Any]:
         return await ApprovalService(self).revert_match(match_id)

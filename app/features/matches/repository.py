@@ -132,37 +132,6 @@ class MatchRepository:
         res = await self._pending.insert_one(dict(match_doc), session=session)
         return res.inserted_id
 
-    async def update_pending_match_set(
-        self,
-        oid: ObjectId,
-        changes: Mapping[str, Any],
-        *,
-        session: AsyncClientSession | None = None,
-    ) -> bool:
-        res = await self._pending.update_one(
-            {"_id": oid, **_editable(datetime.now(UTC))},
-            {"$set": dict(changes)},
-            session=session,
-        )
-        return res.matched_count == 1
-
-    async def replace_pending_match(
-        self,
-        oid: ObjectId,
-        match_doc: Mapping[str, Any],
-        *,
-        session: AsyncClientSession | None = None,
-    ) -> bool:
-        doc = dict(match_doc)
-        # A null hash would collide in the unique index, whose filter is $exists.
-        if doc.get("save_bytes_sha256") is None:
-            doc.pop("save_bytes_sha256", None)
-        # Guarded too: the model has no approving_at, so a replace would drop a claim.
-        res = await self._pending.replace_one(
-            {"_id": oid, **_editable(datetime.now(UTC))}, doc, session=session
-        )
-        return res.matched_count == 1
-
     # The three guarded writes below miss (None or False) when the match is
     # gone or an approve holds it; the caller asks which.
 
@@ -179,15 +148,12 @@ class MatchRepository:
         self,
         oid: ObjectId,
         entry: Mapping[str, Any],
-        message_id: str | None,
         *,
         now: datetime,
     ) -> bool:
-        push: dict[str, Any] = {"contest_report_list": dict(entry)}
-        if message_id is not None:
-            push["discord_messages_id_list"] = message_id
         res = await self._pending.update_one(
-            {"_id": oid, **_editable(now)}, {"$push": push}
+            {"_id": oid, **_editable(now)},
+            {"$push": {"contest_report_list": dict(entry)}},
         )
         return res.matched_count == 1
 

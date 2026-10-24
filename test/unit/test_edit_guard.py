@@ -78,10 +78,10 @@ class _Q:
         self.players = players
         return True
 
-    async def push_contest(self, oid, entry, message_id, *, now):
+    async def push_contest(self, oid, entry, *, now):
         if self.held or not self.doc:
             return False
-        self.pushed = (entry, message_id)
+        self.pushed = entry
         return True
 
     async def take_pending_match(self, oid, *, now):
@@ -159,10 +159,10 @@ def test_a_contest_is_pushed_not_rewritten(monkeypatch):
             OID, "100000000000000002", "wrong order"
         )
     )
-    entry, message_id = q.pushed
-    assert entry["contestor_discord_id"] == "100000000000000002"
-    assert entry["reason"] == "wrong order"
-    assert message_id is None
+    assert q.pushed == {
+        "contestor_discord_id": "100000000000000002",
+        "reason": "wrong order",
+    }
 
 
 def test_a_contest_on_a_vanished_match_is_404(monkeypatch):

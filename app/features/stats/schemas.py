@@ -36,12 +36,6 @@ class BatchStatsRequest(BaseModel):
     discord_ids: list[str]
 
 
-class BatchStatsResponse(BaseModel):
-    civ_version: str
-    game_type: str
-    results: list[UserStatsResponse]
-
-
 class TeamGenRequest(BaseModel):
     civ_version: str
     game_type: str
@@ -57,7 +51,6 @@ class TeamGenResponse(BaseModel):
 
 __all__ = [
     "BatchStatsRequest",
-    "BatchStatsResponse",
     "StatRow",
     "StatSet",
     "TeamGenRequest",

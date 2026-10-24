@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from pydantic import SecretStr
 
-from app.features.stats.router import router as stats_router
+from app.features.stats.router_v2 import router as stats_router
 
 TOKEN = "mito-test-token"
 
@@ -29,7 +29,7 @@ def test_gate_returns_401_without_header_and_admits_with_it(monkeypatch):
     client = TestClient(app, raise_server_exceptions=False)
 
     denied = client.get(
-        "/api/v1/stats/user",
+        "/api/v2/stats/user",
         params={"civ_version": "civ6", "game_type": "realtime", "discord_id": "1"},
     )
     assert denied.status_code == 401
@@ -38,7 +38,7 @@ def test_gate_returns_401_without_header_and_admits_with_it(monkeypatch):
     # With the header the gate admits the request; it then fails on the missing
     # Mongo dependency (503 via AppDependencyError) — which proves it got past 401.
     admitted = client.get(
-        "/api/v1/stats/user",
+        "/api/v2/stats/user",
         params={"civ_version": "civ6", "game_type": "realtime", "discord_id": "1"},
         headers={"authorization": f"Bearer {TOKEN}"},
     )

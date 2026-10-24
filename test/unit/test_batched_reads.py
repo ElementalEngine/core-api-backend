@@ -73,14 +73,11 @@ def test_one_query_rates_every_seat_as_reading_each_alone_would():
     svc = _service(ratings)
     match = _match(IDS)
     batched = asyncio.run(svc.get_players_ranking(match, is_seasonal=True))
-    alone = [
-        asyncio.run(svc.get_player_ranking(match, i, n, True))
-        for n, i in enumerate(IDS)
-    ]
-    drop = {"lastModified"}
-    assert [s.model_dump(exclude=drop) for s in batched] == [
-        s.model_dump(exclude=drop) for s in alone
-    ]
+    # Each seat as its own stored row, or the starting rating with none.
+    start = settings.ts_mu
+    assert [s.mu for s in batched] == [31.5, start, start, start, 31.5, start, 20.0]
+    assert [s.games for s in batched] == [9, 0, 0, 0, 9, 0, 2]
+    assert [s.index for s in batched] == list(range(len(IDS)))
     # One read, for the real players only, each named once.
     assert ratings.batches == [(["111", "222", "333"], None)]
 

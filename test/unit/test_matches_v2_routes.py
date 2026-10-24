@@ -111,14 +111,14 @@ def test_an_id_still_resolves_to_the_id_handler():
     assert matched[0].name == "get_match", matched[0].name
 
 
-def test_v1_matches_surface_is_untouched():
-    # C10: new routes are additive. v1 keeps its sixteen.
-    v1 = [
-        p
+def test_no_v1_match_route_remains():
+    # Only auth and infractions stay on /api/v1, for Auth and Lady Justice.
+    v1 = {
+        p.split("/")[3]
         for p in (getattr(r, "path", "") for r in app.routes)
-        if p.startswith("/api/v1") and "match" in p
-    ]
-    assert v1, "the v1 matches surface disappeared"
+        if p.startswith("/api/v1/")
+    }
+    assert v1 == {"auth", "infractions"}
 
 
 def test_the_upload_answer_keeps_its_duplicate_flags():

@@ -44,9 +44,8 @@ def test_the_legacy_put_pair_is_gone():
     assert {p for _, p in _routes("/api/v1")} & GONE == set()
 
 
-def test_the_v1_stats_routes_survive_until_cutover():
-    assert ("GET", "/api/v1/stats/user") in _routes("/api/v1/stats")
-    assert ("POST", "/api/v1/stats/batch") in _routes("/api/v1/stats")
+def test_no_v1_stats_route_remains():
+    assert _routes("/api/v1/stats") == set()
 
 
 def test_rating_gains_replaces_wins_and_nothing_else_moves():

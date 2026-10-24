@@ -89,26 +89,6 @@ class RatingsRepository:
             )
         ]
 
-    async def get_player_stat_doc(
-        self,
-        *,
-        civ_version: str,
-        is_seasonal: bool,
-        match_type: str,
-        is_cloud: bool,
-        is_combined: bool,
-        discord_id: str,
-        session: AsyncClientSession | None = None,
-    ) -> dict[str, Any] | None:
-        col = self._stats_collection(
-            civ_version=civ_version,
-            is_seasonal=is_seasonal,
-            match_type=match_type,
-            is_cloud=is_cloud,
-            is_combined=is_combined,
-        )
-        return await col.find_one({"_id": Int64(discord_id)}, session=session)
-
     async def get_player_stat_docs_batch(
         self,
         *,

@@ -58,91 +58,6 @@ class MatchResponse(BaseModel):
     season_label: str | None = None
 
 
-class MatchUpdate(BaseModel):
-    match_id: str
-    players: list[PlayerSchema] | None = None
-    confirmed: bool | None = None
-    flagged: bool | None = None
-    flagged_by: str | None = None
-
-
-class SetPlayerOrder(BaseModel):
-    match_id: str
-    player_order: str
-    discord_message_id: str
-
-
-class ChangeOrder(BaseModel):
-    match_id: str
-    new_order: str
-    discord_message_id: str
-
-
-class DeletePendingMatch(BaseModel):
-    match_id: str
-
-
-class TriggerQuit(BaseModel):
-    match_id: str
-    quitter_discord_id: str
-    discord_message_id: str
-
-
-class AppendDiscordMessageID(BaseModel):
-    match_id: str
-    discord_message_id: list[str]
-
-
-class AssignDiscordId(BaseModel):
-    match_id: str
-    player_id: str
-    player_discord_id: str
-    discord_message_id: str
-
-
-class AssignDiscordIdAll(BaseModel):
-    match_id: str
-    discord_id_list: list[str]
-    discord_message_id: str
-
-
-class AssignSub(BaseModel):
-    match_id: str
-    sub_in_id: str
-    sub_out_discord_id: str
-    discord_message_id: str
-
-
-class RemoveSub(BaseModel):
-    match_id: str
-    sub_out_id: str
-    discord_message_id: str
-
-
-class ContestReportRequest(BaseModel):
-    match_id: str
-    contestor_discord_id: str
-    reason: str
-    discord_message_id: str
-
-
-class RevertMatchRequest(BaseModel):
-    match_id: str
-
-
-class ApproveMatch(BaseModel):
-    match_id: str
-    approver_discord_id: str
-
-
-class GetLeaderboardRequest(BaseModel):
-    game: str
-    game_type: str
-    game_mode: str
-    is_seasonal: bool
-    is_combined: bool
-
-
 class PlayerLeaderboard(BaseModel):
     discord_id: str
     rating: int
@@ -158,23 +73,9 @@ class LeaderboardRankingResponse(BaseModel):
 
 __all__ = [
     "AffectedPlayerRating",
-    "AppendDiscordMessageID",
-    "ApproveMatch",
-    "AssignDiscordId",
-    "AssignDiscordIdAll",
-    "AssignSub",
-    "ChangeOrder",
     "ContestReport",
-    "ContestReportRequest",
-    "DeletePendingMatch",
-    "GetLeaderboardRequest",
     "LeaderboardRankingResponse",
     "MatchResponse",
-    "MatchUpdate",
     "PlayerLeaderboard",
     "PlayerSchema",
-    "RemoveSub",
-    "RevertMatchRequest",
-    "SetPlayerOrder",
-    "TriggerQuit",
 ]

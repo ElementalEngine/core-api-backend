@@ -13,6 +13,7 @@ import hashlib
 import pytest
 from pymongo.errors import DuplicateKeyError
 
+from app.features.matches.ingest import IngestService
 from app.features.matches.service import MatchService
 
 RAW = b"CIV6" + b"\x00" * 64
@@ -92,7 +93,7 @@ def _svc(q, monkeypatch):
 
 
 async def _upload(svc):
-    return await svc.create_from_save(RAW, "1", False, "1")
+    return await IngestService(svc).create_from_save(RAW, "1", False, "1")
 
 
 def test_same_bytes_in_pending_is_repeated_by_file(monkeypatch):
