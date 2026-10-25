@@ -1,6 +1,6 @@
 {
   "edition": "civ7",
-  "leader_data_version": 4,
+  "leader_data_version": 5,
   "leaders": [
     {
       "token": "LEADER_ADA_LOVELACE",
@@ -8,6 +8,12 @@
       "display": "Ada Lovelace",
       "type": "None",
       "emoji_id": "1464705360970645504"
+    },
+    {
+      "token": "LEADER_ALEXANDER",
+      "name": "Alexander",
+      "display": "Alexander",
+      "type": "None"
     },
     {
       "token": "LEADER_AMINA",
@@ -78,6 +84,12 @@
       "display": "Edward Teach",
       "type": "None",
       "emoji_id": "1464705377714311321"
+    },
+    {
+      "token": "LEADER_ELIZABETH",
+      "name": "Elizabeth_I",
+      "display": "Elizabeth I",
+      "type": "None"
     },
     {
       "token": "LEADER_FRIEDRICH",
@@ -213,11 +225,23 @@
       "emoji_id": "1464705410090144010"
     },
     {
+      "token": "LEADER_TOYOTOMI_HIDEYOSHI",
+      "name": "Toyotomi_Hideyoshi",
+      "display": "Toyotomi Hideyoshi",
+      "type": "None"
+    },
+    {
       "token": "LEADER_TRUNG_TRAC",
       "name": "Trung_Trac",
       "display": "Trưng Trắc",
       "type": "None",
       "emoji_id": "1464705411436515491"
+    },
+    {
+      "token": "LEADER_WASHINGTON",
+      "name": "George_Washington",
+      "display": "George Washington",
+      "type": "None"
     },
     {
       "token": "LEADER_XERXES",
@@ -232,6 +256,12 @@
       "display": "Xerxes, the Achaemenid",
       "type": "None",
       "emoji_id": "1464705416398245949"
+    },
+    {
+      "token": "LEADER_YI_SUN_SIN",
+      "name": "Yi_Sun_sin",
+      "display": "Yi Sun-sin",
+      "type": "None"
     }
   ],
   "civs": [
@@ -268,6 +298,13 @@
       "emoji_id": "1464696343917494374"
     },
     {
+      "token": "CIVILIZATION_BABYLON",
+      "name": "Babylonian",
+      "display": "Babylon",
+      "age_pool": "AGE_ANTIQUITY",
+      "age_pool_source": "inferred"
+    },
+    {
       "token": "CIVILIZATION_BUGANDA",
       "name": "Bugandan",
       "display": "Buganda",
@@ -301,10 +338,11 @@
     },
     {
       "token": "CIVILIZATION_DAI_VIET",
-      "name": "DaiViet",
+      "name": "Vietnamese",
       "display": "Đại Việt",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "inferred"
+      "age_pool_source": "inferred",
+      "emoji_id": "1464701100849627229"
     },
     {
       "token": "CIVILIZATION_EGYPT",
@@ -315,12 +353,33 @@
       "emoji_id": "1464696346492666149"
     },
     {
+      "token": "CIVILIZATION_ENGLAND",
+      "name": "English",
+      "display": "England",
+      "age_pool": "AGE_EXPLORATION",
+      "age_pool_source": "inferred"
+    },
+    {
       "token": "CIVILIZATION_FRENCH_EMPIRE",
       "name": "French_Imperial",
       "display": "French Empire",
       "age_pool": "AGE_MODERN",
       "age_pool_source": "mite",
       "emoji_id": "1464703956541509695"
+    },
+    {
+      "token": "CIVILIZATION_GAUL",
+      "name": "Gallic",
+      "display": "Gauls",
+      "age_pool": "AGE_ANTIQUITY",
+      "age_pool_source": "inferred"
+    },
+    {
+      "token": "CIVILIZATION_GORYEO",
+      "name": "Goryeo",
+      "display": "Goryeo",
+      "age_pool": "AGE_EXPLORATION",
+      "age_pool_source": "inferred"
     },
     {
       "token": "CIVILIZATION_GREAT_BRITAIN",
@@ -355,6 +414,13 @@
       "emoji_id": "1464701080670834909"
     },
     {
+      "token": "CIVILIZATION_HEIAN",
+      "name": "Heian",
+      "display": "Heian Japan",
+      "age_pool": "AGE_ANTIQUITY",
+      "age_pool_source": "inferred"
+    },
+    {
       "token": "CIVILIZATION_ICELAND",
       "name": "Icelandic",
       "display": "Iceland",
@@ -369,6 +435,13 @@
       "age_pool": "AGE_EXPLORATION",
       "age_pool_source": "mite",
       "emoji_id": "1464701085435560099"
+    },
+    {
+      "token": "CIVILIZATION_JOSEON",
+      "name": "Joseon",
+      "display": "Joseon",
+      "age_pool": "AGE_MODERN",
+      "age_pool_source": "inferred"
     },
     {
       "token": "CIVILIZATION_KHMER",
@@ -531,6 +604,13 @@
       "emoji_id": "1464703972215361762"
     },
     {
+      "token": "CIVILIZATION_SENGOKU",
+      "name": "Sengoku",
+      "display": "Sengoku Japan",
+      "age_pool": "AGE_EXPLORATION",
+      "age_pool_source": "inferred"
+    },
+    {
       "token": "CIVILIZATION_SHAWNEE",
       "name": "Shawnee",
       "display": "Shawnee",
@@ -577,14 +657,6 @@
       "age_pool": "AGE_ANTIQUITY",
       "age_pool_source": "mite",
       "emoji_id": "1464696362422632468"
-    },
-    {
-      "token": "CIVILIZATION_VIETNAM",
-      "name": "Vietnamese",
-      "display": "Vietnam",
-      "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701100849627229"
     }
   ]
 }
