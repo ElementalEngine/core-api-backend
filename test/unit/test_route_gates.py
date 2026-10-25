@@ -4,11 +4,7 @@ from fastapi.routing import APIRoute
 from starlette.routing import Match
 
 from app.core import dependencies
-from app.core.dependencies import (
-    require_activity_token,
-    require_any_service_token,
-    require_mito_token,
-)
+from app.core.dependencies import require_any_service_token, require_mito_token
 from app.main import app
 
 GATES = frozenset(
@@ -106,58 +102,23 @@ def test_the_check_fails_on_a_router_that_forgot_its_gate():
     assert "/api/v2/forgot/thing" in offenders
 
 
-LOBBY_PATH = "/api/v2/lobbies/652f1a2b3c4d5e6f7a8b9c0d"
-MITE = "/api/v2/lobbies/mite"
-MITE_LOBBY_PATH = f"{MITE}/652f1a2b3c4d5e6f7a8b9c0d"
-
-
-def test_resolution_finds_a_route_for_an_unambiguous_path():
-    route = resolve("POST", MITE)
-    assert route is not None and route.path == MITE
+MATCH_PATH = "/api/v2/matches/652f1a2b3c4d5e6f7a8b9c0d"
 
 
 def test_a_literal_path_is_not_captured_by_its_parameterised_sibling():
-    assert resolve("POST", f"{MITE}/claim-post").path == f"{MITE}/claim-post"
-    # `mite` is a literal where {lobby_id} also lives: if the parameter won,
-    # every bot call would read a lobby whose id is the word "mite".
-    assert resolve("GET", MITE).path == MITE
-    assert (
-        resolve("GET", "/api/v2/matches/leaderboard").path
-        == "/api/v2/matches/leaderboard"
-    )
+    # `leaderboard` is a literal where {match_id} also lives: if the parameter
+    # won, the bot would read a match whose id is the word "leaderboard".
+    for literal in ("leaderboard", "sub-quota"):
+        path = f"/api/v2/matches/{literal}"
+        assert resolve("GET", path).path == path
 
 
 def test_the_parameterised_sibling_still_resolves():
-    # Proving a literal wins is worthless if /{lobby_id} matches nothing.
-    assert resolve("GET", LOBBY_PATH).path == "/api/v2/lobbies/{lobby_id}"
+    # Proving a literal wins is worthless if /{match_id} matches nothing.
+    assert resolve("GET", MATCH_PATH).path == "/api/v2/matches/{match_id}"
 
 
-def test_each_lobby_route_carries_its_own_gate_not_merely_a_gate():
-    for method, mite_path in (
-        ("POST", MITE),
-        ("GET", MITE),
-        ("POST", f"{MITE}/claim-post"),
-        ("POST", f"{MITE}/sweep"),
-        ("GET", f"{MITE}/settings/civ6"),
-        ("POST", f"{MITE}/deal"),
-        ("POST", f"{MITE_LOBBY_PATH}/cancel"),
-        ("PATCH", f"{MITE_LOBBY_PATH}/leave"),
-    ):
-        mite_gates = gate_callables(resolve(method, mite_path))
-        assert require_mito_token in mite_gates, mite_path
-        assert require_activity_token not in mite_gates, mite_path
-    for method, path in (
-        ("GET", "/api/v2/lobbies"),
-        ("GET", LOBBY_PATH),
-        ("POST", f"{LOBBY_PATH}/cancel"),
-        ("PATCH", f"{LOBBY_PATH}/seats"),
-        ("POST", f"{LOBBY_PATH}/start"),
-        ("PUT", f"{LOBBY_PATH}/votes"),
-        ("PUT", f"{LOBBY_PATH}/bans"),
-        ("PUT", f"{LOBBY_PATH}/picks"),
-        ("POST", f"{LOBBY_PATH}/cancel"),
-        ("PUT", f"{LOBBY_PATH}/ready"),
-    ):
-        gates = gate_callables(resolve(method, path))
-        assert require_activity_token in gates, f"{method} {path}"
-        assert require_mito_token not in gates, f"{method} {path}"
+def test_the_draft_deal_carries_mite_s_own_gate():
+    assert require_mito_token in gate_callables(
+        resolve("POST", "/api/v2/lobbies/mite/deal")
+    )

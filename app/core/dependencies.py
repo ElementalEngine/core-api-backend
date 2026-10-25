@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from urllib.parse import unquote
-
 from fastapi import Header, HTTPException, Request, status
 from pymongo import AsyncMongoClient
 
@@ -22,14 +20,8 @@ def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:
     return x_actor_is_staff
 
 
-def actor_name(x_actor_name: str = Header(default="")) -> str:
-    """What the guild calls this player, percent-encoded because a header is
-    Latin-1 and a nickname is not. Display only: nothing keys on it."""
-    return unquote(x_actor_name)[:64]
-
-
 def actor_discord_id(x_actor_discord_id: str = Header()) -> str:
-    """The single identity header every activity route requires."""
+    """Who is acting, as the bot asserts it."""
     return x_actor_discord_id
 
 
@@ -94,23 +86,12 @@ def require_mito_token(authorization: str | None = Header(default=None)) -> None
     )
 
 
-def require_activity_token(authorization: str | None = Header(default=None)) -> None:
-    """The Activity server's own credential, kept separate from Mite's."""
-    _require_bearer(
-        authorization,
-        configured=settings.activity_service_token.get_secret_value(),
-        misconfig_code="ACTIVITY_SERVICE_MISCONFIGURED",
-        misconfig_message="Activity service token is not configured on the backend.",
-    )
-
-
 def require_any_service_token(authorization: str | None = Header(default=None)) -> None:
     """Accept any configured service token."""
     configured = [
         settings.mito_service_token.get_secret_value(),
         settings.lj_service_token.get_secret_value(),
         settings.auth_service_token.get_secret_value(),
-        settings.activity_service_token.get_secret_value(),
     ]
     scheme, _, token = (authorization or "").partition(" ")
     if scheme.lower() == "bearer" and token:

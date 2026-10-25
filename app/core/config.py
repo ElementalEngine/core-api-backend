@@ -71,11 +71,6 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("MITO_SERVICE_TOKEN"),
     )
 
-    activity_service_token: SecretStr = Field(
-        default=SecretStr(""),
-        validation_alias=AliasChoices("ACTIVITY_SERVICE_TOKEN"),
-    )
-
     # Auth parameters
     auth_service_token: SecretStr = Field(
         default=SecretStr(""),
