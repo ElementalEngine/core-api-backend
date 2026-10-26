@@ -25,30 +25,25 @@ def _catalogue(edition: str) -> dict[str, Any]:
     return data
 
 
-def questions_for(edition: str, game_type: str) -> list[dict[str, Any]]:
-    """Every question a seat votes on, settings first and `draft_mode` last."""
+def settings_for(edition: str, game_type: str) -> list[dict[str, Any]]:
+    """The game settings asked for a game type, without the draft mode."""
     catalogue = _catalogue(edition)
     try:
         settings = catalogue["settings"][catalogue["settings_for"][game_type]]
     except KeyError as exc:
         raise UnknownBallot(f"{edition} has no ballot for {game_type}") from exc
+    return json.loads(json.dumps(settings))
+
+
+def questions_for(edition: str, game_type: str) -> list[dict[str, Any]]:
+    """Every question a seat votes on, settings first and `draft_mode` last."""
+    asked = settings_for(edition, game_type)
     # A teamer's draft mode is chosen when the lobby is created, so it is not
     # on the ballot; every other game type votes on it.
-    variant = catalogue["draft_mode_for"].get(game_type)
-    asked = [*settings]
+    variant = _catalogue(edition)["draft_mode_for"].get(game_type)
     if variant is not None:
-        asked.append(catalogue["draft_mode"][variant])
-    return json.loads(json.dumps(asked))
+        asked.append(json.loads(json.dumps(_catalogue(edition)["draft_mode"][variant])))
+    return asked
 
 
-def command_settings(edition: str) -> list[dict[str, Any]]:
-    """Every settings question of the edition, once each: what /draft offers."""
-    catalogue = _catalogue(edition)
-    seen: dict[str, dict[str, Any]] = {}
-    for questions in catalogue["settings"].values():
-        for question in questions:
-            seen.setdefault(question["id"], question)
-    return json.loads(json.dumps(list(seen.values())))
-
-
-__all__ = ["EDITIONS", "UnknownBallot", "command_settings", "questions_for"]
+__all__ = ["EDITIONS", "UnknownBallot", "questions_for", "settings_for"]

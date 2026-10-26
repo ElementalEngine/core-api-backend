@@ -5,8 +5,8 @@ import pytest
 from app.features.match_setups.questions import (
     EDITIONS,
     UnknownBallot,
-    command_settings,
     questions_for,
+    settings_for,
 )
 
 GAME_TYPES = ("ffa", "duel", "teamer")
@@ -101,11 +101,10 @@ def test_an_unknown_ballot_is_refused(edition, game_type):
         questions_for(edition, game_type)
 
 
-def test_every_civ6_setting_is_offered_once_with_huts():
-    ids = [question["id"] for question in command_settings("civ6")]
-    assert len(ids) == len(set(ids)) == 14
-    assert {"map", "disasters", "huts", "wonders", "byc_mode"} <= set(ids)
-    assert "draft_mode" not in ids
-    huts = next(q for q in command_settings("civ6") if q["id"] == "huts")
+def test_settings_are_the_ballot_without_its_draft_mode():
+    ffa = [question["id"] for question in settings_for("civ6", "ffa")]
+    assert ffa == [q["id"] for q in questions_for("civ6", "ffa")][:-1]
+    assert {"map", "disasters", "huts"} <= set(ffa)
+    huts = next(q for q in settings_for("civ6", "ffa") if q["id"] == "huts")
     assert [o["label"] for o in huts["options"]] == ["1x", "1.25x", "1.5x", "1.75x"]
-    assert len(command_settings("civ7")) == 12
+    assert "draft_mode" not in [q["id"] for q in settings_for("civ6", "teamer")]

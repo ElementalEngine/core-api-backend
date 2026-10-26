@@ -22,7 +22,10 @@ class DraftRefused(ValueError):
     """A draft that cannot be dealt, said so the host can fix it."""
 
 
-def _bans(asked: list[str], allowed: list[str], cap: int, kind: str) -> list[str]:
+def checked_bans(
+    asked: list[str], allowed: list[str], cap: int, kind: str
+) -> list[str]:
+    """The bans asked for, once each, refused if unknown or over the cap."""
     bans = list(dict.fromkeys(asked))
     unknown = [token for token in bans if token not in set(allowed)]
     if unknown:
@@ -39,8 +42,8 @@ def deal_draft(
     caps = ban_caps(request.edition, request.starting_age)
     leaders = [row["token"] for row in civ_data["leaders"]]
     civs = bannable_civs(civ_data["civs"], request.starting_age)
-    leader_bans = _bans(request.leader_bans, leaders, caps["leader"], "leader")
-    civ_bans = _bans(request.civ_bans, civs, caps["civ"], "civ")
+    leader_bans = checked_bans(request.leader_bans, leaders, caps["leader"], "leader")
+    civ_bans = checked_bans(request.civ_bans, civs, caps["civ"], "civ")
     try:
         leader_pools = deal(
             remaining_after_bans(leaders, leader_bans),
@@ -64,4 +67,4 @@ def deal_draft(
     }
 
 
-__all__ = ["DraftRefused", "deal_draft"]
+__all__ = ["DraftRefused", "checked_bans", "deal_draft"]

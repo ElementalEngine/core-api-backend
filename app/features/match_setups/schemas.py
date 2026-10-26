@@ -1,7 +1,8 @@
-"""/draft: what Mite asks for and the deal it gets back."""
+"""What Mite sends for /draft and /lobby, and what it gets back."""
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -59,4 +60,129 @@ class DraftDeal(BaseModel):
     bans: DealtBans
 
 
-__all__ = ["MAX_DRAFTS", "DealtBans", "DealtPool", "DraftDeal", "DraftRequest"]
+LobbyShape = Literal[
+    "ffa-8",
+    "ffa-10",
+    "ffa-12",
+    "ffa-14",
+    "duel",
+    "teamer-2v2",
+    "teamer-3v3",
+    "teamer-4v4",
+    "teamer-5v5",
+    "teamer-2v2v2v2",
+]
+
+
+class LobbyRequest(BaseModel):
+    """/lobby host. The host is the acting player."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    shape: LobbyShape
+    draft_mode: Literal["standard", "random"]
+    guild_id: str = Field(min_length=1, max_length=32)
+    channel_id: str = Field(min_length=1, max_length=32)
+    steam_link: str = Field(min_length=1, max_length=120)
+    rules: str | None = Field(default=None, max_length=500)
+
+
+class LobbyMessage(BaseModel):
+    message_id: str = Field(min_length=1, max_length=32)
+
+
+class TeamMove(BaseModel):
+    player_id: str = Field(min_length=1, max_length=32)
+    team: int = Field(ge=1, le=4)
+
+
+class HostSettings(BaseModel):
+    """Every setting the host fixes, by question id; the rest are voted."""
+
+    settings: dict[str, str]
+
+
+class HostBans(BaseModel):
+    leaders: list[str] = Field(max_length=100)
+
+
+class LobbyPlayer(BaseModel):
+    discord_id: str
+    team: int | None
+
+
+class ChosenSetting(BaseModel):
+    id: str
+    value: str
+    by: str
+
+
+class SetupBan(BaseModel):
+    token: str
+    kind: str
+    by: str
+
+
+class LobbyPool(BaseModel):
+    """A player's draft, or a team's when `player_id` is empty."""
+
+    player_id: str | None
+    team: int | None
+    leaders: list[str]
+
+
+class LobbyView(BaseModel):
+    id: str
+    shape: LobbyShape
+    mode: str
+    seats: int
+    teams: int
+    draft_mode: str
+    status: Literal["open", "done", "cancelled"]
+    host_id: str
+    guild_id: str
+    channel_id: str
+    message_id: str | None
+    steam_link: str
+    rules: str | None
+    players: list[LobbyPlayer]
+    settings: list[ChosenSetting]
+    bans: list[SetupBan]
+    pools: list[LobbyPool]
+    cancel_reason: str | None
+    updated_at: datetime
+
+
+class SettingOption(BaseModel):
+    id: str
+    label: str
+    emoji: str
+
+
+class SettingQuestion(BaseModel):
+    id: str
+    title: str
+    options: list[SettingOption]
+    default_option_id: str
+
+
+__all__ = [
+    "MAX_DRAFTS",
+    "ChosenSetting",
+    "DealtBans",
+    "DealtPool",
+    "DraftDeal",
+    "DraftRequest",
+    "HostBans",
+    "HostSettings",
+    "LobbyMessage",
+    "LobbyPlayer",
+    "LobbyPool",
+    "LobbyRequest",
+    "LobbyShape",
+    "LobbyView",
+    "SettingOption",
+    "SettingQuestion",
+    "SetupBan",
+    "TeamMove",
+]
