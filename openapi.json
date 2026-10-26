@@ -895,40 +895,6 @@
         "title": "HistoryPage",
         "type": "object"
       },
-      "HostBans": {
-        "properties": {
-          "leaders": {
-            "items": {
-              "type": "string"
-            },
-            "maxItems": 100,
-            "title": "Leaders",
-            "type": "array"
-          }
-        },
-        "required": [
-          "leaders"
-        ],
-        "title": "HostBans",
-        "type": "object"
-      },
-      "HostSettings": {
-        "description": "Every setting the host fixes, by question id; the rest are voted.",
-        "properties": {
-          "settings": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "title": "Settings",
-            "type": "object"
-          }
-        },
-        "required": [
-          "settings"
-        ],
-        "title": "HostSettings",
-        "type": "object"
-      },
       "LeaderRow": {
         "properties": {
           "civ": {
@@ -1094,7 +1060,67 @@
         "title": "LinkedAccountLookupResponse",
         "type": "object"
       },
-      "LobbyMessage": {
+      "LobbyEdit": {
+        "additionalProperties": false,
+        "description": "The host's whole edit: the size, every setting fixed (the rest are\nvoted), every leader banned, and players moved or removed.",
+        "properties": {
+          "bans": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Bans",
+            "type": "array"
+          },
+          "removed": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 14,
+            "title": "Removed",
+            "type": "array"
+          },
+          "settings": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Settings",
+            "type": "object"
+          },
+          "shape": {
+            "enum": [
+              "ffa-8",
+              "ffa-10",
+              "ffa-12",
+              "ffa-14",
+              "duel",
+              "teamer-2v2",
+              "teamer-3v3",
+              "teamer-4v4",
+              "teamer-5v5",
+              "teamer-2v2v2v2"
+            ],
+            "title": "Shape",
+            "type": "string"
+          },
+          "teams": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Teams",
+            "type": "object"
+          }
+        },
+        "required": [
+          "shape",
+          "settings",
+          "bans"
+        ],
+        "title": "LobbyEdit",
+        "type": "object"
+      },
+      "LobbyLive": {
+        "description": "The post that opens the lobby to players, edited in place from then on.",
         "properties": {
           "message_id": {
             "maxLength": 32,
@@ -1106,7 +1132,7 @@
         "required": [
           "message_id"
         ],
-        "title": "LobbyMessage",
+        "title": "LobbyLive",
         "type": "object"
       },
       "LobbyPlayer": {
@@ -1228,18 +1254,23 @@
             "type": "string"
           },
           "steam_link": {
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Steam Link",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steam Link"
           }
         },
         "required": [
           "shape",
           "draft_mode",
           "guild_id",
-          "channel_id",
-          "steam_link"
+          "channel_id"
         ],
         "title": "LobbyRequest",
         "type": "object"
@@ -1283,6 +1314,10 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "live": {
+            "title": "Live",
+            "type": "boolean"
           },
           "message_id": {
             "anyOf": [
@@ -1361,8 +1396,15 @@
             "type": "string"
           },
           "steam_link": {
-            "title": "Steam Link",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steam Link"
           },
           "teams": {
             "title": "Teams",
@@ -1382,6 +1424,7 @@
           "teams",
           "draft_mode",
           "status",
+          "live",
           "host_id",
           "guild_id",
           "channel_id",
@@ -3091,28 +3134,6 @@
           "teams"
         ],
         "title": "TeamGenResponse",
-        "type": "object"
-      },
-      "TeamMove": {
-        "properties": {
-          "player_id": {
-            "maxLength": 32,
-            "minLength": 1,
-            "title": "Player Id",
-            "type": "string"
-          },
-          "team": {
-            "maximum": 4.0,
-            "minimum": 1.0,
-            "title": "Team",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "player_id",
-          "team"
-        ],
-        "title": "TeamMove",
         "type": "object"
       },
       "TierCategory": {
@@ -4992,6 +5013,7 @@
     },
     "/api/v2/match-setups/lobbies": {
       "get": {
+        "description": "The live lobbies players can join; with a host, that host's own, live\nor in setup.",
         "operationId": "open_lobbies_api_v2_match_setups_lobbies_get",
         "parameters": [
           {
@@ -5003,6 +5025,24 @@
               "minLength": 1,
               "title": "Guild Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "host_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host Id"
             }
           },
           {
@@ -5232,83 +5272,6 @@
         ]
       }
     },
-    "/api/v2/match-setups/lobbies/{lobby_id}/bans": {
-      "put": {
-        "operationId": "ban_leaders_api_v2_match_setups_lobbies__lobby_id__bans_put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "lobby_id",
-            "required": true,
-            "schema": {
-              "title": "Lobby Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-actor-discord-id",
-            "required": true,
-            "schema": {
-              "title": "X-Actor-Discord-Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HostBans"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LobbyView"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Ban Leaders",
-        "tags": [
-          "match-setups"
-        ]
-      }
-    },
     "/api/v2/match-setups/lobbies/{lobby_id}/cancel": {
       "post": {
         "operationId": "cancel_lobby_api_v2_match_setups_lobbies__lobby_id__cancel_post",
@@ -5381,6 +5344,84 @@
           }
         },
         "summary": "Cancel Lobby",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/lobbies/{lobby_id}/edit": {
+      "put": {
+        "description": "The host's edit, saved whole.",
+        "operationId": "edit_lobby_api_v2_match_setups_lobbies__lobby_id__edit_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LobbyEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LobbyView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Lobby",
         "tags": [
           "match-setups"
         ]
@@ -5520,78 +5561,10 @@
         ]
       }
     },
-    "/api/v2/match-setups/lobbies/{lobby_id}/message": {
-      "put": {
-        "description": "The post that shows the lobby, so it can be edited in place.",
-        "operationId": "set_lobby_message_api_v2_match_setups_lobbies__lobby_id__message_put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "lobby_id",
-            "required": true,
-            "schema": {
-              "title": "Lobby Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LobbyMessage"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LobbyView"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Set Lobby Message",
-        "tags": [
-          "match-setups"
-        ]
-      }
-    },
-    "/api/v2/match-setups/lobbies/{lobby_id}/move": {
+    "/api/v2/match-setups/lobbies/{lobby_id}/live": {
       "post": {
-        "operationId": "move_player_api_v2_match_setups_lobbies__lobby_id__move_post",
+        "description": "The host confirms the setup; its post opens the lobby to players.",
+        "operationId": "open_lobby_api_v2_match_setups_lobbies__lobby_id__live_post",
         "parameters": [
           {
             "in": "path",
@@ -5632,7 +5605,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TeamMove"
+                "$ref": "#/components/schemas/LobbyLive"
               }
             }
           },
@@ -5660,84 +5633,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Move Player",
-        "tags": [
-          "match-setups"
-        ]
-      }
-    },
-    "/api/v2/match-setups/lobbies/{lobby_id}/settings": {
-      "put": {
-        "operationId": "fix_settings_api_v2_match_setups_lobbies__lobby_id__settings_put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "lobby_id",
-            "required": true,
-            "schema": {
-              "title": "Lobby Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-actor-discord-id",
-            "required": true,
-            "schema": {
-              "title": "X-Actor-Discord-Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HostSettings"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LobbyView"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Fix Settings",
+        "summary": "Open Lobby",
         "tags": [
           "match-setups"
         ]

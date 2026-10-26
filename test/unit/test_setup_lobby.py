@@ -12,12 +12,11 @@ from app.features.match_setups.lobby import (
     cancel_reason,
     dealt,
     draft_groups,
-    host_bans,
-    host_settings,
+    edited,
     joined,
     left,
-    moved,
     new_lobby,
+    went_live,
 )
 from app.features.match_setups.questions import settings_for
 from app.features.match_setups.schemas import LobbyShape
@@ -43,7 +42,7 @@ def hosted(**fields):
 
 
 def lobby(shape="ffa-8", draft_mode="standard", players=()):
-    made = hosted(shape=shape, draft_mode=draft_mode)
+    made = {**hosted(shape=shape, draft_mode=draft_mode), "live": True}
     for player in players:
         made["players"] = joined(made, player)
     return made
@@ -82,40 +81,76 @@ def test_a_player_leaves_but_the_host_cancels_instead():
         left(lobby(), "a")
 
 
-def test_only_the_host_moves_players_and_only_onto_a_team_with_room():
-    teamer = lobby("teamer-2v2", players=["a", "b"])
-    assert {p["discord_id"]: p["team"] for p in moved(teamer, "host", "b", 2)}["b"] == 2
-    with pytest.raises(NotTheHost):
-        moved(teamer, "a", "b", 2)
-    with pytest.raises(LobbyRefused, match="team 2 is full"):
-        moved(lobby("teamer-2v2", players=["a", "b", "c"]), "host", "b", 2)
-    with pytest.raises(LobbyRefused, match="already on team 1"):
-        moved(teamer, "host", "b", 1)
-    with pytest.raises(LobbyRefused, match="only a teamer"):
-        moved(lobby(players=["a"]), "host", "a", 1)
-
-
-def test_the_host_fixes_known_settings_in_catalogue_order():
-    questions = settings_for("civ6", "ffa")
-    fixed = host_settings(
-        lobby(), "host", questions, {"huts": "x1_5", "map": "pangea_classic"}
+def edit(made, actor="host", **fields):
+    return edited(
+        made,
+        actor,
+        **{
+            "shape": made["shape"],
+            "questions": settings_for("civ6", made["mode"]),
+            "settings": {},
+            "bans": [],
+            "teams": {},
+            "removed": [],
+            **fields,
+        },
     )
-    assert [s["id"] for s in fixed] == [
-        q["id"] for q in questions if q["id"] in {"huts", "map"}
-    ]
-    assert all(s["by"] == "host" for s in fixed)
-    with pytest.raises(LobbyRefused, match="huts has no option"):
-        host_settings(lobby(), "host", questions, {"huts": "x9"})
+
+
+def test_a_lobby_waits_in_setup_until_its_host_opens_it():
+    setup = hosted(steam_link=None)
+    assert (setup["live"], setup["steam_link"]) == (False, None)
+    with pytest.raises(LobbyRefused, match="not open to players yet"):
+        joined(setup, "a")
+    with pytest.raises(LobbyRefused, match="not open to players yet"):
+        draft_groups(setup, "host")
     with pytest.raises(NotTheHost):
-        host_settings(lobby(), "a", questions, {})
+        went_live(setup, "a", "m")
+    assert went_live(setup, "host", "m") == {"live": True, "message_id": "m"}
+    with pytest.raises(LobbyRefused, match="already open"):
+        went_live({**setup, "live": True}, "host", "m")
 
 
-def test_host_bans_land_once_each():
-    bans = host_bans(lobby(), "host", ["LEADER_01", "LEADER_01", "LEADER_02"])
-    assert bans == [
-        {"token": "LEADER_01", "kind": "leader", "by": "host"},
-        {"token": "LEADER_02", "kind": "leader", "by": "host"},
+def test_an_edit_resizes_fixes_settings_and_bans_in_one_change():
+    changes = edit(
+        lobby(players=["a", "b"]),
+        shape="ffa-12",
+        settings={"huts": "x1_5", "map": "pangea_classic"},
+        bans=["LEADER_01", "LEADER_01", "LEADER_02"],
+    )
+    assert (changes["shape"], changes["seats"]) == ("ffa-12", 12)
+    assert [s["id"] for s in changes["settings"]] == [
+        q["id"] for q in settings_for("civ6", "ffa") if q["id"] in {"huts", "map"}
     ]
+    assert [b["token"] for b in changes["bans"]] == ["LEADER_01", "LEADER_02"]
+    with pytest.raises(LobbyRefused, match="huts has no option"):
+        edit(lobby(), settings={"huts": "x9"})
+    with pytest.raises(NotTheHost):
+        edit(lobby(players=["a"]), actor="a")
+
+
+def test_an_edit_keeps_the_mode_and_room_for_everyone_seated():
+    with pytest.raises(LobbyRefused, match="not its mode"):
+        edit(lobby(), shape="duel")
+    with pytest.raises(LobbyRefused, match="not its mode"):
+        edit(lobby("teamer-4v4"), shape="teamer-2v2v2v2")
+    with pytest.raises(LobbyRefused, match="10 players do not fit in 8 seats"):
+        edit(lobby("ffa-10", players=list("abcdefghi")), shape="ffa-8")
+    assert edit(lobby("teamer-2v2"), shape="teamer-3v3")["seats"] == 6
+
+
+def test_the_host_moves_and_removes_players_but_not_themself():
+    teamer = lobby("teamer-2v2", players=["a", "b"])
+    moved = edit(teamer, teams={"b": 2}, removed=["a"])["players"]
+    assert moved == [{"discord_id": "host", "team": 1}, {"discord_id": "b", "team": 2}]
+    with pytest.raises(LobbyRefused, match="team 2 has more than 2"):
+        edit(lobby("teamer-2v2", players=["a", "b", "c"]), teams={"b": 2})
+    with pytest.raises(LobbyRefused, match="host cannot be removed"):
+        edit(teamer, removed=["host"])
+    with pytest.raises(LobbyRefused, match="has left the lobby"):
+        edit(teamer, removed=["z"])
+    with pytest.raises(LobbyRefused, match="only a teamer"):
+        edit(lobby(players=["a"]), teams={"a": 1})
 
 
 @pytest.mark.parametrize(
@@ -138,7 +173,7 @@ def test_three_a_side_in_a_four_a_side_lobby_may_start():
 
 def test_standard_splits_the_leaders_left_after_bans_evenly():
     ffa = lobby(players=["a", "b"])
-    ffa["bans"] = host_bans(ffa, "host", LEADERS[:4])
+    ffa["bans"] = edit(ffa, bans=LEADERS[:4])["bans"]
     pools = dealt(ffa, draft_groups(ffa, "host"), LEADERS, random.Random(3))
     assert [p["player_id"] for p in pools] == ["host", "a", "b"]
     assert [len(p["leaders"]) for p in pools] == [12, 12, 12]

@@ -68,8 +68,12 @@ class MatchSetupRepository:
         except DuplicateKeyError as exc:
             raise SeatedElsewhere from exc
 
-    async def open_lobbies(self, guild_id: str) -> list[dict[str, Any]]:
-        cursor = self._setups.find({**OPEN_LOBBY, "guild_id": guild_id})
+    async def open_lobbies(
+        self, guild_id: str, host_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """The live lobbies players can join; a host's own, live or in setup."""
+        mine = {"host_id": host_id} if host_id else {"live": True}
+        cursor = self._setups.find({**OPEN_LOBBY, **mine, "guild_id": guild_id})
         return await cursor.sort("created_at", DESCENDING).to_list(None)
 
     async def close_idle(self, cutoff: datetime, now: datetime) -> list[dict[str, Any]]:

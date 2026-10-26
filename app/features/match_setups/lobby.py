@@ -63,12 +63,13 @@ def new_lobby(
     host_id: str,
     guild_id: str,
     channel_id: str,
-    steam_link: str,
+    steam_link: str | None,
     rules: str | None,
     now: datetime,
 ) -> dict[str, Any]:
-    """An open civ6 lobby with its host in the first seat."""
-    if not STEAM_LINK.fullmatch(steam_link):
+    """A civ6 lobby in setup, its host in the first seat. Players join once the
+    host makes it live."""
+    if steam_link is not None and not STEAM_LINK.fullmatch(steam_link):
         raise LobbyRefused("the Steam link is not a Civ6 lobby link")
     chosen = SHAPES[shape]
     return {
@@ -80,6 +81,7 @@ def new_lobby(
         "teams": chosen.teams,
         "draft_mode": draft_mode,
         "status": OPEN,
+        "live": False,
         "host_id": host_id,
         "guild_id": guild_id,
         "channel_id": channel_id,
@@ -108,6 +110,22 @@ def _host(lobby: Mapping[str, Any], actor_id: str) -> None:
         raise NotTheHost("only the host can do that")
 
 
+def _live(lobby: Mapping[str, Any]) -> None:
+    _open(lobby)
+    if not lobby["live"]:
+        raise LobbyRefused("the lobby is not open to players yet")
+
+
+def went_live(
+    lobby: Mapping[str, Any], actor_id: str, message_id: str
+) -> dict[str, Any]:
+    """The host confirms the setup; the lobby's post opens it to players."""
+    _host(lobby, actor_id)
+    if lobby["live"]:
+        raise LobbyRefused("the lobby is already open")
+    return {"live": True, "message_id": message_id}
+
+
 def team_sizes(lobby: Mapping[str, Any]) -> list[int]:
     """Players per team, team 1 first."""
     sizes = [0] * lobby["teams"]
@@ -118,7 +136,7 @@ def team_sizes(lobby: Mapping[str, Any]) -> list[int]:
 
 def joined(lobby: Mapping[str, Any], player_id: str) -> list[dict[str, Any]]:
     """The players once this one sits down, on the emptiest team in a teamer."""
-    _open(lobby)
+    _live(lobby)
     players = list(lobby["players"])
     if any(p["discord_id"] == player_id for p in players):
         raise LobbyRefused("you are already in this lobby")
@@ -142,62 +160,71 @@ def left(lobby: Mapping[str, Any], player_id: str) -> list[dict[str, Any]]:
     return players
 
 
-def moved(
-    lobby: Mapping[str, Any], actor_id: str, player_id: str, team: int
-) -> list[dict[str, Any]]:
-    """The players once the host puts one on another team."""
-    _host(lobby, actor_id)
-    if not lobby["teams"]:
-        raise LobbyRefused("only a teamer has teams")
-    if not 1 <= team <= lobby["teams"]:
-        raise LobbyRefused(f"there is no team {team}")
-    player = next((p for p in lobby["players"] if p["discord_id"] == player_id), None)
-    if player is None:
-        raise LobbyRefused("that player is not in this lobby")
-    if player["team"] == team:
-        raise LobbyRefused(f"that player is already on team {team}")
-    if team_sizes(lobby)[team - 1] >= lobby["seats"] // lobby["teams"]:
-        raise LobbyRefused(f"team {team} is full")
-    return [
-        {**p, "team": team} if p["discord_id"] == player_id else p
-        for p in lobby["players"]
-    ]
-
-
-def host_settings(
+def edited(
     lobby: Mapping[str, Any],
     actor_id: str,
+    *,
+    shape: str,
     questions: Sequence[Mapping[str, Any]],
-    chosen: Mapping[str, str],
-) -> list[dict[str, str]]:
-    """The settings the host fixes, in the catalogue's order; the rest are voted."""
+    settings: Mapping[str, str],
+    bans: Sequence[str],
+    teams: Mapping[str, int],
+    removed: Sequence[str],
+) -> dict[str, Any]:
+    """The host's edit as one change: the size, the settings they fix (the rest
+    are voted), the leaders they ban, and players moved or removed. Players who
+    joined meanwhile keep their seats."""
     _host(lobby, actor_id)
+    chosen, current = SHAPES[shape], SHAPES[lobby["shape"]]
+    if (chosen.mode, chosen.teams) != (current.mode, current.teams):
+        raise LobbyRefused("a lobby changes its size, not its mode")
+    if lobby["host_id"] in removed:
+        raise LobbyRefused("the host cannot be removed")
+    seated = {p["discord_id"] for p in lobby["players"]}
+    if (set(removed) | set(teams)) - seated:
+        raise LobbyRefused("a player you changed has left the lobby")
+    if teams and not chosen.teams:
+        raise LobbyRefused("only a teamer has teams")
+    for team in teams.values():
+        if not 1 <= team <= chosen.teams:
+            raise LobbyRefused(f"there is no team {team}")
+    players = [
+        {**p, "team": teams.get(p["discord_id"], p["team"])}
+        for p in lobby["players"]
+        if p["discord_id"] not in removed
+    ]
+    if len(players) > chosen.seats:
+        raise LobbyRefused(f"{len(players)} players do not fit in {chosen.seats} seats")
+    if chosen.teams:
+        size = chosen.seats // chosen.teams
+        for team, count in enumerate(team_sizes({**lobby, "players": players}), 1):
+            if count > size:
+                raise LobbyRefused(f"team {team} has more than {size} players")
     options = {q["id"]: {o["id"] for o in q["options"]} for q in questions}
-    for question, option in chosen.items():
+    for question, option in settings.items():
         if option not in options.get(question, ()):
             raise LobbyRefused(f"{question} has no option {option}")
-    return [
-        {"id": q["id"], "value": chosen[q["id"]], "by": "host"}
-        for q in questions
-        if q["id"] in chosen
-    ]
-
-
-def host_bans(
-    lobby: Mapping[str, Any], actor_id: str, leaders: Sequence[str]
-) -> list[dict[str, str]]:
-    """The leaders the host bans; the router checks them against civ data."""
-    _host(lobby, actor_id)
-    return [
-        {"token": token, "kind": "leader", "by": "host"}
-        for token in dict.fromkeys(leaders)
-    ]
+    return {
+        "shape": shape,
+        "seats": chosen.seats,
+        "players": players,
+        "settings": [
+            {"id": q["id"], "value": settings[q["id"]], "by": "host"}
+            for q in questions
+            if q["id"] in settings
+        ],
+        "bans": [
+            {"token": token, "kind": "leader", "by": "host"}
+            for token in dict.fromkeys(bans)
+        ],
+    }
 
 
 def draft_groups(lobby: Mapping[str, Any], actor_id: str) -> list[list[str]]:
     """Who drafts together: each player alone, or each team. Refused until the
     lobby can start: two duellists, two players, or equal teams."""
     _host(lobby, actor_id)
+    _live(lobby)
     players = lobby["players"]
     if lobby["mode"] == "duel" and len(players) != 2:
         raise LobbyRefused("a duel starts with two players")
@@ -272,11 +299,10 @@ __all__ = [
     "cancel_reason",
     "dealt",
     "draft_groups",
-    "host_bans",
-    "host_settings",
+    "edited",
     "joined",
     "left",
-    "moved",
     "new_lobby",
     "team_sizes",
+    "went_live",
 ]

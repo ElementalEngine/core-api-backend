@@ -28,12 +28,11 @@ from app.features.match_setups.lobby import (
     cancel_reason,
     dealt,
     draft_groups,
-    host_bans,
-    host_settings,
+    edited,
     joined,
     left,
-    moved,
     new_lobby,
+    went_live,
 )
 from app.features.match_setups.questions import UnknownBallot, settings_for
 from app.features.match_setups.record import draft_setup
@@ -41,13 +40,11 @@ from app.features.match_setups.repository import MatchSetupRepository, SeatedEls
 from app.features.match_setups.schemas import (
     DraftDeal,
     DraftRequest,
-    HostBans,
-    HostSettings,
-    LobbyMessage,
+    LobbyEdit,
+    LobbyLive,
     LobbyRequest,
     LobbyView,
     SettingQuestion,
-    TeamMove,
 )
 from app.features.seasons.repository import SeasonNotSeededError, SeasonsRepository
 
@@ -164,12 +161,13 @@ async def host_lobby(
 @router.get("/lobbies", response_model=list[LobbyView])
 async def open_lobbies(
     guild_id: str = Query(min_length=1, max_length=32),
+    host_id: str | None = Query(default=None, min_length=1, max_length=32),
     db: AsyncMongoClient = Depends(get_database),
 ) -> list[dict[str, Any]]:
-    return [
-        lobby_view(lobby)
-        for lobby in await MatchSetupRepository(db).open_lobbies(guild_id)
-    ]
+    """The live lobbies players can join; with a host, that host's own, live
+    or in setup."""
+    found = await MatchSetupRepository(db).open_lobbies(guild_id, host_id)
+    return [lobby_view(lobby) for lobby in found]
 
 
 @router.post("/lobbies/close-idle", response_model=list[LobbyView])
@@ -192,12 +190,17 @@ async def read_lobby(
     return lobby_view(lobby)
 
 
-@router.put("/lobbies/{lobby_id}/message", response_model=LobbyView)
-async def set_lobby_message(
-    lobby_id: str, body: LobbyMessage, db: AsyncMongoClient = Depends(get_database)
+@router.post("/lobbies/{lobby_id}/live", response_model=LobbyView)
+async def open_lobby(
+    lobby_id: str,
+    body: LobbyLive,
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """The post that shows the lobby, so it can be edited in place."""
-    return await _change(db, lobby_id, lambda _: {"message_id": body.message_id})
+    """The host confirms the setup; its post opens the lobby to players."""
+    return await _change(
+        db, lobby_id, lambda lobby: went_live(lobby, actor, body.message_id)
+    )
 
 
 @router.post("/lobbies/{lobby_id}/join", response_model=LobbyView)
@@ -218,51 +221,34 @@ async def leave_lobby(
     return await _change(db, lobby_id, lambda lobby: {"players": left(lobby, actor)})
 
 
-@router.post("/lobbies/{lobby_id}/move", response_model=LobbyView)
-async def move_player(
+@router.put("/lobbies/{lobby_id}/edit", response_model=LobbyView)
+async def edit_lobby(
     lobby_id: str,
-    body: TeamMove,
+    body: LobbyEdit,
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    return await _change(
-        db,
-        lobby_id,
-        lambda lobby: {"players": moved(lobby, actor, body.player_id, body.team)},
-    )
-
-
-@router.put("/lobbies/{lobby_id}/settings", response_model=LobbyView)
-async def fix_settings(
-    lobby_id: str,
-    body: HostSettings,
-    actor: str = Depends(actor_discord_id),
-    db: AsyncMongoClient = Depends(get_database),
-) -> dict[str, Any]:
-    def fixed(lobby: dict[str, Any]) -> dict[str, Any]:
-        questions = settings_for(lobby["edition"], lobby["mode"])
-        return {"settings": host_settings(lobby, actor, questions, body.settings)}
-
-    return await _change(db, lobby_id, fixed)
-
-
-@router.put("/lobbies/{lobby_id}/bans", response_model=LobbyView)
-async def ban_leaders(
-    lobby_id: str,
-    body: HostBans,
-    actor: str = Depends(actor_discord_id),
-    db: AsyncMongoClient = Depends(get_database),
-) -> dict[str, Any]:
+    """The host's edit, saved whole."""
     leaders = [row["token"] for row in (await _civ_data(db, "civ6"))["leaders"]]
+    cap = ban_caps("civ6", None)["leader"]
     try:
-        banned = checked_bans(
-            body.leaders, leaders, ban_caps("civ6", None)["leader"], "leader"
-        )
+        bans = checked_bans(body.bans, leaders, cap, "leader")
     except DraftRefused as exc:
         raise invalid_request(str(exc)) from exc
-    return await _change(
-        db, lobby_id, lambda lobby: {"bans": host_bans(lobby, actor, banned)}
-    )
+
+    def saved(lobby: dict[str, Any]) -> dict[str, Any]:
+        return edited(
+            lobby,
+            actor,
+            shape=body.shape,
+            questions=settings_for(lobby["edition"], lobby["mode"]),
+            settings=body.settings,
+            bans=bans,
+            teams=body.teams,
+            removed=body.removed,
+        )
+
+    return await _change(db, lobby_id, saved)
 
 
 @router.post("/lobbies/{lobby_id}/start", response_model=LobbyView)

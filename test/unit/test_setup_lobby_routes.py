@@ -78,11 +78,13 @@ class Store:
         self.docs[lobby["_id"]] = written
         return dict(written)
 
-    async def open_lobbies(self, guild_id):
+    async def open_lobbies(self, guild_id, host_id=None):
         return [
             d
             for d in self.docs.values()
-            if d["status"] == "open" and d["guild_id"] == guild_id
+            if d["status"] == "open"
+            and d["guild_id"] == guild_id
+            and (d["host_id"] == host_id if host_id else d["live"])
         ]
 
     async def close_idle(self, cutoff, now):
@@ -129,10 +131,21 @@ def lobbies(monkeypatch):
     return TestClient(app, raise_server_exceptions=False), store
 
 
-def hosted(client, host="host", **fields):
+def hosted(client, host="host", live=True, **fields):
     reply = client.post(LOBBIES, json={**HOST, **fields}, headers=as_player(host))
     assert reply.status_code == 201, reply.json()
-    return reply.json()
+    if not live:
+        return reply.json()
+    url = f"{LOBBIES}/{reply.json()['id']}/live"
+    opened = client.post(url, json={"message_id": "m"}, headers=as_player(host))
+    assert opened.status_code == 200, opened.json()
+    return opened.json()
+
+
+def edit(client, lobby, host="host", **fields):
+    body = {"shape": lobby["shape"], "settings": {}, "bans": [], **fields}
+    url = f"{LOBBIES}/{lobby['id']}/edit"
+    return client.put(url, json=body, headers=as_player(host))
 
 
 def test_a_lobby_is_hosted_joined_and_started_into_a_recorded_draft(lobbies):
@@ -140,9 +153,7 @@ def test_a_lobby_is_hosted_joined_and_started_into_a_recorded_draft(lobbies):
     lobby = hosted(client)
     url = f"{LOBBIES}/{lobby['id']}"
     assert client.post(f"{url}/join", headers=as_player("a")).status_code == 200
-    banned = client.put(
-        f"{url}/bans", json={"leaders": ["LEADER_00"]}, headers=as_player("host")
-    )
+    banned = edit(client, lobby, bans=["LEADER_00"])
     assert banned.json()["bans"] == [
         {"token": "LEADER_00", "kind": "leader", "by": "host"}
     ]
@@ -181,23 +192,30 @@ def test_a_player_sits_in_one_open_lobby_at_a_time(lobbies):
     )
 
 
-def test_bans_are_checked_against_civ_data_and_settings_against_the_catalogue(lobbies):
+def test_a_lobby_in_setup_is_hidden_and_closed_to_players(lobbies):
     client, _ = lobbies
-    url = f"{LOBBIES}/{hosted(client)['id']}"
-    unknown = client.put(
-        f"{url}/bans", json={"leaders": ["LEADER_NOBODY"]}, headers=as_player("host")
-    )
-    assert unknown.status_code == 400
-    wrong = client.put(
-        f"{url}/settings", json={"settings": {"huts": "x9"}}, headers=as_player("host")
-    )
-    assert wrong.status_code == 409
-    fixed = client.put(
-        f"{url}/settings",
-        json={"settings": {"huts": "x1_5"}},
-        headers=as_player("host"),
-    )
-    assert fixed.json()["settings"] == [{"id": "huts", "value": "x1_5", "by": "host"}]
+    setup = hosted(client, live=False, steam_link=None)
+    assert (setup["live"], setup["steam_link"]) == (False, None)
+    url = f"{LOBBIES}/{setup['id']}"
+    assert client.post(f"{url}/join", headers=as_player("a")).status_code == 409
+    listed = client.get(LOBBIES, params={"guild_id": "g"}, headers=as_player("a"))
+    assert listed.json() == []
+    mine = {"guild_id": "g", "host_id": "host"}
+    found = client.get(LOBBIES, params=mine, headers=as_player("host")).json()
+    assert [lobby["id"] for lobby in found] == [setup["id"]]
+    live = client.post(f"{url}/live", json={"message_id": "m"}, headers=as_player("a"))
+    assert live.status_code == 403
+
+
+def test_an_edit_is_checked_whole_against_civ_data_and_the_catalogue(lobbies):
+    client, _ = lobbies
+    lobby = hosted(client)
+    assert edit(client, lobby, bans=["LEADER_NOBODY"]).status_code == 400
+    assert edit(client, lobby, settings={"huts": "x9"}).status_code == 409
+    assert edit(client, lobby, shape="duel").status_code == 409
+    saved = edit(client, lobby, shape="ffa-10", settings={"huts": "x1_5"}).json()
+    assert saved["settings"] == [{"id": "huts", "value": "x1_5", "by": "host"}]
+    assert saved["seats"] == 10
     questions = client.get(
         "/api/v2/match-setups/settings/civ6/ffa", headers=as_player("host")
     )

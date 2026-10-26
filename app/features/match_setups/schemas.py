@@ -83,27 +83,27 @@ class LobbyRequest(BaseModel):
     draft_mode: Literal["standard", "random"]
     guild_id: str = Field(min_length=1, max_length=32)
     channel_id: str = Field(min_length=1, max_length=32)
-    steam_link: str = Field(min_length=1, max_length=120)
+    steam_link: str | None = Field(default=None, max_length=120)
     rules: str | None = Field(default=None, max_length=500)
 
 
-class LobbyMessage(BaseModel):
+class LobbyLive(BaseModel):
+    """The post that opens the lobby to players, edited in place from then on."""
+
     message_id: str = Field(min_length=1, max_length=32)
 
 
-class TeamMove(BaseModel):
-    player_id: str = Field(min_length=1, max_length=32)
-    team: int = Field(ge=1, le=4)
+class LobbyEdit(BaseModel):
+    """The host's whole edit: the size, every setting fixed (the rest are
+    voted), every leader banned, and players moved or removed."""
 
+    model_config = ConfigDict(extra="forbid")
 
-class HostSettings(BaseModel):
-    """Every setting the host fixes, by question id; the rest are voted."""
-
+    shape: LobbyShape
     settings: dict[str, str]
-
-
-class HostBans(BaseModel):
-    leaders: list[str] = Field(max_length=100)
+    bans: list[str] = Field(max_length=100)
+    teams: dict[str, int] = Field(default_factory=dict)
+    removed: list[str] = Field(default_factory=list, max_length=14)
 
 
 class LobbyPlayer(BaseModel):
@@ -139,11 +139,12 @@ class LobbyView(BaseModel):
     teams: int
     draft_mode: str
     status: Literal["open", "done", "cancelled"]
+    live: bool
     host_id: str
     guild_id: str
     channel_id: str
     message_id: str | None
-    steam_link: str
+    steam_link: str | None
     rules: str | None
     players: list[LobbyPlayer]
     settings: list[ChosenSetting]
@@ -173,9 +174,8 @@ __all__ = [
     "DealtPool",
     "DraftDeal",
     "DraftRequest",
-    "HostBans",
-    "HostSettings",
-    "LobbyMessage",
+    "LobbyEdit",
+    "LobbyLive",
     "LobbyPlayer",
     "LobbyPool",
     "LobbyRequest",
@@ -184,5 +184,4 @@ __all__ = [
     "SettingOption",
     "SettingQuestion",
     "SetupBan",
-    "TeamMove",
 ]
