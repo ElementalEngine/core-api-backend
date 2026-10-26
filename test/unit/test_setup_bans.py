@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.features.lobbies.bans import ban_caps, capped, resolve_bans
+from app.features.match_setups.bans import ban_caps, capped, resolve_bans
 
 
 def seat(player, leaders=(), civs=()):

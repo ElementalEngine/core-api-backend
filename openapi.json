@@ -315,112 +315,6 @@
         "title": "CreateRegistrationSessionRequest",
         "type": "object"
       },
-      "DealRequest": {
-        "additionalProperties": false,
-        "description": "/draft: how many pools, their sizes, the age and the host's bans.",
-        "properties": {
-          "civ_bans": {
-            "items": {
-              "type": "string"
-            },
-            "maxItems": 100,
-            "title": "Civ Bans",
-            "type": "array"
-          },
-          "civs": {
-            "anyOf": [
-              {
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Civs"
-          },
-          "drafts": {
-            "maximum": 14.0,
-            "minimum": 2.0,
-            "title": "Drafts",
-            "type": "integer"
-          },
-          "edition": {
-            "enum": [
-              "civ6",
-              "civ7"
-            ],
-            "title": "Edition",
-            "type": "string"
-          },
-          "game_type": {
-            "enum": [
-              "ffa",
-              "teamer",
-              "duel"
-            ],
-            "title": "Game Type",
-            "type": "string"
-          },
-          "leader_bans": {
-            "items": {
-              "type": "string"
-            },
-            "maxItems": 100,
-            "title": "Leader Bans",
-            "type": "array"
-          },
-          "leaders": {
-            "minimum": 1.0,
-            "title": "Leaders",
-            "type": "integer"
-          },
-          "starting_age": {
-            "anyOf": [
-              {
-                "enum": [
-                  "AGE_ANTIQUITY",
-                  "AGE_EXPLORATION",
-                  "AGE_MODERN"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Starting Age"
-          }
-        },
-        "required": [
-          "edition",
-          "game_type",
-          "drafts",
-          "leaders"
-        ],
-        "title": "DealRequest",
-        "type": "object"
-      },
-      "DealResponse": {
-        "properties": {
-          "bans": {
-            "$ref": "#/components/schemas/DealtBans"
-          },
-          "pools": {
-            "items": {
-              "$ref": "#/components/schemas/DealtPool"
-            },
-            "title": "Pools",
-            "type": "array"
-          }
-        },
-        "required": [
-          "pools",
-          "bans"
-        ],
-        "title": "DealResponse",
-        "type": "object"
-      },
       "DealtBans": {
         "properties": {
           "civ": {
@@ -621,6 +515,119 @@
           "platform"
         ],
         "title": "DiscordOAuthCallbackResult",
+        "type": "object"
+      },
+      "DraftDeal": {
+        "properties": {
+          "bans": {
+            "$ref": "#/components/schemas/DealtBans"
+          },
+          "pools": {
+            "items": {
+              "$ref": "#/components/schemas/DealtPool"
+            },
+            "title": "Pools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pools",
+          "bans"
+        ],
+        "title": "DraftDeal",
+        "type": "object"
+      },
+      "DraftRequest": {
+        "additionalProperties": false,
+        "description": "How many pools, their sizes, the age and the host's bans.",
+        "properties": {
+          "civ_bans": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Civ Bans",
+            "type": "array"
+          },
+          "civs": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Civs"
+          },
+          "drafts": {
+            "maximum": 14.0,
+            "minimum": 2.0,
+            "title": "Drafts",
+            "type": "integer"
+          },
+          "edition": {
+            "enum": [
+              "civ6",
+              "civ7"
+            ],
+            "title": "Edition",
+            "type": "string"
+          },
+          "game_type": {
+            "enum": [
+              "ffa",
+              "teamer",
+              "duel"
+            ],
+            "title": "Game Type",
+            "type": "string"
+          },
+          "host_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Host Id",
+            "type": "string"
+          },
+          "leader_bans": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Leader Bans",
+            "type": "array"
+          },
+          "leaders": {
+            "minimum": 1.0,
+            "title": "Leaders",
+            "type": "integer"
+          },
+          "starting_age": {
+            "anyOf": [
+              {
+                "enum": [
+                  "AGE_ANTIQUITY",
+                  "AGE_EXPLORATION",
+                  "AGE_MODERN"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starting Age"
+          }
+        },
+        "required": [
+          "host_id",
+          "edition",
+          "game_type",
+          "drafts",
+          "leaders"
+        ],
+        "title": "DraftRequest",
         "type": "object"
       },
       "FinalizeRegistrationOperationRequest": {
@@ -4463,10 +4470,10 @@
         ]
       }
     },
-    "/api/v2/lobbies/mite/deal": {
+    "/api/v2/match-setups/draft": {
       "post": {
-        "description": "One /draft deal. Nothing is stored.",
-        "operationId": "deal_for_draft_api_v2_lobbies_mite_deal_post",
+        "description": "/draft: deal the pools, then record the setup.",
+        "operationId": "deal_draft_and_record_api_v2_match_setups_draft_post",
         "parameters": [
           {
             "in": "header",
@@ -4489,7 +4496,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DealRequest"
+                "$ref": "#/components/schemas/DraftRequest"
               }
             }
           },
@@ -4500,7 +4507,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DealResponse"
+                  "$ref": "#/components/schemas/DraftDeal"
                 }
               }
             },
@@ -4517,9 +4524,9 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Deal For Draft",
+        "summary": "Deal Draft And Record",
         "tags": [
-          "lobbies"
+          "match-setups"
         ]
       }
     },

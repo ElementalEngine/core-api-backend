@@ -5,9 +5,8 @@ import random
 import pytest
 from pydantic import ValidationError
 
-from app.features.lobbies.draft import DraftRefused, deal_draft
-from app.features.lobbies.questions import command_settings
-from app.features.lobbies.schemas import DealRequest
+from app.features.match_setups.deal import DraftRefused, deal_draft
+from app.features.match_setups.schemas import DraftRequest
 
 LEADERS = [f"LEADER_{n}" for n in range(30)]
 ANTIQUITY = [f"CIVILIZATION_A{n}" for n in range(6)]
@@ -21,11 +20,11 @@ CIV6 = {"leaders": [{"token": t} for t in LEADERS], "civs": []}
 
 
 def civ6(**fields):
-    return DealRequest(edition="civ6", game_type="ffa", **fields)
+    return DraftRequest(host_id="1", edition="civ6", game_type="ffa", **fields)
 
 
 def civ7(**fields):
-    return DealRequest(edition="civ7", game_type="ffa", **fields)
+    return DraftRequest(host_id="1", edition="civ7", game_type="ffa", **fields)
 
 
 def dealt(civ_data, request):
@@ -83,7 +82,7 @@ def test_a_civ_outside_the_age_cannot_be_banned():
         )
 
 
-def test_the_lobby_s_ban_caps_hold():
+def test_the_edition_s_ban_caps_hold():
     with pytest.raises(DraftRefused, match="At most 20 leader bans"):
         dealt(CIV6, civ6(drafts=2, leaders=2, leader_bans=LEADERS[:21]))
     with pytest.raises(DraftRefused, match="At most 3 civ bans"):
@@ -116,14 +115,4 @@ def test_an_unknown_leader_cannot_be_banned():
 )
 def test_a_request_that_does_not_fit_its_edition_is_refused(fields):
     with pytest.raises(ValidationError):
-        DealRequest(**fields)
-
-
-def test_the_command_offers_every_civ6_setting_once_with_huts():
-    ids = [question["id"] for question in command_settings("civ6")]
-    assert len(ids) == len(set(ids)) == 14
-    assert {"map", "disasters", "huts", "wonders", "byc_mode"} <= set(ids)
-    assert "draft_mode" not in ids
-    huts = next(q for q in command_settings("civ6") if q["id"] == "huts")
-    assert [o["label"] for o in huts["options"]] == ["1x", "1.25x", "1.5x", "1.75x"]
-    assert len(command_settings("civ7")) == 12
+        DraftRequest(host_id="1", **fields)

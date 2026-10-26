@@ -1,4 +1,4 @@
-"""The /draft command's deal: the lobby's dealer and ban rules, with no lobby."""
+"""/draft's deal: pools from what is left after the host's bans."""
 
 from __future__ import annotations
 
@@ -6,14 +6,14 @@ from collections.abc import Mapping
 from random import SystemRandom
 from typing import Any
 
-from app.features.lobbies.bans import ban_caps, bannable_civs
-from app.features.lobbies.pools import (
+from app.features.match_setups.bans import ban_caps, bannable_civs
+from app.features.match_setups.pools import (
     NotEnoughPool,
     deal,
     deal_civs,
     remaining_after_bans,
 )
-from app.features.lobbies.schemas import DealRequest
+from app.features.match_setups.schemas import DraftRequest
 
 _RANDOM = SystemRandom()
 
@@ -33,7 +33,7 @@ def _bans(asked: list[str], allowed: list[str], cap: int, kind: str) -> list[str
 
 
 def deal_draft(
-    civ_data: Mapping[str, Any], request: DealRequest, rng: Any = _RANDOM
+    civ_data: Mapping[str, Any], request: DraftRequest, rng: Any = _RANDOM
 ) -> dict[str, Any]:
     """One pool per draft: leaders never repeat, civ7 civs only when too few."""
     caps = ban_caps(request.edition, request.starting_age)

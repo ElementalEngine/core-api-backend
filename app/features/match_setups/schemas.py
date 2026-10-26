@@ -1,4 +1,4 @@
-"""/draft's deal: what Mite asks for and what it gets back."""
+"""/draft: what Mite asks for and the deal it gets back."""
 
 from __future__ import annotations
 
@@ -9,11 +9,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 MAX_DRAFTS = {"civ6": 14, "civ7": 10}
 
 
-class DealRequest(BaseModel):
-    """/draft: how many pools, their sizes, the age and the host's bans."""
+class DraftRequest(BaseModel):
+    """How many pools, their sizes, the age and the host's bans."""
 
     model_config = ConfigDict(extra="forbid")
 
+    host_id: str = Field(min_length=1, max_length=32)
     edition: Literal["civ6", "civ7"]
     game_type: Literal["ffa", "teamer", "duel"]
     drafts: int = Field(ge=2, le=14)
@@ -27,7 +28,7 @@ class DealRequest(BaseModel):
     civ_bans: list[str] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
-    def _suits_the_edition(self) -> DealRequest:
+    def _suits_the_edition(self) -> DraftRequest:
         if self.drafts > MAX_DRAFTS[self.edition]:
             raise ValueError(
                 f"{self.edition} deals at most {MAX_DRAFTS[self.edition]} drafts"
@@ -53,9 +54,9 @@ class DealtBans(BaseModel):
     civ: list[str]
 
 
-class DealResponse(BaseModel):
+class DraftDeal(BaseModel):
     pools: list[DealtPool]
     bans: DealtBans
 
 
-__all__ = ["MAX_DRAFTS", "DealRequest", "DealResponse", "DealtBans", "DealtPool"]
+__all__ = ["MAX_DRAFTS", "DealtBans", "DealtPool", "DraftDeal", "DraftRequest"]

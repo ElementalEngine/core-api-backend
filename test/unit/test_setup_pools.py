@@ -4,7 +4,7 @@ import random
 
 import pytest
 
-from app.features.lobbies.pools import (
+from app.features.match_setups.pools import (
     NotEnoughPool,
     assign_one_each,
     civ_target,

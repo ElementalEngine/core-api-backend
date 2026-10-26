@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.features.lobbies.questions import (
+from app.features.match_setups.questions import (
     EDITIONS,
     UnknownBallot,
+    command_settings,
     questions_for,
 )
 
@@ -98,3 +99,13 @@ def test_the_catalogue_hands_out_a_copy():
 def test_an_unknown_ballot_is_refused(edition, game_type):
     with pytest.raises(UnknownBallot):
         questions_for(edition, game_type)
+
+
+def test_every_civ6_setting_is_offered_once_with_huts():
+    ids = [question["id"] for question in command_settings("civ6")]
+    assert len(ids) == len(set(ids)) == 14
+    assert {"map", "disasters", "huts", "wonders", "byc_mode"} <= set(ids)
+    assert "draft_mode" not in ids
+    huts = next(q for q in command_settings("civ6") if q["id"] == "huts")
+    assert [o["label"] for o in huts["options"]] == ["1x", "1.25x", "1.5x", "1.75x"]
+    assert len(command_settings("civ7")) == 12

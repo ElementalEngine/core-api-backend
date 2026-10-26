@@ -118,7 +118,7 @@ def test_the_parameterised_sibling_still_resolves():
     assert resolve("GET", MATCH_PATH).path == "/api/v2/matches/{match_id}"
 
 
-def test_the_draft_deal_carries_mite_s_own_gate():
+def test_the_draft_route_carries_mite_s_own_gate():
     assert require_mito_token in gate_callables(
-        resolve("POST", "/api/v2/lobbies/mite/deal")
+        resolve("POST", "/api/v2/match-setups/draft")
     )
