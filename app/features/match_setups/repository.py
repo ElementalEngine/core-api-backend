@@ -10,13 +10,22 @@ from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import DuplicateKeyError
 
 from app.core.constants import COL_MATCH_SETUPS, GAMES_DB
-from app.features.match_setups.lobby import CANCELLED, OPEN
+from app.features.match_setups.lobby import CANCELLED, OPEN, SETUP
 
 OPEN_LOBBY = {"command": "lobby", "status": OPEN}
 
 
 class SeatedElsewhere(RuntimeError):
     """A player already sits in another open lobby."""
+
+
+class CodeTaken(RuntimeError):
+    """Another open lobby in the server has this code."""
+
+
+def _refused(exc: DuplicateKeyError) -> RuntimeError:
+    taken = "code" in ((exc.details or {}).get("keyPattern") or {})
+    return CodeTaken() if taken else SeatedElsewhere()
 
 
 class MatchSetupRepository:
@@ -31,6 +40,12 @@ class MatchSetupRepository:
             name="one_open_seat_per_player",
         )
         await self._setups.create_index(
+            [("guild_id", ASCENDING), ("code", ASCENDING)],
+            unique=True,
+            partialFilterExpression=OPEN_LOBBY,
+            name="one_open_lobby_per_code",
+        )
+        await self._setups.create_index(
             [("guild_id", ASCENDING), ("created_at", DESCENDING)],
             partialFilterExpression=OPEN_LOBBY,
             name="open_lobbies_by_guild",
@@ -41,16 +56,16 @@ class MatchSetupRepository:
             name="idle_open_lobbies",
         )
         await self._setups.create_index(
-            [("vote.ends_at", ASCENDING)],
+            [("deadline", ASCENDING)],
             partialFilterExpression=OPEN_LOBBY,
-            name="open_votes_by_end",
+            name="open_lobbies_by_deadline",
         )
 
     async def insert(self, setup: dict[str, Any]) -> ObjectId:
         try:
             return (await self._setups.insert_one(setup)).inserted_id
         except DuplicateKeyError as exc:
-            raise SeatedElsewhere from exc
+            raise _refused(exc) from exc
 
     async def lobby(self, lobby_id: str) -> dict[str, Any] | None:
         try:
@@ -58,6 +73,11 @@ class MatchSetupRepository:
         except InvalidId:
             return None
         return await self._setups.find_one({"_id": oid, "command": "lobby"})
+
+    async def lobby_by_code(self, guild_id: str, code: str) -> dict[str, Any] | None:
+        return await self._setups.find_one(
+            {**OPEN_LOBBY, "guild_id": guild_id, "code": code}
+        )
 
     async def update_lobby(
         self, lobby: dict[str, Any], changes: dict[str, Any], now: datetime
@@ -71,22 +91,20 @@ class MatchSetupRepository:
                 return_document=ReturnDocument.AFTER,
             )
         except DuplicateKeyError as exc:
-            raise SeatedElsewhere from exc
+            raise _refused(exc) from exc
 
     async def open_lobbies(
         self, guild_id: str, host_id: str | None = None
     ) -> list[dict[str, Any]]:
-        """The live lobbies players can join; a host's own, live or in setup."""
-        mine = {"host_id": host_id} if host_id else {"live": True}
+        """The lobbies players can see; a host's own, in setup or not."""
+        mine = {"host_id": host_id} if host_id else {"phase": {"$ne": SETUP}}
         cursor = self._setups.find({**OPEN_LOBBY, **mine, "guild_id": guild_id})
         return await cursor.sort("created_at", DESCENDING).to_list(None)
 
-    async def votes_due(self, now: datetime) -> list[dict[str, Any]]:
-        """The open lobbies whose vote has run out of time, oldest first."""
-        due = {**OPEN_LOBBY, "vote.ends_at": {"$lt": now}}
-        return (
-            await self._setups.find(due).sort("vote.ends_at", ASCENDING).to_list(None)
-        )
+    async def due(self, now: datetime) -> list[dict[str, Any]]:
+        """The open lobbies whose vote or blind picks are past their time."""
+        cursor = self._setups.find({**OPEN_LOBBY, "deadline": {"$lt": now}})
+        return await cursor.sort("deadline", ASCENDING).to_list(None)
 
     async def close_idle(self, cutoff: datetime, now: datetime) -> list[dict[str, Any]]:
         """Close every open lobby untouched since the cutoff; the closed ones."""
@@ -99,6 +117,7 @@ class MatchSetupRepository:
                     "$set": {
                         "status": CANCELLED,
                         "cancel_reason": "idle",
+                        "deadline": None,
                         "closed_at": now,
                     },
                     "$inc": {"revision": 1},
@@ -110,4 +129,4 @@ class MatchSetupRepository:
         return closed
 
 
-__all__ = ["MatchSetupRepository", "SeatedElsewhere"]
+__all__ = ["CodeTaken", "MatchSetupRepository", "SeatedElsewhere"]

@@ -21,7 +21,9 @@ from app.features.match_setups.bans import ban_caps
 from app.features.match_setups.deal import DraftRefused, checked_bans, deal_draft
 from app.features.match_setups.lobby import (
     CANCELLED,
+    DONE,
     IDLE_LIMIT,
+    SHAPES,
     LobbyRefused,
     NotTheHost,
     cancel_reason,
@@ -29,19 +31,28 @@ from app.features.match_setups.lobby import (
     finished,
     joined,
     left,
+    lobby_code,
     new_lobby,
+    picked,
+    revealed,
+    started,
     tallied,
-    vote_opened,
     vote_placed,
     went_live,
 )
-from app.features.match_setups.questions import UnknownBallot, settings_for
+from app.features.match_setups.questions import UnknownBallot, questions_for
 from app.features.match_setups.record import draft_setup
-from app.features.match_setups.repository import MatchSetupRepository, SeatedElsewhere
+from app.features.match_setups.repository import (
+    CodeTaken,
+    MatchSetupRepository,
+    SeatedElsewhere,
+)
 from app.features.match_setups.schemas import (
     DraftDeal,
     DraftRequest,
+    LeaderPick,
     LobbyBallot,
+    LobbyCancel,
     LobbyEdit,
     LobbyLive,
     LobbyRequest,
@@ -82,7 +93,7 @@ async def _civ_data(db: AsyncMongoClient, edition: str) -> dict[str, Any]:
 
 
 def lobby_view(lobby: Mapping[str, Any]) -> dict[str, Any]:
-    return {**lobby, "id": str(lobby["_id"]), "vote": lobby.get("vote")}
+    return {**lobby, "id": str(lobby["_id"])}
 
 
 async def _change(
@@ -137,9 +148,9 @@ async def deal_draft_and_record(
 async def settings_questions(
     edition: Literal["civ6", "civ7"], game_type: Literal["ffa", "duel", "teamer"]
 ) -> list[dict[str, Any]]:
-    """The settings a host may fix for a game type; the rest are voted."""
+    """Every setting a game is set up with, draft mode last."""
     try:
-        return settings_for(edition, game_type)
+        return questions_for(edition, game_type)
     except UnknownBallot as exc:
         raise not_found(str(exc)) from exc
 
@@ -150,15 +161,32 @@ async def host_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    try:
-        lobby = new_lobby(**request.model_dump(), host_id=actor, now=datetime.now(UTC))
-    except LobbyRefused as exc:
-        raise invalid_request(str(exc)) from exc
-    try:
-        lobby["_id"] = await MatchSetupRepository(db).insert(lobby)
-    except SeatedElsewhere as exc:
-        raise conflict(SEATED_ELSEWHERE) from exc
-    return lobby_view(lobby)
+    """A lobby in setup, under a code no other open lobby here has."""
+    mode = SHAPES[request.shape].mode
+    for _ in range(WRITE_ATTEMPTS):
+        try:
+            lobby = new_lobby(
+                **request.model_dump(),
+                host_id=actor,
+                questions=questions_for("civ6", mode),
+                code=lobby_code(),
+                now=datetime.now(UTC),
+            )
+        except LobbyRefused as exc:
+            raise invalid_request(str(exc)) from exc
+        try:
+            lobby["_id"] = await MatchSetupRepository(db).insert(lobby)
+        except SeatedElsewhere as exc:
+            raise conflict(SEATED_ELSEWHERE) from exc
+        except CodeTaken:
+            continue
+        return lobby_view(lobby)
+    raise api_error(
+        code="CONFLICT",
+        message="no free lobby code was found",
+        status_code=status.HTTP_409_CONFLICT,
+        retryable=True,
+    )
 
 
 @router.get("/lobbies", response_model=list[LobbyView])
@@ -167,8 +195,8 @@ async def open_lobbies(
     host_id: str | None = Query(default=None, min_length=1, max_length=32),
     db: AsyncMongoClient = Depends(get_database),
 ) -> list[dict[str, Any]]:
-    """The live lobbies players can join; with a host, that host's own, live
-    or in setup."""
+    """The lobbies players can see; with a host, that host's own, in setup or
+    not."""
     found = await MatchSetupRepository(db).open_lobbies(guild_id, host_id)
     return [lobby_view(lobby) for lobby in found]
 
@@ -183,13 +211,37 @@ async def close_idle_lobbies(
     return [lobby_view(lobby) for lobby in closed]
 
 
-@router.get("/lobbies/votes-due", response_model=list[LobbyView])
-async def votes_due(
+@router.get("/lobbies/due", response_model=list[LobbyView])
+async def lobbies_due(
     db: AsyncMongoClient = Depends(get_database),
 ) -> list[dict[str, Any]]:
-    """Votes past their time, for the bot to count."""
-    due = await MatchSetupRepository(db).votes_due(datetime.now(UTC))
+    """Votes and blind picks past their time, for the bot to close."""
+    due = await MatchSetupRepository(db).due(datetime.now(UTC))
     return [lobby_view(lobby) for lobby in due]
+
+
+@router.post("/lobbies/cancel", response_model=LobbyView)
+async def cancel_lobby(
+    body: LobbyCancel,
+    actor: str = Depends(actor_discord_id),
+    staff: bool = Depends(actor_is_staff),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """The host, or staff, cancel an open lobby by its code."""
+    code = body.code.strip().upper()
+    found = await MatchSetupRepository(db).lobby_by_code(body.guild_id, code)
+    if found is None:
+        raise not_found("no open lobby here has that code")
+
+    def cancelled(lobby: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "status": CANCELLED,
+            "cancel_reason": cancel_reason(lobby, actor, staff),
+            "deadline": None,
+            "closed_at": datetime.now(UTC),
+        }
+
+    return await _change(db, str(found["_id"]), cancelled)
 
 
 @router.get("/lobbies/{lobby_id}", response_model=LobbyView)
@@ -221,7 +273,9 @@ async def join_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    return await _change(db, lobby_id, lambda lobby: {"players": joined(lobby, actor)})
+    """A player sits down; the last seat starts the bans vote."""
+    now = datetime.now(UTC)
+    return await _change(db, lobby_id, lambda lobby: joined(lobby, actor, now))
 
 
 @router.post("/lobbies/{lobby_id}/leave", response_model=LobbyView)
@@ -253,7 +307,7 @@ async def edit_lobby(
             lobby,
             actor,
             shape=body.shape,
-            questions=settings_for(lobby["edition"], lobby["mode"]),
+            questions=questions_for(lobby["edition"], lobby["mode"]),
             settings=body.settings,
             bans=bans,
             teams=body.teams,
@@ -269,9 +323,9 @@ async def start_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """The host starts: the seats lock and the vote opens."""
+    """The host starts before it fills: the seats lock and the bans vote opens."""
     now = datetime.now(UTC)
-    return await _change(db, lobby_id, lambda lobby: vote_opened(lobby, actor, now))
+    return await _change(db, lobby_id, lambda lobby: started(lobby, actor, now))
 
 
 @router.put("/lobbies/{lobby_id}/vote", response_model=LobbyView)
@@ -305,43 +359,44 @@ async def tally_vote(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """Count the vote and deal the draft, closing the lobby. The bot counts,
-    acting as the host, once all finish or the time is up."""
+    """Count the bans and deal the draft. The bot counts, acting as the host,
+    once all finish or the time is up."""
     leaders = [row["token"] for row in (await _civ_data(db, "civ6"))["leaders"]]
     season_id = await _open_season_id(db, "civ6")
 
     def counted(lobby: dict[str, Any]) -> dict[str, Any]:
-        return {
-            **tallied(
-                lobby,
-                actor,
-                questions=settings_for(lobby["edition"], lobby["mode"]),
-                settings_votes=body.settings,
-                ban_votes=body.bans,
-                leaders=leaders,
-            ),
-            "season_id": season_id,
-            "closed_at": datetime.now(UTC),
-        }
+        now = datetime.now(UTC)
+        changes = tallied(lobby, actor, ban_votes=body.bans, leaders=leaders, now=now)
+        closed = {"closed_at": now} if changes.get("status") == DONE else {}
+        return {**changes, "season_id": season_id, **closed}
 
     return await _change(db, lobby_id, counted)
 
 
-@router.post("/lobbies/{lobby_id}/cancel", response_model=LobbyView)
-async def cancel_lobby(
+@router.post("/lobbies/{lobby_id}/pick", response_model=LobbyView)
+async def pick_leader(
     lobby_id: str,
+    body: LeaderPick,
     actor: str = Depends(actor_discord_id),
-    staff: bool = Depends(actor_is_staff),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    def cancelled(lobby: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "status": CANCELLED,
-            "cancel_reason": cancel_reason(lobby, actor, staff),
-            "closed_at": datetime.now(UTC),
-        }
+    """A player's blind pick."""
+    return await _change(db, lobby_id, lambda lobby: picked(lobby, actor, body.leader))
 
-    return await _change(db, lobby_id, cancelled)
+
+@router.post("/lobbies/{lobby_id}/reveal", response_model=LobbyView)
+async def reveal_picks(
+    lobby_id: str,
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """The blind picks revealed. The bot reveals, acting as the host, once all
+    have picked or the time is up."""
+
+    def shown(lobby: dict[str, Any]) -> dict[str, Any]:
+        return {**revealed(lobby, actor), "closed_at": datetime.now(UTC)}
+
+    return await _change(db, lobby_id, shown)
 
 
 __all__ = ["router"]

@@ -36,13 +36,11 @@ def settings_for(edition: str, game_type: str) -> list[dict[str, Any]]:
 
 
 def questions_for(edition: str, game_type: str) -> list[dict[str, Any]]:
-    """Every question a seat votes on, settings first and `draft_mode` last."""
+    """Every question a game is set up with: its settings, then `draft_mode`."""
     asked = settings_for(edition, game_type)
-    # A teamer's draft mode is chosen when the lobby is created, so it is not
-    # on the ballot; every other game type votes on it.
-    variant = _catalogue(edition)["draft_mode_for"].get(game_type)
-    if variant is not None:
-        asked.append(json.loads(json.dumps(_catalogue(edition)["draft_mode"][variant])))
+    catalogue = _catalogue(edition)
+    variant = catalogue["draft_mode_for"][game_type]
+    asked.append(json.loads(json.dumps(catalogue["draft_mode"][variant])))
     return asked
 
 

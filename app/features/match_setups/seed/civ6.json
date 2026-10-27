@@ -502,10 +502,28 @@
         }
       ],
       "default_option_id": "standard"
+    },
+    "teamer": {
+      "id": "draft_mode",
+      "title": "Draft Mode",
+      "options": [
+        {
+          "id": "standard",
+          "emoji": "✅",
+          "label": "Standard"
+        },
+        {
+          "id": "random",
+          "emoji": "❓",
+          "label": "Random"
+        }
+      ],
+      "default_option_id": "standard"
     }
   },
   "draft_mode_for": {
     "ffa": "ffa",
-    "duel": "duel"
+    "duel": "duel",
+    "teamer": "teamer"
   }
 }

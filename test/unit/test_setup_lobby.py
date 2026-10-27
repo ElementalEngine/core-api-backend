@@ -1,84 +1,138 @@
 from __future__ import annotations
 
 import random
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from bson import ObjectId
 
 from app.features.match_setups.lobby import (
+    BLIND_POOL,
+    CODE_LETTERS,
     SHAPES,
     LobbyRefused,
     NotTheHost,
     cancel_reason,
     dealt,
-    draft_groups,
     edited,
     finished,
     joined,
     left,
+    lobby_code,
     new_lobby,
+    picked,
+    revealed,
+    started,
     tallied,
-    vote_opened,
     vote_placed,
     went_live,
 )
-from app.features.match_setups.questions import settings_for
+from app.features.match_setups.questions import questions_for
 from app.features.match_setups.schemas import LobbyShape
 
 LINK = "steam://joinlobby/289070/109775241000000000/76561198000000000"
 LEADERS = [f"LEADER_{n:02}" for n in range(40)]
+NOW = datetime(2026, 10, 27, 12, tzinfo=UTC)
 
 
-def hosted(**fields):
+def hosted(shape="ffa-8", **fields):
     return new_lobby(
         **{
-            "shape": "ffa-8",
-            "draft_mode": "standard",
+            "shape": shape,
             "host_id": "host",
             "guild_id": "g",
             "channel_id": "c",
             "steam_link": LINK,
-            "now": datetime.now(UTC),
+            "questions": questions_for("civ6", SHAPES[shape].mode),
+            "code": "K7Q2",
+            "now": NOW,
             **fields,
         }
     )
 
 
-def lobby(shape="ffa-8", draft_mode="standard", players=()):
-    made = {
-        **hosted(shape=shape, draft_mode=draft_mode),
-        "live": True,
-        "_id": ObjectId(),
-    }
+def apply(made, changes):
+    return {**made, **changes}
+
+
+def lobby(shape="ffa-8", players=(), draft_mode=None):
+    made = apply(hosted(shape), went_live(hosted(shape), "host", "m"))
+    if draft_mode:
+        made["draft_mode"] = draft_mode
     for player in players:
-        made["players"] = joined(made, player)
+        made = apply(made, joined(made, player, NOW))
     return made
+
+
+def edit(made, actor="host", **fields):
+    questions = questions_for("civ6", made["mode"])
+    settings = {s["id"]: s["value"] for s in made["settings"]}
+    return edited(
+        made,
+        actor,
+        **{
+            "shape": made["shape"],
+            "questions": questions,
+            "settings": settings,
+            "bans": [],
+            "teams": {},
+            "removed": [],
+            **fields,
+        },
+    )
 
 
 def test_every_shape_the_request_offers_is_known():
     assert set(SHAPES) == set(LobbyShape.__args__)
 
 
-def test_a_lobby_opens_with_its_host_seated_and_refuses_another_game_s_link():
-    assert lobby()["players"] == [{"discord_id": "host", "team": None}]
-    assert lobby("teamer-3v3")["players"] == [{"discord_id": "host", "team": 1}]
-    for link in (
-        "steam://joinlobby/1295660/1/76561198000000000",
-        f"{LINK}\n",
-        "https://x.example",
-    ):
+def test_a_lobby_opens_in_setup_with_every_setting_at_its_default():
+    made = hosted()
+    asked = questions_for("civ6", "ffa")
+    assert (made["phase"], made["code"], made["draft_mode"]) == (
+        "setup",
+        "K7Q2",
+        "standard",
+    )
+    assert made["settings"] == [
+        {"id": q["id"], "value": q["default_option_id"], "by": "host"} for q in asked
+    ]
+    assert made["players"] == [{"discord_id": "host", "team": None}]
+    assert hosted("teamer-3v3")["players"] == [{"discord_id": "host", "team": 1}]
+    for link in ("steam://joinlobby/1295660/1/76561198000000000", f"{LINK}\n"):
         with pytest.raises(LobbyRefused, match="not a Civ6 lobby link"):
             hosted(steam_link=link)
 
 
-def test_joining_fills_the_emptiest_team_and_stops_at_the_last_seat():
-    teamer = lobby("teamer-2v2", players=["a", "b", "c"])
-    assert [p["team"] for p in teamer["players"]] == [1, 2, 1, 2]
-    with pytest.raises(LobbyRefused, match="full"):
-        joined(teamer, "d")
+def test_a_code_is_four_easily_read_letters():
+    codes = {lobby_code(random.Random(n)) for n in range(50)}
+    assert len(codes) > 40
+    assert all(len(c) == 4 and set(c) <= set(CODE_LETTERS) for c in codes)
+    assert not set("01IOL") & set(CODE_LETTERS)
+
+
+def test_a_lobby_waits_in_setup_until_its_host_opens_it():
+    setup = hosted(steam_link=None)
+    with pytest.raises(LobbyRefused, match="not open to players yet"):
+        joined(setup, "a", NOW)
+    with pytest.raises(NotTheHost):
+        went_live(setup, "a", "m")
+    assert went_live(setup, "host", "m") == {"phase": "live", "message_id": "m"}
+    with pytest.raises(LobbyRefused, match="already open"):
+        went_live(lobby(), "host", "m")
+
+
+def test_joining_fills_the_emptiest_team_and_the_last_seat_starts_the_vote():
+    teamer = lobby("teamer-2v2", players=["a", "b"])
+    assert [p["team"] for p in teamer["players"]] == [1, 2, 1]
+    assert teamer["phase"] == "live"
+    full = apply(teamer, joined(teamer, "c", NOW))
+    assert [p["team"] for p in full["players"]] == [1, 2, 1, 2]
+    assert (full["phase"], full["deadline"]) == ("voting", NOW + timedelta(minutes=10))
+    assert full["vote"] == {"channel_id": None, "messages": {}, "finished": []}
+    with pytest.raises(LobbyRefused, match="seats are locked"):
+        joined(full, "d", NOW)
     with pytest.raises(LobbyRefused, match="already in this lobby"):
-        joined(lobby(players=["a"]), "a")
+        joined(lobby(players=["a"]), "a", NOW)
 
 
 def test_a_player_leaves_but_the_host_cancels_instead():
@@ -89,50 +143,31 @@ def test_a_player_leaves_but_the_host_cancels_instead():
         left(lobby(), "a")
 
 
-def edit(made, actor="host", **fields):
-    return edited(
-        made,
-        actor,
-        **{
-            "shape": made["shape"],
-            "questions": settings_for("civ6", made["mode"]),
-            "settings": {},
-            "bans": [],
-            "teams": {},
-            "removed": [],
-            **fields,
-        },
-    )
-
-
-def test_a_lobby_waits_in_setup_until_its_host_opens_it():
-    setup = hosted(steam_link=None)
-    assert (setup["live"], setup["steam_link"]) == (False, None)
-    with pytest.raises(LobbyRefused, match="not open to players yet"):
-        joined(setup, "a")
-    with pytest.raises(LobbyRefused, match="not open to players yet"):
-        draft_groups(setup, "host")
-    with pytest.raises(NotTheHost):
-        went_live(setup, "a", "m")
-    assert went_live(setup, "host", "m") == {"live": True, "message_id": "m"}
-    with pytest.raises(LobbyRefused, match="already open"):
-        went_live({**setup, "live": True}, "host", "m")
-
-
-def test_an_edit_resizes_fixes_settings_and_bans_in_one_change():
+def test_an_edit_saves_the_size_every_setting_the_draft_mode_and_bans():
+    settings = {s["id"]: s["value"] for s in lobby()["settings"]}
     changes = edit(
         lobby(players=["a", "b"]),
         shape="ffa-12",
-        settings={"huts": "x1_5", "map": "pangea_classic"},
+        settings={**settings, "huts": "x1_5", "draft_mode": "blind"},
         bans=["LEADER_01", "LEADER_01", "LEADER_02"],
     )
-    assert (changes["shape"], changes["seats"]) == ("ffa-12", 12)
-    assert [s["id"] for s in changes["settings"]] == [
-        q["id"] for q in settings_for("civ6", "ffa") if q["id"] in {"huts", "map"}
-    ]
+    assert (changes["shape"], changes["seats"], changes["draft_mode"]) == (
+        "ffa-12",
+        12,
+        "blind",
+    )
+    assert {"id": "huts", "value": "x1_5", "by": "host"} in changes["settings"]
     assert [b["token"] for b in changes["bans"]] == ["LEADER_01", "LEADER_02"]
     with pytest.raises(LobbyRefused, match="huts has no option"):
-        edit(lobby(), settings={"huts": "x9"})
+        edit(lobby(), settings={**settings, "huts": "x9"})
+    with pytest.raises(LobbyRefused, match="every setting needs one value"):
+        edit(lobby(), settings={"huts": "x1"})
+    with pytest.raises(LobbyRefused, match="draft_mode has no option blind"):
+        edit(
+            lobby("duel"),
+            settings={s["id"]: s["value"] for s in lobby("duel")["settings"]}
+            | {"draft_mode": "blind"},
+        )
     with pytest.raises(NotTheHost):
         edit(lobby(players=["a"]), actor="a")
 
@@ -142,8 +177,8 @@ def test_an_edit_keeps_the_mode_and_room_for_everyone_seated():
         edit(lobby(), shape="duel")
     with pytest.raises(LobbyRefused, match="not its mode"):
         edit(lobby("teamer-4v4"), shape="teamer-2v2v2v2")
-    with pytest.raises(LobbyRefused, match="10 players do not fit in 8 seats"):
-        edit(lobby("ffa-10", players=list("abcdefghi")), shape="ffa-8")
+    with pytest.raises(LobbyRefused, match="9 players do not fit in 8 seats"):
+        edit(lobby("ffa-10", players=list("abcdefgh")), shape="ffa-8")
     assert edit(lobby("teamer-2v2"), shape="teamer-3v3")["seats"] == 6
 
 
@@ -152,7 +187,7 @@ def test_the_host_moves_and_removes_players_but_not_themself():
     moved = edit(teamer, teams={"b": 2}, removed=["a"])["players"]
     assert moved == [{"discord_id": "host", "team": 1}, {"discord_id": "b", "team": 2}]
     with pytest.raises(LobbyRefused, match="team 2 has more than 2"):
-        edit(lobby("teamer-2v2", players=["a", "b", "c"]), teams={"b": 2})
+        edit(lobby("teamer-2v2", players=["a", "b"]), teams={"host": 2, "b": 2})
     with pytest.raises(LobbyRefused, match="host cannot be removed"):
         edit(teamer, removed=["host"])
     with pytest.raises(LobbyRefused, match="has left the lobby"):
@@ -169,103 +204,43 @@ def test_the_host_moves_and_removes_players_but_not_themself():
         ("teamer-3v3", ["a", "b"], "same size"),
     ],
 )
-def test_a_lobby_starts_only_when_it_can(shape, players, refusal):
+def test_the_host_starts_early_only_when_the_lobby_can_draft(shape, players, refusal):
     with pytest.raises(LobbyRefused, match=refusal):
-        draft_groups(lobby(shape, players=players), "host")
+        started(lobby(shape, players=players), "host", NOW)
 
 
-def test_three_a_side_in_a_four_a_side_lobby_may_start():
-    teamer = lobby("teamer-4v4", players=["a", "b", "c", "d", "e"])
-    assert draft_groups(teamer, "host") == [["host", "b", "d"], ["a", "c", "e"]]
-
-
-def test_standard_splits_the_leaders_left_after_bans_evenly():
-    ffa = lobby(players=["a", "b"])
-    ffa["bans"] = edit(ffa, bans=LEADERS[:4])["bans"]
-    pools = dealt(ffa, draft_groups(ffa, "host"), LEADERS, random.Random(3))
-    assert [p["player_id"] for p in pools] == ["host", "a", "b"]
-    assert [len(p["leaders"]) for p in pools] == [12, 12, 12]
-    dealt_out = {t for p in pools for t in p["leaders"]}
-    assert len(dealt_out) == 36 and not dealt_out & set(LEADERS[:4])
-
-
-def test_a_teamer_drafts_by_team_and_random_gives_each_player_one():
-    teamer = lobby("teamer-2v2", players=["a", "b", "c"])
-    pools = dealt(teamer, draft_groups(teamer, "host"), LEADERS, random.Random(3))
-    assert [(p["player_id"], p["team"], len(p["leaders"])) for p in pools] == [
-        (None, 1, 20),
-        (None, 2, 20),
-    ]
-    rolled = lobby("teamer-2v2", "random", players=["a", "b", "c"])
-    picks = dealt(rolled, draft_groups(rolled, "host"), LEADERS, random.Random(3))
-    assert [(p["player_id"], p["team"]) for p in picks] == [
-        ("host", 1),
-        ("b", 1),
-        ("a", 2),
-        ("c", 2),
-    ]
-    assert len({p["leaders"][0] for p in picks}) == 4
-
-
-def test_the_host_or_staff_cancel_and_a_closed_lobby_takes_no_change():
-    assert cancel_reason(lobby(), "host", staff=False) == "host"
-    assert cancel_reason(lobby(), "mod", staff=True) == "staff"
+def test_starting_locks_the_seats_for_a_ten_minute_bans_vote():
+    made = apply(lobby(players=["a"]), started(lobby(players=["a"]), "host", NOW))
+    assert (made["phase"], made["deadline"]) == ("voting", NOW + timedelta(minutes=10))
+    for locked in (
+        lambda: joined(made, "b", NOW),
+        lambda: left(made, "a"),
+        lambda: edit(made),
+        lambda: started(made, "host", NOW),
+    ):
+        with pytest.raises(LobbyRefused, match="seats are locked"):
+            locked()
     with pytest.raises(NotTheHost):
-        cancel_reason(lobby(), "a", staff=False)
-    closed = {**lobby(), "status": "done"}
-    with pytest.raises(LobbyRefused, match="closed"):
-        joined(closed, "a")
-
-
-NOW = datetime(2026, 10, 27, 12, tzinfo=UTC)
-FFA = settings_for("civ6", "ffa")
+        started(lobby(players=["a"]), "a", NOW)
+    four = lobby("teamer-4v4", players=["a", "b", "c", "d", "e"])
+    assert started(four, "host", NOW)["phase"] == "voting"
 
 
 def voting(made):
-    return {**made, **vote_opened(made, "host", NOW)}
-
-
-def tally(made, settings_votes=None, ban_votes=None, actor="host"):
-    return tallied(
-        made,
-        actor,
-        questions=FFA,
-        settings_votes=settings_votes or {},
-        ban_votes=ban_votes or {},
-        leaders=LEADERS,
-        rng=random.Random(3),
-    )
-
-
-def test_starting_locks_the_seats_for_a_ten_minute_vote():
-    made = voting(lobby(players=["a"]))
-    assert made["vote"] == {
-        "ends_at": datetime(2026, 10, 27, 12, 10, tzinfo=UTC),
-        "channel_id": None,
-        "messages": {},
-        "finished": [],
-    }
-    for locked in (
-        lambda: joined(made, "b"),
-        lambda: left(made, "a"),
-        lambda: edit(made),
-        lambda: vote_opened(made, "host", NOW),
-    ):
-        with pytest.raises(LobbyRefused, match="voting"):
-            locked()
-    with pytest.raises(NotTheHost):
-        vote_opened(lobby(players=["a"]), "a", NOW)
-    with pytest.raises(LobbyRefused, match="at least two"):
-        vote_opened(lobby(), "host", NOW)
+    return apply(made, started(made, "host", NOW))
 
 
 def test_the_vote_is_posted_once_and_each_player_finishes_once():
     made = voting(lobby(players=["a"]))
-    placed = {**made, **vote_placed(made, "host", "thread", {"map": "m1"})}
-    assert placed["vote"]["messages"] == {"map": "m1"}
+    placed = apply(made, vote_placed(made, "host", "v", {"bans": "m1"}))
+    assert placed["vote"] == {
+        "channel_id": "v",
+        "messages": {"bans": "m1"},
+        "finished": [],
+    }
     with pytest.raises(LobbyRefused, match="already posted"):
-        vote_placed(placed, "host", "thread", {})
-    done = {**placed, **finished(placed, "a")}
+        vote_placed(placed, "host", "v", {})
+    done = apply(placed, finished(placed, "a"))
     assert done["vote"]["finished"] == ["a"]
     with pytest.raises(LobbyRefused, match="already finished"):
         finished(done, "a")
@@ -275,34 +250,103 @@ def test_the_vote_is_posted_once_and_each_player_finishes_once():
         finished(lobby(players=["a"]), "a")
 
 
-def test_the_vote_fills_what_the_host_left_open_and_adds_bans():
+def tally(made, ban_votes=None, actor="host"):
+    rng = random.Random(3)
+    return tallied(
+        made, actor, ban_votes=ban_votes or {}, leaders=LEADERS, now=NOW, rng=rng
+    )
+
+
+def test_the_vote_adds_bans_with_a_majority_then_the_draft_is_dealt():
     made = lobby(players=["a", "b"])
-    made.update(edit(made, settings={"huts": "x1_5"}, bans=LEADERS[:2]))
-    made = voting(made)
+    made = voting(apply(made, edit(made, bans=LEADERS[:2])))
     counted = tally(
         made,
-        {"huts": {"x1": ["host", "a", "b"]}, "map": {"pangea_classic": ["a", "b"]}},
         {"LEADER_05": ["host", "a"], "LEADER_06": ["a"], "LEADER_00": ["host", "a"]},
     )
-    chosen = {s["id"]: (s["value"], s["by"]) for s in counted["settings"]}
-    assert [s["id"] for s in counted["settings"]] == [q["id"] for q in FFA]
-    assert chosen["huts"] == ("x1_5", "host")
-    assert chosen["map"] == ("pangea_classic", "vote")
-    defaults = {q["id"]: q["default_option_id"] for q in FFA}
-    assert chosen["duration"] == (defaults["duration"], "vote")
     assert [(b["token"], b["by"]) for b in counted["bans"]] == [
         ("LEADER_00", "host"),
         ("LEADER_01", "host"),
         ("LEADER_05", "vote"),
     ]
+    assert (counted["status"], counted["deadline"]) == ("done", None)
+    assert [len(p["leaders"]) for p in counted["pools"]] == [12, 12, 12]
     dealt_out = {t for p in counted["pools"] for t in p["leaders"]}
-    assert counted["status"] == "done"
-    assert not dealt_out & {"LEADER_00", "LEADER_01", "LEADER_05"}
-
-
-def test_only_the_host_counts_a_running_vote():
-    made = voting(lobby(players=["a"]))
+    assert len(dealt_out) == 36 and not dealt_out & {
+        "LEADER_00",
+        "LEADER_01",
+        "LEADER_05",
+    }
     with pytest.raises(NotTheHost):
         tally(made, actor="a")
     with pytest.raises(LobbyRefused, match="not voting"):
         tally(lobby(players=["a"]))
+
+
+def test_a_teamer_drafts_by_team_and_random_gives_each_player_one():
+    teamer = lobby("teamer-2v2", players=["a", "b", "c"])
+    pools = tally(teamer)["pools"]
+    assert [(p["player_id"], p["team"], len(p["leaders"])) for p in pools] == [
+        (None, 1, 20),
+        (None, 2, 20),
+    ]
+    rolled = lobby("teamer-2v2", players=["a", "b", "c"], draft_mode="random")
+    picks = tally(rolled)["pools"]
+    assert [(p["player_id"], p["team"]) for p in picks] == [
+        ("host", 1),
+        ("b", 1),
+        ("a", 2),
+        ("c", 2),
+    ]
+    assert len({p["leaders"][0] for p in picks}) == 4
+
+
+def test_a_blind_draft_deals_at_most_a_menu_each_then_its_players_pick():
+    duo = voting(lobby(players=["a"], draft_mode="blind"))
+    assert [len(p["leaders"]) for p in dealt(duo, [["host"], ["a"]], LEADERS)] == [
+        20,
+        20,
+    ]
+    many = [f"L{n}" for n in range(80)]
+    assert [len(p["leaders"]) for p in dealt(duo, [["host"], ["a"]], many)] == [
+        BLIND_POOL,
+        BLIND_POOL,
+    ]
+    blind = apply(duo, tally(duo))
+    assert (blind["status"], blind["phase"]) == ("open", "picking")
+    assert blind["deadline"] == NOW + timedelta(minutes=3)
+    mine = blind["pools"][1]["leaders"]
+    first = apply(blind, picked(blind, "a", mine[0]))
+    changed = apply(first, picked(first, "a", mine[1]))
+    assert changed["picks"] == [{"player_id": "a", "leader": mine[1], "by": "player"}]
+    with pytest.raises(LobbyRefused, match="not in your pool"):
+        picked(blind, "a", blind["pools"][0]["leaders"][0])
+    with pytest.raises(LobbyRefused, match="only the lobby's players pick"):
+        picked(blind, "z", mine[0])
+    with pytest.raises(LobbyRefused, match="not picking"):
+        picked(duo, "a", mine[0])
+
+
+def test_the_picks_are_revealed_together_and_a_missing_one_is_random():
+    blind = voting(lobby(players=["a"], draft_mode="blind"))
+    blind = apply(blind, tally(blind))
+    mine = blind["pools"][1]["leaders"]
+    blind = apply(blind, picked(blind, "a", mine[2]))
+    shown = revealed(blind, "host", random.Random(1))
+    host_pick, a_pick = shown["picks"]
+    assert a_pick == {"player_id": "a", "leader": mine[2], "by": "player"}
+    assert host_pick["by"] == "random"
+    assert host_pick["leader"] in blind["pools"][0]["leaders"]
+    assert (shown["status"], shown["deadline"]) == ("done", None)
+    with pytest.raises(NotTheHost):
+        revealed(blind, "a")
+
+
+def test_the_host_or_staff_cancel_and_a_closed_lobby_takes_no_change():
+    assert cancel_reason(lobby(), "host", staff=False) == "host"
+    assert cancel_reason(lobby(), "mod", staff=True) == "staff"
+    with pytest.raises(NotTheHost):
+        cancel_reason(lobby(), "a", staff=False)
+    closed = {**lobby(), "status": "done"}
+    with pytest.raises(LobbyRefused, match="closed"):
+        joined(closed, "a", NOW)

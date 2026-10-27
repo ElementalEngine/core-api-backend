@@ -90,6 +90,33 @@
         "title": "BatchStatsResponseV2",
         "type": "object"
       },
+      "BlindPick": {
+        "properties": {
+          "by": {
+            "enum": [
+              "player",
+              "random"
+            ],
+            "title": "By",
+            "type": "string"
+          },
+          "leader": {
+            "title": "Leader",
+            "type": "string"
+          },
+          "player_id": {
+            "title": "Player Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "player_id",
+          "leader",
+          "by"
+        ],
+        "title": "BlindPick",
+        "type": "object"
+      },
       "Body_upload_match_api_v2_matches_post": {
         "properties": {
           "discord_message_id": {
@@ -895,6 +922,22 @@
         "title": "HistoryPage",
         "type": "object"
       },
+      "LeaderPick": {
+        "additionalProperties": false,
+        "properties": {
+          "leader": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Leader",
+            "type": "string"
+          }
+        },
+        "required": [
+          "leader"
+        ],
+        "title": "LeaderPick",
+        "type": "object"
+      },
       "LeaderRow": {
         "properties": {
           "civ": {
@@ -1062,7 +1105,7 @@
       },
       "LobbyBallot": {
         "additionalProperties": false,
-        "description": "The players' reactions: per setting, each option's voters, and per\nleader, the players banning it.",
+        "description": "The players' reactions: per leader, the players banning it.",
         "properties": {
           "bans": {
             "additionalProperties": {
@@ -1075,33 +1118,41 @@
             "maxProperties": 100,
             "title": "Bans",
             "type": "object"
-          },
-          "settings": {
-            "additionalProperties": {
-              "additionalProperties": {
-                "items": {
-                  "type": "string"
-                },
-                "maxItems": 14,
-                "type": "array"
-              },
-              "type": "object"
-            },
-            "maxProperties": 30,
-            "title": "Settings",
-            "type": "object"
           }
         },
         "required": [
-          "settings",
           "bans"
         ],
         "title": "LobbyBallot",
         "type": "object"
       },
+      "LobbyCancel": {
+        "additionalProperties": false,
+        "description": "A lobby is cancelled by its code, by its host or by staff.",
+        "properties": {
+          "code": {
+            "maxLength": 8,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "guild_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Guild Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "guild_id",
+          "code"
+        ],
+        "title": "LobbyCancel",
+        "type": "object"
+      },
       "LobbyEdit": {
         "additionalProperties": false,
-        "description": "The host's whole edit: the size, every setting fixed (the rest are\nvoted), every leader banned, and players moved or removed.",
+        "description": "The host's whole edit: the size, every setting with the draft mode,\nevery leader banned, and players moved or removed.",
         "properties": {
           "bans": {
             "items": {
@@ -1242,20 +1293,12 @@
       },
       "LobbyRequest": {
         "additionalProperties": false,
-        "description": "/lobby host. The host is the acting player.",
+        "description": "/lobby host. The host is the acting player; the settings start at their\ndefaults.",
         "properties": {
           "channel_id": {
             "maxLength": 32,
             "minLength": 1,
             "title": "Channel Id",
-            "type": "string"
-          },
-          "draft_mode": {
-            "enum": [
-              "standard",
-              "random"
-            ],
-            "title": "Draft Mode",
             "type": "string"
           },
           "guild_id": {
@@ -1295,7 +1338,6 @@
         },
         "required": [
           "shape",
-          "draft_mode",
           "guild_id",
           "channel_id"
         ],
@@ -1326,6 +1368,22 @@
             "title": "Channel Id",
             "type": "string"
           },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
           "draft_mode": {
             "title": "Draft Mode",
             "type": "string"
@@ -1342,10 +1400,6 @@
             "title": "Id",
             "type": "string"
           },
-          "live": {
-            "title": "Live",
-            "type": "boolean"
-          },
           "message_id": {
             "anyOf": [
               {
@@ -1360,6 +1414,23 @@
           "mode": {
             "title": "Mode",
             "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "setup",
+              "live",
+              "voting",
+              "picking"
+            ],
+            "title": "Phase",
+            "type": "string"
+          },
+          "picks": {
+            "items": {
+              "$ref": "#/components/schemas/BlindPick"
+            },
+            "title": "Picks",
+            "type": "array"
           },
           "players": {
             "items": {
@@ -1450,7 +1521,9 @@
           "teams",
           "draft_mode",
           "status",
-          "live",
+          "phase",
+          "deadline",
+          "code",
           "host_id",
           "guild_id",
           "channel_id",
@@ -1460,6 +1533,7 @@
           "settings",
           "bans",
           "pools",
+          "picks",
           "vote",
           "cancel_reason",
           "updated_at"
@@ -1480,11 +1554,6 @@
             ],
             "title": "Channel Id"
           },
-          "ends_at": {
-            "format": "date-time",
-            "title": "Ends At",
-            "type": "string"
-          },
           "finished": {
             "items": {
               "type": "string"
@@ -1501,7 +1570,6 @@
           }
         },
         "required": [
-          "ends_at",
           "channel_id",
           "messages",
           "finished"
@@ -3538,7 +3606,7 @@
       },
       "VotePlace": {
         "additionalProperties": false,
-        "description": "Where the vote is posted: its channel or thread, and the message of each\nopen setting and of the bans.",
+        "description": "Where the bans vote is posted: its channel, and its messages.",
         "properties": {
           "channel_id": {
             "maxLength": 32,
@@ -3550,7 +3618,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "maxProperties": 30,
+            "maxProperties": 4,
             "title": "Messages",
             "type": "object"
           }
@@ -5107,7 +5175,7 @@
     },
     "/api/v2/match-setups/lobbies": {
       "get": {
-        "description": "The live lobbies players can join; with a host, that host's own, live\nor in setup.",
+        "description": "The lobbies players can see; with a host, that host's own, in setup or\nnot.",
         "operationId": "open_lobbies_api_v2_match_setups_lobbies_get",
         "parameters": [
           {
@@ -5188,6 +5256,7 @@
         ]
       },
       "post": {
+        "description": "A lobby in setup, under a code no other open lobby here has.",
         "operationId": "host_lobby_api_v2_match_setups_lobbies_post",
         "parameters": [
           {
@@ -5254,6 +5323,85 @@
         ]
       }
     },
+    "/api/v2/match-setups/lobbies/cancel": {
+      "post": {
+        "description": "The host, or staff, cancel an open lobby by its code.",
+        "operationId": "cancel_lobby_api_v2_match_setups_lobbies_cancel_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-is-staff",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "X-Actor-Is-Staff",
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LobbyCancel"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LobbyView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Lobby",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
     "/api/v2/match-setups/lobbies/close-idle": {
       "post": {
         "description": "Close every lobby idle past the limit, so the bot can mark their posts.",
@@ -5308,10 +5456,10 @@
         ]
       }
     },
-    "/api/v2/match-setups/lobbies/votes-due": {
+    "/api/v2/match-setups/lobbies/due": {
       "get": {
-        "description": "Votes past their time, for the bot to count.",
-        "operationId": "votes_due_api_v2_match_setups_lobbies_votes_due_get",
+        "description": "Votes and blind picks past their time, for the bot to close.",
+        "operationId": "lobbies_due_api_v2_match_setups_lobbies_due_get",
         "parameters": [
           {
             "in": "header",
@@ -5338,7 +5486,7 @@
                   "items": {
                     "$ref": "#/components/schemas/LobbyView"
                   },
-                  "title": "Response Votes Due Api V2 Match Setups Lobbies Votes Due Get",
+                  "title": "Response Lobbies Due Api V2 Match Setups Lobbies Due Get",
                   "type": "array"
                 }
               }
@@ -5356,7 +5504,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Votes Due",
+        "summary": "Lobbies Due",
         "tags": [
           "match-setups"
         ]
@@ -5415,83 +5563,6 @@
           }
         },
         "summary": "Read Lobby",
-        "tags": [
-          "match-setups"
-        ]
-      }
-    },
-    "/api/v2/match-setups/lobbies/{lobby_id}/cancel": {
-      "post": {
-        "operationId": "cancel_lobby_api_v2_match_setups_lobbies__lobby_id__cancel_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "lobby_id",
-            "required": true,
-            "schema": {
-              "title": "Lobby Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-actor-discord-id",
-            "required": true,
-            "schema": {
-              "title": "X-Actor-Discord-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-actor-is-staff",
-            "required": false,
-            "schema": {
-              "default": false,
-              "title": "X-Actor-Is-Staff",
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LobbyView"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Cancel Lobby",
         "tags": [
           "match-setups"
         ]
@@ -5644,6 +5715,7 @@
     },
     "/api/v2/match-setups/lobbies/{lobby_id}/join": {
       "post": {
+        "description": "A player sits down; the last seat starts the bans vote.",
         "operationId": "join_lobby_api_v2_match_setups_lobbies__lobby_id__join_post",
         "parameters": [
           {
@@ -5854,9 +5926,155 @@
         ]
       }
     },
+    "/api/v2/match-setups/lobbies/{lobby_id}/pick": {
+      "post": {
+        "description": "A player's blind pick.",
+        "operationId": "pick_leader_api_v2_match_setups_lobbies__lobby_id__pick_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeaderPick"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LobbyView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pick Leader",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/lobbies/{lobby_id}/reveal": {
+      "post": {
+        "description": "The blind picks revealed. The bot reveals, acting as the host, once all\nhave picked or the time is up.",
+        "operationId": "reveal_picks_api_v2_match_setups_lobbies__lobby_id__reveal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LobbyView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reveal Picks",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
     "/api/v2/match-setups/lobbies/{lobby_id}/start": {
       "post": {
-        "description": "The host starts: the seats lock and the vote opens.",
+        "description": "The host starts before it fills: the seats lock and the bans vote opens.",
         "operationId": "start_lobby_api_v2_match_setups_lobbies__lobby_id__start_post",
         "parameters": [
           {
@@ -5924,7 +6142,7 @@
     },
     "/api/v2/match-setups/lobbies/{lobby_id}/tally": {
       "post": {
-        "description": "Count the vote and deal the draft, closing the lobby. The bot counts,\nacting as the host, once all finish or the time is up.",
+        "description": "Count the bans and deal the draft. The bot counts, acting as the host,\nonce all finish or the time is up.",
         "operationId": "tally_vote_api_v2_match_setups_lobbies__lobby_id__tally_post",
         "parameters": [
           {
@@ -6080,7 +6298,7 @@
     },
     "/api/v2/match-setups/settings/{edition}/{game_type}": {
       "get": {
-        "description": "The settings a host may fix for a game type; the rest are voted.",
+        "description": "Every setting a game is set up with, draft mode last.",
         "operationId": "settings_questions_api_v2_match_setups_settings__edition___game_type__get",
         "parameters": [
           {

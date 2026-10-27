@@ -36,21 +36,23 @@ def test_every_question_is_answerable(edition, game_type):
 
 
 @pytest.mark.parametrize(("edition", "game_type"), EVERY_BALLOT)
-def test_draft_mode_is_asked_last_and_only_where_it_is_voted_on(edition, game_type):
-    # A teamer picks standard or cwc when the lobby is created, so its ballot
-    # has no draft-mode question at all.
+def test_draft_mode_is_asked_once_and_last(edition, game_type):
     asked = [question["id"] for question in questions_for(edition, game_type)]
-    if game_type == "teamer":
-        assert "draft_mode" not in asked
-        return
     assert asked[-1] == "draft_mode"
     assert asked.count("draft_mode") == 1
 
 
 @pytest.mark.parametrize("edition", EDITIONS)
-def test_duel_offers_standard_and_random_only(edition):
-    modes = questions_for(edition, "duel")[-1]
+@pytest.mark.parametrize("game_type", ["duel", "teamer"])
+def test_duels_and_teamers_offer_standard_and_random_only(edition, game_type):
+    modes = questions_for(edition, game_type)[-1]
     assert [option["id"] for option in modes["options"]] == ["standard", "random"]
+
+
+@pytest.mark.parametrize("edition", EDITIONS)
+def test_an_ffa_may_also_draft_blind(edition):
+    modes = questions_for(edition, "ffa")[-1]
+    assert [o["id"] for o in modes["options"]] == ["standard", "random", "blind"]
 
 
 @pytest.mark.parametrize("edition", EDITIONS)
@@ -66,8 +68,8 @@ def test_no_ballot_offers_cwc(edition):
 
 
 @pytest.mark.parametrize("edition", EDITIONS)
-def test_random_is_offered_wherever_the_mode_is_voted_on(edition):
-    for game_type in ("ffa", "duel"):
+def test_random_is_offered_for_every_game_type(edition):
+    for game_type in GAME_TYPES:
         offered = {o["id"] for o in questions_for(edition, game_type)[-1]["options"]}
         assert "random" in offered, game_type
 

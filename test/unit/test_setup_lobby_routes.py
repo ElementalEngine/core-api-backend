@@ -6,7 +6,7 @@ import pytest
 from bson import ObjectId
 from pydantic import SecretStr
 
-from app.features.match_setups.repository import SeatedElsewhere
+from app.features.match_setups.repository import CodeTaken, SeatedElsewhere
 
 TOKEN = "mito-test-token"
 LOBBIES = "/api/v2/match-setups/lobbies"
@@ -18,7 +18,6 @@ CIV6 = {
 }
 HOST = {
     "shape": "ffa-8",
-    "draft_mode": "standard",
     "guild_id": "g",
     "channel_id": "c",
     "steam_link": "steam://joinlobby/289070/109775241000000000/76561198000000000",
@@ -52,6 +51,11 @@ class Store:
     async def insert(self, doc):
         if doc.get("command") == "lobby" and self._seated_elsewhere(doc):
             raise SeatedElsewhere
+        if doc.get("command") == "lobby" and any(
+            d["status"] == "open" and d["code"] == doc["code"]
+            for d in self.docs.values()
+        ):
+            raise CodeTaken
         doc["_id"] = ObjectId()
         self.docs[doc["_id"]] = dict(doc)
         return doc["_id"]
@@ -78,20 +82,32 @@ class Store:
         self.docs[lobby["_id"]] = written
         return dict(written)
 
+    async def lobby_by_code(self, guild_id, code):
+        return next(
+            (
+                dict(d)
+                for d in self.docs.values()
+                if d["status"] == "open"
+                and d["guild_id"] == guild_id
+                and d["code"] == code
+            ),
+            None,
+        )
+
     async def open_lobbies(self, guild_id, host_id=None):
         return [
             d
             for d in self.docs.values()
             if d["status"] == "open"
             and d["guild_id"] == guild_id
-            and (d["host_id"] == host_id if host_id else d["live"])
+            and (d["host_id"] == host_id if host_id else d["phase"] != "setup")
         ]
 
-    async def votes_due(self, now):
+    async def due(self, now):
         return [
             dict(d)
             for d in self.docs.values()
-            if d["status"] == "open" and d.get("vote") and d["vote"]["ends_at"] < now
+            if d["status"] == "open" and d["deadline"] and d["deadline"] < now
         ]
 
     async def close_idle(self, cutoff, now):
@@ -149,73 +165,134 @@ def hosted(client, host="host", live=True, **fields):
     return opened.json()
 
 
-def edit(client, lobby, host="host", **fields):
-    body = {"shape": lobby["shape"], "settings": {}, "bans": [], **fields}
+def edit(client, lobby, host="host", settings=None, **fields):
+    chosen = {s["id"]: s["value"] for s in lobby["settings"]} | (settings or {})
+    body = {"shape": lobby["shape"], "settings": chosen, "bans": [], **fields}
     url = f"{LOBBIES}/{lobby['id']}/edit"
     return client.put(url, json=body, headers=as_player(host))
 
 
-def test_a_lobby_votes_then_drafts_into_a_recorded_setup(lobbies):
+def post(client, lobby, action, player, **kwargs):
+    return client.post(
+        f"{LOBBIES}/{lobby['id']}/{action}", headers=as_player(player), **kwargs
+    )
+
+
+def cancel(client, code, player, staff=False):
+    body = {"guild_id": "g", "code": code}
+    return client.post(
+        f"{LOBBIES}/cancel", json=body, headers=as_player(player, staff=staff)
+    )
+
+
+def test_a_lobby_votes_on_bans_then_drafts_into_a_recorded_setup(lobbies):
     client, store = lobbies
     lobby = hosted(client)
-    url = f"{LOBBIES}/{lobby['id']}"
-    assert client.post(f"{url}/join", headers=as_player("a")).status_code == 200
+    assert len(lobby["code"]) == 4 and lobby["phase"] == "live"
+    assert post(client, lobby, "join", "a").status_code == 200
     banned = edit(client, lobby, bans=["LEADER_00"])
     assert banned.json()["bans"] == [
         {"token": "LEADER_00", "kind": "leader", "by": "host"}
     ]
-    started = client.post(f"{url}/start", headers=as_player("host")).json()
-    assert (started["status"], started["vote"]["finished"]) == ("open", [])
-    place = {"channel_id": "t", "messages": {"map": "m1", "bans": "m2"}}
+    started = post(client, lobby, "start", "host").json()
+    assert (started["phase"], started["vote"]["finished"]) == ("voting", [])
+    place = {"channel_id": "v", "messages": {"status": "m1", "bans": "m2"}}
+    url = f"{LOBBIES}/{lobby['id']}"
     placed = client.put(f"{url}/vote", json=place, headers=as_player("host")).json()
     assert placed["vote"]["messages"] == place["messages"]
-    done = client.post(f"{url}/finished", headers=as_player("a")).json()
-    assert done["vote"]["finished"] == ["a"]
-    ballot = {
-        "settings": {"map": {"pangea_classic": ["host", "a"]}},
-        "bans": {"LEADER_01": ["host", "a"], "LEADER_02": ["a"]},
-    }
-    counted = client.post(f"{url}/tally", json=ballot, headers=as_player("host"))
-    drafted = counted.json()
-    assert drafted["status"] == "done"
-    assert {"id": "map", "value": "pangea_classic", "by": "vote"} in drafted["settings"]
+    assert post(client, lobby, "finished", "a").json()["vote"]["finished"] == ["a"]
+    ballot = {"bans": {"LEADER_01": ["host", "a"], "LEADER_02": ["a"]}}
+    drafted = post(client, lobby, "tally", "host", json=ballot).json()
+    assert (drafted["status"], drafted["deadline"]) == ("done", None)
     assert [b["token"] for b in drafted["bans"]] == ["LEADER_00", "LEADER_01"]
     assert [(p["player_id"], len(p["leaders"])) for p in drafted["pools"]] == [
         ("host", 14),
         ("a", 14),
     ]
     assert store.docs[ObjectId(lobby["id"])]["season_id"] == SEASON
-    again = client.post(f"{url}/tally", json=ballot, headers=as_player("host"))
-    assert again.status_code == 409
+    assert post(client, lobby, "tally", "host", json=ballot).status_code == 409
 
 
-def test_a_vote_out_of_time_is_listed_for_counting(lobbies):
-    client, store = lobbies
-    url = f"{LOBBIES}/{hosted(client)['id']}"
-    client.post(f"{url}/join", headers=as_player("a"))
-    started = client.post(f"{url}/start", headers=as_player("host")).json()
-    due = client.get(f"{LOBBIES}/votes-due", headers=as_player("bot"))
-    assert due.json() == []
-    store.docs[ObjectId(started["id"])]["vote"]["ends_at"] = datetime.now(
-        UTC
-    ) - timedelta(seconds=1)
-    due = client.get(f"{LOBBIES}/votes-due", headers=as_player("bot")).json()
-    assert [lobby["id"] for lobby in due] == [started["id"]]
-    too_many = {"settings": {}, "bans": {"LEADER_01": [str(n) for n in range(15)]}}
-    refused = client.post(f"{url}/tally", json=too_many, headers=as_player("host"))
-    assert refused.status_code == 422
-
-
-def test_refusals_say_why_and_only_the_host_starts(lobbies):
+def test_a_full_lobby_starts_its_vote_and_only_the_host_starts_early(lobbies):
     client, _ = lobbies
-    url = f"{LOBBIES}/{hosted(client, shape='duel')['id']}"
-    client.post(f"{url}/join", headers=as_player("a"))
-    full = client.post(f"{url}/join", headers=as_player("b"))
+    duel = hosted(client, shape="duel")
+    full = post(client, duel, "join", "a").json()
+    assert full["phase"] == "voting"
+    assert post(client, duel, "leave", "a").status_code == 409
+    ffa = hosted(client, host="other")
+    post(client, ffa, "join", "b")
+    assert post(client, ffa, "start", "b").status_code == 403
+    assert post(client, ffa, "start", "other").json()["phase"] == "voting"
+
+
+def test_a_blind_draft_is_picked_privately_then_revealed(lobbies):
+    client, _ = lobbies
+    lobby = hosted(client)
+    assert edit(client, lobby, settings={"draft_mode": "blind"}).status_code == 200
+    post(client, lobby, "join", "a")
+    post(client, lobby, "start", "host")
+    blind = post(client, lobby, "tally", "host", json={"bans": {}}).json()
+    assert (blind["status"], blind["phase"]) == ("open", "picking")
+    mine = blind["pools"][1]["leaders"]
+    pick = {"leader": mine[0]}
+    assert post(client, lobby, "pick", "a", json=pick).json()["picks"] == [
+        {"player_id": "a", "leader": mine[0], "by": "player"}
+    ]
+    assert post(client, lobby, "pick", "z", json=pick).status_code == 409
+    assert post(client, lobby, "reveal", "a").status_code == 403
+    shown = post(client, lobby, "reveal", "host").json()
+    assert shown["status"] == "done"
+    assert [p["by"] for p in shown["picks"]] == ["random", "player"]
+
+
+def test_votes_and_picks_past_their_time_are_listed(lobbies):
+    client, store = lobbies
+    lobby = hosted(client)
+    post(client, lobby, "join", "a")
+    post(client, lobby, "start", "host")
+    due = client.get(f"{LOBBIES}/due", headers=as_player("bot"))
+    assert due.json() == []
+    store.docs[ObjectId(lobby["id"])]["deadline"] = datetime.now(UTC) - timedelta(
+        seconds=1
+    )
+    due = client.get(f"{LOBBIES}/due", headers=as_player("bot")).json()
+    assert [found["id"] for found in due] == [lobby["id"]]
+    too_many = {"bans": {"LEADER_01": [str(n) for n in range(15)]}}
+    assert post(client, lobby, "tally", "host", json=too_many).status_code == 422
+
+
+def test_refusals_say_why(lobbies):
+    client, _ = lobbies
+    duel = hosted(client, shape="duel")
+    post(client, duel, "join", "a")
+    full = post(client, duel, "join", "b")
     assert full.status_code == 409
-    assert full.json()["detail"]["error"]["message"] == "the lobby is full"
-    assert client.post(f"{url}/start", headers=as_player("a")).status_code == 403
-    assert client.post(f"{url}/start", headers=as_player("host")).status_code == 200
-    assert client.post(f"{url}/leave", headers=as_player("a")).status_code == 409
+    assert (
+        full.json()["detail"]["error"]["message"]
+        == "the lobby has started, so its seats are locked"
+    )
+
+
+def test_a_lobby_is_cancelled_by_its_code_by_its_host_or_staff(lobbies):
+    client, store = lobbies
+    lobby = hosted(client)
+    assert cancel(client, "ZZZZ", "host").status_code == 404
+    assert cancel(client, lobby["code"], "a").status_code == 403
+    staffed = cancel(client, lobby["code"], "mod", staff=True).json()
+    assert (staffed["status"], staffed["cancel_reason"]) == ("cancelled", "staff")
+    mine = hosted(client)
+    closed = cancel(client, mine["code"].lower(), "host").json()
+    assert (closed["status"], closed["cancel_reason"]) == ("cancelled", "host")
+
+
+def test_a_code_in_use_is_drawn_again(lobbies, monkeypatch):
+    client, _ = lobbies
+    from app.features.match_setups import router as match_setups
+
+    codes = iter(["AAAA", "AAAA", "BBBB"])
+    monkeypatch.setattr(match_setups, "lobby_code", lambda: next(codes))
+    assert hosted(client)["code"] == "AAAA"
+    assert hosted(client, host="other")["code"] == "BBBB"
 
 
 def test_a_player_sits_in_one_open_lobby_at_a_time(lobbies):
@@ -235,7 +312,7 @@ def test_a_player_sits_in_one_open_lobby_at_a_time(lobbies):
 def test_a_lobby_in_setup_is_hidden_and_closed_to_players(lobbies):
     client, _ = lobbies
     setup = hosted(client, live=False, steam_link=None)
-    assert (setup["live"], setup["steam_link"]) == (False, None)
+    assert (setup["phase"], setup["steam_link"]) == ("setup", None)
     url = f"{LOBBIES}/{setup['id']}"
     assert client.post(f"{url}/join", headers=as_player("a")).status_code == 409
     listed = client.get(LOBBIES, params={"guild_id": "g"}, headers=as_player("a"))
@@ -253,13 +330,18 @@ def test_an_edit_is_checked_whole_against_civ_data_and_the_catalogue(lobbies):
     assert edit(client, lobby, bans=["LEADER_NOBODY"]).status_code == 400
     assert edit(client, lobby, settings={"huts": "x9"}).status_code == 409
     assert edit(client, lobby, shape="duel").status_code == 409
+    partial = {"shape": "ffa-8", "settings": {"huts": "x1"}, "bans": []}
+    url = f"{LOBBIES}/{lobby['id']}/edit"
+    assert client.put(url, json=partial, headers=as_player("host")).status_code == 409
     saved = edit(client, lobby, shape="ffa-10", settings={"huts": "x1_5"}).json()
-    assert saved["settings"] == [{"id": "huts", "value": "x1_5", "by": "host"}]
+    assert {"id": "huts", "value": "x1_5", "by": "host"} in saved["settings"]
+    assert len(saved["settings"]) == len(lobby["settings"])
     assert saved["seats"] == 10
     questions = client.get(
         "/api/v2/match-setups/settings/civ6/ffa", headers=as_player("host")
-    )
-    assert "huts" in [q["id"] for q in questions.json()]
+    ).json()
+    assert [q["id"] for q in questions][-1] == "draft_mode"
+    assert [q["id"] for q in questions] == [s["id"] for s in lobby["settings"]]
 
 
 def test_a_write_that_lost_a_race_is_tried_again(lobbies):
@@ -274,14 +356,8 @@ def test_a_write_that_lost_a_race_is_tried_again(lobbies):
     )
 
 
-def test_staff_cancel_for_the_host_and_idle_lobbies_close(lobbies):
+def test_idle_lobbies_close(lobbies):
     client, store = lobbies
-    url = f"{LOBBIES}/{hosted(client)['id']}"
-    assert client.post(f"{url}/cancel", headers=as_player("a")).status_code == 403
-    cancelled = client.post(
-        f"{url}/cancel", headers=as_player("mod", staff=True)
-    ).json()
-    assert (cancelled["status"], cancelled["cancel_reason"]) == ("cancelled", "staff")
     idle = hosted(client, host="sleepy")
     store.docs[ObjectId(idle["id"])]["updated_at"] = datetime.now(UTC) - timedelta(
         hours=3

@@ -75,12 +75,12 @@ LobbyShape = Literal[
 
 
 class LobbyRequest(BaseModel):
-    """/lobby host. The host is the acting player."""
+    """/lobby host. The host is the acting player; the settings start at their
+    defaults."""
 
     model_config = ConfigDict(extra="forbid")
 
     shape: LobbyShape
-    draft_mode: Literal["standard", "random"]
     guild_id: str = Field(min_length=1, max_length=32)
     channel_id: str = Field(min_length=1, max_length=32)
     steam_link: str | None = Field(default=None, max_length=120)
@@ -93,8 +93,8 @@ class LobbyLive(BaseModel):
 
 
 class LobbyEdit(BaseModel):
-    """The host's whole edit: the size, every setting fixed (the rest are
-    voted), every leader banned, and players moved or removed."""
+    """The host's whole edit: the size, every setting with the draft mode,
+    every leader banned, and players moved or removed."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -110,30 +110,47 @@ Voters = Annotated[list[str], Field(max_length=14)]
 
 
 class VotePlace(BaseModel):
-    """Where the vote is posted: its channel or thread, and the message of each
-    open setting and of the bans."""
+    """Where the bans vote is posted: its channel, and its messages."""
 
     model_config = ConfigDict(extra="forbid")
 
     channel_id: str = Field(min_length=1, max_length=32)
-    messages: dict[str, str] = Field(max_length=30)
+    messages: dict[str, str] = Field(max_length=4)
 
 
 class LobbyBallot(BaseModel):
-    """The players' reactions: per setting, each option's voters, and per
-    leader, the players banning it."""
+    """The players' reactions: per leader, the players banning it."""
 
     model_config = ConfigDict(extra="forbid")
 
-    settings: dict[str, dict[str, Voters]] = Field(max_length=30)
     bans: dict[str, Voters] = Field(max_length=100)
 
 
+class LobbyCancel(BaseModel):
+    """A lobby is cancelled by its code, by its host or by staff."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    guild_id: str = Field(min_length=1, max_length=32)
+    code: str = Field(min_length=1, max_length=8)
+
+
+class LeaderPick(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    leader: str = Field(min_length=1, max_length=64)
+
+
 class LobbyVote(BaseModel):
-    ends_at: datetime
     channel_id: str | None
     messages: dict[str, str]
     finished: list[str]
+
+
+class BlindPick(BaseModel):
+    player_id: str
+    leader: str
+    by: Literal["player", "random"]
 
 
 class LobbyPlayer(BaseModel):
@@ -169,7 +186,9 @@ class LobbyView(BaseModel):
     teams: int
     draft_mode: str
     status: Literal["open", "done", "cancelled"]
-    live: bool
+    phase: Literal["setup", "live", "voting", "picking"]
+    deadline: datetime | None
+    code: str
     host_id: str
     guild_id: str
     channel_id: str
@@ -179,6 +198,7 @@ class LobbyView(BaseModel):
     settings: list[ChosenSetting]
     bans: list[SetupBan]
     pools: list[LobbyPool]
+    picks: list[BlindPick]
     vote: LobbyVote | None
     cancel_reason: str | None
     updated_at: datetime
@@ -199,12 +219,15 @@ class SettingQuestion(BaseModel):
 
 __all__ = [
     "MAX_DRAFTS",
+    "BlindPick",
     "ChosenSetting",
     "DealtBans",
     "DealtPool",
     "DraftDeal",
     "DraftRequest",
+    "LeaderPick",
     "LobbyBallot",
+    "LobbyCancel",
     "LobbyEdit",
     "LobbyLive",
     "LobbyPlayer",
