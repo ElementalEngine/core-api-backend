@@ -40,6 +40,11 @@ class MatchSetupRepository:
             partialFilterExpression=OPEN_LOBBY,
             name="idle_open_lobbies",
         )
+        await self._setups.create_index(
+            [("vote.ends_at", ASCENDING)],
+            partialFilterExpression=OPEN_LOBBY,
+            name="open_votes_by_end",
+        )
 
     async def insert(self, setup: dict[str, Any]) -> ObjectId:
         try:
@@ -75,6 +80,13 @@ class MatchSetupRepository:
         mine = {"host_id": host_id} if host_id else {"live": True}
         cursor = self._setups.find({**OPEN_LOBBY, **mine, "guild_id": guild_id})
         return await cursor.sort("created_at", DESCENDING).to_list(None)
+
+    async def votes_due(self, now: datetime) -> list[dict[str, Any]]:
+        """The open lobbies whose vote has run out of time, oldest first."""
+        due = {**OPEN_LOBBY, "vote.ends_at": {"$lt": now}}
+        return (
+            await self._setups.find(due).sort("vote.ends_at", ASCENDING).to_list(None)
+        )
 
     async def close_idle(self, cutoff: datetime, now: datetime) -> list[dict[str, Any]]:
         """Close every open lobby untouched since the cutoff; the closed ones."""

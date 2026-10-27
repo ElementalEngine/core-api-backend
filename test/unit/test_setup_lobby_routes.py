@@ -87,6 +87,13 @@ class Store:
             and (d["host_id"] == host_id if host_id else d["live"])
         ]
 
+    async def votes_due(self, now):
+        return [
+            dict(d)
+            for d in self.docs.values()
+            if d["status"] == "open" and d.get("vote") and d["vote"]["ends_at"] < now
+        ]
+
     async def close_idle(self, cutoff, now):
         closed = []
         for doc in self.docs.values():
@@ -148,7 +155,7 @@ def edit(client, lobby, host="host", **fields):
     return client.put(url, json=body, headers=as_player(host))
 
 
-def test_a_lobby_is_hosted_joined_and_started_into_a_recorded_draft(lobbies):
+def test_a_lobby_votes_then_drafts_into_a_recorded_setup(lobbies):
     client, store = lobbies
     lobby = hosted(client)
     url = f"{LOBBIES}/{lobby['id']}"
@@ -158,12 +165,45 @@ def test_a_lobby_is_hosted_joined_and_started_into_a_recorded_draft(lobbies):
         {"token": "LEADER_00", "kind": "leader", "by": "host"}
     ]
     started = client.post(f"{url}/start", headers=as_player("host")).json()
-    assert started["status"] == "done"
-    assert [(p["player_id"], len(p["leaders"])) for p in started["pools"]] == [
+    assert (started["status"], started["vote"]["finished"]) == ("open", [])
+    place = {"channel_id": "t", "messages": {"map": "m1", "bans": "m2"}}
+    placed = client.put(f"{url}/vote", json=place, headers=as_player("host")).json()
+    assert placed["vote"]["messages"] == place["messages"]
+    done = client.post(f"{url}/finished", headers=as_player("a")).json()
+    assert done["vote"]["finished"] == ["a"]
+    ballot = {
+        "settings": {"map": {"pangea_classic": ["host", "a"]}},
+        "bans": {"LEADER_01": ["host", "a"], "LEADER_02": ["a"]},
+    }
+    counted = client.post(f"{url}/tally", json=ballot, headers=as_player("host"))
+    drafted = counted.json()
+    assert drafted["status"] == "done"
+    assert {"id": "map", "value": "pangea_classic", "by": "vote"} in drafted["settings"]
+    assert [b["token"] for b in drafted["bans"]] == ["LEADER_00", "LEADER_01"]
+    assert [(p["player_id"], len(p["leaders"])) for p in drafted["pools"]] == [
         ("host", 14),
         ("a", 14),
     ]
     assert store.docs[ObjectId(lobby["id"])]["season_id"] == SEASON
+    again = client.post(f"{url}/tally", json=ballot, headers=as_player("host"))
+    assert again.status_code == 409
+
+
+def test_a_vote_out_of_time_is_listed_for_counting(lobbies):
+    client, store = lobbies
+    url = f"{LOBBIES}/{hosted(client)['id']}"
+    client.post(f"{url}/join", headers=as_player("a"))
+    started = client.post(f"{url}/start", headers=as_player("host")).json()
+    due = client.get(f"{LOBBIES}/votes-due", headers=as_player("bot"))
+    assert due.json() == []
+    store.docs[ObjectId(started["id"])]["vote"]["ends_at"] = datetime.now(
+        UTC
+    ) - timedelta(seconds=1)
+    due = client.get(f"{LOBBIES}/votes-due", headers=as_player("bot")).json()
+    assert [lobby["id"] for lobby in due] == [started["id"]]
+    too_many = {"settings": {}, "bans": {"LEADER_01": [str(n) for n in range(15)]}}
+    refused = client.post(f"{url}/tally", json=too_many, headers=as_player("host"))
+    assert refused.status_code == 422
 
 
 def test_refusals_say_why_and_only_the_host_starts(lobbies):

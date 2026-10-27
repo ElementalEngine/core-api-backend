@@ -21,17 +21,18 @@ from app.features.match_setups.bans import ban_caps
 from app.features.match_setups.deal import DraftRefused, checked_bans, deal_draft
 from app.features.match_setups.lobby import (
     CANCELLED,
-    DONE,
     IDLE_LIMIT,
     LobbyRefused,
     NotTheHost,
     cancel_reason,
-    dealt,
-    draft_groups,
     edited,
+    finished,
     joined,
     left,
     new_lobby,
+    tallied,
+    vote_opened,
+    vote_placed,
     went_live,
 )
 from app.features.match_setups.questions import UnknownBallot, settings_for
@@ -40,11 +41,13 @@ from app.features.match_setups.repository import MatchSetupRepository, SeatedEls
 from app.features.match_setups.schemas import (
     DraftDeal,
     DraftRequest,
+    LobbyBallot,
     LobbyEdit,
     LobbyLive,
     LobbyRequest,
     LobbyView,
     SettingQuestion,
+    VotePlace,
 )
 from app.features.seasons.repository import SeasonNotSeededError, SeasonsRepository
 
@@ -79,7 +82,7 @@ async def _civ_data(db: AsyncMongoClient, edition: str) -> dict[str, Any]:
 
 
 def lobby_view(lobby: Mapping[str, Any]) -> dict[str, Any]:
-    return {**lobby, "id": str(lobby["_id"])}
+    return {**lobby, "id": str(lobby["_id"]), "vote": lobby.get("vote")}
 
 
 async def _change(
@@ -180,6 +183,15 @@ async def close_idle_lobbies(
     return [lobby_view(lobby) for lobby in closed]
 
 
+@router.get("/lobbies/votes-due", response_model=list[LobbyView])
+async def votes_due(
+    db: AsyncMongoClient = Depends(get_database),
+) -> list[dict[str, Any]]:
+    """Votes past their time, for the bot to count."""
+    due = await MatchSetupRepository(db).votes_due(datetime.now(UTC))
+    return [lobby_view(lobby) for lobby in due]
+
+
 @router.get("/lobbies/{lobby_id}", response_model=LobbyView)
 async def read_lobby(
     lobby_id: str, db: AsyncMongoClient = Depends(get_database)
@@ -257,20 +269,62 @@ async def start_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """Deal the draft and close the lobby. The bot starts a full lobby itself,
-    acting as its host."""
+    """The host starts: the seats lock and the vote opens."""
+    now = datetime.now(UTC)
+    return await _change(db, lobby_id, lambda lobby: vote_opened(lobby, actor, now))
+
+
+@router.put("/lobbies/{lobby_id}/vote", response_model=LobbyView)
+async def place_vote(
+    lobby_id: str,
+    body: VotePlace,
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """Where the bot posted the vote, acting as the host."""
+    return await _change(
+        db,
+        lobby_id,
+        lambda lobby: vote_placed(lobby, actor, body.channel_id, body.messages),
+    )
+
+
+@router.post("/lobbies/{lobby_id}/finished", response_model=LobbyView)
+async def finish_voting(
+    lobby_id: str,
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    return await _change(db, lobby_id, lambda lobby: finished(lobby, actor))
+
+
+@router.post("/lobbies/{lobby_id}/tally", response_model=LobbyView)
+async def tally_vote(
+    lobby_id: str,
+    body: LobbyBallot,
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """Count the vote and deal the draft, closing the lobby. The bot counts,
+    acting as the host, once all finish or the time is up."""
     leaders = [row["token"] for row in (await _civ_data(db, "civ6"))["leaders"]]
     season_id = await _open_season_id(db, "civ6")
 
-    def started(lobby: dict[str, Any]) -> dict[str, Any]:
+    def counted(lobby: dict[str, Any]) -> dict[str, Any]:
         return {
-            "pools": dealt(lobby, draft_groups(lobby, actor), leaders),
-            "status": DONE,
+            **tallied(
+                lobby,
+                actor,
+                questions=settings_for(lobby["edition"], lobby["mode"]),
+                settings_votes=body.settings,
+                ban_votes=body.bans,
+                leaders=leaders,
+            ),
             "season_id": season_id,
             "closed_at": datetime.now(UTC),
         }
 
-    return await _change(db, lobby_id, started)
+    return await _change(db, lobby_id, counted)
 
 
 @router.post("/lobbies/{lobby_id}/cancel", response_model=LobbyView)

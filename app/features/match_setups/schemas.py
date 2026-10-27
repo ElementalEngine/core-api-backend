@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -84,7 +84,6 @@ class LobbyRequest(BaseModel):
     guild_id: str = Field(min_length=1, max_length=32)
     channel_id: str = Field(min_length=1, max_length=32)
     steam_link: str | None = Field(default=None, max_length=120)
-    rules: str | None = Field(default=None, max_length=500)
 
 
 class LobbyLive(BaseModel):
@@ -104,6 +103,37 @@ class LobbyEdit(BaseModel):
     bans: list[str] = Field(max_length=100)
     teams: dict[str, int] = Field(default_factory=dict)
     removed: list[str] = Field(default_factory=list, max_length=14)
+
+
+# The players who backed one option or one ban: at most a full lobby.
+Voters = Annotated[list[str], Field(max_length=14)]
+
+
+class VotePlace(BaseModel):
+    """Where the vote is posted: its channel or thread, and the message of each
+    open setting and of the bans."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    channel_id: str = Field(min_length=1, max_length=32)
+    messages: dict[str, str] = Field(max_length=30)
+
+
+class LobbyBallot(BaseModel):
+    """The players' reactions: per setting, each option's voters, and per
+    leader, the players banning it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    settings: dict[str, dict[str, Voters]] = Field(max_length=30)
+    bans: dict[str, Voters] = Field(max_length=100)
+
+
+class LobbyVote(BaseModel):
+    ends_at: datetime
+    channel_id: str | None
+    messages: dict[str, str]
+    finished: list[str]
 
 
 class LobbyPlayer(BaseModel):
@@ -145,11 +175,11 @@ class LobbyView(BaseModel):
     channel_id: str
     message_id: str | None
     steam_link: str | None
-    rules: str | None
     players: list[LobbyPlayer]
     settings: list[ChosenSetting]
     bans: list[SetupBan]
     pools: list[LobbyPool]
+    vote: LobbyVote | None
     cancel_reason: str | None
     updated_at: datetime
 
@@ -174,6 +204,7 @@ __all__ = [
     "DealtPool",
     "DraftDeal",
     "DraftRequest",
+    "LobbyBallot",
     "LobbyEdit",
     "LobbyLive",
     "LobbyPlayer",
@@ -181,7 +212,9 @@ __all__ = [
     "LobbyRequest",
     "LobbyShape",
     "LobbyView",
+    "LobbyVote",
     "SettingOption",
     "SettingQuestion",
     "SetupBan",
+    "VotePlace",
 ]

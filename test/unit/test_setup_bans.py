@@ -2,15 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.features.match_setups.bans import ban_caps, capped, resolve_bans
-
-
-def seat(player, leaders=(), civs=()):
-    return {
-        "seat_index": 0,
-        "discord_id": player,
-        "bans": {"leader_keys": list(leaders), "civ_keys": list(civs)},
-    }
+from app.features.match_setups.bans import ban_caps, capped, voted_bans
 
 
 def test_civ6_caps_leaders_at_twenty_and_has_no_civ_bans():
@@ -27,40 +19,6 @@ def test_civ7_drops_to_three_civ_bans_once_an_age_is_chosen(age):
     # Read from the settings the previous phase resolved, never from the
     # request -- the first place one phase's outcome bounds the next.
     assert ban_caps("civ7", age) == {"leader": 10, "civ": 3}
-
-
-def test_a_key_lands_only_at_a_majority_of_all_seats():
-    # Of ALL seats, not of submitters: a timeout creates non-submitters and
-    # must not make bans easier to land.
-    four = [seat("a", ["gandhi"]), seat("b", ["gandhi"]), seat("c"), seat("d")]
-    assert resolve_bans(four, "civ6", None)["leader"] == []
-    three = [seat("a", ["gandhi"]), seat("b", ["gandhi"]), seat("c")]
-    assert resolve_bans(three, "civ6", None)["leader"] == ["gandhi"]
-
-
-def test_an_unseated_seat_is_not_counted_in_the_threshold():
-    seats = [
-        seat("a", ["gandhi"]),
-        seat("b", ["gandhi"]),
-        {"seat_index": 2, "discord_id": None},
-    ]
-    assert resolve_bans(seats, "civ6", None)["leader"] == ["gandhi"]
-
-
-def test_civ6_lands_no_civ_bans_even_when_they_are_submitted():
-    seats = [seat("a", civs=["rome"]), seat("b", civs=["rome"])]
-    assert resolve_bans(seats, "civ6", None)["civ"] == []
-
-
-def test_leaders_and_civs_are_tallied_independently():
-    seats = [
-        seat("a", ["gandhi"], ["rome"]),
-        seat("b", ["gandhi"], ["egypt"]),
-        seat("c", ["trajan"], ["rome"]),
-    ]
-    landed = resolve_bans(seats, "civ7", "none")
-    assert landed["leader"] == ["gandhi"]
-    assert landed["civ"] == ["rome"]
 
 
 def test_the_cap_drops_every_key_tied_at_the_boundary():
@@ -89,10 +47,27 @@ def test_a_zero_cap_lands_nothing():
     assert capped({"a": 99}, ["a"], 0) == []
 
 
-def test_nobody_banning_anything_lands_nothing():
-    seats = [seat("a"), seat("b")]
-    assert resolve_bans(seats, "civ7", "none") == {"leader": [], "civ": []}
+PLAYERS = {"a", "b", "c", "d"}
 
 
-def test_an_empty_lobby_lands_nothing():
-    assert resolve_bans([], "civ6", None) == {"leader": [], "civ": []}
+def test_a_voted_ban_needs_a_majority_of_all_the_players():
+    votes = {"gandhi": ["a", "b"], "trajan": ["a", "b", "c"]}
+    assert voted_bans(votes, PLAYERS, ["gandhi", "trajan"], 20) == ["trajan"]
+    assert voted_bans(votes, PLAYERS - {"d"}, ["gandhi", "trajan"], 20) == [
+        "trajan",
+        "gandhi",
+    ]
+
+
+def test_only_players_and_bannable_leaders_count_and_the_room_caps_them():
+    votes = {
+        "gandhi": ["a", "b", "x", "y"],
+        "taken": ["a", "b", "c"],
+        "trajan": ["a", "b", "c", "d"],
+        "rome": ["a", "b", "c"],
+    }
+    allowed = ["gandhi", "trajan", "rome"]
+    assert voted_bans(votes, PLAYERS, allowed, 20) == ["trajan", "rome"]
+    assert voted_bans(votes, PLAYERS, allowed, 1) == ["trajan"]
+    assert voted_bans(votes, PLAYERS, allowed, 0) == []
+    assert voted_bans({}, set(), allowed, 20) == []

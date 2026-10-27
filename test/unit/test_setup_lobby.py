@@ -4,6 +4,7 @@ import random
 from datetime import UTC, datetime
 
 import pytest
+from bson import ObjectId
 
 from app.features.match_setups.lobby import (
     SHAPES,
@@ -13,9 +14,13 @@ from app.features.match_setups.lobby import (
     dealt,
     draft_groups,
     edited,
+    finished,
     joined,
     left,
     new_lobby,
+    tallied,
+    vote_opened,
+    vote_placed,
     went_live,
 )
 from app.features.match_setups.questions import settings_for
@@ -34,7 +39,6 @@ def hosted(**fields):
             "guild_id": "g",
             "channel_id": "c",
             "steam_link": LINK,
-            "rules": None,
             "now": datetime.now(UTC),
             **fields,
         }
@@ -42,7 +46,11 @@ def hosted(**fields):
 
 
 def lobby(shape="ffa-8", draft_mode="standard", players=()):
-    made = {**hosted(shape=shape, draft_mode=draft_mode), "live": True}
+    made = {
+        **hosted(shape=shape, draft_mode=draft_mode),
+        "live": True,
+        "_id": ObjectId(),
+    }
     for player in players:
         made["players"] = joined(made, player)
     return made
@@ -207,3 +215,94 @@ def test_the_host_or_staff_cancel_and_a_closed_lobby_takes_no_change():
     closed = {**lobby(), "status": "done"}
     with pytest.raises(LobbyRefused, match="closed"):
         joined(closed, "a")
+
+
+NOW = datetime(2026, 10, 27, 12, tzinfo=UTC)
+FFA = settings_for("civ6", "ffa")
+
+
+def voting(made):
+    return {**made, **vote_opened(made, "host", NOW)}
+
+
+def tally(made, settings_votes=None, ban_votes=None, actor="host"):
+    return tallied(
+        made,
+        actor,
+        questions=FFA,
+        settings_votes=settings_votes or {},
+        ban_votes=ban_votes or {},
+        leaders=LEADERS,
+        rng=random.Random(3),
+    )
+
+
+def test_starting_locks_the_seats_for_a_ten_minute_vote():
+    made = voting(lobby(players=["a"]))
+    assert made["vote"] == {
+        "ends_at": datetime(2026, 10, 27, 12, 10, tzinfo=UTC),
+        "channel_id": None,
+        "messages": {},
+        "finished": [],
+    }
+    for locked in (
+        lambda: joined(made, "b"),
+        lambda: left(made, "a"),
+        lambda: edit(made),
+        lambda: vote_opened(made, "host", NOW),
+    ):
+        with pytest.raises(LobbyRefused, match="voting"):
+            locked()
+    with pytest.raises(NotTheHost):
+        vote_opened(lobby(players=["a"]), "a", NOW)
+    with pytest.raises(LobbyRefused, match="at least two"):
+        vote_opened(lobby(), "host", NOW)
+
+
+def test_the_vote_is_posted_once_and_each_player_finishes_once():
+    made = voting(lobby(players=["a"]))
+    placed = {**made, **vote_placed(made, "host", "thread", {"map": "m1"})}
+    assert placed["vote"]["messages"] == {"map": "m1"}
+    with pytest.raises(LobbyRefused, match="already posted"):
+        vote_placed(placed, "host", "thread", {})
+    done = {**placed, **finished(placed, "a")}
+    assert done["vote"]["finished"] == ["a"]
+    with pytest.raises(LobbyRefused, match="already finished"):
+        finished(done, "a")
+    with pytest.raises(LobbyRefused, match="only the lobby's players"):
+        finished(done, "z")
+    with pytest.raises(LobbyRefused, match="not voting"):
+        finished(lobby(players=["a"]), "a")
+
+
+def test_the_vote_fills_what_the_host_left_open_and_adds_bans():
+    made = lobby(players=["a", "b"])
+    made.update(edit(made, settings={"huts": "x1_5"}, bans=LEADERS[:2]))
+    made = voting(made)
+    counted = tally(
+        made,
+        {"huts": {"x1": ["host", "a", "b"]}, "map": {"pangea_classic": ["a", "b"]}},
+        {"LEADER_05": ["host", "a"], "LEADER_06": ["a"], "LEADER_00": ["host", "a"]},
+    )
+    chosen = {s["id"]: (s["value"], s["by"]) for s in counted["settings"]}
+    assert [s["id"] for s in counted["settings"]] == [q["id"] for q in FFA]
+    assert chosen["huts"] == ("x1_5", "host")
+    assert chosen["map"] == ("pangea_classic", "vote")
+    defaults = {q["id"]: q["default_option_id"] for q in FFA}
+    assert chosen["duration"] == (defaults["duration"], "vote")
+    assert [(b["token"], b["by"]) for b in counted["bans"]] == [
+        ("LEADER_00", "host"),
+        ("LEADER_01", "host"),
+        ("LEADER_05", "vote"),
+    ]
+    dealt_out = {t for p in counted["pools"] for t in p["leaders"]}
+    assert counted["status"] == "done"
+    assert not dealt_out & {"LEADER_00", "LEADER_01", "LEADER_05"}
+
+
+def test_only_the_host_counts_a_running_vote():
+    made = voting(lobby(players=["a"]))
+    with pytest.raises(NotTheHost):
+        tally(made, actor="a")
+    with pytest.raises(LobbyRefused, match="not voting"):
+        tally(lobby(players=["a"]))

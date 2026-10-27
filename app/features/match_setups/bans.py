@@ -1,10 +1,8 @@
-"""Which bans land: a key needs a majority of all seats, not of those who
-submitted, and each edition caps how many land."""
+"""How many bans each edition allows, and which voted bans land."""
 
 from __future__ import annotations
 
-from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, Set
 from typing import Any
 
 BAN_KINDS = ("leader", "civ")
@@ -53,24 +51,20 @@ def capped(counts: Mapping[str, int], qualified: Sequence[str], cap: int) -> lis
     return [key for key in ranked[:cap] if counts[key] > boundary]
 
 
-def resolve_bans(
-    seats: Sequence[Mapping[str, Any]], edition: str, starting_age: str | None
-) -> dict[str, list[str]]:
-    """The bans that land, per kind."""
-    voters = [seat for seat in seats if seat.get("discord_id")]
+def voted_bans(
+    votes: Mapping[str, Sequence[str]],
+    voters: Set[str],
+    allowed: Sequence[str],
+    room: int,
+) -> list[str]:
+    """The voted bans that land: each needs a majority of all the players, not
+    of those who voted, and at most `room` land."""
     need = len(voters) // 2 + 1
-    caps = ban_caps(edition, starting_age)
-
-    resolved: dict[str, list[str]] = {}
-    for kind in BAN_KINDS:
-        counts: Counter[str] = Counter()
-        for seat in voters:
-            submitted = (seat.get("bans") or {}).get(f"{kind}_keys") or []
-            for key in submitted:
-                counts[key] += 1
-        qualified = [key for key, votes in counts.items() if votes >= need]
-        resolved[kind] = capped(counts, qualified, caps[kind])
-    return resolved
+    counts = {
+        token: len(voters & set(votes.get(token, ())))
+        for token in dict.fromkeys(allowed)
+    }
+    return capped(counts, [t for t, n in counts.items() if n >= need], room)
 
 
 __all__ = [
@@ -79,5 +73,5 @@ __all__ = [
     "ban_caps",
     "bannable_civs",
     "capped",
-    "resolve_bans",
+    "voted_bans",
 ]

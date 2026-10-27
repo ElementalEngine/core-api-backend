@@ -1060,6 +1060,45 @@
         "title": "LinkedAccountLookupResponse",
         "type": "object"
       },
+      "LobbyBallot": {
+        "additionalProperties": false,
+        "description": "The players' reactions: per setting, each option's voters, and per\nleader, the players banning it.",
+        "properties": {
+          "bans": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 14,
+              "type": "array"
+            },
+            "maxProperties": 100,
+            "title": "Bans",
+            "type": "object"
+          },
+          "settings": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 14,
+                "type": "array"
+              },
+              "type": "object"
+            },
+            "maxProperties": 30,
+            "title": "Settings",
+            "type": "object"
+          }
+        },
+        "required": [
+          "settings",
+          "bans"
+        ],
+        "title": "LobbyBallot",
+        "type": "object"
+      },
       "LobbyEdit": {
         "additionalProperties": false,
         "description": "The host's whole edit: the size, every setting fixed (the rest are\nvoted), every leader banned, and players moved or removed.",
@@ -1225,18 +1264,6 @@
             "title": "Guild Id",
             "type": "string"
           },
-          "rules": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rules"
-          },
           "shape": {
             "enum": [
               "ffa-8",
@@ -1348,17 +1375,6 @@
             "title": "Pools",
             "type": "array"
           },
-          "rules": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rules"
-          },
           "seats": {
             "title": "Seats",
             "type": "integer"
@@ -1414,6 +1430,16 @@
             "format": "date-time",
             "title": "Updated At",
             "type": "string"
+          },
+          "vote": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LobbyVote"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1430,15 +1456,57 @@
           "channel_id",
           "message_id",
           "steam_link",
-          "rules",
           "players",
           "settings",
           "bans",
           "pools",
+          "vote",
           "cancel_reason",
           "updated_at"
         ],
         "title": "LobbyView",
+        "type": "object"
+      },
+      "LobbyVote": {
+        "properties": {
+          "channel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Id"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "finished": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Finished",
+            "type": "array"
+          },
+          "messages": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Messages",
+            "type": "object"
+          }
+        },
+        "required": [
+          "ends_at",
+          "channel_id",
+          "messages",
+          "finished"
+        ],
+        "title": "LobbyVote",
         "type": "object"
       },
       "ManualRegistrationChoice": {
@@ -3467,6 +3535,32 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "VotePlace": {
+        "additionalProperties": false,
+        "description": "Where the vote is posted: its channel or thread, and the message of each\nopen setting and of the bans.",
+        "properties": {
+          "channel_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "messages": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 30,
+            "title": "Messages",
+            "type": "object"
+          }
+        },
+        "required": [
+          "channel_id",
+          "messages"
+        ],
+        "title": "VotePlace",
+        "type": "object"
       }
     }
   },
@@ -5214,6 +5308,60 @@
         ]
       }
     },
+    "/api/v2/match-setups/lobbies/votes-due": {
+      "get": {
+        "description": "Votes past their time, for the bot to count.",
+        "operationId": "votes_due_api_v2_match_setups_lobbies_votes_due_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LobbyView"
+                  },
+                  "title": "Response Votes Due Api V2 Match Setups Lobbies Votes Due Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Votes Due",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
     "/api/v2/match-setups/lobbies/{lobby_id}": {
       "get": {
         "operationId": "read_lobby_api_v2_match_setups_lobbies__lobby_id__get",
@@ -5422,6 +5570,73 @@
           }
         },
         "summary": "Edit Lobby",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/lobbies/{lobby_id}/finished": {
+      "post": {
+        "operationId": "finish_voting_api_v2_match_setups_lobbies__lobby_id__finished_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LobbyView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finish Voting",
         "tags": [
           "match-setups"
         ]
@@ -5641,7 +5856,7 @@
     },
     "/api/v2/match-setups/lobbies/{lobby_id}/start": {
       "post": {
-        "description": "Deal the draft and close the lobby. The bot starts a full lobby itself,\nacting as its host.",
+        "description": "The host starts: the seats lock and the vote opens.",
         "operationId": "start_lobby_api_v2_match_setups_lobbies__lobby_id__start_post",
         "parameters": [
           {
@@ -5702,6 +5917,162 @@
           }
         },
         "summary": "Start Lobby",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/lobbies/{lobby_id}/tally": {
+      "post": {
+        "description": "Count the vote and deal the draft, closing the lobby. The bot counts,\nacting as the host, once all finish or the time is up.",
+        "operationId": "tally_vote_api_v2_match_setups_lobbies__lobby_id__tally_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LobbyBallot"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LobbyView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tally Vote",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/lobbies/{lobby_id}/vote": {
+      "put": {
+        "description": "Where the bot posted the vote, acting as the host.",
+        "operationId": "place_vote_api_v2_match_setups_lobbies__lobby_id__vote_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VotePlace"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LobbyView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Place Vote",
         "tags": [
           "match-setups"
         ]

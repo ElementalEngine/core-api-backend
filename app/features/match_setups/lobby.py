@@ -1,5 +1,6 @@
-"""A hosted lobby's rules: its shapes, who sits where, and when it may start.
-Pure functions over the stored document; the router writes what they return."""
+"""A hosted lobby's rules: its shapes, who sits where, its vote, and when it
+drafts. Pure functions over the stored document; the router writes what they
+return."""
 
 from __future__ import annotations
 
@@ -10,12 +11,14 @@ from datetime import datetime, timedelta
 from random import SystemRandom
 from typing import Any
 
+from app.features.match_setups.bans import ban_caps, voted_bans
 from app.features.match_setups.pools import (
     NotEnoughPool,
     assign_one_each,
     deal,
     remaining_after_bans,
 )
+from app.features.match_setups.tally import voted_settings
 
 _RANDOM = SystemRandom()
 
@@ -23,6 +26,7 @@ OPEN = "open"
 DONE = "done"
 CANCELLED = "cancelled"
 IDLE_LIMIT = timedelta(hours=2, minutes=30)
+VOTE_LIMIT = timedelta(minutes=10)
 STEAM_LINK = re.compile(r"steam://joinlobby/289070/[0-9]+/7656119[0-9]+")
 
 
@@ -64,7 +68,6 @@ def new_lobby(
     guild_id: str,
     channel_id: str,
     steam_link: str | None,
-    rules: str | None,
     now: datetime,
 ) -> dict[str, Any]:
     """A civ6 lobby in setup, its host in the first seat. Players join once the
@@ -87,11 +90,11 @@ def new_lobby(
         "channel_id": channel_id,
         "message_id": None,
         "steam_link": steam_link,
-        "rules": rules,
         "players": [{"discord_id": host_id, "team": 1 if chosen.teams else None}],
         "settings": [],
         "bans": [],
         "pools": [],
+        "vote": None,
         "cancel_reason": None,
         "revision": 1,
         "created_at": now,
@@ -116,6 +119,19 @@ def _live(lobby: Mapping[str, Any]) -> None:
         raise LobbyRefused("the lobby is not open to players yet")
 
 
+def _unlocked(lobby: Mapping[str, Any]) -> None:
+    if lobby.get("vote"):
+        raise LobbyRefused("the lobby is voting, so its seats are locked")
+
+
+def _voting(lobby: Mapping[str, Any]) -> Mapping[str, Any]:
+    _open(lobby)
+    vote: Mapping[str, Any] | None = lobby.get("vote")
+    if not vote:
+        raise LobbyRefused("the lobby is not voting")
+    return vote
+
+
 def went_live(
     lobby: Mapping[str, Any], actor_id: str, message_id: str
 ) -> dict[str, Any]:
@@ -137,6 +153,7 @@ def team_sizes(lobby: Mapping[str, Any]) -> list[int]:
 def joined(lobby: Mapping[str, Any], player_id: str) -> list[dict[str, Any]]:
     """The players once this one sits down, on the emptiest team in a teamer."""
     _live(lobby)
+    _unlocked(lobby)
     players = list(lobby["players"])
     if any(p["discord_id"] == player_id for p in players):
         raise LobbyRefused("you are already in this lobby")
@@ -152,6 +169,7 @@ def joined(lobby: Mapping[str, Any], player_id: str) -> list[dict[str, Any]]:
 def left(lobby: Mapping[str, Any], player_id: str) -> list[dict[str, Any]]:
     """The players once this one stands up. The host cancels instead."""
     _open(lobby)
+    _unlocked(lobby)
     if player_id == lobby["host_id"]:
         raise LobbyRefused("the host cancels the lobby rather than leaving it")
     players = [p for p in lobby["players"] if p["discord_id"] != player_id]
@@ -175,6 +193,7 @@ def edited(
     are voted), the leaders they ban, and players moved or removed. Players who
     joined meanwhile keep their seats."""
     _host(lobby, actor_id)
+    _unlocked(lobby)
     chosen, current = SHAPES[shape], SHAPES[lobby["shape"]]
     if (chosen.mode, chosen.teams) != (current.mode, current.teams):
         raise LobbyRefused("a lobby changes its size, not its mode")
@@ -241,6 +260,90 @@ def draft_groups(lobby: Mapping[str, Any], actor_id: str) -> list[list[str]]:
     ]
 
 
+def vote_opened(
+    lobby: Mapping[str, Any], actor_id: str, now: datetime
+) -> dict[str, Any]:
+    """The host starts: the seats lock while the players vote on the settings
+    left open and on more bans, until all finish or the time is up."""
+    draft_groups(lobby, actor_id)
+    _unlocked(lobby)
+    return {
+        "vote": {
+            "ends_at": now + VOTE_LIMIT,
+            "channel_id": None,
+            "messages": {},
+            "finished": [],
+        }
+    }
+
+
+def vote_placed(
+    lobby: Mapping[str, Any],
+    actor_id: str,
+    channel_id: str,
+    messages: Mapping[str, str],
+) -> dict[str, Any]:
+    """Where the vote runs, so it can be counted from there."""
+    _host(lobby, actor_id)
+    vote = _voting(lobby)
+    if vote["channel_id"]:
+        raise LobbyRefused("the vote is already posted")
+    return {"vote": {**vote, "channel_id": channel_id, "messages": dict(messages)}}
+
+
+def finished(lobby: Mapping[str, Any], player_id: str) -> dict[str, Any]:
+    """A player is done voting."""
+    vote = _voting(lobby)
+    if all(p["discord_id"] != player_id for p in lobby["players"]):
+        raise LobbyRefused("only the lobby's players vote")
+    if player_id in vote["finished"]:
+        raise LobbyRefused("you have already finished")
+    return {"vote": {**vote, "finished": [*vote["finished"], player_id]}}
+
+
+def tallied(
+    lobby: Mapping[str, Any],
+    actor_id: str,
+    *,
+    questions: Sequence[Mapping[str, Any]],
+    settings_votes: Mapping[str, Mapping[str, Sequence[str]]],
+    ban_votes: Mapping[str, Sequence[str]],
+    leaders: Sequence[str],
+    rng: Any = _RANDOM,
+) -> dict[str, Any]:
+    """The vote counted and the lobby drafted. Only players' votes count: the
+    settings left open go to the most chosen, and more leader bans land, as
+    many as the cap leaves room for."""
+    groups = draft_groups(lobby, actor_id)
+    _voting(lobby)
+    voters = {p["discord_id"] for p in lobby["players"]}
+    fixed = {s["id"]: s for s in lobby["settings"]}
+    won = voted_settings(
+        [q for q in questions if q["id"] not in fixed],
+        settings_votes,
+        voters,
+        str(lobby["_id"]),
+    )
+    host_bans = {b["token"] for b in lobby["bans"]}
+    room = ban_caps(lobby["edition"], None)["leader"] - len(host_bans)
+    banned = voted_bans(
+        ban_votes, voters, [t for t in leaders if t not in host_bans], room
+    )
+    bans = [
+        *lobby["bans"],
+        *({"token": token, "kind": "leader", "by": "vote"} for token in banned),
+    ]
+    return {
+        "settings": [
+            fixed.get(q["id"]) or {"id": q["id"], "value": won[q["id"]], "by": "vote"}
+            for q in questions
+        ],
+        "bans": bans,
+        "pools": dealt({**lobby, "bans": bans}, groups, leaders, rng),
+        "status": DONE,
+    }
+
+
 def dealt(
     lobby: Mapping[str, Any],
     teams: Sequence[Sequence[str]],
@@ -293,6 +396,7 @@ __all__ = [
     "IDLE_LIMIT",
     "OPEN",
     "SHAPES",
+    "VOTE_LIMIT",
     "LobbyRefused",
     "NotTheHost",
     "Shape",
@@ -300,9 +404,13 @@ __all__ = [
     "dealt",
     "draft_groups",
     "edited",
+    "finished",
     "joined",
     "left",
     "new_lobby",
+    "tallied",
     "team_sizes",
+    "vote_opened",
+    "vote_placed",
     "went_live",
 ]
