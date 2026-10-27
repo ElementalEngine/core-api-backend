@@ -363,6 +363,11 @@
           "id": "random",
           "emoji": "❓",
           "label": "Random"
+        },
+        {
+          "id": "blind",
+          "emoji": "🕶️",
+          "label": "Blind"
         }
       ],
       "default_option_id": "standard"

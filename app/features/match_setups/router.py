@@ -212,7 +212,8 @@ async def close_idle_lobbies(
 async def lobbies_due(
     db: AsyncMongoClient = Depends(get_database),
 ) -> list[dict[str, Any]]:
-    """Votes and blind picks past their time, for the bot to close."""
+    """Countdowns, votes and blind picks past their time, for the bot to move
+    on."""
     due = await MatchSetupRepository(db).due(datetime.now(UTC))
     return [lobby_view(lobby) for lobby in due]
 
@@ -273,7 +274,7 @@ async def join_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """A player sits down; the last seat starts the bans vote."""
+    """A player sits down; the last seat starts the countdown to the vote."""
     now = datetime.now(UTC)
     return await _change(db, lobby_id, lambda lobby: joined(lobby, actor, now))
 
@@ -284,7 +285,7 @@ async def leave_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    return await _change(db, lobby_id, lambda lobby: {"players": left(lobby, actor)})
+    return await _change(db, lobby_id, lambda lobby: left(lobby, actor))
 
 
 @router.put("/lobbies/{lobby_id}/edit", response_model=LobbyView)
@@ -312,6 +313,7 @@ async def edit_lobby(
             bans=bans,
             teams=body.teams,
             removed=body.removed,
+            now=datetime.now(UTC),
         )
 
     return await _change(db, lobby_id, saved)
@@ -323,7 +325,8 @@ async def start_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """The host starts before it fills: the seats lock and the bans vote opens."""
+    """The host starts, or the bot once a full lobby's countdown ends: the
+    seats lock and the bans vote opens."""
     now = datetime.now(UTC)
     return await _change(db, lobby_id, lambda lobby: started(lobby, actor, now))
 

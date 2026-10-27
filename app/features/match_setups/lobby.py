@@ -35,6 +35,9 @@ PICKING = "picking"
 
 IDLE_LIMIT = timedelta(hours=2, minutes=30)
 VOTE_LIMIT = timedelta(minutes=3)
+# A full lobby waits this long before its vote, so players can check everyone
+# is there; the host may start sooner.
+FILL_WAIT = timedelta(minutes=3)
 PICK_LIMIT = timedelta(minutes=3)
 # A blind pool is picked from one menu, which holds 25.
 BLIND_POOL = 25
@@ -86,6 +89,8 @@ def new_lobby(
     guild_id: str,
     channel_id: str,
     steam_link: str | None,
+    message: str | None,
+    lfg: bool,
     code: str,
     now: datetime,
 ) -> dict[str, Any]:
@@ -110,6 +115,8 @@ def new_lobby(
         "channel_id": channel_id,
         "message_id": None,
         "steam_link": steam_link,
+        "message": message,
+        "lfg": lfg,
         "players": [{"discord_id": host_id, "team": 1 if chosen.teams else None}],
         "settings": [],
         "bans": [],
@@ -181,9 +188,20 @@ def _vote(now: datetime) -> dict[str, Any]:
     }
 
 
+def _countdown(
+    lobby: Mapping[str, Any], players: Sequence[Any], seats: int, now: datetime
+) -> datetime | None:
+    """When a full live lobby starts its vote: a clock that starts as the last
+    seat fills and stops if a seat frees."""
+    if len(players) < seats:
+        return None
+    deadline: datetime | None = lobby["deadline"]
+    return deadline or now + FILL_WAIT
+
+
 def joined(lobby: Mapping[str, Any], player_id: str, now: datetime) -> dict[str, Any]:
     """This player sits down, on the emptiest team in a teamer. The last seat
-    filled starts the bans vote."""
+    filled starts the countdown to the bans vote."""
     _in(lobby, LIVE)
     players = list(lobby["players"])
     if any(p["discord_id"] == player_id for p in players):
@@ -195,19 +213,22 @@ def joined(lobby: Mapping[str, Any], player_id: str, now: datetime) -> dict[str,
         sizes = team_sizes(lobby)
         team = sizes.index(min(sizes)) + 1
     players.append({"discord_id": player_id, "team": team})
-    full = len(players) == lobby["seats"]
-    return {"players": players, **(_vote(now) if full else {})}
+    return {
+        "players": players,
+        "deadline": _countdown(lobby, players, lobby["seats"], now),
+    }
 
 
-def left(lobby: Mapping[str, Any], player_id: str) -> list[dict[str, Any]]:
-    """The players once this one stands up. The host cancels instead."""
+def left(lobby: Mapping[str, Any], player_id: str) -> dict[str, Any]:
+    """This player stands up, stopping any countdown. The host cancels
+    instead."""
     _in(lobby, LIVE)
     if player_id == lobby["host_id"]:
         raise LobbyRefused("the host cancels the lobby rather than leaving it")
     players = [p for p in lobby["players"] if p["discord_id"] != player_id]
     if len(players) == len(lobby["players"]):
         raise LobbyRefused("you are not in this lobby")
-    return players
+    return {"players": players, "deadline": None}
 
 
 def edited(
@@ -220,10 +241,12 @@ def edited(
     bans: Sequence[str],
     teams: Mapping[str, int],
     removed: Sequence[str],
+    now: datetime,
 ) -> dict[str, Any]:
     """The host's edit as one change: the size, the settings (every one, once
     live), the leaders they ban, and players moved or removed. Players who
-    joined meanwhile keep their seats."""
+    joined meanwhile keep their seats; a lobby the edit fills, or frees, starts
+    or stops its countdown."""
     _host(lobby, actor_id)
     _in(lobby, SETUP, LIVE)
     chosen, current = SHAPES[shape], SHAPES[lobby["shape"]]
@@ -261,6 +284,9 @@ def edited(
         "shape": shape,
         "seats": chosen.seats,
         "players": players,
+        "deadline": _countdown(lobby, players, chosen.seats, now)
+        if lobby["phase"] == LIVE
+        else None,
         "draft_mode": settings.get("draft_mode"),
         "settings": [
             {"id": q["id"], "value": settings[q["id"]], "by": "host"}
@@ -286,8 +312,9 @@ def _groups(lobby: Mapping[str, Any]) -> list[list[str]]:
 
 
 def started(lobby: Mapping[str, Any], actor_id: str, now: datetime) -> dict[str, Any]:
-    """The host starts before the lobby fills: two duellists, two players, or
-    equal teams. The seats lock while the players vote on more bans."""
+    """The host starts, or the bot for the host once a full lobby's countdown
+    ends: two duellists, two players, or equal teams. The seats lock while the
+    players vote on more bans."""
     _host(lobby, actor_id)
     _in(lobby, LIVE)
     players = lobby["players"]
@@ -306,14 +333,16 @@ def vote_placed(
     channel_id: str,
     messages: Mapping[str, str],
 ) -> dict[str, Any]:
-    """Where the vote runs, so it can be counted from there."""
+    """Where the vote runs, so it can be counted from there; then where the
+    blind picks run, in the same channel."""
     _host(lobby, actor_id)
-    _in(lobby, VOTING)
-    if lobby["vote"]["channel_id"]:
+    _in(lobby, VOTING, PICKING)
+    vote = lobby["vote"]
+    if lobby["phase"] == VOTING and vote["channel_id"]:
         raise LobbyRefused("the vote is already posted")
-    return {
-        "vote": {**lobby["vote"], "channel_id": channel_id, "messages": dict(messages)}
-    }
+    if lobby["phase"] == PICKING and channel_id != vote["channel_id"]:
+        raise LobbyRefused("the picks run where the vote did")
+    return {"vote": {**vote, "channel_id": channel_id, "messages": dict(messages)}}
 
 
 def finished(lobby: Mapping[str, Any], player_id: str) -> dict[str, Any]:
@@ -449,6 +478,7 @@ __all__ = [
     "BLIND_POOL",
     "CANCELLED",
     "DONE",
+    "FILL_WAIT",
     "IDLE_LIMIT",
     "LIVE",
     "OPEN",

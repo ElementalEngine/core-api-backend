@@ -76,8 +76,7 @@ LobbyShape = Literal[
 
 
 class LobbyRequest(BaseModel):
-    """/lobby host. The host is the acting player; the settings start at their
-    defaults."""
+    """/lobby host. The host is the acting player; the settings start blank."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -85,6 +84,9 @@ class LobbyRequest(BaseModel):
     guild_id: str = Field(min_length=1, max_length=32)
     channel_id: str = Field(min_length=1, max_length=32)
     steam_link: str | None = Field(default=None, max_length=120)
+    message: str | None = Field(default=None, max_length=200)
+    # Pings the server's LFG role when the lobby opens.
+    lfg: bool = False
 
 
 class LobbyLive(BaseModel):
@@ -94,8 +96,8 @@ class LobbyLive(BaseModel):
 
 
 class LobbyEdit(BaseModel):
-    """The host's whole edit: the size, every setting with the draft mode,
-    every leader banned, and players moved or removed."""
+    """The host's whole edit: the size, the settings with the draft mode (all
+    of them once live), every leader banned, and players moved or removed."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -111,12 +113,13 @@ Voters = Annotated[list[str], Field(max_length=14)]
 
 
 class VotePlace(BaseModel):
-    """Where the bans vote is posted: its channel, and its messages."""
+    """Where the bans vote, then the blind picks, are posted: the channel and
+    the one message."""
 
     model_config = ConfigDict(extra="forbid")
 
     channel_id: str = Field(min_length=1, max_length=32)
-    messages: dict[str, str] = Field(max_length=4)
+    messages: dict[str, str] = Field(max_length=1)
 
 
 class LobbyBallot(BaseModel):
@@ -195,6 +198,8 @@ class LobbyView(BaseModel):
     channel_id: str
     message_id: str | None
     steam_link: str | None
+    message: str | None = None
+    lfg: bool = False
     players: list[LobbyPlayer]
     settings: list[ChosenSetting]
     bans: list[SetupBan]

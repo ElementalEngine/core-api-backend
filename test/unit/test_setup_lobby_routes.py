@@ -204,7 +204,7 @@ def test_a_lobby_votes_on_bans_then_drafts_into_a_recorded_setup(lobbies):
     ]
     started = post(client, lobby, "start", "host").json()
     assert (started["phase"], started["vote"]["finished"]) == ("voting", [])
-    place = {"channel_id": "v", "messages": {"status": "m1", "bans": "m2"}}
+    place = {"channel_id": "v", "messages": {"status": "m1"}}
     url = f"{LOBBIES}/{lobby['id']}"
     placed = client.put(f"{url}/vote", json=place, headers=as_player("host")).json()
     assert placed["vote"]["messages"] == place["messages"]
@@ -221,11 +221,16 @@ def test_a_lobby_votes_on_bans_then_drafts_into_a_recorded_setup(lobbies):
     assert post(client, lobby, "tally", "host", json=ballot).status_code == 409
 
 
-def test_a_full_lobby_starts_its_vote_and_only_the_host_starts_early(lobbies):
+def test_a_full_lobby_counts_down_and_only_the_host_starts_it_sooner(lobbies):
     client, _ = lobbies
-    duel = hosted(client, shape="duel")
+    duel = hosted(client, shape="duel", message="No novices", lfg=True)
+    assert (duel["message"], duel["lfg"]) == ("No novices", True)
     full = post(client, duel, "join", "a").json()
-    assert full["phase"] == "voting"
+    assert (full["phase"], full["deadline"] is not None) == ("live", True)
+    freed = post(client, duel, "leave", "a").json()
+    assert (freed["phase"], freed["deadline"]) == ("live", None)
+    post(client, duel, "join", "a")
+    assert post(client, duel, "start", "host").json()["phase"] == "voting"
     assert post(client, duel, "leave", "a").status_code == 409
     ffa = hosted(client, host="other")
     post(client, ffa, "join", "b")
@@ -275,10 +280,7 @@ def test_refusals_say_why(lobbies):
     post(client, duel, "join", "a")
     full = post(client, duel, "join", "b")
     assert full.status_code == 409
-    assert (
-        full.json()["detail"]["error"]["message"]
-        == "the lobby has started, so its seats are locked"
-    )
+    assert full.json()["detail"]["error"]["message"] == "the lobby is full"
 
 
 def test_a_lobby_is_cancelled_by_its_code_by_its_host_or_staff(lobbies):

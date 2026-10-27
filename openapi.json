@@ -1152,7 +1152,7 @@
       },
       "LobbyEdit": {
         "additionalProperties": false,
-        "description": "The host's whole edit: the size, every setting with the draft mode,\nevery leader banned, and players moved or removed.",
+        "description": "The host's whole edit: the size, the settings with the draft mode (all\nof them once live), every leader banned, and players moved or removed.",
         "properties": {
           "bans": {
             "items": {
@@ -1294,7 +1294,7 @@
       },
       "LobbyRequest": {
         "additionalProperties": false,
-        "description": "/lobby host. The host is the acting player; the settings start at their\ndefaults.",
+        "description": "/lobby host. The host is the acting player; the settings start blank.",
         "properties": {
           "channel_id": {
             "maxLength": 32,
@@ -1307,6 +1307,23 @@
             "minLength": 1,
             "title": "Guild Id",
             "type": "string"
+          },
+          "lfg": {
+            "default": false,
+            "title": "Lfg",
+            "type": "boolean"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
           },
           "shape": {
             "enum": [
@@ -1408,6 +1425,22 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "lfg": {
+            "default": false,
+            "title": "Lfg",
+            "type": "boolean"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
           },
           "message_id": {
             "anyOf": [
@@ -3616,7 +3649,7 @@
       },
       "VotePlace": {
         "additionalProperties": false,
-        "description": "Where the bans vote is posted: its channel, and its messages.",
+        "description": "Where the bans vote, then the blind picks, are posted: the channel and\nthe one message.",
         "properties": {
           "channel_id": {
             "maxLength": 32,
@@ -3628,7 +3661,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "maxProperties": 4,
+            "maxProperties": 1,
             "title": "Messages",
             "type": "object"
           }
@@ -5468,7 +5501,7 @@
     },
     "/api/v2/match-setups/lobbies/due": {
       "get": {
-        "description": "Votes and blind picks past their time, for the bot to close.",
+        "description": "Countdowns, votes and blind picks past their time, for the bot to move\non.",
         "operationId": "lobbies_due_api_v2_match_setups_lobbies_due_get",
         "parameters": [
           {
@@ -5725,7 +5758,7 @@
     },
     "/api/v2/match-setups/lobbies/{lobby_id}/join": {
       "post": {
-        "description": "A player sits down; the last seat starts the bans vote.",
+        "description": "A player sits down; the last seat starts the countdown to the vote.",
         "operationId": "join_lobby_api_v2_match_setups_lobbies__lobby_id__join_post",
         "parameters": [
           {
@@ -6084,7 +6117,7 @@
     },
     "/api/v2/match-setups/lobbies/{lobby_id}/start": {
       "post": {
-        "description": "The host starts before it fills: the seats lock and the bans vote opens.",
+        "description": "The host starts, or the bot once a full lobby's countdown ends: the\nseats lock and the bans vote opens.",
         "operationId": "start_lobby_api_v2_match_setups_lobbies__lobby_id__start_post",
         "parameters": [
           {

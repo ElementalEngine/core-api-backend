@@ -42,6 +42,8 @@ def hosted(shape="ffa-8", **fields):
             "guild_id": "g",
             "channel_id": "c",
             "steam_link": LINK,
+            "message": None,
+            "lfg": False,
             "code": "K7Q2DM",
             "now": NOW,
             **fields,
@@ -82,6 +84,7 @@ def edit(made, actor="host", **fields):
             "bans": [],
             "teams": {},
             "removed": [],
+            "now": NOW,
             **fields,
         },
     )
@@ -89,6 +92,11 @@ def edit(made, actor="host", **fields):
 
 def test_every_shape_the_request_offers_is_known():
     assert set(SHAPES) == set(LobbyShape.__args__)
+
+
+def test_a_lobby_keeps_its_host_s_message_and_lfg_ping():
+    made = hosted(message="No novices", lfg=True)
+    assert (made["message"], made["lfg"]) == ("No novices", True)
 
 
 def test_a_lobby_opens_in_setup_with_no_setting_set():
@@ -134,22 +142,42 @@ def test_a_lobby_opens_to_players_only_once_every_setting_is_set():
         went_live(lobby(), "host", "m", questions(ready))
 
 
-def test_joining_fills_the_emptiest_team_and_the_last_seat_starts_the_vote():
+def test_the_last_seat_starts_a_three_minute_countdown_a_freed_seat_stops():
     teamer = lobby("teamer-2v2", players=["a", "b"])
     assert [p["team"] for p in teamer["players"]] == [1, 2, 1]
-    assert teamer["phase"] == "live"
+    assert (teamer["phase"], teamer["deadline"]) == ("live", None)
     full = apply(teamer, joined(teamer, "c", NOW))
     assert [p["team"] for p in full["players"]] == [1, 2, 1, 2]
-    assert (full["phase"], full["deadline"]) == ("voting", NOW + timedelta(minutes=3))
-    assert full["vote"] == {"channel_id": None, "messages": {}, "finished": []}
-    with pytest.raises(LobbyRefused, match="seats are locked"):
+    assert (full["phase"], full["deadline"]) == ("live", NOW + timedelta(minutes=3))
+    with pytest.raises(LobbyRefused, match="the lobby is full"):
         joined(full, "d", NOW)
+    freed = apply(full, left(full, "c"))
+    assert (len(freed["players"]), freed["deadline"]) == (3, None)
+    later = NOW + timedelta(minutes=1)
+    refilled = apply(freed, joined(freed, "d", later))
+    assert refilled["deadline"] == later + timedelta(minutes=3)
     with pytest.raises(LobbyRefused, match="already in this lobby"):
         joined(lobby(players=["a"]), "a", NOW)
 
 
+def test_an_edit_that_fills_or_frees_the_lobby_starts_or_stops_its_countdown():
+    full = lobby("teamer-2v2", players=["a", "b", "c"])
+    clock = NOW + timedelta(minutes=3)
+    later = every_setting(full, huts="x1_5")
+    assert (
+        edit(full, settings=later, now=NOW + timedelta(minutes=1))["deadline"] == clock
+    )
+    assert edit(full, removed=["c"])["deadline"] is None
+    assert edit(full, shape="teamer-3v3")["deadline"] is None
+    short = lobby("teamer-3v3", players=["a", "b", "c"])
+    assert short["deadline"] is None
+    assert edit(short, shape="teamer-2v2")["deadline"] == clock
+
+
 def test_a_player_leaves_but_the_host_cancels_instead():
-    assert [p["discord_id"] for p in left(lobby(players=["a"]), "a")] == ["host"]
+    assert [p["discord_id"] for p in left(lobby(players=["a"]), "a")["players"]] == [
+        "host"
+    ]
     with pytest.raises(LobbyRefused, match="host cancels"):
         left(lobby(), "host")
     with pytest.raises(LobbyRefused, match="not in this lobby"):
@@ -177,8 +205,8 @@ def test_an_edit_saves_the_size_every_setting_the_draft_mode_and_bans():
         edit(lobby(), settings={"huts": "x1"})
     with pytest.raises(LobbyRefused, match="draft_mode has no option blind"):
         edit(
-            lobby("duel"),
-            settings={s["id"]: s["value"] for s in lobby("duel")["settings"]}
+            lobby("teamer-2v2"),
+            settings={s["id"]: s["value"] for s in lobby("teamer-2v2")["settings"]}
             | {"draft_mode": "blind"},
         )
     with pytest.raises(NotTheHost):
@@ -245,10 +273,10 @@ def voting(made):
 
 def test_the_vote_is_posted_once_and_each_player_finishes_once():
     made = voting(lobby(players=["a"]))
-    placed = apply(made, vote_placed(made, "host", "v", {"bans": "m1"}))
+    placed = apply(made, vote_placed(made, "host", "v", {"status": "m1"}))
     assert placed["vote"] == {
         "channel_id": "v",
-        "messages": {"bans": "m1"},
+        "messages": {"status": "m1"},
         "finished": [],
     }
     with pytest.raises(LobbyRefused, match="already posted"):
@@ -300,7 +328,8 @@ def test_three_teams_of_two_fill_in_turn_and_draft_by_team():
     trio = lobby("teamer-2v2v2", players=["a", "b", "c", "d"])
     assert [p["team"] for p in trio["players"]] == [1, 2, 3, 1, 2]
     full = apply(trio, joined(trio, "e", NOW))
-    assert (full["phase"], [p["team"] for p in full["players"]][-1]) == ("voting", 3)
+    assert [p["team"] for p in full["players"]][-1] == 3
+    assert full["deadline"] == NOW + timedelta(minutes=3)
     pools = tally(voting(lobby("teamer-2v2v2", players=["a", "b"])))["pools"]
     assert [(p["team"], len(p["leaders"])) for p in pools] == [
         (1, 13),
@@ -310,13 +339,13 @@ def test_three_teams_of_two_fill_in_turn_and_draft_by_team():
 
 
 def test_a_teamer_drafts_by_team_and_random_gives_each_player_one():
-    teamer = lobby("teamer-2v2", players=["a", "b", "c"])
+    teamer = voting(lobby("teamer-2v2", players=["a", "b", "c"]))
     pools = tally(teamer)["pools"]
     assert [(p["player_id"], p["team"], len(p["leaders"])) for p in pools] == [
         (None, 1, 20),
         (None, 2, 20),
     ]
-    rolled = lobby("teamer-2v2", players=["a", "b", "c"], draft_mode="random")
+    rolled = voting(lobby("teamer-2v2", players=["a", "b", "c"], draft_mode="random"))
     picks = tally(rolled)["pools"]
     assert [(p["player_id"], p["team"]) for p in picks] == [
         ("host", 1),
@@ -329,6 +358,7 @@ def test_a_teamer_drafts_by_team_and_random_gives_each_player_one():
 
 def test_a_blind_draft_deals_at_most_a_menu_each_then_each_player_locks_in():
     duo = voting(lobby(players=["a"], draft_mode="blind"))
+    duo = apply(duo, vote_placed(duo, "host", "v", {"status": "m1"}))
     assert [len(p["leaders"]) for p in dealt(duo, [["host"], ["a"]], LEADERS)] == [
         20,
         20,
@@ -352,6 +382,10 @@ def test_a_blind_draft_deals_at_most_a_menu_each_then_each_player_locks_in():
         picked(blind, "z", mine[0])
     with pytest.raises(LobbyRefused, match="not picking"):
         picked(duo, "a", mine[0])
+    moved = apply(blind, vote_placed(blind, "host", "v", {"status": "m2"}))
+    assert moved["vote"]["messages"] == {"status": "m2"}
+    with pytest.raises(LobbyRefused, match="where the vote did"):
+        vote_placed(blind, "host", "w", {"status": "m2"})
 
 
 def test_the_picks_are_revealed_together_and_a_missing_one_is_auto_picked():

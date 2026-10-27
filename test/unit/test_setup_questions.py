@@ -43,15 +43,15 @@ def test_draft_mode_is_asked_once_and_last(edition, game_type):
 
 
 @pytest.mark.parametrize("edition", EDITIONS)
-@pytest.mark.parametrize("game_type", ["duel", "teamer"])
-def test_duels_and_teamers_offer_standard_and_random_only(edition, game_type):
-    modes = questions_for(edition, game_type)[-1]
+def test_teamers_offer_standard_and_random_only(edition):
+    modes = questions_for(edition, "teamer")[-1]
     assert [option["id"] for option in modes["options"]] == ["standard", "random"]
 
 
 @pytest.mark.parametrize("edition", EDITIONS)
-def test_an_ffa_may_also_draft_blind(edition):
-    modes = questions_for(edition, "ffa")[-1]
+@pytest.mark.parametrize("game_type", ["ffa", "duel"])
+def test_ffas_and_duels_may_also_draft_blind(edition, game_type):
+    modes = questions_for(edition, game_type)[-1]
     assert [o["id"] for o in modes["options"]] == ["standard", "random", "blind"]
 
 

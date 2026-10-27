@@ -102,7 +102,7 @@ class MatchSetupRepository:
         return await cursor.sort("created_at", DESCENDING).to_list(None)
 
     async def due(self, now: datetime) -> list[dict[str, Any]]:
-        """The open lobbies whose vote or blind picks are past their time."""
+        """The open lobbies whose countdown, vote or blind picks are past their time."""
         cursor = self._setups.find({**OPEN_LOBBY, "deadline": {"$lt": now}})
         return await cursor.sort("deadline", ASCENDING).to_list(None)
 
