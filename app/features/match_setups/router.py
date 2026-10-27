@@ -23,7 +23,6 @@ from app.features.match_setups.lobby import (
     CANCELLED,
     DONE,
     IDLE_LIMIT,
-    SHAPES,
     LobbyRefused,
     NotTheHost,
     cancel_reason,
@@ -162,13 +161,11 @@ async def host_lobby(
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     """A lobby in setup, under a code no other open lobby here has."""
-    mode = SHAPES[request.shape].mode
     for _ in range(WRITE_ATTEMPTS):
         try:
             lobby = new_lobby(
                 **request.model_dump(),
                 host_id=actor,
-                questions=questions_for("civ6", mode),
                 code=lobby_code(),
                 now=datetime.now(UTC),
             )
@@ -262,9 +259,12 @@ async def open_lobby(
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     """The host confirms the setup; its post opens the lobby to players."""
-    return await _change(
-        db, lobby_id, lambda lobby: went_live(lobby, actor, body.message_id)
-    )
+
+    def opened(lobby: dict[str, Any]) -> dict[str, Any]:
+        questions = questions_for(lobby["edition"], lobby["mode"])
+        return went_live(lobby, actor, body.message_id, questions)
+
+    return await _change(db, lobby_id, opened)
 
 
 @router.post("/lobbies/{lobby_id}/join", response_model=LobbyView)

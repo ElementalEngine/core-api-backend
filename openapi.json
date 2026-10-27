@@ -1385,8 +1385,15 @@
             "title": "Deadline"
           },
           "draft_mode": {
-            "title": "Draft Mode",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Draft Mode"
           },
           "guild_id": {
             "title": "Guild Id",

@@ -154,11 +154,19 @@ def lobbies(monkeypatch):
     return TestClient(app, raise_server_exceptions=False), store
 
 
+def every_setting(client, lobby):
+    url = f"/api/v2/match-setups/settings/civ6/{lobby['mode']}"
+    asked = client.get(url, headers=as_player("host")).json()
+    return {q["id"]: q["default_option_id"] for q in asked}
+
+
 def hosted(client, host="host", live=True, **fields):
     reply = client.post(LOBBIES, json={**HOST, **fields}, headers=as_player(host))
     assert reply.status_code == 201, reply.json()
     if not live:
         return reply.json()
+    set_up = edit(client, reply.json(), host, every_setting(client, reply.json()))
+    assert set_up.status_code == 200, set_up.json()
     url = f"{LOBBIES}/{reply.json()['id']}/live"
     opened = client.post(url, json={"message_id": "m"}, headers=as_player(host))
     assert opened.status_code == 200, opened.json()
@@ -188,7 +196,7 @@ def cancel(client, code, player, staff=False):
 def test_a_lobby_votes_on_bans_then_drafts_into_a_recorded_setup(lobbies):
     client, store = lobbies
     lobby = hosted(client)
-    assert len(lobby["code"]) == 4 and lobby["phase"] == "live"
+    assert len(lobby["code"]) == 6 and lobby["phase"] == "live"
     assert post(client, lobby, "join", "a").status_code == 200
     banned = edit(client, lobby, bans=["LEADER_00"])
     assert banned.json()["bans"] == [
@@ -312,7 +320,11 @@ def test_a_player_sits_in_one_open_lobby_at_a_time(lobbies):
 def test_a_lobby_in_setup_is_hidden_and_closed_to_players(lobbies):
     client, _ = lobbies
     setup = hosted(client, live=False, steam_link=None)
-    assert (setup["phase"], setup["steam_link"]) == ("setup", None)
+    assert (setup["phase"], setup["steam_link"], setup["settings"]) == (
+        "setup",
+        None,
+        [],
+    )
     url = f"{LOBBIES}/{setup['id']}"
     assert client.post(f"{url}/join", headers=as_player("a")).status_code == 409
     listed = client.get(LOBBIES, params={"guild_id": "g"}, headers=as_player("a"))
@@ -322,6 +334,12 @@ def test_a_lobby_in_setup_is_hidden_and_closed_to_players(lobbies):
     assert [lobby["id"] for lobby in found] == [setup["id"]]
     live = client.post(f"{url}/live", json={"message_id": "m"}, headers=as_player("a"))
     assert live.status_code == 403
+    blank = client.post(
+        f"{url}/live", json={"message_id": "m"}, headers=as_player("host")
+    )
+    assert blank.json()["detail"]["error"]["message"].startswith(
+        "set every setting first"
+    )
 
 
 def test_an_edit_is_checked_whole_against_civ_data_and_the_catalogue(lobbies):

@@ -40,7 +40,7 @@ PICK_LIMIT = timedelta(minutes=3)
 BLIND_POOL = 25
 STEAM_LINK = re.compile(r"steam://joinlobby/289070/[0-9]+/7656119[0-9]+")
 CODE_LETTERS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
-CODE_LENGTH = 4
+CODE_LENGTH = 6
 
 
 @dataclass(frozen=True)
@@ -85,16 +85,14 @@ def new_lobby(
     guild_id: str,
     channel_id: str,
     steam_link: str | None,
-    questions: Sequence[Mapping[str, Any]],
     code: str,
     now: datetime,
 ) -> dict[str, Any]:
-    """A civ6 lobby in setup, its host in the first seat and every setting at
-    its default until the host changes it."""
+    """A civ6 lobby in setup, its host in the first seat and no setting set
+    until the host sets each one."""
     if steam_link is not None and not STEAM_LINK.fullmatch(steam_link):
         raise LobbyRefused("the Steam link is not a Civ6 lobby link")
     chosen = SHAPES[shape]
-    settings = {q["id"]: q["default_option_id"] for q in questions}
     return {
         "command": "lobby",
         "edition": "civ6",
@@ -102,7 +100,7 @@ def new_lobby(
         "shape": shape,
         "seats": chosen.seats,
         "teams": chosen.teams,
-        "draft_mode": settings["draft_mode"],
+        "draft_mode": None,
         "status": OPEN,
         "phase": SETUP,
         "code": code,
@@ -112,7 +110,7 @@ def new_lobby(
         "message_id": None,
         "steam_link": steam_link,
         "players": [{"discord_id": host_id, "team": 1 if chosen.teams else None}],
-        "settings": [{"id": k, "value": v, "by": "host"} for k, v in settings.items()],
+        "settings": [],
         "bans": [],
         "pools": [],
         "picks": [],
@@ -149,12 +147,20 @@ def _in(lobby: Mapping[str, Any], *phases: str) -> None:
 
 
 def went_live(
-    lobby: Mapping[str, Any], actor_id: str, message_id: str
+    lobby: Mapping[str, Any],
+    actor_id: str,
+    message_id: str,
+    questions: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """The host confirms the setup; the lobby's post opens it to players."""
+    """The host confirms the setup, every setting set; the lobby's post opens
+    it to players."""
     _host(lobby, actor_id)
     if lobby["phase"] != SETUP:
         raise LobbyRefused("the lobby is already open")
+    chosen = {s["id"] for s in lobby["settings"]}
+    unset = [q["title"] for q in questions if q["id"] not in chosen]
+    if unset:
+        raise LobbyRefused(f"set every setting first: {', '.join(unset)}")
     return {"phase": LIVE, "message_id": message_id}
 
 
@@ -214,9 +220,9 @@ def edited(
     teams: Mapping[str, int],
     removed: Sequence[str],
 ) -> dict[str, Any]:
-    """The host's edit as one change: the size, every setting, the leaders they
-    ban, and players moved or removed. Players who joined meanwhile keep their
-    seats."""
+    """The host's edit as one change: the size, the settings (every one, once
+    live), the leaders they ban, and players moved or removed. Players who
+    joined meanwhile keep their seats."""
     _host(lobby, actor_id)
     _in(lobby, SETUP, LIVE)
     chosen, current = SHAPES[shape], SHAPES[lobby["shape"]]
@@ -245,18 +251,20 @@ def edited(
             if count > size:
                 raise LobbyRefused(f"team {team} has more than {size} players")
     options = {q["id"]: {o["id"] for o in q["options"]} for q in questions}
-    if set(settings) != set(options):
-        raise LobbyRefused("every setting needs one value")
     for question, option in settings.items():
-        if option not in options[question]:
+        if option not in options.get(question, ()):
             raise LobbyRefused(f"{question} has no option {option}")
+    if lobby["phase"] != SETUP and set(settings) != set(options):
+        raise LobbyRefused("every setting needs one value")
     return {
         "shape": shape,
         "seats": chosen.seats,
         "players": players,
-        "draft_mode": settings["draft_mode"],
+        "draft_mode": settings.get("draft_mode"),
         "settings": [
-            {"id": q["id"], "value": settings[q["id"]], "by": "host"} for q in questions
+            {"id": q["id"], "value": settings[q["id"]], "by": "host"}
+            for q in questions
+            if q["id"] in settings
         ],
         "bans": [
             {"token": token, "kind": "leader", "by": "host"}

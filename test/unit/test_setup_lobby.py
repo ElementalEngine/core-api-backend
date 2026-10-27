@@ -42,8 +42,7 @@ def hosted(shape="ffa-8", **fields):
             "guild_id": "g",
             "channel_id": "c",
             "steam_link": LINK,
-            "questions": questions_for("civ6", SHAPES[shape].mode),
-            "code": "K7Q2",
+            "code": "K7Q2DM",
             "now": NOW,
             **fields,
         }
@@ -54,24 +53,31 @@ def apply(made, changes):
     return {**made, **changes}
 
 
-def lobby(shape="ffa-8", players=(), draft_mode=None):
-    made = apply(hosted(shape), went_live(hosted(shape), "host", "m"))
-    if draft_mode:
-        made["draft_mode"] = draft_mode
+def questions(made):
+    return questions_for("civ6", made["mode"])
+
+
+def every_setting(made, **chosen):
+    return {q["id"]: q["default_option_id"] for q in questions(made)} | chosen
+
+
+def lobby(shape="ffa-8", players=(), draft_mode="standard"):
+    made = hosted(shape)
+    made = apply(made, edit(made, settings=every_setting(made, draft_mode=draft_mode)))
+    made = apply(made, went_live(made, "host", "m", questions(made)))
     for player in players:
         made = apply(made, joined(made, player, NOW))
     return made
 
 
 def edit(made, actor="host", **fields):
-    questions = questions_for("civ6", made["mode"])
     settings = {s["id"]: s["value"] for s in made["settings"]}
     return edited(
         made,
         actor,
         **{
             "shape": made["shape"],
-            "questions": questions,
+            "questions": questions(made),
             "settings": settings,
             "bans": [],
             "teams": {},
@@ -85,17 +91,14 @@ def test_every_shape_the_request_offers_is_known():
     assert set(SHAPES) == set(LobbyShape.__args__)
 
 
-def test_a_lobby_opens_in_setup_with_every_setting_at_its_default():
+def test_a_lobby_opens_in_setup_with_no_setting_set():
     made = hosted()
-    asked = questions_for("civ6", "ffa")
     assert (made["phase"], made["code"], made["draft_mode"]) == (
         "setup",
-        "K7Q2",
-        "standard",
+        "K7Q2DM",
+        None,
     )
-    assert made["settings"] == [
-        {"id": q["id"], "value": q["default_option_id"], "by": "host"} for q in asked
-    ]
+    assert made["settings"] == []
     assert made["players"] == [{"discord_id": "host", "team": None}]
     assert hosted("teamer-3v3")["players"] == [{"discord_id": "host", "team": 1}]
     for link in ("steam://joinlobby/1295660/1/76561198000000000", f"{LINK}\n"):
@@ -103,22 +106,32 @@ def test_a_lobby_opens_in_setup_with_every_setting_at_its_default():
             hosted(steam_link=link)
 
 
-def test_a_code_is_four_easily_read_letters():
+def test_a_code_is_six_easily_read_letters():
     codes = {lobby_code(random.Random(n)) for n in range(50)}
-    assert len(codes) > 40
-    assert all(len(c) == 4 and set(c) <= set(CODE_LETTERS) for c in codes)
+    assert len(codes) == 50
+    assert all(len(c) == 6 and set(c) <= set(CODE_LETTERS) for c in codes)
     assert not set("01IOL") & set(CODE_LETTERS)
 
 
-def test_a_lobby_waits_in_setup_until_its_host_opens_it():
+def test_a_lobby_opens_to_players_only_once_every_setting_is_set():
     setup = hosted(steam_link=None)
     with pytest.raises(LobbyRefused, match="not open to players yet"):
         joined(setup, "a", NOW)
+    half = apply(setup, edit(setup, settings={"huts": "x1", "map": "pangea_classic"}))
+    assert [s["id"] for s in half["settings"]] == ["map", "huts"]
+    assert half["draft_mode"] is None
+    with pytest.raises(LobbyRefused, match="set every setting first: Official"):
+        went_live(half, "host", "m", questions(half))
+    ready = apply(half, edit(half, settings=every_setting(half, draft_mode="blind")))
+    assert ready["draft_mode"] == "blind"
     with pytest.raises(NotTheHost):
-        went_live(setup, "a", "m")
-    assert went_live(setup, "host", "m") == {"phase": "live", "message_id": "m"}
+        went_live(ready, "a", "m", questions(ready))
+    assert went_live(ready, "host", "m", questions(ready)) == {
+        "phase": "live",
+        "message_id": "m",
+    }
     with pytest.raises(LobbyRefused, match="already open"):
-        went_live(lobby(), "host", "m")
+        went_live(lobby(), "host", "m", questions(ready))
 
 
 def test_joining_fills_the_emptiest_team_and_the_last_seat_starts_the_vote():

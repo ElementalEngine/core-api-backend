@@ -184,7 +184,7 @@ class LobbyView(BaseModel):
     mode: str
     seats: int
     teams: int
-    draft_mode: str
+    draft_mode: str | None
     status: Literal["open", "done", "cancelled"]
     phase: Literal["setup", "live", "voting", "picking"]
     deadline: datetime | None
