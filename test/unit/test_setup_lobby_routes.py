@@ -242,7 +242,7 @@ def test_a_blind_draft_is_picked_privately_then_revealed(lobbies):
     assert post(client, lobby, "reveal", "a").status_code == 403
     shown = post(client, lobby, "reveal", "host").json()
     assert shown["status"] == "done"
-    assert [p["by"] for p in shown["picks"]] == ["random", "player"]
+    assert [p["by"] for p in shown["picks"]] == ["auto", "player"]
 
 
 def test_votes_and_picks_past_their_time_are_listed(lobbies):

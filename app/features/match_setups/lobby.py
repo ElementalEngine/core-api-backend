@@ -34,7 +34,7 @@ VOTING = "voting"
 PICKING = "picking"
 
 IDLE_LIMIT = timedelta(hours=2, minutes=30)
-VOTE_LIMIT = timedelta(minutes=10)
+VOTE_LIMIT = timedelta(minutes=3)
 PICK_LIMIT = timedelta(minutes=3)
 # A blind pool is picked from one menu, which holds 25.
 BLIND_POOL = 25
@@ -393,25 +393,24 @@ def tallied(
 
 
 def picked(lobby: Mapping[str, Any], player_id: str, leader: str) -> dict[str, Any]:
-    """A player's blind pick from their own pool, theirs to change until the
-    picks are revealed."""
+    """A player's blind pick from their own pool, locked in once made."""
     _in(lobby, PICKING)
     pool = next((p for p in lobby["pools"] if p["player_id"] == player_id), None)
     if pool is None:
         raise LobbyRefused("only the lobby's players pick")
+    if any(p["player_id"] == player_id for p in lobby["picks"]):
+        raise LobbyRefused("you have already locked in your pick")
     if leader not in pool["leaders"]:
         raise LobbyRefused("that leader is not in your pool")
-    others = [p for p in lobby["picks"] if p["player_id"] != player_id]
-    return {
-        "picks": [*others, {"player_id": player_id, "leader": leader, "by": "player"}]
-    }
+    pick = {"player_id": player_id, "leader": leader, "by": "player"}
+    return {"picks": [*lobby["picks"], pick]}
 
 
 def revealed(
     lobby: Mapping[str, Any], actor_id: str, rng: Any = _RANDOM
 ) -> dict[str, Any]:
     """The blind picks revealed together, in seat order; a player who did not
-    pick is given one from their pool at random."""
+    pick is auto-picked one from their pool at random."""
     _host(lobby, actor_id)
     _in(lobby, PICKING)
     made = {p["player_id"]: p for p in lobby["picks"]}
@@ -420,7 +419,7 @@ def revealed(
         or {
             "player_id": pool["player_id"],
             "leader": rng.choice(pool["leaders"]),
-            "by": "random",
+            "by": "auto",
         }
         for pool in lobby["pools"]
     ]

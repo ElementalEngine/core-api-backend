@@ -127,7 +127,7 @@ def test_joining_fills_the_emptiest_team_and_the_last_seat_starts_the_vote():
     assert teamer["phase"] == "live"
     full = apply(teamer, joined(teamer, "c", NOW))
     assert [p["team"] for p in full["players"]] == [1, 2, 1, 2]
-    assert (full["phase"], full["deadline"]) == ("voting", NOW + timedelta(minutes=10))
+    assert (full["phase"], full["deadline"]) == ("voting", NOW + timedelta(minutes=3))
     assert full["vote"] == {"channel_id": None, "messages": {}, "finished": []}
     with pytest.raises(LobbyRefused, match="seats are locked"):
         joined(full, "d", NOW)
@@ -209,9 +209,9 @@ def test_the_host_starts_early_only_when_the_lobby_can_draft(shape, players, ref
         started(lobby(shape, players=players), "host", NOW)
 
 
-def test_starting_locks_the_seats_for_a_ten_minute_bans_vote():
+def test_starting_locks_the_seats_for_a_three_minute_bans_vote():
     made = apply(lobby(players=["a"]), started(lobby(players=["a"]), "host", NOW))
-    assert (made["phase"], made["deadline"]) == ("voting", NOW + timedelta(minutes=10))
+    assert (made["phase"], made["deadline"]) == ("voting", NOW + timedelta(minutes=3))
     for locked in (
         lambda: joined(made, "b", NOW),
         lambda: left(made, "a"),
@@ -301,7 +301,7 @@ def test_a_teamer_drafts_by_team_and_random_gives_each_player_one():
     assert len({p["leaders"][0] for p in picks}) == 4
 
 
-def test_a_blind_draft_deals_at_most_a_menu_each_then_its_players_pick():
+def test_a_blind_draft_deals_at_most_a_menu_each_then_each_player_locks_in():
     duo = voting(lobby(players=["a"], draft_mode="blind"))
     assert [len(p["leaders"]) for p in dealt(duo, [["host"], ["a"]], LEADERS)] == [
         20,
@@ -317,8 +317,9 @@ def test_a_blind_draft_deals_at_most_a_menu_each_then_its_players_pick():
     assert blind["deadline"] == NOW + timedelta(minutes=3)
     mine = blind["pools"][1]["leaders"]
     first = apply(blind, picked(blind, "a", mine[0]))
-    changed = apply(first, picked(first, "a", mine[1]))
-    assert changed["picks"] == [{"player_id": "a", "leader": mine[1], "by": "player"}]
+    assert first["picks"] == [{"player_id": "a", "leader": mine[0], "by": "player"}]
+    with pytest.raises(LobbyRefused, match="already locked in"):
+        picked(first, "a", mine[1])
     with pytest.raises(LobbyRefused, match="not in your pool"):
         picked(blind, "a", blind["pools"][0]["leaders"][0])
     with pytest.raises(LobbyRefused, match="only the lobby's players pick"):
@@ -327,7 +328,7 @@ def test_a_blind_draft_deals_at_most_a_menu_each_then_its_players_pick():
         picked(duo, "a", mine[0])
 
 
-def test_the_picks_are_revealed_together_and_a_missing_one_is_random():
+def test_the_picks_are_revealed_together_and_a_missing_one_is_auto_picked():
     blind = voting(lobby(players=["a"], draft_mode="blind"))
     blind = apply(blind, tally(blind))
     mine = blind["pools"][1]["leaders"]
@@ -335,7 +336,7 @@ def test_the_picks_are_revealed_together_and_a_missing_one_is_random():
     shown = revealed(blind, "host", random.Random(1))
     host_pick, a_pick = shown["picks"]
     assert a_pick == {"player_id": "a", "leader": mine[2], "by": "player"}
-    assert host_pick["by"] == "random"
+    assert host_pick["by"] == "auto"
     assert host_pick["leader"] in blind["pools"][0]["leaders"]
     assert (shown["status"], shown["deadline"]) == ("done", None)
     with pytest.raises(NotTheHost):

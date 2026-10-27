@@ -95,7 +95,7 @@
           "by": {
             "enum": [
               "player",
-              "random"
+              "auto"
             ],
             "title": "By",
             "type": "string"

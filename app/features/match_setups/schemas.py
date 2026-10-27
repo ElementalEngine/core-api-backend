@@ -150,7 +150,7 @@ class LobbyVote(BaseModel):
 class BlindPick(BaseModel):
     player_id: str
     leader: str
-    by: Literal["player", "random"]
+    by: Literal["player", "auto"]
 
 
 class LobbyPlayer(BaseModel):
