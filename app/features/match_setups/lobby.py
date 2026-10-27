@@ -34,6 +34,8 @@ VOTING = "voting"
 PICKING = "picking"
 
 IDLE_LIMIT = timedelta(hours=2, minutes=30)
+# A lobby still in setup has outlived its editor by then, so it frees its host.
+SETUP_IDLE_LIMIT = timedelta(minutes=15)
 VOTE_LIMIT = timedelta(minutes=3)
 # A full lobby waits this long before its vote, so players can check everyone
 # is there; the host may start sooner.
@@ -485,6 +487,7 @@ __all__ = [
     "PICKING",
     "PICK_LIMIT",
     "SETUP",
+    "SETUP_IDLE_LIMIT",
     "SHAPES",
     "VOTE_LIMIT",
     "VOTING",

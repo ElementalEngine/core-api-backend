@@ -23,6 +23,7 @@ from app.features.match_setups.lobby import (
     CANCELLED,
     DONE,
     IDLE_LIMIT,
+    SETUP_IDLE_LIMIT,
     LobbyRefused,
     NotTheHost,
     cancel_reason,
@@ -202,9 +203,12 @@ async def open_lobbies(
 async def close_idle_lobbies(
     db: AsyncMongoClient = Depends(get_database),
 ) -> list[dict[str, Any]]:
-    """Close every lobby idle past the limit, so the bot can mark their posts."""
+    """Close every lobby idle past its limit, so the bot can remove their posts;
+    one left in setup, past the shorter one."""
     now = datetime.now(UTC)
-    closed = await MatchSetupRepository(db).close_idle(now - IDLE_LIMIT, now)
+    closed = await MatchSetupRepository(db).close_idle(
+        now - IDLE_LIMIT, now - SETUP_IDLE_LIMIT, now
+    )
     return [lobby_view(lobby) for lobby in closed]
 
 

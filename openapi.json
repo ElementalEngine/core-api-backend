@@ -5447,7 +5447,7 @@
     },
     "/api/v2/match-setups/lobbies/close-idle": {
       "post": {
-        "description": "Close every lobby idle past the limit, so the bot can mark their posts.",
+        "description": "Close every lobby idle past its limit, so the bot can remove their posts;\none left in setup, past the shorter one.",
         "operationId": "close_idle_lobbies_api_v2_match_setups_lobbies_close_idle_post",
         "parameters": [
           {

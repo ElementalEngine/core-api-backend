@@ -110,10 +110,11 @@ class Store:
             if d["status"] == "open" and d["deadline"] and d["deadline"] < now
         ]
 
-    async def close_idle(self, cutoff, now):
+    async def close_idle(self, cutoff, setup_cutoff, now):
         closed = []
         for doc in self.docs.values():
-            if doc["status"] == "open" and doc["updated_at"] < cutoff:
+            limit = setup_cutoff if doc["phase"] == "setup" else cutoff
+            if doc["status"] == "open" and doc["updated_at"] < limit:
                 doc.update(status="cancelled", cancel_reason="idle", closed_at=now)
                 closed.append(dict(doc))
         return closed
@@ -388,3 +389,16 @@ def test_idle_lobbies_close(lobbies):
         client.get(LOBBIES, params={"guild_id": "g"}, headers=as_player("bot")).json()
         == []
     )
+
+
+def test_a_lobby_left_in_setup_frees_its_host_sooner(lobbies):
+    client, store = lobbies
+    left = hosted(client, host="gone", live=False)
+    live = hosted(client, host="here")
+    for lobby in (left, live):
+        store.docs[ObjectId(lobby["id"])]["updated_at"] = datetime.now(UTC) - timedelta(
+            minutes=20
+        )
+    closed = client.post(f"{LOBBIES}/close-idle", headers=as_player("bot")).json()
+    assert [c["id"] for c in closed] == [left["id"]]
+    assert hosted(client, host="gone", live=False)["status"] == "open"

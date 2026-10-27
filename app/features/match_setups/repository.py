@@ -106,9 +106,18 @@ class MatchSetupRepository:
         cursor = self._setups.find({**OPEN_LOBBY, "deadline": {"$lt": now}})
         return await cursor.sort("deadline", ASCENDING).to_list(None)
 
-    async def close_idle(self, cutoff: datetime, now: datetime) -> list[dict[str, Any]]:
-        """Close every open lobby untouched since the cutoff; the closed ones."""
-        idle = {**OPEN_LOBBY, "updated_at": {"$lt": cutoff}}
+    async def close_idle(
+        self, cutoff: datetime, setup_cutoff: datetime, now: datetime
+    ) -> list[dict[str, Any]]:
+        """Close every open lobby untouched since the cutoff, or since the
+        setup cutoff while in setup; the closed ones."""
+        idle = {
+            **OPEN_LOBBY,
+            "$or": [
+                {"updated_at": {"$lt": cutoff}},
+                {"phase": SETUP, "updated_at": {"$lt": setup_cutoff}},
+            ],
+        }
         closed = []
         async for lobby in self._setups.find(idle, {"_id": 1}):
             done = await self._setups.find_one_and_update(
