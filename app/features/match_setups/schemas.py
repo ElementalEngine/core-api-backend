@@ -70,6 +70,7 @@ LobbyShape = Literal[
     "teamer-3v3",
     "teamer-4v4",
     "teamer-5v5",
+    "teamer-2v2v2",
     "teamer-2v2v2v2",
 ]
 

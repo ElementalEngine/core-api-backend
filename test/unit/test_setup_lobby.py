@@ -296,6 +296,19 @@ def test_the_vote_adds_bans_with_a_majority_then_the_draft_is_dealt():
         tally(lobby(players=["a"]))
 
 
+def test_three_teams_of_two_fill_in_turn_and_draft_by_team():
+    trio = lobby("teamer-2v2v2", players=["a", "b", "c", "d"])
+    assert [p["team"] for p in trio["players"]] == [1, 2, 3, 1, 2]
+    full = apply(trio, joined(trio, "e", NOW))
+    assert (full["phase"], [p["team"] for p in full["players"]][-1]) == ("voting", 3)
+    pools = tally(voting(lobby("teamer-2v2v2", players=["a", "b"])))["pools"]
+    assert [(p["team"], len(p["leaders"])) for p in pools] == [
+        (1, 13),
+        (2, 13),
+        (3, 13),
+    ]
+
+
 def test_a_teamer_drafts_by_team_and_random_gives_each_player_one():
     teamer = lobby("teamer-2v2", players=["a", "b", "c"])
     pools = tally(teamer)["pools"]

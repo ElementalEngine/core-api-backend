@@ -61,6 +61,7 @@ SHAPES: dict[str, Shape] = {
     "teamer-3v3": Shape("teamer", 6, 2),
     "teamer-4v4": Shape("teamer", 8, 2),
     "teamer-5v5": Shape("teamer", 10, 2),
+    "teamer-2v2v2": Shape("teamer", 6, 3),
     "teamer-2v2v2v2": Shape("teamer", 8, 4),
 }
 
