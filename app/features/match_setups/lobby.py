@@ -14,9 +14,7 @@ from typing import Any
 from app.features.match_setups.bans import ban_caps, voted_bans
 from app.features.match_setups.pools import (
     NotEnoughPool,
-    assign_one_each,
-    deal,
-    even_split,
+    leader_pools,
     remaining_after_bans,
 )
 
@@ -36,13 +34,11 @@ PICKING = "picking"
 IDLE_LIMIT = timedelta(hours=2, minutes=30)
 # A lobby still in setup has outlived its editor by then, so it frees its host.
 SETUP_IDLE_LIMIT = timedelta(minutes=15)
-VOTE_LIMIT = timedelta(minutes=3)
+BANS_VOTE_LIMIT = timedelta(minutes=3)
 # A full lobby waits this long before its vote, so players can check everyone
 # is there; the host may start sooner.
 FILL_WAIT = timedelta(minutes=3)
 PICK_LIMIT = timedelta(minutes=3)
-# A blind pool is picked from one menu, which holds 25.
-BLIND_POOL = 25
 STEAM_LINK = re.compile(r"steam://joinlobby/289070/[0-9]+/7656119[0-9]+")
 CODE_LETTERS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 CODE_LENGTH = 6
@@ -187,14 +183,6 @@ def team_sizes(lobby: Mapping[str, Any]) -> list[int]:
     return sizes
 
 
-def _vote(now: datetime) -> dict[str, Any]:
-    return {
-        "phase": VOTING,
-        "deadline": now + VOTE_LIMIT,
-        "vote": {"channel_id": None, "messages": {}, "finished": []},
-    }
-
-
 def _countdown(
     lobby: Mapping[str, Any], players: Sequence[Any], seats: int, now: datetime
 ) -> datetime | None:
@@ -331,7 +319,11 @@ def started(lobby: Mapping[str, Any], actor_id: str, now: datetime) -> dict[str,
         raise LobbyRefused("the lobby needs at least two players")
     if lobby["teams"] and len(set(team_sizes(lobby))) != 1:
         raise LobbyRefused("the teams must be the same size")
-    return _vote(now)
+    return {
+        "phase": VOTING,
+        "deadline": now + BANS_VOTE_LIMIT,
+        "vote": {"channel_id": None, "messages": {}, "finished": []},
+    }
 
 
 def vote_placed(
@@ -369,36 +361,25 @@ def dealt(
     leaders: Sequence[str],
     rng: Any = _RANDOM,
 ) -> list[dict[str, Any]]:
-    """The draft: standard deals each player or team an even share of the
-    leaders left after bans, blind deals each player up to a menu's worth, and
-    random gives each player one."""
+    """The draft from the leaders left after bans: a pool each player, or each
+    team in a teamer; random gives each player one."""
     remaining = remaining_after_bans(leaders, [b["token"] for b in lobby["bans"]])
-    on_team = bool(lobby["teams"])
+    by_team = bool(lobby["teams"]) and lobby["draft_mode"] != "random"
+    team_of = {p: i + 1 for i, team in enumerate(teams) for p in team}
+    groups = teams if by_team else [[p] for team in teams for p in team]
     try:
-        if lobby["draft_mode"] == "random":
-            players = [p for team in teams for p in team]
-            picks = assign_one_each(remaining, len(players), rng)
-            team_of = {p: i + 1 for i, team in enumerate(teams) for p in team}
-            return [
-                {
-                    "player_id": player,
-                    "team": team_of[player] if on_team else None,
-                    "leaders": [pick],
-                }
-                for player, pick in zip(players, picks, strict=True)
-            ]
-        share, _ = even_split(len(remaining), len(teams))
-        size = min(share, BLIND_POOL) if lobby["draft_mode"] == "blind" else share
-        pools = deal(remaining, len(teams), rng, per_player=size)
+        pools = leader_pools(remaining, len(groups), lobby["draft_mode"], rng)
     except NotEnoughPool as exc:
         raise LobbyRefused(f"not enough leaders to deal: {exc}") from exc
     return [
         {
-            "player_id": None if on_team else team[0],
-            "team": i + 1 if on_team else None,
+            "player_id": None if by_team else group[0],
+            "team": (i + 1 if by_team else team_of[group[0]])
+            if lobby["teams"]
+            else None,
             "leaders": pool,
         }
-        for i, (team, pool) in enumerate(zip(teams, pools, strict=True))
+        for i, (group, pool) in enumerate(zip(groups, pools, strict=True))
     ]
 
 
@@ -436,6 +417,15 @@ def ballot_counted(
     return {"bans": with_voted_bans(lobby, ban_votes, {"leader": leaders})}
 
 
+def drafted(
+    changes: dict[str, Any], draft_mode: str | None, now: datetime
+) -> dict[str, Any]:
+    """A dealt draft: a blind one goes on to its picks, any other is done."""
+    if draft_mode == "blind":
+        return {**changes, "phase": PICKING, "deadline": now + PICK_LIMIT}
+    return {**changes, "status": DONE, "deadline": None}
+
+
 def tallied(
     lobby: Mapping[str, Any],
     actor_id: str,
@@ -452,14 +442,7 @@ def tallied(
     require_phase(lobby, VOTING)
     bans = with_voted_bans(lobby, ban_votes, {"leader": leaders})
     pools = dealt({**lobby, "bans": bans}, _groups(lobby), leaders, rng)
-    if lobby["draft_mode"] == "blind":
-        return {
-            "bans": bans,
-            "pools": pools,
-            "phase": PICKING,
-            "deadline": now + PICK_LIMIT,
-        }
-    return {"bans": bans, "pools": pools, "status": DONE, "deadline": None}
+    return drafted({"bans": bans, "pools": pools}, lobby["draft_mode"], now)
 
 
 def picked(
@@ -518,10 +501,10 @@ def cancel_reason(lobby: Mapping[str, Any], actor_id: str, staff: bool) -> str:
 
 
 __all__ = [
-    "BLIND_POOL",
+    "BANS_VOTE_LIMIT",
     "CANCELLED",
+    "CODE_LETTERS",
     "DONE",
-    "FILL_WAIT",
     "IDLE_LIMIT",
     "LIVE",
     "OPEN",
@@ -530,14 +513,13 @@ __all__ = [
     "SETUP",
     "SETUP_IDLE_LIMIT",
     "SHAPES",
-    "VOTE_LIMIT",
     "VOTING",
     "LobbyRefused",
     "NotTheHost",
-    "Shape",
     "ballot_counted",
     "cancel_reason",
     "dealt",
+    "drafted",
     "edited",
     "finished",
     "joined",
@@ -545,10 +527,12 @@ __all__ = [
     "lobby_code",
     "new_lobby",
     "picked",
+    "require_host",
+    "require_phase",
     "revealed",
     "started",
     "tallied",
-    "team_sizes",
     "vote_placed",
     "went_live",
+    "with_voted_bans",
 ]

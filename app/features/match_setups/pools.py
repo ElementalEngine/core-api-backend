@@ -8,14 +8,16 @@ from random import SystemRandom
 from typing import Any
 
 _RANDOM = SystemRandom()
+# A blind pool is picked from one menu, which holds 25.
+BLIND_POOL = 25
 
 
 class NotEnoughPool(ValueError):
     """The post-ban set cannot cover what the draft needs."""
 
 
-def even_split(total: int, players: int) -> tuple[int, int]:
-    """Per-player pool size, and how many entries fall off the end."""
+def even_split(total: int, players: int) -> int:
+    """Per-player pool size; what is left over is not dealt."""
     if players <= 0:
         raise NotEnoughPool("a draft needs at least one player")
     per_player = total // players
@@ -23,20 +25,14 @@ def even_split(total: int, players: int) -> tuple[int, int]:
         raise NotEnoughPool(
             f"{total} remain after bans and {players} players need one each"
         )
-    return per_player, total % players
+    return per_player
 
 
 def deal(
-    tokens: Sequence[str],
-    players: int,
-    rng: Any = _RANDOM,
-    per_player: int | None = None,
+    tokens: Sequence[str], players: int, per_player: int, rng: Any = _RANDOM
 ) -> list[list[str]]:
-    """One disjoint pool per player, every pool the same size: `per_player`, or
-    the even split of what is left."""
-    if per_player is None:
-        per_player, _ = even_split(len(tokens), players)
-    elif per_player * players > len(tokens):
+    """One disjoint pool per player, each of `per_player`."""
+    if per_player * players > len(tokens):
         raise NotEnoughPool(
             f"{len(tokens)} remain after bans and {players} pools of "
             f"{per_player} need {per_player * players}"
@@ -90,6 +86,18 @@ def assign_one_each(
     return shuffled[:players]
 
 
+def leader_pools(
+    tokens: Sequence[str], groups: int, draft_mode: str, rng: Any = _RANDOM
+) -> list[list[str]]:
+    """A draft's leader pools: random gives each one leader, blind up to a
+    menu's worth, standard an even split of what is left."""
+    if draft_mode == "random":
+        return [[token] for token in assign_one_each(tokens, groups, rng)]
+    share = even_split(len(tokens), groups)
+    size = min(share, BLIND_POOL) if draft_mode == "blind" else share
+    return deal(tokens, groups, size, rng)
+
+
 def remaining_after_bans(tokens: Sequence[str], banned: Sequence[str]) -> list[str]:
     """The draftable set, in the catalogue's own order."""
     refused = set(banned)
@@ -97,11 +105,13 @@ def remaining_after_bans(tokens: Sequence[str], banned: Sequence[str]) -> list[s
 
 
 __all__ = [
+    "BLIND_POOL",
     "NotEnoughPool",
     "assign_one_each",
     "civ_target",
     "deal",
     "deal_civs",
     "even_split",
+    "leader_pools",
     "remaining_after_bans",
 ]

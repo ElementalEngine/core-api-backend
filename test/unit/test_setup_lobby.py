@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.features.match_setups.lobby import (
-    BLIND_POOL,
     CODE_LETTERS,
     SHAPES,
     LobbyRefused,
@@ -27,6 +26,7 @@ from app.features.match_setups.lobby import (
     vote_placed,
     went_live,
 )
+from app.features.match_setups.pools import BLIND_POOL
 from app.features.match_setups.questions import questions_for
 from app.features.match_setups.schemas import LobbyShape
 

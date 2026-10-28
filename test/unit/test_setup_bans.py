@@ -9,15 +9,12 @@ def test_civ6_caps_leaders_at_twenty_and_has_no_civ_bans():
     assert ban_caps("civ6", None) == {"leader": 20, "civ": 0}
 
 
-@pytest.mark.parametrize("age", [None, "none", "None"])
-def test_civ7_allows_ten_civ_bans_when_no_starting_age_is_chosen(age):
-    assert ban_caps("civ7", age) == {"leader": 10, "civ": 10}
+def test_civ7_allows_ten_civ_bans_when_no_starting_age_is_chosen():
+    assert ban_caps("civ7", None) == {"leader": 10, "civ": 10}
 
 
-@pytest.mark.parametrize("age", ["antiquity", "exploration", "modern"])
+@pytest.mark.parametrize("age", ["AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"])
 def test_civ7_drops_to_three_civ_bans_once_an_age_is_chosen(age):
-    # Read from the settings the previous phase resolved, never from the
-    # request -- the first place one phase's outcome bounds the next.
     assert ban_caps("civ7", age) == {"leader": 10, "civ": 3}
 
 

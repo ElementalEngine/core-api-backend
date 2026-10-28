@@ -152,8 +152,7 @@
             "label": "Terra"
           }
         ],
-        "default_option_id": "pangea_standard",
-        "max_selections": 2
+        "default_option_id": "pangea_standard"
       },
       {
         "id": "sea_level",

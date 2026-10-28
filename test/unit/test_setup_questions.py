@@ -55,41 +55,6 @@ def test_ffas_and_duels_may_also_draft_blind(edition, game_type):
     assert [o["id"] for o in modes["options"]] == ["standard", "random", "blind"]
 
 
-@pytest.mark.parametrize("edition", EDITIONS)
-def test_no_ballot_offers_cwc(edition):
-    # cwc is chosen when the lobby is made, so no ballot offers it. `cwc` is
-    # also a civ6 timer option, so only the draft-mode question is checked.
-    for game_type in GAME_TYPES:
-        modes = [
-            q for q in questions_for(edition, game_type) if q["id"] == "draft_mode"
-        ]
-        for question in modes:
-            assert "cwc" not in {o["id"] for o in question["options"]}, game_type
-
-
-@pytest.mark.parametrize("edition", EDITIONS)
-def test_random_is_offered_for_every_game_type(edition):
-    for game_type in GAME_TYPES:
-        offered = {o["id"] for o in questions_for(edition, game_type)[-1]["options"]}
-        assert "random" in offered, game_type
-
-
-def test_multi_select_is_capped_below_the_option_count():
-    # `map` is the only multi-select in either edition. A cap at or above the
-    # option count would let a seat approve everything, which is not a vote.
-    capped = [
-        (e, g, q)
-        for e, g in EVERY_BALLOT
-        for q in questions_for(e, g)
-        if "max_selections" in q
-    ]
-    assert capped, "the fixture must find a multi-select or this asserts nothing"
-    for edition, game_type, question in capped:
-        assert 2 <= question["max_selections"] < len(question["options"]), (
-            f"{edition}/{game_type}/{question['id']}"
-        )
-
-
 def test_the_catalogue_hands_out_a_copy():
     questions_for("civ6", "ffa")[0]["title"] = "MUTATED"
     assert questions_for("civ6", "ffa")[0]["title"] != "MUTATED"

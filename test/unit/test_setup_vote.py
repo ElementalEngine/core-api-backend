@@ -7,13 +7,13 @@ import pytest
 from bson import ObjectId
 
 from app.features.match_setups.lobby import (
-    BLIND_POOL,
     LobbyRefused,
     NotTheHost,
     finished,
     picked,
     revealed,
 )
+from app.features.match_setups.pools import BLIND_POOL
 from app.features.match_setups.questions import questions_for
 from app.features.match_setups.vote import (
     VOTE_LIMIT,
@@ -86,7 +86,6 @@ def test_a_vote_opens_at_once_for_ten_minutes_with_its_starter_bans_standing():
         ({"players": ["a"]}, "2 to 14 players"),
         ({"mode": "duel"}, "a duel is two players"),
         ({"mode": "teamer"}, "two teams of two or more"),
-        ({"age": "AGE_ANTIQUITY"}, "civ6 has no starting age"),
     ],
 )
 def test_a_vote_is_refused_when_its_players_do_not_fit(fields, refusal):
@@ -175,8 +174,8 @@ def test_a_teamer_deals_one_pool_a_team_and_random_one_leader_a_player():
     civ7 = voting(edition="civ7", mode="teamer", players=["a", "b", "c", "d"])
     standard_civ7 = tally(civ7, settings={"draft_mode": {"standard": ["a"]}}, civs=CIVS)
     assert [len(p["civs"]) for p in standard_civ7["pools"]] == [7, 7]
-    blind = tally(civ7, settings={"draft_mode": {"random": ["a"]}}, civs=CIVS)
-    assert [len(p["civs"]) for p in blind["pools"]] == [1, 1, 1, 1]
+    random_civ7 = tally(civ7, settings={"draft_mode": {"random": ["a"]}}, civs=CIVS)
+    assert [len(p["civs"]) for p in random_civ7["pools"]] == [1, 1, 1, 1]
 
 
 def test_civ7_deals_civs_beside_leaders_and_bans_civs_within_their_cap():

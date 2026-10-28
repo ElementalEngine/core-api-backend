@@ -7,9 +7,6 @@ from typing import Any
 
 BAN_KINDS = ("leader", "civ")
 
-AGE_POOLS = ("AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN")
-NO_STARTING_AGE = None
-
 CIV6_CAPS = {"leader": 20, "civ": 0}
 CIV7_LEADER_CAP = 10
 CIV7_CIV_CAP_ANY_AGE = 10
@@ -20,22 +17,21 @@ def ban_caps(edition: str, starting_age: str | None) -> dict[str, int]:
     """How many bans may land, per kind."""
     if edition == "civ6":
         return dict(CIV6_CAPS)
-    fixed_age = starting_age not in (None, "none", "None")
     return {
         "leader": CIV7_LEADER_CAP,
-        "civ": CIV7_CIV_CAP_FIXED_AGE if fixed_age else CIV7_CIV_CAP_ANY_AGE,
+        "civ": CIV7_CIV_CAP_ANY_AGE if starting_age is None else CIV7_CIV_CAP_FIXED_AGE,
     }
 
 
 def bannable_civs(
     civs: Sequence[Mapping[str, Any]], starting_age: str | None
 ) -> list[str]:
-    """The civ tokens a ban may name."""
-    if starting_age is NO_STARTING_AGE:
-        return [civ["token"] for civ in civs]
-    if starting_age not in AGE_POOLS:
-        raise ValueError(f"unknown starting age: {starting_age!r}")
-    return [civ["token"] for civ in civs if civ.get("age_pool") == starting_age]
+    """The civ tokens a ban may name: those of the starting age, or every one."""
+    return [
+        civ["token"]
+        for civ in civs
+        if starting_age is None or civ.get("age_pool") == starting_age
+    ]
 
 
 def capped(counts: Mapping[str, int], qualified: Sequence[str], cap: int) -> list[str]:
@@ -68,7 +64,6 @@ def voted_bans(
 
 
 __all__ = [
-    "AGE_POOLS",
     "BAN_KINDS",
     "ban_caps",
     "bannable_civs",

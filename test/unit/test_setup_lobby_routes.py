@@ -10,17 +10,36 @@ from app.features.match_setups.repository import CodeTaken, SeatedElsewhere
 
 TOKEN = "mito-test-token"
 LOBBIES = "/api/v2/match-setups/lobbies"
+VOTES = "/api/v2/match-setups/votes"
 SEASON = ObjectId()
-CIV6 = {
-    "leader_data_version": 5,
-    "leaders": [{"token": f"LEADER_{n:02}"} for n in range(30)],
-    "civs": [],
+CIV_DATA = {
+    "civ6": {
+        "leader_data_version": 5,
+        "leaders": [{"token": f"LEADER_{n:02}"} for n in range(30)],
+        "civs": [],
+    },
+    "civ7": {
+        "leader_data_version": 5,
+        "leaders": [{"token": f"LEADER_{n:02}"} for n in range(20)],
+        "civs": [
+            {"token": f"CIVILIZATION_{n:02}", "age_pool": "AGE_ANTIQUITY"}
+            for n in range(10)
+        ]
+        + [{"token": "CIVILIZATION_MODERN", "age_pool": "AGE_MODERN"}],
+    },
 }
 HOST = {
     "shape": "ffa-8",
     "guild_id": "g",
     "channel_id": "c",
     "steam_link": "steam://joinlobby/289070/109775241000000000/76561198000000000",
+}
+START = {
+    "edition": "civ6",
+    "mode": "ffa",
+    "guild_id": "g",
+    "channel_id": "c",
+    "players": ["a", "b", "c"],
 }
 
 
@@ -104,7 +123,8 @@ class Store:
         return [
             d
             for d in self.docs.values()
-            if d["status"] == "open"
+            if d["command"] == "lobby"
+            and d["status"] == "open"
             and d["guild_id"] == guild_id
             and (d["host_id"] == host_id if host_id else d["phase"] != "setup")
         ]
@@ -123,20 +143,22 @@ class Store:
         closed = []
         for doc in self.docs.values():
             limit = setup_cutoff if doc["phase"] == "setup" else cutoff
-            if doc["status"] == "open" and doc["updated_at"] < limit:
+            open_lobby = doc["command"] == "lobby" and doc["status"] == "open"
+            if open_lobby and doc["updated_at"] < limit:
                 doc.update(status="cancelled", cancel_reason="idle", closed_at=now)
                 closed.append(dict(doc))
         return closed
 
 
 @pytest.fixture
-def lobbies(monkeypatch):
+def setups(monkeypatch):
+    """The lobby and vote routes on an in-memory store."""
     pytest.importorskip("httpx")
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
     from app.core import dependencies
-    from app.features.match_setups import router as match_setups
+    from app.features.match_setups import router as match_setups, vote_router
 
     store = Store()
 
@@ -145,7 +167,7 @@ def lobbies(monkeypatch):
             pass
 
         async def fetch(self, edition):
-            return CIV6
+            return CIV_DATA[edition]
 
     class FakeSeasons:
         def __init__(self, _db):
@@ -158,8 +180,10 @@ def lobbies(monkeypatch):
     monkeypatch.setattr(match_setups, "CivDataRepository", FakeCivData)
     monkeypatch.setattr(match_setups, "SeasonsRepository", FakeSeasons)
     monkeypatch.setattr(match_setups, "MatchSetupRepository", store)
+    monkeypatch.setattr(vote_router, "MatchSetupRepository", store)
     app = FastAPI()
     app.include_router(match_setups.router)
+    app.include_router(vote_router.router)
     app.dependency_overrides[dependencies.get_database] = lambda: object()
     return TestClient(app, raise_server_exceptions=False), store
 
@@ -203,8 +227,8 @@ def cancel(client, code, player, staff=False):
     )
 
 
-def test_a_lobby_votes_on_bans_then_drafts_into_a_recorded_setup(lobbies):
-    client, store = lobbies
+def test_a_lobby_votes_on_bans_then_drafts_into_a_recorded_setup(setups):
+    client, store = setups
     lobby = hosted(client)
     assert len(lobby["code"]) == 6 and lobby["phase"] == "live"
     assert post(client, lobby, "join", "a").status_code == 200
@@ -235,8 +259,8 @@ def test_a_lobby_votes_on_bans_then_drafts_into_a_recorded_setup(lobbies):
     assert post(client, lobby, "tally", "host", json=ballot).status_code == 409
 
 
-def test_a_full_lobby_counts_down_and_only_the_host_starts_it_sooner(lobbies):
-    client, _ = lobbies
+def test_a_full_lobby_counts_down_and_only_the_host_starts_it_sooner(setups):
+    client, _ = setups
     duel = hosted(client, shape="duel", message="No novices", lfg=True)
     assert (duel["message"], duel["lfg"]) == ("No novices", True)
     full = post(client, duel, "join", "a").json()
@@ -252,8 +276,8 @@ def test_a_full_lobby_counts_down_and_only_the_host_starts_it_sooner(lobbies):
     assert post(client, ffa, "start", "other").json()["phase"] == "voting"
 
 
-def test_a_blind_draft_is_picked_privately_then_revealed(lobbies):
-    client, _ = lobbies
+def test_a_blind_draft_is_picked_privately_then_revealed(setups):
+    client, _ = setups
     lobby = hosted(client)
     assert edit(client, lobby, settings={"draft_mode": "blind"}).status_code == 200
     post(client, lobby, "join", "a")
@@ -272,8 +296,8 @@ def test_a_blind_draft_is_picked_privately_then_revealed(lobbies):
     assert [p["by"] for p in shown["picks"]] == ["auto", "player"]
 
 
-def test_votes_and_picks_past_their_time_are_listed(lobbies):
-    client, store = lobbies
+def test_votes_and_picks_past_their_time_are_listed(setups):
+    client, store = setups
     lobby = hosted(client)
     post(client, lobby, "join", "a")
     post(client, lobby, "start", "host")
@@ -288,8 +312,8 @@ def test_votes_and_picks_past_their_time_are_listed(lobbies):
     assert post(client, lobby, "tally", "host", json=too_many).status_code == 422
 
 
-def test_refusals_say_why(lobbies):
-    client, _ = lobbies
+def test_refusals_say_why(setups):
+    client, _ = setups
     duel = hosted(client, shape="duel")
     post(client, duel, "join", "a")
     full = post(client, duel, "join", "b")
@@ -297,8 +321,8 @@ def test_refusals_say_why(lobbies):
     assert full.json()["detail"]["error"]["message"] == "the lobby is full"
 
 
-def test_a_lobby_is_cancelled_by_its_code_by_its_host_or_staff(lobbies):
-    client, store = lobbies
+def test_a_lobby_is_cancelled_by_its_code_by_its_host_or_staff(setups):
+    client, store = setups
     lobby = hosted(client)
     assert cancel(client, "ZZZZ", "host").status_code == 404
     assert cancel(client, lobby["code"], "a").status_code == 403
@@ -309,8 +333,8 @@ def test_a_lobby_is_cancelled_by_its_code_by_its_host_or_staff(lobbies):
     assert (closed["status"], closed["cancel_reason"]) == ("cancelled", "host")
 
 
-def test_a_code_in_use_is_drawn_again(lobbies, monkeypatch):
-    client, _ = lobbies
+def test_a_code_in_use_is_drawn_again(setups, monkeypatch):
+    client, _ = setups
     from app.features.match_setups import router as match_setups
 
     codes = iter(["AAAA", "AAAA", "BBBB"])
@@ -319,8 +343,8 @@ def test_a_code_in_use_is_drawn_again(lobbies, monkeypatch):
     assert hosted(client, host="other")["code"] == "BBBB"
 
 
-def test_a_player_sits_in_one_open_lobby_at_a_time(lobbies):
-    client, _ = lobbies
+def test_a_player_sits_in_one_open_lobby_at_a_time(setups):
+    client, _ = setups
     first = hosted(client)
     second = client.post(LOBBIES, json=HOST, headers=as_player("host"))
     assert second.status_code == 409
@@ -333,8 +357,8 @@ def test_a_player_sits_in_one_open_lobby_at_a_time(lobbies):
     )
 
 
-def test_a_lobby_in_setup_is_hidden_and_closed_to_players(lobbies):
-    client, _ = lobbies
+def test_a_lobby_in_setup_is_hidden_and_closed_to_players(setups):
+    client, _ = setups
     setup = hosted(client, live=False, steam_link=None)
     assert (setup["phase"], setup["steam_link"], setup["settings"]) == (
         "setup",
@@ -358,8 +382,8 @@ def test_a_lobby_in_setup_is_hidden_and_closed_to_players(lobbies):
     )
 
 
-def test_an_edit_is_checked_whole_against_civ_data_and_the_catalogue(lobbies):
-    client, _ = lobbies
+def test_an_edit_is_checked_whole_against_civ_data_and_the_catalogue(setups):
+    client, _ = setups
     lobby = hosted(client)
     assert edit(client, lobby, bans=["LEADER_NOBODY"]).status_code == 400
     assert edit(client, lobby, settings={"huts": "x9"}).status_code == 409
@@ -378,8 +402,8 @@ def test_an_edit_is_checked_whole_against_civ_data_and_the_catalogue(lobbies):
     assert [q["id"] for q in questions] == [s["id"] for s in lobby["settings"]]
 
 
-def test_a_write_that_lost_a_race_is_tried_again(lobbies):
-    client, store = lobbies
+def test_a_write_that_lost_a_race_is_tried_again(setups):
+    client, store = setups
     url = f"{LOBBIES}/{hosted(client)['id']}"
     store.stale_writes = 2
     assert client.post(f"{url}/join", headers=as_player("a")).status_code == 200
@@ -390,8 +414,8 @@ def test_a_write_that_lost_a_race_is_tried_again(lobbies):
     )
 
 
-def test_idle_lobbies_close(lobbies):
-    client, store = lobbies
+def test_idle_lobbies_close(setups):
+    client, store = setups
     idle = hosted(client, host="sleepy")
     store.docs[ObjectId(idle["id"])]["updated_at"] = datetime.now(UTC) - timedelta(
         hours=3
@@ -404,8 +428,8 @@ def test_idle_lobbies_close(lobbies):
     )
 
 
-def test_a_lobby_left_in_setup_frees_its_host_sooner(lobbies):
-    client, store = lobbies
+def test_a_lobby_left_in_setup_frees_its_host_sooner(setups):
+    client, store = setups
     left = hosted(client, host="gone", live=False)
     live = hosted(client, host="here")
     for lobby in (left, live):
@@ -417,76 +441,14 @@ def test_a_lobby_left_in_setup_frees_its_host_sooner(lobbies):
     assert hosted(client, host="gone", live=False)["status"] == "open"
 
 
-VOTES = "/api/v2/match-setups/votes"
-CIV_DATA = {
-    "civ6": {
-        "leader_data_version": 5,
-        "leaders": [{"token": f"LEADER_{n:02}"} for n in range(30)],
-        "civs": [],
-    },
-    "civ7": {
-        "leader_data_version": 5,
-        "leaders": [{"token": f"LEADER_{n:02}"} for n in range(20)],
-        "civs": [
-            {"token": f"CIVILIZATION_{n:02}", "age_pool": "AGE_ANTIQUITY"}
-            for n in range(10)
-        ]
-        + [{"token": "CIVILIZATION_MODERN", "age_pool": "AGE_MODERN"}],
-    },
-}
-START = {
-    "edition": "civ6",
-    "mode": "ffa",
-    "guild_id": "g",
-    "channel_id": "c",
-    "players": ["a", "b", "c"],
-}
-
-
-@pytest.fixture
-def votes(monkeypatch):
-    pytest.importorskip("httpx")
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-
-    from app.core import dependencies
-    from app.features.match_setups import router as match_setups, vote_router
-
-    store = Store()
-
-    class FakeCivData:
-        def __init__(self, _db):
-            pass
-
-        async def fetch(self, edition):
-            return CIV_DATA[edition]
-
-    class FakeSeasons:
-        def __init__(self, _db):
-            pass
-
-        async def get_current_season(self, edition):
-            return {"_id": SEASON}
-
-    monkeypatch.setattr(dependencies.settings, "mito_service_token", SecretStr(TOKEN))
-    monkeypatch.setattr(match_setups, "CivDataRepository", FakeCivData)
-    monkeypatch.setattr(match_setups, "SeasonsRepository", FakeSeasons)
-    monkeypatch.setattr(match_setups, "MatchSetupRepository", store)
-    monkeypatch.setattr(vote_router, "MatchSetupRepository", store)
-    app = FastAPI()
-    app.include_router(vote_router.router)
-    app.dependency_overrides[dependencies.get_database] = lambda: object()
-    return TestClient(app, raise_server_exceptions=False), store
-
-
 def vote_post(client, vote, path, actor, **kwargs):
     return client.post(
         f"{VOTES}/{vote['id']}/{path}", headers=as_player(actor), **kwargs
     )
 
 
-def test_a_vote_runs_from_its_messages_to_a_recorded_draft(votes):
-    client, store = votes
+def test_a_vote_runs_from_its_messages_to_a_recorded_draft(setups):
+    client, store = setups
     started = client.post(
         VOTES, json={**START, "leader_bans": ["LEADER_00"]}, headers=as_player("a")
     )
@@ -526,8 +488,8 @@ def test_a_vote_runs_from_its_messages_to_a_recorded_draft(votes):
     assert vote_post(client, vote, "tally", "a", json=ballot).status_code == 409
 
 
-def test_civ7_bans_civs_of_its_age_and_blind_picks_a_leader_and_a_civ(votes):
-    client, store = votes
+def test_civ7_bans_civs_of_its_age_and_blind_picks_a_leader_and_a_civ(setups):
+    client, store = setups
     asked = {
         **START,
         "edition": "civ7",
@@ -561,8 +523,8 @@ def test_civ7_bans_civs_of_its_age_and_blind_picks_a_leader_and_a_civ(votes):
     assert "closed_at" in store.docs[ObjectId(vote["id"])]
 
 
-def test_a_vote_is_refused_for_civ6_ages_and_found_by_its_code_or_when_due(votes):
-    client, store = votes
+def test_a_vote_is_refused_for_civ6_ages_and_found_by_its_code_or_when_due(setups):
+    client, store = setups
     assert (
         client.post(
             VOTES, json={**START, "age": "AGE_ANTIQUITY"}, headers=as_player("a")

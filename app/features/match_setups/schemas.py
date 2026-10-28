@@ -1,4 +1,4 @@
-"""What Mite sends for /draft and /lobby, and what it gets back."""
+"""What Mite sends for /draft, /lobby and /vote, and what it gets back."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 MAX_DRAFTS = {"civ6": 14, "civ7": 10}
+StartingAge = Literal["AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"]
 
 
 class DraftRequest(BaseModel):
@@ -22,9 +23,7 @@ class DraftRequest(BaseModel):
     leaders: int = Field(ge=1)
     # civ7 only, as is the starting age; no age means every age.
     civs: int | None = Field(default=None, ge=1)
-    starting_age: Literal["AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"] | None = (
-        None
-    )
+    starting_age: StartingAge | None = None
     leader_bans: list[str] = Field(default_factory=list, max_length=100)
     civ_bans: list[str] = Field(default_factory=list, max_length=100)
 
@@ -131,7 +130,7 @@ class LobbyBallot(BaseModel):
 
 
 class LobbyCancel(BaseModel):
-    """A lobby is cancelled by its code, by its host or by staff."""
+    """A lobby or vote is cancelled by its code, by its host or by staff."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -187,35 +186,35 @@ class LobbyPool(BaseModel):
     civs: list[str] = []
 
 
-class LobbyView(BaseModel):
+class SetupView(BaseModel):
     id: str
-    shape: LobbyShape
-    mode: str
-    seats: int
     teams: int
     draft_mode: str | None
     status: Literal["open", "done", "cancelled"]
-    phase: Literal["setup", "live", "voting", "picking"]
     deadline: datetime | None
     code: str
     host_id: str
     guild_id: str
     channel_id: str
-    message_id: str | None
-    steam_link: str | None
-    message: str | None = None
-    lfg: bool = False
     players: list[LobbyPlayer]
     settings: list[ChosenSetting]
     bans: list[SetupBan]
     pools: list[LobbyPool]
     picks: list[BlindPick]
-    vote: LobbyVote | None
     cancel_reason: str | None
     updated_at: datetime
 
 
-StartingAge = Literal["AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"]
+class LobbyView(SetupView):
+    shape: LobbyShape
+    mode: str
+    seats: int
+    phase: Literal["setup", "live", "voting", "picking"]
+    message_id: str | None
+    steam_link: str | None
+    message: str | None = None
+    lfg: bool = False
+    vote: LobbyVote | None
 
 
 class VoteRequest(BaseModel):
@@ -255,28 +254,12 @@ class VoteBallot(BaseModel):
     bans: dict[str, Voters] = Field(default_factory=dict, max_length=200)
 
 
-class VoteView(BaseModel):
-    id: str
+class VoteView(SetupView):
     edition: Literal["civ6", "civ7"]
     mode: Literal["ffa", "duel", "teamer"]
-    teams: int
     age: StartingAge | None
-    draft_mode: str | None
-    status: Literal["open", "done", "cancelled"]
     phase: Literal["voting", "picking"]
-    deadline: datetime | None
-    code: str
-    host_id: str
-    guild_id: str
-    channel_id: str
-    players: list[LobbyPlayer]
-    settings: list[ChosenSetting]
-    bans: list[SetupBan]
-    pools: list[LobbyPool]
-    picks: list[BlindPick]
     vote: LobbyVote
-    cancel_reason: str | None
-    updated_at: datetime
 
 
 class SettingOption(BaseModel):
@@ -293,7 +276,6 @@ class SettingQuestion(BaseModel):
 
 
 __all__ = [
-    "MAX_DRAFTS",
     "BlindPick",
     "ChosenSetting",
     "DealtBans",
@@ -314,6 +296,7 @@ __all__ = [
     "SettingOption",
     "SettingQuestion",
     "SetupBan",
+    "SetupView",
     "StartingAge",
     "VoteBallot",
     "VoteMessages",

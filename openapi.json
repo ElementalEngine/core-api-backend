@@ -1153,7 +1153,7 @@
       },
       "LobbyCancel": {
         "additionalProperties": false,
-        "description": "A lobby is cancelled by its code, by its host or by staff.",
+        "description": "A lobby or vote is cancelled by its code, by its host or by staff.",
         "properties": {
           "code": {
             "maxLength": 8,
@@ -1591,28 +1591,28 @@
         },
         "required": [
           "id",
-          "shape",
-          "mode",
-          "seats",
           "teams",
           "draft_mode",
           "status",
-          "phase",
           "deadline",
           "code",
           "host_id",
           "guild_id",
           "channel_id",
-          "message_id",
-          "steam_link",
           "players",
           "settings",
           "bans",
           "pools",
           "picks",
-          "vote",
           "cancel_reason",
-          "updated_at"
+          "updated_at",
+          "shape",
+          "mode",
+          "seats",
+          "phase",
+          "message_id",
+          "steam_link",
+          "vote"
         ],
         "title": "LobbyView",
         "type": "object"
@@ -4009,13 +4009,9 @@
         },
         "required": [
           "id",
-          "edition",
-          "mode",
           "teams",
-          "age",
           "draft_mode",
           "status",
-          "phase",
           "deadline",
           "code",
           "host_id",
@@ -4026,9 +4022,13 @@
           "bans",
           "pools",
           "picks",
-          "vote",
           "cancel_reason",
-          "updated_at"
+          "updated_at",
+          "edition",
+          "mode",
+          "age",
+          "phase",
+          "vote"
         ],
         "title": "VoteView",
         "type": "object"
@@ -6929,7 +6929,7 @@
     },
     "/api/v2/match-setups/votes/cancel": {
       "post": {
-        "description": "The host, or staff, cancel an open vote by its code.",
+        "description": "The starter, or staff, cancel an open vote by its code.",
         "operationId": "cancel_vote_api_v2_match_setups_votes_cancel_post",
         "parameters": [
           {

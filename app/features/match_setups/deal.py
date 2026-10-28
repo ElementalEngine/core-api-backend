@@ -27,7 +27,8 @@ def checked_bans(
 ) -> list[str]:
     """The bans asked for, once each, refused if unknown or over the cap."""
     bans = list(dict.fromkeys(asked))
-    unknown = [token for token in bans if token not in set(allowed)]
+    known = set(allowed)
+    unknown = [token for token in bans if token not in known]
     if unknown:
         raise DraftRefused(f"These cannot be banned here: {', '.join(unknown)}.")
     if len(bans) > cap:
@@ -48,8 +49,8 @@ def deal_draft(
         leader_pools = deal(
             remaining_after_bans(leaders, leader_bans),
             request.drafts,
+            request.leaders,
             rng,
-            per_player=request.leaders,
         )
         civ_pools: list[list[str]] = [[] for _ in leader_pools]
         if request.civs is not None:

@@ -11,6 +11,7 @@ from app.features.match_setups.pools import (
     deal,
     deal_civs,
     even_split,
+    leader_pools,
     remaining_after_bans,
 )
 
@@ -18,8 +19,8 @@ TOKENS = [f"LEADER_{i:02d}" for i in range(44)]
 
 
 def test_the_pool_is_truncated_so_every_player_gets_the_same_count():
-    assert even_split(44, 5) == (8, 4)
-    assert even_split(44, 4) == (11, 0)
+    assert even_split(44, 5) == 8
+    assert even_split(44, 4) == 11
 
 
 def test_a_player_who_would_get_nothing_is_refused():
@@ -35,7 +36,7 @@ def test_a_draft_needs_players(players):
 
 
 def test_pools_are_disjoint_and_equal():
-    pools = deal(TOKENS, 5, random.Random(7))
+    pools = leader_pools(TOKENS, 5, "standard", random.Random(7))
     assert [len(pool) for pool in pools] == [8, 8, 8, 8, 8]
     flat = [token for pool in pools for token in pool]
     assert len(flat) == len(set(flat)), "a token reached two players"
@@ -43,9 +44,15 @@ def test_pools_are_disjoint_and_equal():
     assert len(TOKENS) - len(flat) == 4
 
 
+def test_a_blind_pool_fits_one_menu_and_random_deals_one_each():
+    many = [f"L{n}" for n in range(80)]
+    assert [len(p) for p in leader_pools(many, 2, "blind")] == [25, 25]
+    assert [len(p) for p in leader_pools(many, 3, "random")] == [1, 1, 1]
+
+
 def test_a_deal_is_not_reproducible_from_the_lobby():
-    first = deal(TOKENS, 5)
-    second = deal(TOKENS, 5)
+    first = leader_pools(TOKENS, 5, "standard")
+    second = leader_pools(TOKENS, 5, "standard")
     assert first != second
 
 
@@ -122,7 +129,7 @@ def test_no_civs_at_all_is_refused():
 
 
 def test_a_chosen_pool_size_is_dealt_and_the_rest_left():
-    pools = deal(TOKENS, 3, random.Random(7), per_player=2)
+    pools = deal(TOKENS, 3, 2, random.Random(7))
     assert [len(pool) for pool in pools] == [2, 2, 2]
     with pytest.raises(NotEnoughPool, match="need"):
-        deal(TOKENS, 3, random.Random(7), per_player=len(TOKENS))
+        deal(TOKENS, 3, len(TOKENS), random.Random(7))

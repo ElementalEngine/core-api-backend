@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from random import SystemRandom
 from typing import Any
 
 from fastapi import APIRouter, Depends, status
@@ -16,28 +15,20 @@ from app.core.dependencies import (
     get_database,
     require_mito_token,
 )
-from app.core.errors import api_error, invalid_request, not_found
+from app.core.errors import invalid_request
 from app.features.match_setups.bans import ban_caps, bannable_civs
 from app.features.match_setups.deal import DraftRefused, checked_bans
-from app.features.match_setups.lobby import (
-    CANCELLED,
-    DONE,
-    LobbyRefused,
-    cancel_reason,
-    finished,
-    lobby_code,
-    picked,
-    revealed,
-    vote_placed,
-)
+from app.features.match_setups.lobby import finished, picked, revealed, vote_placed
 from app.features.match_setups.questions import questions_for
-from app.features.match_setups.repository import CodeTaken, MatchSetupRepository
+from app.features.match_setups.repository import MatchSetupRepository
 from app.features.match_setups.router import (
-    WRITE_ATTEMPTS,
+    cancel_by_code,
     change_setup,
     civ_data_for,
+    insert_coded,
     lobby_view,
     open_season_id,
+    read_setup,
 )
 from app.features.match_setups.schemas import (
     LeaderPick,
@@ -55,7 +46,6 @@ router = APIRouter(
     dependencies=[Depends(require_mito_token)],
 )
 
-_RANDOM = SystemRandom()
 VOTE = "vote"
 
 
@@ -72,9 +62,7 @@ async def _read(
     db: AsyncMongoClient, vote_id: str
 ) -> tuple[dict[str, Any], list[str], list[str]]:
     """The vote, with the leaders and civs it may ban and deal."""
-    vote = await MatchSetupRepository(db).lobby(vote_id, VOTE)
-    if vote is None:
-        raise not_found("there is no such vote")
+    vote = await read_setup(db, vote_id, VOTE)
     civ_data = await civ_data_for(db, vote["edition"])
     return vote, *_draftable(civ_data, vote["age"], vote["edition"])
 
@@ -102,28 +90,17 @@ async def start_vote(
         ]
     except DraftRefused as exc:
         raise invalid_request(str(exc)) from exc
-    for _ in range(WRITE_ATTEMPTS):
-        try:
-            vote = new_vote(
-                **request.model_dump(exclude={"leader_bans", "civ_bans"}),
-                host_id=actor,
-                bans=bans,
-                code=lobby_code(),
-                now=datetime.now(UTC),
-            )
-        except LobbyRefused as exc:
-            raise invalid_request(str(exc)) from exc
-        try:
-            vote["_id"] = await MatchSetupRepository(db).insert(vote)
-        except CodeTaken:
-            continue
-        return lobby_view(vote)
-    raise api_error(
-        code="CONFLICT",
-        message="no free vote code was found",
-        status_code=status.HTTP_409_CONFLICT,
-        retryable=True,
-    )
+
+    def made(code: str) -> dict[str, Any]:
+        return new_vote(
+            **request.model_dump(exclude={"leader_bans", "civ_bans"}),
+            host_id=actor,
+            bans=bans,
+            code=code,
+            now=datetime.now(UTC),
+        )
+
+    return await insert_coded(db, made, VOTE)
 
 
 @router.get("/due", response_model=list[VoteView])
@@ -142,31 +119,15 @@ async def cancel_vote(
     staff: bool = Depends(actor_is_staff),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """The host, or staff, cancel an open vote by its code."""
-    code = body.code.strip().upper()
-    found = await MatchSetupRepository(db).lobby_by_code(body.guild_id, code, VOTE)
-    if found is None:
-        raise not_found("no open vote here has that code")
-
-    def cancelled(vote: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "status": CANCELLED,
-            "cancel_reason": cancel_reason(vote, actor, staff),
-            "deadline": None,
-            "closed_at": datetime.now(UTC),
-        }
-
-    return await change_setup(db, str(found["_id"]), cancelled, VOTE)
+    """The starter, or staff, cancel an open vote by its code."""
+    return await cancel_by_code(db, body, actor, staff, VOTE)
 
 
 @router.get("/{vote_id}", response_model=VoteView)
 async def read_vote(
     vote_id: str, db: AsyncMongoClient = Depends(get_database)
 ) -> dict[str, Any]:
-    vote = await MatchSetupRepository(db).lobby(vote_id, VOTE)
-    if vote is None:
-        raise not_found("there is no such vote")
-    return lobby_view(vote)
+    return lobby_view(await read_setup(db, vote_id, VOTE))
 
 
 @router.put("/{vote_id}/messages", response_model=VoteView)
@@ -233,7 +194,6 @@ async def tally_vote(
     season_id = await open_season_id(db, read["edition"])
 
     def counted(vote: dict[str, Any]) -> dict[str, Any]:
-        now = datetime.now(UTC)
         changes = vote_tallied(
             vote,
             actor,
@@ -242,11 +202,9 @@ async def tally_vote(
             questions=questions_for(vote["edition"], vote["mode"]),
             leaders=leaders,
             civs=civs,
-            now=now,
-            rng=_RANDOM,
+            now=datetime.now(UTC),
         )
-        closed = {"closed_at": now} if changes.get("status") == DONE else {}
-        return {**changes, "season_id": season_id, **closed}
+        return {**changes, "season_id": season_id}
 
     return await change_setup(db, vote_id, counted, VOTE)
 
@@ -272,8 +230,7 @@ async def reveal_vote_picks(
 ) -> dict[str, Any]:
     """The blind picks revealed; the bot reveals, acting as the host, once all
     have picked or the time is up."""
+    return await change_setup(db, vote_id, lambda vote: revealed(vote, actor), VOTE)
 
-    def shown(vote: dict[str, Any]) -> dict[str, Any]:
-        return {**revealed(vote, actor), "closed_at": datetime.now(UTC)}
 
-    return await change_setup(db, vote_id, shown, VOTE)
+__all__ = ["router"]
