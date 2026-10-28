@@ -23,7 +23,6 @@ from app.features.match_setups.lobby import (
     CANCELLED,
     DONE,
     LobbyRefused,
-    ballot_counted,
     cancel_reason,
     finished,
     lobby_code,
@@ -42,14 +41,13 @@ from app.features.match_setups.router import (
 )
 from app.features.match_setups.schemas import (
     LeaderPick,
-    LobbyBallot,
     LobbyCancel,
     VoteBallot,
     VoteMessages,
     VoteRequest,
     VoteView,
 )
-from app.features.match_setups.vote import new_vote, vote_tallied
+from app.features.match_setups.vote import new_vote, vote_counted, vote_tallied
 
 router = APIRouter(
     prefix="/api/v2/match-setups/votes",
@@ -198,22 +196,28 @@ async def finish_vote(
 
 
 @router.post("/{vote_id}/ballot", response_model=VoteView)
-async def count_vote_bans(
+async def count_vote_so_far(
     vote_id: str,
-    body: LobbyBallot,
+    body: VoteBallot,
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """The ban reactions so far, sent by the bot as the host: a leader or civ
-    reaching a majority is banned at once and stays banned."""
+    """The reactions so far, sent by the bot as the host: a setting option or a
+    ban reaching a majority is won at once and stays won."""
     _, leaders, civs = await _read(db, vote_id)
-    allowed = {"leader": leaders, "civ": civs} if civs else {"leader": leaders}
-    return await change_setup(
-        db,
-        vote_id,
-        lambda vote: ballot_counted(vote, actor, ban_votes=body.bans, allowed=allowed),
-        VOTE,
-    )
+
+    def counted(vote: dict[str, Any]) -> dict[str, Any]:
+        return vote_counted(
+            vote,
+            actor,
+            setting_votes=body.settings,
+            ban_votes=body.bans,
+            questions=questions_for(vote["edition"], vote["mode"]),
+            leaders=leaders,
+            civs=civs,
+        )
+
+    return await change_setup(db, vote_id, counted, VOTE)
 
 
 @router.post("/{vote_id}/tally", response_model=VoteView)

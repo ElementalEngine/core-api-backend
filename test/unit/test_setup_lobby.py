@@ -328,7 +328,7 @@ def test_the_vote_adds_bans_with_a_majority_then_the_draft_is_dealt():
 def test_a_leader_reaching_a_majority_mid_vote_is_banned_and_stays_banned():
     made = voting(lobby(players=["a", "b"]))
     count = lambda m, votes: apply(  # noqa: E731
-        m, ballot_counted(m, "host", ban_votes=votes, allowed={"leader": LEADERS})
+        m, ballot_counted(m, "host", ban_votes=votes, leaders=LEADERS)
     )
     one = count(made, {"LEADER_03": ["host"], "LEADER_04": ["a"]})
     assert one["bans"] == []
@@ -338,11 +338,9 @@ def test_a_leader_reaching_a_majority_mid_vote_is_banned_and_stays_banned():
     assert [b["token"] for b in taken_back["bans"]] == ["LEADER_03"]
     assert [b["token"] for b in tally(taken_back)["bans"]] == ["LEADER_03"]
     with pytest.raises(NotTheHost):
-        ballot_counted(made, "a", ban_votes={}, allowed={"leader": LEADERS})
+        ballot_counted(made, "a", ban_votes={}, leaders=LEADERS)
     with pytest.raises(LobbyRefused, match="not voting"):
-        ballot_counted(
-            lobby(players=["a"]), "host", ban_votes={}, allowed={"leader": LEADERS}
-        )
+        ballot_counted(lobby(players=["a"]), "host", ban_votes={}, leaders=LEADERS)
 
 
 def test_three_teams_of_two_fill_in_turn_and_draft_by_team():

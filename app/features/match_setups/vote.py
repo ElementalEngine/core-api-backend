@@ -33,14 +33,13 @@ from app.features.match_setups.pools import (
 
 VOTE_LIMIT = timedelta(minutes=10)
 MAX_PLAYERS = 14
-MAX_TEAMS = 4
+TEAMS = 2
 
 
 def new_vote(
     *,
     edition: str,
     mode: str,
-    teams: int,
     age: str | None,
     host_id: str,
     guild_id: str,
@@ -57,17 +56,15 @@ def new_vote(
         raise LobbyRefused(f"a vote needs 2 to {MAX_PLAYERS} players")
     if mode == "duel" and len(voters) != 2:
         raise LobbyRefused("a duel is two players")
-    if mode == "teamer" and not 2 <= teams <= min(MAX_TEAMS, len(voters)):
-        raise LobbyRefused(f"a teamer has 2 to {MAX_TEAMS} teams, each with a player")
-    if mode != "teamer" and teams:
-        raise LobbyRefused("only a teamer has teams")
+    if mode == "teamer" and len(voters) < 2 * TEAMS:
+        raise LobbyRefused("a teamer is two teams of two or more")
     if edition == "civ6" and age is not None:
         raise LobbyRefused("civ6 has no starting age")
     return {
         "command": "vote",
         "edition": edition,
         "mode": mode,
-        "teams": teams if mode == "teamer" else 0,
+        "teams": TEAMS if mode == "teamer" else 0,
         "age": age,
         "draft_mode": None,
         "status": OPEN,
@@ -96,22 +93,47 @@ def seeded_index(seed: str, question_id: str, count: int) -> int:
     return int(digest[:8], 16) % count
 
 
+def _backing(
+    question: Mapping[str, Any], votes: Mapping[str, Sequence[str]], voters: set[str]
+) -> dict[str, int]:
+    return {
+        o["id"]: len(voters & set(votes.get(o["id"], ()))) for o in question["options"]
+    }
+
+
 def winner(
     question: Mapping[str, Any],
     votes: Mapping[str, Sequence[str]],
     voters: set[str],
     seed: str,
 ) -> str:
-    """The option most players reacted for; with no reactions, the default. A
-    tie goes to one of the tied options by a fixed hash."""
-    counts = {
-        o["id"]: len(voters & set(votes.get(o["id"], ()))) for o in question["options"]
-    }
+    """The option most players reacted for. A tie, none reacting included, goes
+    to one of the tied options by a fixed hash."""
+    counts = _backing(question, votes, voters)
     most = max(counts.values(), default=0)
-    if most == 0:
-        return str(question["default_option_id"])
     tied = sorted(option for option, count in counts.items() if count == most)
     return tied[seeded_index(seed, question["id"], len(tied))]
+
+
+def settled(
+    vote: Mapping[str, Any],
+    setting_votes: Mapping[str, Mapping[str, Sequence[str]]],
+    questions: Sequence[Mapping[str, Any]],
+    *,
+    final: bool,
+) -> list[dict[str, Any]]:
+    """The settings won so far: one an option has a majority of the players
+    for is won at once and stays won. The final count settles the rest."""
+    voters = {p["discord_id"] for p in vote["players"]}
+    need = len(voters) // 2 + 1
+    chosen = {s["id"]: s for s in vote["settings"]}
+    for q in questions:
+        votes = setting_votes.get(q["id"], {})
+        won = max(_backing(q, votes, voters).values(), default=0) >= need
+        if q["id"] not in chosen and (final or won):
+            value = winner(q, votes, voters, str(vote["_id"]))
+            chosen[q["id"]] = {"id": q["id"], "value": value, "by": "vote"}
+    return [chosen[q["id"]] for q in questions if q["id"] in chosen]
 
 
 def _pools(
@@ -171,6 +193,30 @@ def _pools(
     ]
 
 
+def _bannable(leaders: Sequence[str], civs: Sequence[str]) -> dict[str, Sequence[str]]:
+    return {"leader": leaders, "civ": civs} if civs else {"leader": leaders}
+
+
+def vote_counted(
+    vote: Mapping[str, Any],
+    actor_id: str,
+    *,
+    setting_votes: Mapping[str, Mapping[str, Sequence[str]]],
+    ban_votes: Mapping[str, Sequence[str]],
+    questions: Sequence[Mapping[str, Any]],
+    leaders: Sequence[str],
+    civs: Sequence[str],
+) -> dict[str, Any]:
+    """A running count while the players vote: a setting option or a ban
+    reaching a majority is won at once, and stays won."""
+    require_host(vote, actor_id)
+    require_phase(vote, VOTING)
+    return {
+        "settings": settled(vote, setting_votes, questions, final=False),
+        "bans": with_voted_bans(vote, ban_votes, _bannable(leaders, civs)),
+    }
+
+
 def vote_tallied(
     vote: Mapping[str, Any],
     actor_id: str,
@@ -183,37 +229,31 @@ def vote_tallied(
     now: datetime,
     rng: Any,
 ) -> dict[str, Any]:
-    """The vote counted: each setting and the draft mode go to the most
-    reactions, the bans a majority backs land within the caps, and the draft is
-    dealt. A blind draft then has its players pick; any other is done."""
+    """The vote counted: each setting not yet won goes to the most reactions,
+    the bans a majority backs land within the caps, and the draft is dealt. A
+    blind draft then has its players pick; any other is done."""
     require_host(vote, actor_id)
     require_phase(vote, VOTING)
-    voters = {p["discord_id"] for p in vote["players"]}
-    seed = str(vote["_id"])
-    settings = [
-        {
-            "id": q["id"],
-            "value": winner(q, setting_votes.get(q["id"], {}), voters, seed),
-            "by": "vote",
-        }
-        for q in questions
-    ]
+    settings = settled(vote, setting_votes, questions, final=True)
     draft_mode = next(s["value"] for s in settings if s["id"] == "draft_mode")
-    bans = with_voted_bans(
-        vote,
-        ban_votes,
-        {"leader": leaders, "civ": civs} if civs else {"leader": leaders},
-    )
-    pools = _pools({**vote, "bans": bans}, draft_mode, leaders, civs, rng)
+    bans = with_voted_bans(vote, ban_votes, _bannable(leaders, civs))
     changes = {
         "settings": settings,
         "draft_mode": draft_mode,
         "bans": bans,
-        "pools": pools,
+        "pools": _pools({**vote, "bans": bans}, draft_mode, leaders, civs, rng),
     }
     if draft_mode == "blind":
         return {**changes, "phase": PICKING, "deadline": now + PICK_LIMIT}
     return {**changes, "status": DONE, "deadline": None}
 
 
-__all__ = ["VOTE_LIMIT", "new_vote", "seeded_index", "vote_tallied", "winner"]
+__all__ = [
+    "VOTE_LIMIT",
+    "new_vote",
+    "seeded_index",
+    "settled",
+    "vote_counted",
+    "vote_tallied",
+    "winner",
+]

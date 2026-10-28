@@ -10,7 +10,6 @@ from app.features.match_setups.lobby import (
     BLIND_POOL,
     LobbyRefused,
     NotTheHost,
-    ballot_counted,
     finished,
     picked,
     revealed,
@@ -20,6 +19,7 @@ from app.features.match_setups.vote import (
     VOTE_LIMIT,
     new_vote,
     seeded_index,
+    vote_counted,
     vote_tallied,
     winner,
 )
@@ -34,7 +34,6 @@ def voting(edition="civ6", mode="ffa", players=("a", "b", "c"), **fields):
         **{
             "edition": edition,
             "mode": mode,
-            "teams": 0,
             "age": None,
             "host_id": "a",
             "guild_id": "g",
@@ -86,9 +85,7 @@ def test_a_vote_opens_at_once_for_ten_minutes_with_its_starter_bans_standing():
     [
         ({"players": ["a"]}, "2 to 14 players"),
         ({"mode": "duel"}, "a duel is two players"),
-        ({"mode": "teamer", "teams": 5}, "2 to 4 teams"),
-        ({"mode": "teamer", "teams": 1}, "2 to 4 teams"),
-        ({"teams": 2}, "only a teamer has teams"),
+        ({"mode": "teamer"}, "two teams of two or more"),
         ({"age": "AGE_ANTIQUITY"}, "civ6 has no starting age"),
     ],
 )
@@ -97,39 +94,60 @@ def test_a_vote_is_refused_when_its_players_do_not_fit(fields, refusal):
         voting(**fields)
 
 
-def test_a_setting_goes_to_the_most_player_reactions_or_its_default_and_a_tie_is_fixed():
-    question = {
-        "id": "huts",
-        "default_option_id": "x1",
-        "options": [{"id": "x1"}, {"id": "x2"}, {"id": "x3"}],
-    }
+def test_a_setting_goes_to_the_most_player_reactions_and_any_tie_is_fixed():
+    question = {"id": "huts", "options": [{"id": "x1"}, {"id": "x2"}, {"id": "x3"}]}
     players = {"a", "b", "c"}
     assert (
         winner(question, {"x2": ["a", "b"], "x3": ["c", "watcher", "w2"]}, players, "s")
         == "x2"
     )
-    assert winner(question, {"x3": ["watcher"]}, players, "s") == "x1"
     tie = winner(question, {"x3": ["a"], "x2": ["b"]}, players, "s")
     assert tie == ["x2", "x3"][seeded_index("s", "huts", 2)]
     assert winner(question, {"x2": ["b"], "x3": ["a"]}, players, "s") == tie
+    unvoted = winner(question, {"x3": ["watcher"]}, players, "s")
+    assert unvoted == ["x1", "x2", "x3"][seeded_index("s", "huts", 3)]
+
+
+def test_a_setting_a_majority_backs_is_won_at_once_and_stays_won():
+    made = voting(players=["a", "b", "c", "d"])
+    count = lambda v, settings: {  # noqa: E731
+        **v,
+        **vote_counted(
+            v,
+            "a",
+            setting_votes=settings,
+            ban_votes={},
+            questions=questions_for("civ6", "ffa"),
+            leaders=LEADERS,
+            civs=[],
+        ),
+    }
+    two = count(made, {"huts": {"x1_5": ["a", "b"]}})
+    assert two["settings"] == []
+    three = count(two, {"huts": {"x1_5": ["a", "b", "c"], "x1": ["d"]}})
+    assert three["settings"] == [{"id": "huts", "value": "x1_5", "by": "vote"}]
+    taken_back = count(three, {"huts": {"x1": ["a", "b", "c", "d"]}})
+    assert taken_back["settings"] == three["settings"]
+    done = tally(taken_back, settings={"huts": {"x1": ["a", "b", "c", "d"]}})
+    assert {"id": "huts", "value": "x1_5", "by": "vote"} in done["settings"]
+    assert [s["id"] for s in done["settings"]] == [
+        q["id"] for q in questions_for("civ6", "ffa")
+    ]
 
 
 def test_the_count_settles_every_setting_lands_bans_and_deals_a_standard_draft():
     made = voting()
     done = tally(
         made,
-        settings={"huts": {"x1_5": ["a", "b"], "x1": ["c"]}},
+        settings={
+            "huts": {"x1_5": ["a", "b"], "x1": ["c"]},
+            "draft_mode": {"standard": ["a"]},
+        },
         bans={"LEADER_05": ["a", "b"], "LEADER_06": ["a"]},
     )
     by_id = {s["id"]: s for s in done["settings"]}
-    default_map = next(q for q in questions_for("civ6", "ffa") if q["id"] == "map")
-    assert by_id["map"] == {
-        "id": "map",
-        "value": default_map["default_option_id"],
-        "by": "vote",
-    }
     assert by_id["huts"] == {"id": "huts", "value": "x1_5", "by": "vote"}
-    assert by_id["draft_mode"]["value"] == "standard"
+    assert len(by_id) == len(questions_for("civ6", "ffa"))
     assert [b["token"] for b in done["bans"]] == ["LEADER_05"]
     assert [(p["player_id"], len(p["leaders"]), p["civs"]) for p in done["pools"]] == [
         ("a", 13, []),
@@ -142,8 +160,8 @@ def test_the_count_settles_every_setting_lands_bans_and_deals_a_standard_draft()
 
 
 def test_a_teamer_deals_one_pool_a_team_and_random_one_leader_a_player():
-    made = voting(mode="teamer", teams=2, players=["a", "b", "c", "d"])
-    standard = tally(made)
+    made = voting(mode="teamer", players=["a", "b", "c", "d"])
+    standard = tally(made, settings={"draft_mode": {"standard": ["a"]}})
     assert [
         (p["player_id"], p["team"], len(p["leaders"])) for p in standard["pools"]
     ] == [(None, 1, 20), (None, 2, 20)]
@@ -154,8 +172,9 @@ def test_a_teamer_deals_one_pool_a_team_and_random_one_leader_a_player():
         ("c", 1),
         ("d", 1),
     ]
-    civ7 = voting(edition="civ7", mode="teamer", teams=2, players=["a", "b", "c", "d"])
-    assert [len(p["civs"]) for p in tally(civ7, civs=CIVS)["pools"]] == [7, 7]
+    civ7 = voting(edition="civ7", mode="teamer", players=["a", "b", "c", "d"])
+    standard_civ7 = tally(civ7, settings={"draft_mode": {"standard": ["a"]}}, civs=CIVS)
+    assert [len(p["civs"]) for p in standard_civ7["pools"]] == [7, 7]
     blind = tally(civ7, settings={"draft_mode": {"random": ["a"]}}, civs=CIVS)
     assert [len(p["civs"]) for p in blind["pools"]] == [1, 1, 1, 1]
 
@@ -163,7 +182,8 @@ def test_a_teamer_deals_one_pool_a_team_and_random_one_leader_a_player():
 def test_civ7_deals_civs_beside_leaders_and_bans_civs_within_their_cap():
     made = voting(edition="civ7", players=["a", "b"])
     bans = {"LEADER_00": ["a", "b"], "CIVILIZATION_00": ["a", "b"]}
-    done = tally(made, bans=bans, civs=CIVS)
+    standard = {"draft_mode": {"standard": ["a"]}}
+    done = tally(made, settings=standard, bans=bans, civs=CIVS)
     assert [(b["token"], b["kind"]) for b in done["bans"]] == [
         ("LEADER_00", "leader"),
         ("CIVILIZATION_00", "civ"),
@@ -173,11 +193,14 @@ def test_civ7_deals_civs_beside_leaders_and_bans_civs_within_their_cap():
         (19, 4),
     ]
     assert not {"CIVILIZATION_00"} & {c for p in done["pools"] for c in p["civs"]}
-    counted = ballot_counted(
+    counted = vote_counted(
         made,
         "a",
+        setting_votes={},
         ban_votes={"CIVILIZATION_03": ["a", "b"]},
-        allowed={"leader": LEADERS, "civ": CIVS},
+        questions=questions_for("civ7", "ffa"),
+        leaders=LEADERS,
+        civs=CIVS,
     )
     assert counted["bans"] == [
         {"token": "CIVILIZATION_03", "kind": "civ", "by": "vote"}

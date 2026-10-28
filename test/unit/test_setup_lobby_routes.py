@@ -506,10 +506,18 @@ def test_a_vote_runs_from_its_messages_to_a_recorded_draft(votes):
     assert placed.json()["vote"]["messages"] == messages
     assert vote_post(client, vote, "finished", "b").json()["vote"]["finished"] == ["b"]
     so_far = vote_post(
-        client, vote, "ballot", "a", json={"bans": {"LEADER_01": ["a", "b"]}}
+        client,
+        vote,
+        "ballot",
+        "a",
+        json={
+            "settings": {"huts": {"x1_5": ["a", "b"]}},
+            "bans": {"LEADER_01": ["a", "b"]},
+        },
     ).json()
     assert [b["token"] for b in so_far["bans"]] == ["LEADER_00", "LEADER_01"]
-    ballot = {"settings": {"huts": {"x1_5": ["a", "b"]}}, "bans": {}}
+    assert so_far["settings"] == [{"id": "huts", "value": "x1_5", "by": "vote"}]
+    ballot = {"settings": {"draft_mode": {"standard": ["c"]}}, "bans": {}}
     done = vote_post(client, vote, "tally", "a", json=ballot).json()
     assert done["status"] == "done"
     assert {"id": "huts", "value": "x1_5", "by": "vote"} in done["settings"]

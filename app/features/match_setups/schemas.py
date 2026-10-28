@@ -226,7 +226,6 @@ class VoteRequest(BaseModel):
 
     edition: Literal["civ6", "civ7"]
     mode: Literal["ffa", "duel", "teamer"]
-    teams: int = Field(default=0, ge=0, le=4)
     # civ7 only; none means every age.
     age: StartingAge | None = None
     guild_id: str = Field(min_length=1, max_length=32)

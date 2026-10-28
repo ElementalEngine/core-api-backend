@@ -3841,13 +3841,6 @@
             "minItems": 2,
             "title": "Players",
             "type": "array"
-          },
-          "teams": {
-            "default": 0,
-            "maximum": 4.0,
-            "minimum": 0.0,
-            "title": "Teams",
-            "type": "integer"
           }
         },
         "required": [
@@ -7127,8 +7120,8 @@
     },
     "/api/v2/match-setups/votes/{vote_id}/ballot": {
       "post": {
-        "description": "The ban reactions so far, sent by the bot as the host: a leader or civ\nreaching a majority is banned at once and stays banned.",
-        "operationId": "count_vote_bans_api_v2_match_setups_votes__vote_id__ballot_post",
+        "description": "The reactions so far, sent by the bot as the host: a setting option or a\nban reaching a majority is won at once and stays won.",
+        "operationId": "count_vote_so_far_api_v2_match_setups_votes__vote_id__ballot_post",
         "parameters": [
           {
             "in": "path",
@@ -7169,7 +7162,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LobbyBallot"
+                "$ref": "#/components/schemas/VoteBallot"
               }
             }
           },
@@ -7197,7 +7190,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Count Vote Bans",
+        "summary": "Count Vote So Far",
         "tags": [
           "match-setups"
         ]

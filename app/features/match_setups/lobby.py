@@ -427,13 +427,13 @@ def ballot_counted(
     actor_id: str,
     *,
     ban_votes: Mapping[str, Sequence[str]],
-    allowed: Mapping[str, Sequence[str]],
+    leaders: Sequence[str],
 ) -> dict[str, Any]:
-    """A running count while the players vote: a leader or civ reaching a
-    majority is banned at once, and stays banned if a vote is then taken back."""
+    """A running count while the players vote: a leader reaching a majority is
+    banned at once, and stays banned if a vote is then taken back."""
     require_host(lobby, actor_id)
     require_phase(lobby, VOTING)
-    return {"bans": with_voted_bans(lobby, ban_votes, allowed)}
+    return {"bans": with_voted_bans(lobby, ban_votes, {"leader": leaders})}
 
 
 def tallied(

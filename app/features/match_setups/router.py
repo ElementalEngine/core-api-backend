@@ -375,7 +375,7 @@ async def count_ballot(
         db,
         lobby_id,
         lambda lobby: ballot_counted(
-            lobby, actor, ban_votes=body.bans, allowed={"leader": leaders}
+            lobby, actor, ban_votes=body.bans, leaders=leaders
         ),
     )
 
