@@ -26,6 +26,7 @@ from app.features.match_setups.lobby import (
     SETUP_IDLE_LIMIT,
     LobbyRefused,
     NotTheHost,
+    ballot_counted,
     cancel_reason,
     edited,
     finished,
@@ -357,6 +358,25 @@ async def finish_voting(
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     return await _change(db, lobby_id, lambda lobby: finished(lobby, actor))
+
+
+@router.post("/lobbies/{lobby_id}/ballot", response_model=LobbyView)
+async def count_ballot(
+    lobby_id: str,
+    body: LobbyBallot,
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """The votes so far, sent by the bot as the host while the players vote: a
+    leader reaching a majority is banned at once and stays banned."""
+    leaders = [row["token"] for row in (await _civ_data(db, "civ6"))["leaders"]]
+    return await _change(
+        db,
+        lobby_id,
+        lambda lobby: ballot_counted(
+            lobby, actor, ban_votes=body.bans, leaders=leaders
+        ),
+    )
 
 
 @router.post("/lobbies/{lobby_id}/tally", response_model=LobbyView)

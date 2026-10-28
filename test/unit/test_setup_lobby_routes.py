@@ -210,7 +210,11 @@ def test_a_lobby_votes_on_bans_then_drafts_into_a_recorded_setup(lobbies):
     placed = client.put(f"{url}/vote", json=place, headers=as_player("host")).json()
     assert placed["vote"]["messages"] == place["messages"]
     assert post(client, lobby, "finished", "a").json()["vote"]["finished"] == ["a"]
-    ballot = {"bans": {"LEADER_01": ["host", "a"], "LEADER_02": ["a"]}}
+    so_far = {"bans": {"LEADER_01": ["host", "a"]}}
+    counted = post(client, lobby, "ballot", "host", json=so_far).json()
+    assert [b["token"] for b in counted["bans"]] == ["LEADER_00", "LEADER_01"]
+    assert post(client, lobby, "ballot", "a", json=so_far).status_code == 403
+    ballot = {"bans": {"LEADER_01": ["host"], "LEADER_02": ["a"]}}
     drafted = post(client, lobby, "tally", "host", json=ballot).json()
     assert (drafted["status"], drafted["deadline"]) == ("done", None)
     assert [b["token"] for b in drafted["bans"]] == ["LEADER_00", "LEADER_01"]

@@ -11,6 +11,7 @@ from app.features.match_setups.lobby import (
     SHAPES,
     LobbyRefused,
     NotTheHost,
+    ballot_counted,
     cancel_reason,
     dealt,
     edited,
@@ -322,6 +323,24 @@ def test_the_vote_adds_bans_with_a_majority_then_the_draft_is_dealt():
         tally(made, actor="a")
     with pytest.raises(LobbyRefused, match="not voting"):
         tally(lobby(players=["a"]))
+
+
+def test_a_leader_reaching_a_majority_mid_vote_is_banned_and_stays_banned():
+    made = voting(lobby(players=["a", "b"]))
+    count = lambda m, votes: apply(  # noqa: E731
+        m, ballot_counted(m, "host", ban_votes=votes, leaders=LEADERS)
+    )
+    one = count(made, {"LEADER_03": ["host"], "LEADER_04": ["a"]})
+    assert one["bans"] == []
+    two = count(one, {"LEADER_03": ["host", "a"], "LEADER_04": ["a"]})
+    assert [(b["token"], b["by"]) for b in two["bans"]] == [("LEADER_03", "vote")]
+    taken_back = count(two, {"LEADER_03": ["host"]})
+    assert [b["token"] for b in taken_back["bans"]] == ["LEADER_03"]
+    assert [b["token"] for b in tally(taken_back)["bans"]] == ["LEADER_03"]
+    with pytest.raises(NotTheHost):
+        ballot_counted(made, "a", ban_votes={}, leaders=LEADERS)
+    with pytest.raises(LobbyRefused, match="not voting"):
+        ballot_counted(lobby(players=["a"]), "host", ban_votes={}, leaders=LEADERS)
 
 
 def test_three_teams_of_two_fill_in_turn_and_draft_by_team():

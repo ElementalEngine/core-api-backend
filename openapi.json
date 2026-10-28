@@ -5611,6 +5611,84 @@
         ]
       }
     },
+    "/api/v2/match-setups/lobbies/{lobby_id}/ballot": {
+      "post": {
+        "description": "The votes so far, sent by the bot as the host while the players vote: a\nleader reaching a majority is banned at once and stays banned.",
+        "operationId": "count_ballot_api_v2_match_setups_lobbies__lobby_id__ballot_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lobby_id",
+            "required": true,
+            "schema": {
+              "title": "Lobby Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LobbyBallot"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LobbyView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Count Ballot",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
     "/api/v2/match-setups/lobbies/{lobby_id}/edit": {
       "put": {
         "description": "The host's edit, saved whole.",

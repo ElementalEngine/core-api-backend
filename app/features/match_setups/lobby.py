@@ -397,6 +397,39 @@ def dealt(
     ]
 
 
+def _voted(
+    lobby: Mapping[str, Any],
+    ban_votes: Mapping[str, Sequence[str]],
+    leaders: Sequence[str],
+) -> list[dict[str, Any]]:
+    """The bans, with each leader a majority of the players vote for added, as
+    many as the cap leaves room for. A ban already placed stays."""
+    voters = {p["discord_id"] for p in lobby["players"]}
+    placed = {b["token"] for b in lobby["bans"]}
+    room = ban_caps(lobby["edition"], None)["leader"] - len(placed)
+    banned = voted_bans(
+        ban_votes, voters, [t for t in leaders if t not in placed], room
+    )
+    return [
+        *lobby["bans"],
+        *({"token": token, "kind": "leader", "by": "vote"} for token in banned),
+    ]
+
+
+def ballot_counted(
+    lobby: Mapping[str, Any],
+    actor_id: str,
+    *,
+    ban_votes: Mapping[str, Sequence[str]],
+    leaders: Sequence[str],
+) -> dict[str, Any]:
+    """A running count while the players vote: a leader reaching a majority is
+    banned at once, and stays banned if a vote is then taken back."""
+    _host(lobby, actor_id)
+    _in(lobby, VOTING)
+    return {"bans": _voted(lobby, ban_votes, leaders)}
+
+
 def tallied(
     lobby: Mapping[str, Any],
     actor_id: str,
@@ -411,16 +444,7 @@ def tallied(
     then has its players pick; any other is done."""
     _host(lobby, actor_id)
     _in(lobby, VOTING)
-    voters = {p["discord_id"] for p in lobby["players"]}
-    host_bans = {b["token"] for b in lobby["bans"]}
-    room = ban_caps(lobby["edition"], None)["leader"] - len(host_bans)
-    banned = voted_bans(
-        ban_votes, voters, [t for t in leaders if t not in host_bans], room
-    )
-    bans = [
-        *lobby["bans"],
-        *({"token": token, "kind": "leader", "by": "vote"} for token in banned),
-    ]
+    bans = _voted(lobby, ban_votes, leaders)
     pools = dealt({**lobby, "bans": bans}, _groups(lobby), leaders, rng)
     if lobby["draft_mode"] == "blind":
         return {
@@ -494,6 +518,7 @@ __all__ = [
     "LobbyRefused",
     "NotTheHost",
     "Shape",
+    "ballot_counted",
     "cancel_reason",
     "dealt",
     "edited",
