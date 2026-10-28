@@ -40,9 +40,12 @@ class Store:
         return self
 
     def _seated_elsewhere(self, doc: dict) -> bool:
+        if doc["command"] != "lobby":
+            return False
         mine = {p["discord_id"] for p in doc["players"]}
         return any(
             other["_id"] != doc.get("_id")
+            and other["command"] == "lobby"
             and other["status"] == "open"
             and mine & {p["discord_id"] for p in other["players"]}
             for other in self.docs.values()
@@ -51,8 +54,10 @@ class Store:
     async def insert(self, doc):
         if doc.get("command") == "lobby" and self._seated_elsewhere(doc):
             raise SeatedElsewhere
-        if doc.get("command") == "lobby" and any(
-            d["status"] == "open" and d["code"] == doc["code"]
+        if doc.get("command") in ("lobby", "vote") and any(
+            d["status"] == "open"
+            and d["command"] == doc["command"]
+            and d["code"] == doc["code"]
             for d in self.docs.values()
         ):
             raise CodeTaken
@@ -60,9 +65,9 @@ class Store:
         self.docs[doc["_id"]] = dict(doc)
         return doc["_id"]
 
-    async def lobby(self, lobby_id):
+    async def lobby(self, lobby_id, command="lobby"):
         doc = self.docs.get(ObjectId(lobby_id)) if ObjectId.is_valid(lobby_id) else None
-        return dict(doc) if doc else None
+        return dict(doc) if doc and doc["command"] == command else None
 
     async def update_lobby(self, lobby, changes, now):
         if self.stale_writes:
@@ -82,12 +87,13 @@ class Store:
         self.docs[lobby["_id"]] = written
         return dict(written)
 
-    async def lobby_by_code(self, guild_id, code):
+    async def lobby_by_code(self, guild_id, code, command="lobby"):
         return next(
             (
                 dict(d)
                 for d in self.docs.values()
                 if d["status"] == "open"
+                and d["command"] == command
                 and d["guild_id"] == guild_id
                 and d["code"] == code
             ),
@@ -103,11 +109,14 @@ class Store:
             and (d["host_id"] == host_id if host_id else d["phase"] != "setup")
         ]
 
-    async def due(self, now):
+    async def due(self, now, command="lobby"):
         return [
             dict(d)
             for d in self.docs.values()
-            if d["status"] == "open" and d["deadline"] and d["deadline"] < now
+            if d["command"] == command
+            and d["status"] == "open"
+            and d["deadline"]
+            and d["deadline"] < now
         ]
 
     async def close_idle(self, cutoff, setup_cutoff, now):
@@ -254,7 +263,7 @@ def test_a_blind_draft_is_picked_privately_then_revealed(lobbies):
     mine = blind["pools"][1]["leaders"]
     pick = {"leader": mine[0]}
     assert post(client, lobby, "pick", "a", json=pick).json()["picks"] == [
-        {"player_id": "a", "leader": mine[0], "by": "player"}
+        {"player_id": "a", "leader": mine[0], "civ": None, "by": "player"}
     ]
     assert post(client, lobby, "pick", "z", json=pick).status_code == 409
     assert post(client, lobby, "reveal", "a").status_code == 403
@@ -406,3 +415,175 @@ def test_a_lobby_left_in_setup_frees_its_host_sooner(lobbies):
     closed = client.post(f"{LOBBIES}/close-idle", headers=as_player("bot")).json()
     assert [c["id"] for c in closed] == [left["id"]]
     assert hosted(client, host="gone", live=False)["status"] == "open"
+
+
+VOTES = "/api/v2/match-setups/votes"
+CIV_DATA = {
+    "civ6": {
+        "leader_data_version": 5,
+        "leaders": [{"token": f"LEADER_{n:02}"} for n in range(30)],
+        "civs": [],
+    },
+    "civ7": {
+        "leader_data_version": 5,
+        "leaders": [{"token": f"LEADER_{n:02}"} for n in range(20)],
+        "civs": [
+            {"token": f"CIVILIZATION_{n:02}", "age_pool": "AGE_ANTIQUITY"}
+            for n in range(10)
+        ]
+        + [{"token": "CIVILIZATION_MODERN", "age_pool": "AGE_MODERN"}],
+    },
+}
+START = {
+    "edition": "civ6",
+    "mode": "ffa",
+    "guild_id": "g",
+    "channel_id": "c",
+    "players": ["a", "b", "c"],
+}
+
+
+@pytest.fixture
+def votes(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.core import dependencies
+    from app.features.match_setups import router as match_setups, vote_router
+
+    store = Store()
+
+    class FakeCivData:
+        def __init__(self, _db):
+            pass
+
+        async def fetch(self, edition):
+            return CIV_DATA[edition]
+
+    class FakeSeasons:
+        def __init__(self, _db):
+            pass
+
+        async def get_current_season(self, edition):
+            return {"_id": SEASON}
+
+    monkeypatch.setattr(dependencies.settings, "mito_service_token", SecretStr(TOKEN))
+    monkeypatch.setattr(match_setups, "CivDataRepository", FakeCivData)
+    monkeypatch.setattr(match_setups, "SeasonsRepository", FakeSeasons)
+    monkeypatch.setattr(match_setups, "MatchSetupRepository", store)
+    monkeypatch.setattr(vote_router, "MatchSetupRepository", store)
+    app = FastAPI()
+    app.include_router(vote_router.router)
+    app.dependency_overrides[dependencies.get_database] = lambda: object()
+    return TestClient(app, raise_server_exceptions=False), store
+
+
+def vote_post(client, vote, path, actor, **kwargs):
+    return client.post(
+        f"{VOTES}/{vote['id']}/{path}", headers=as_player(actor), **kwargs
+    )
+
+
+def test_a_vote_runs_from_its_messages_to_a_recorded_draft(votes):
+    client, store = votes
+    started = client.post(
+        VOTES, json={**START, "leader_bans": ["LEADER_00"]}, headers=as_player("a")
+    )
+    assert started.status_code == 201, started.json()
+    vote = started.json()
+    assert (vote["phase"], len(vote["code"]), vote["bans"]) == (
+        "voting",
+        6,
+        [{"token": "LEADER_00", "kind": "leader", "by": "host"}],
+    )
+    messages = {"status": "m1", "huts": "m2", "leaders": "m3"}
+    placed = client.put(
+        f"{VOTES}/{vote['id']}/messages",
+        json={"channel_id": "v", "messages": messages},
+        headers=as_player("a"),
+    )
+    assert placed.json()["vote"]["messages"] == messages
+    assert vote_post(client, vote, "finished", "b").json()["vote"]["finished"] == ["b"]
+    so_far = vote_post(
+        client, vote, "ballot", "a", json={"bans": {"LEADER_01": ["a", "b"]}}
+    ).json()
+    assert [b["token"] for b in so_far["bans"]] == ["LEADER_00", "LEADER_01"]
+    ballot = {"settings": {"huts": {"x1_5": ["a", "b"]}}, "bans": {}}
+    done = vote_post(client, vote, "tally", "a", json=ballot).json()
+    assert done["status"] == "done"
+    assert {"id": "huts", "value": "x1_5", "by": "vote"} in done["settings"]
+    assert [len(p["leaders"]) for p in done["pools"]] == [9, 9, 9]
+    assert store.docs[ObjectId(vote["id"])]["season_id"] == SEASON
+    assert vote_post(client, vote, "tally", "a", json=ballot).status_code == 409
+
+
+def test_civ7_bans_civs_of_its_age_and_blind_picks_a_leader_and_a_civ(votes):
+    client, store = votes
+    asked = {
+        **START,
+        "edition": "civ7",
+        "players": ["a", "b"],
+        "age": "AGE_ANTIQUITY",
+    }
+    refused = client.post(
+        VOTES,
+        json={**asked, "civ_bans": ["CIVILIZATION_MODERN"]},
+        headers=as_player("a"),
+    )
+    assert refused.status_code == 400
+    vote = client.post(
+        VOTES, json={**asked, "civ_bans": ["CIVILIZATION_00"]}, headers=as_player("a")
+    ).json()
+    blind = {"settings": {"draft_mode": {"blind": ["a", "b"]}}}
+    picking = vote_post(client, vote, "tally", "a", json=blind).json()
+    assert picking["phase"] == "picking"
+    mine = picking["pools"][0]
+    assert (
+        "CIVILIZATION_00" not in mine["civs"]
+        and "CIVILIZATION_MODERN" not in mine["civs"]
+    )
+    pick = {"leader": mine["leaders"][0], "civ": mine["civs"][0]}
+    picks = vote_post(client, vote, "pick", "a", json=pick).json()["picks"]
+    assert picks == [
+        {"player_id": "a", "leader": pick["leader"], "civ": pick["civ"], "by": "player"}
+    ]
+    shown = vote_post(client, vote, "reveal", "a").json()
+    assert [p["by"] for p in shown["picks"]] == ["player", "auto"]
+    assert "closed_at" in store.docs[ObjectId(vote["id"])]
+
+
+def test_a_vote_is_refused_for_civ6_ages_and_found_by_its_code_or_when_due(votes):
+    client, store = votes
+    assert (
+        client.post(
+            VOTES, json={**START, "age": "AGE_ANTIQUITY"}, headers=as_player("a")
+        ).status_code
+        == 400
+    )
+    assert (
+        client.post(
+            VOTES, json={**START, "mode": "duel"}, headers=as_player("a")
+        ).status_code
+        == 400
+    )
+    vote = client.post(VOTES, json=START, headers=as_player("a")).json()
+    store.docs[ObjectId(vote["id"])]["deadline"] = datetime.now(UTC) - timedelta(
+        seconds=1
+    )
+    assert [
+        v["id"] for v in client.get(f"{VOTES}/due", headers=as_player("bot")).json()
+    ] == [vote["id"]]
+    cancel = {"guild_id": "g", "code": vote["code"].lower()}
+    assert (
+        client.post(f"{VOTES}/cancel", json=cancel, headers=as_player("b")).status_code
+        == 403
+    )
+    cancelled = client.post(
+        f"{VOTES}/cancel", json=cancel, headers=as_player("a")
+    ).json()
+    assert (cancelled["status"], cancelled["cancel_reason"]) == ("cancelled", "host")
+    assert (
+        client.get(f"{VOTES}/{vote['id']}", headers=as_player("a")).json()["status"]
+        == "cancelled"
+    )

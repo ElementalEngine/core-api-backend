@@ -49,6 +49,18 @@ def deal(
     ]
 
 
+CIV_TARGET_PER_PLAYER = 4
+CIV_TARGET_BY_TEAM_COUNT = {2: 7, 3: 5, 4: 5}
+
+
+def civ_target(game_type: str, groups: int) -> int:
+    """How many civs each player or team is offered: a fixed target, because
+    there are too few civs to split by player count."""
+    if game_type == "teamer":
+        return CIV_TARGET_BY_TEAM_COUNT.get(groups, CIV_TARGET_PER_PLAYER)
+    return CIV_TARGET_PER_PLAYER
+
+
 def deal_civs(
     tokens: Sequence[str], groups: int, target: int, rng: Any = _RANDOM
 ) -> list[list[str]]:
@@ -87,6 +99,7 @@ def remaining_after_bans(tokens: Sequence[str], banned: Sequence[str]) -> list[s
 __all__ = [
     "NotEnoughPool",
     "assign_one_each",
+    "civ_target",
     "deal",
     "deal_civs",
     "even_split",

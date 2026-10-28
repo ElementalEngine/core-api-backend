@@ -140,9 +140,12 @@ class LobbyCancel(BaseModel):
 
 
 class LeaderPick(BaseModel):
+    """A blind pick: a leader, and a civ where the pool has civs."""
+
     model_config = ConfigDict(extra="forbid")
 
     leader: str = Field(min_length=1, max_length=64)
+    civ: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class LobbyVote(BaseModel):
@@ -154,6 +157,7 @@ class LobbyVote(BaseModel):
 class BlindPick(BaseModel):
     player_id: str
     leader: str
+    civ: str | None = None
     by: Literal["player", "auto"]
 
 
@@ -180,6 +184,7 @@ class LobbyPool(BaseModel):
     player_id: str | None
     team: int | None
     leaders: list[str]
+    civs: list[str] = []
 
 
 class LobbyView(BaseModel):
@@ -206,6 +211,71 @@ class LobbyView(BaseModel):
     pools: list[LobbyPool]
     picks: list[BlindPick]
     vote: LobbyVote | None
+    cancel_reason: str | None
+    updated_at: datetime
+
+
+StartingAge = Literal["AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"]
+
+
+class VoteRequest(BaseModel):
+    """/vote: the players from a voice channel, the game, and the bans its
+    starter chose; everything else is voted on."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    edition: Literal["civ6", "civ7"]
+    mode: Literal["ffa", "duel", "teamer"]
+    teams: int = Field(default=0, ge=0, le=4)
+    # civ7 only; none means every age.
+    age: StartingAge | None = None
+    guild_id: str = Field(min_length=1, max_length=32)
+    channel_id: str = Field(min_length=1, max_length=32)
+    players: list[str] = Field(min_length=2, max_length=14)
+    leader_bans: list[str] = Field(default_factory=list, max_length=100)
+    civ_bans: list[str] = Field(default_factory=list, max_length=100)
+
+
+class VoteMessages(BaseModel):
+    """Where the vote is posted: the channel, and its status, setting and ban
+    messages by name."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    channel_id: str = Field(min_length=1, max_length=32)
+    messages: dict[str, str] = Field(min_length=1, max_length=25)
+
+
+class VoteBallot(BaseModel):
+    """The players' reactions: per setting, the players backing each option;
+    per leader or civ, the players banning it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    settings: dict[str, dict[str, Voters]] = Field(default_factory=dict, max_length=40)
+    bans: dict[str, Voters] = Field(default_factory=dict, max_length=200)
+
+
+class VoteView(BaseModel):
+    id: str
+    edition: Literal["civ6", "civ7"]
+    mode: Literal["ffa", "duel", "teamer"]
+    teams: int
+    age: StartingAge | None
+    draft_mode: str | None
+    status: Literal["open", "done", "cancelled"]
+    phase: Literal["voting", "picking"]
+    deadline: datetime | None
+    code: str
+    host_id: str
+    guild_id: str
+    channel_id: str
+    players: list[LobbyPlayer]
+    settings: list[ChosenSetting]
+    bans: list[SetupBan]
+    pools: list[LobbyPool]
+    picks: list[BlindPick]
+    vote: LobbyVote
     cancel_reason: str | None
     updated_at: datetime
 
@@ -245,5 +315,10 @@ __all__ = [
     "SettingOption",
     "SettingQuestion",
     "SetupBan",
+    "StartingAge",
+    "VoteBallot",
+    "VoteMessages",
     "VotePlace",
+    "VoteRequest",
+    "VoteView",
 ]

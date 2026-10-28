@@ -110,3 +110,17 @@ def test_settings_are_the_ballot_without_its_draft_mode():
     huts = next(q for q in settings_for("civ6", "ffa") if q["id"] == "huts")
     assert [o["label"] for o in huts["options"]] == ["1x", "1.25x", "1.5x", "1.75x"]
     assert "draft_mode" not in [q["id"] for q in settings_for("civ6", "teamer")]
+
+
+def _one_emoji(emoji: str) -> bool:
+    plain = emoji.replace("️", "")
+    return len(plain) == 1 or (len(plain) == 2 and plain[1] == "⃣")
+
+
+@pytest.mark.parametrize(("edition", "game_type"), EVERY_BALLOT)
+def test_every_option_is_one_reaction_of_its_own(edition, game_type):
+    # A vote counts each option by its emoji as a reaction.
+    for question in questions_for(edition, game_type):
+        emojis = [option["emoji"] for option in question["options"]]
+        assert all(_one_emoji(e) for e in emojis), (question["id"], emojis)
+        assert len(set(emojis)) == len(emojis), question["id"]

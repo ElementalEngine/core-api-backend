@@ -286,7 +286,7 @@ def test_the_vote_is_posted_once_and_each_player_finishes_once():
     assert done["vote"]["finished"] == ["a"]
     with pytest.raises(LobbyRefused, match="already finished"):
         finished(done, "a")
-    with pytest.raises(LobbyRefused, match="only the lobby's players"):
+    with pytest.raises(LobbyRefused, match="not a player in this lobby"):
         finished(done, "z")
     with pytest.raises(LobbyRefused, match="not voting"):
         finished(lobby(players=["a"]), "a")
@@ -328,7 +328,7 @@ def test_the_vote_adds_bans_with_a_majority_then_the_draft_is_dealt():
 def test_a_leader_reaching_a_majority_mid_vote_is_banned_and_stays_banned():
     made = voting(lobby(players=["a", "b"]))
     count = lambda m, votes: apply(  # noqa: E731
-        m, ballot_counted(m, "host", ban_votes=votes, leaders=LEADERS)
+        m, ballot_counted(m, "host", ban_votes=votes, allowed={"leader": LEADERS})
     )
     one = count(made, {"LEADER_03": ["host"], "LEADER_04": ["a"]})
     assert one["bans"] == []
@@ -338,9 +338,11 @@ def test_a_leader_reaching_a_majority_mid_vote_is_banned_and_stays_banned():
     assert [b["token"] for b in taken_back["bans"]] == ["LEADER_03"]
     assert [b["token"] for b in tally(taken_back)["bans"]] == ["LEADER_03"]
     with pytest.raises(NotTheHost):
-        ballot_counted(made, "a", ban_votes={}, leaders=LEADERS)
+        ballot_counted(made, "a", ban_votes={}, allowed={"leader": LEADERS})
     with pytest.raises(LobbyRefused, match="not voting"):
-        ballot_counted(lobby(players=["a"]), "host", ban_votes={}, leaders=LEADERS)
+        ballot_counted(
+            lobby(players=["a"]), "host", ban_votes={}, allowed={"leader": LEADERS}
+        )
 
 
 def test_three_teams_of_two_fill_in_turn_and_draft_by_team():
@@ -397,7 +399,7 @@ def test_a_blind_draft_deals_at_most_a_menu_each_then_each_player_locks_in():
         picked(first, "a", mine[1])
     with pytest.raises(LobbyRefused, match="not in your pool"):
         picked(blind, "a", blind["pools"][0]["leaders"][0])
-    with pytest.raises(LobbyRefused, match="only the lobby's players pick"):
+    with pytest.raises(LobbyRefused, match="not a player in this lobby"):
         picked(blind, "z", mine[0])
     with pytest.raises(LobbyRefused, match="not picking"):
         picked(duo, "a", mine[0])

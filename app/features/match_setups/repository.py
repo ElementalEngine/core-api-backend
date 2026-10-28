@@ -13,6 +13,7 @@ from app.core.constants import COL_MATCH_SETUPS, GAMES_DB
 from app.features.match_setups.lobby import CANCELLED, OPEN, SETUP
 
 OPEN_LOBBY = {"command": "lobby", "status": OPEN}
+OPEN_VOTE = {"command": "vote", "status": OPEN}
 
 
 class SeatedElsewhere(RuntimeError):
@@ -60,6 +61,17 @@ class MatchSetupRepository:
             partialFilterExpression=OPEN_LOBBY,
             name="open_lobbies_by_deadline",
         )
+        await self._setups.create_index(
+            [("guild_id", ASCENDING), ("code", ASCENDING)],
+            unique=True,
+            partialFilterExpression=OPEN_VOTE,
+            name="one_open_vote_per_code",
+        )
+        await self._setups.create_index(
+            [("deadline", ASCENDING)],
+            partialFilterExpression=OPEN_VOTE,
+            name="open_votes_by_deadline",
+        )
 
     async def insert(self, setup: dict[str, Any]) -> ObjectId:
         try:
@@ -67,16 +79,21 @@ class MatchSetupRepository:
         except DuplicateKeyError as exc:
             raise _refused(exc) from exc
 
-    async def lobby(self, lobby_id: str) -> dict[str, Any] | None:
+    async def lobby(
+        self, lobby_id: str, command: str = "lobby"
+    ) -> dict[str, Any] | None:
+        """A lobby, or a vote with `command="vote"`."""
         try:
             oid = ObjectId(lobby_id)
         except InvalidId:
             return None
-        return await self._setups.find_one({"_id": oid, "command": "lobby"})
+        return await self._setups.find_one({"_id": oid, "command": command})
 
-    async def lobby_by_code(self, guild_id: str, code: str) -> dict[str, Any] | None:
+    async def lobby_by_code(
+        self, guild_id: str, code: str, command: str = "lobby"
+    ) -> dict[str, Any] | None:
         return await self._setups.find_one(
-            {**OPEN_LOBBY, "guild_id": guild_id, "code": code}
+            {"command": command, "status": OPEN, "guild_id": guild_id, "code": code}
         )
 
     async def update_lobby(
@@ -101,9 +118,12 @@ class MatchSetupRepository:
         cursor = self._setups.find({**OPEN_LOBBY, **mine, "guild_id": guild_id})
         return await cursor.sort("created_at", DESCENDING).to_list(None)
 
-    async def due(self, now: datetime) -> list[dict[str, Any]]:
-        """The open lobbies whose countdown, vote or blind picks are past their time."""
-        cursor = self._setups.find({**OPEN_LOBBY, "deadline": {"$lt": now}})
+    async def due(self, now: datetime, command: str = "lobby") -> list[dict[str, Any]]:
+        """The open lobbies, or votes, whose countdown, vote or blind picks are
+        past their time."""
+        cursor = self._setups.find(
+            {"command": command, "status": OPEN, "deadline": {"$lt": now}}
+        )
         return await cursor.sort("deadline", ASCENDING).to_list(None)
 
     async def close_idle(

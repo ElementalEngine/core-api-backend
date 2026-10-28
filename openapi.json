@@ -100,6 +100,17 @@
             "title": "By",
             "type": "string"
           },
+          "civ": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Civ"
+          },
           "leader": {
             "title": "Leader",
             "type": "string"
@@ -924,7 +935,21 @@
       },
       "LeaderPick": {
         "additionalProperties": false,
+        "description": "A blind pick: a leader, and a civ where the pool has civs.",
         "properties": {
+          "civ": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Civ"
+          },
           "leader": {
             "maxLength": 64,
             "minLength": 1,
@@ -1254,6 +1279,14 @@
       "LobbyPool": {
         "description": "A player's draft, or a team's when `player_id` is empty.",
         "properties": {
+          "civs": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Civs",
+            "type": "array"
+          },
           "leaders": {
             "items": {
               "type": "string"
@@ -3647,6 +3680,68 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VoteBallot": {
+        "additionalProperties": false,
+        "description": "The players' reactions: per setting, the players backing each option;\nper leader or civ, the players banning it.",
+        "properties": {
+          "bans": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 14,
+              "type": "array"
+            },
+            "maxProperties": 200,
+            "title": "Bans",
+            "type": "object"
+          },
+          "settings": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 14,
+                "type": "array"
+              },
+              "type": "object"
+            },
+            "maxProperties": 40,
+            "title": "Settings",
+            "type": "object"
+          }
+        },
+        "title": "VoteBallot",
+        "type": "object"
+      },
+      "VoteMessages": {
+        "additionalProperties": false,
+        "description": "Where the vote is posted: the channel, and its status, setting and ban\nmessages by name.",
+        "properties": {
+          "channel_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "messages": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 25,
+            "minProperties": 1,
+            "title": "Messages",
+            "type": "object"
+          }
+        },
+        "required": [
+          "channel_id",
+          "messages"
+        ],
+        "title": "VoteMessages",
+        "type": "object"
+      },
       "VotePlace": {
         "additionalProperties": false,
         "description": "Where the bans vote, then the blind picks, are posted: the channel and\nthe one message.",
@@ -3671,6 +3766,278 @@
           "messages"
         ],
         "title": "VotePlace",
+        "type": "object"
+      },
+      "VoteRequest": {
+        "additionalProperties": false,
+        "description": "/vote: the players from a voice channel, the game, and the bans its\nstarter chose; everything else is voted on.",
+        "properties": {
+          "age": {
+            "anyOf": [
+              {
+                "enum": [
+                  "AGE_ANTIQUITY",
+                  "AGE_EXPLORATION",
+                  "AGE_MODERN"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "channel_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "civ_bans": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Civ Bans",
+            "type": "array"
+          },
+          "edition": {
+            "enum": [
+              "civ6",
+              "civ7"
+            ],
+            "title": "Edition",
+            "type": "string"
+          },
+          "guild_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Guild Id",
+            "type": "string"
+          },
+          "leader_bans": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Leader Bans",
+            "type": "array"
+          },
+          "mode": {
+            "enum": [
+              "ffa",
+              "duel",
+              "teamer"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "players": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 14,
+            "minItems": 2,
+            "title": "Players",
+            "type": "array"
+          },
+          "teams": {
+            "default": 0,
+            "maximum": 4.0,
+            "minimum": 0.0,
+            "title": "Teams",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "edition",
+          "mode",
+          "guild_id",
+          "channel_id",
+          "players"
+        ],
+        "title": "VoteRequest",
+        "type": "object"
+      },
+      "VoteView": {
+        "properties": {
+          "age": {
+            "anyOf": [
+              {
+                "enum": [
+                  "AGE_ANTIQUITY",
+                  "AGE_EXPLORATION",
+                  "AGE_MODERN"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "bans": {
+            "items": {
+              "$ref": "#/components/schemas/SetupBan"
+            },
+            "title": "Bans",
+            "type": "array"
+          },
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "channel_id": {
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "draft_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Draft Mode"
+          },
+          "edition": {
+            "enum": [
+              "civ6",
+              "civ7"
+            ],
+            "title": "Edition",
+            "type": "string"
+          },
+          "guild_id": {
+            "title": "Guild Id",
+            "type": "string"
+          },
+          "host_id": {
+            "title": "Host Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "ffa",
+              "duel",
+              "teamer"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "voting",
+              "picking"
+            ],
+            "title": "Phase",
+            "type": "string"
+          },
+          "picks": {
+            "items": {
+              "$ref": "#/components/schemas/BlindPick"
+            },
+            "title": "Picks",
+            "type": "array"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/LobbyPlayer"
+            },
+            "title": "Players",
+            "type": "array"
+          },
+          "pools": {
+            "items": {
+              "$ref": "#/components/schemas/LobbyPool"
+            },
+            "title": "Pools",
+            "type": "array"
+          },
+          "settings": {
+            "items": {
+              "$ref": "#/components/schemas/ChosenSetting"
+            },
+            "title": "Settings",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "done",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "teams": {
+            "title": "Teams",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "vote": {
+            "$ref": "#/components/schemas/LobbyVote"
+          }
+        },
+        "required": [
+          "id",
+          "edition",
+          "mode",
+          "teams",
+          "age",
+          "draft_mode",
+          "status",
+          "phase",
+          "deadline",
+          "code",
+          "host_id",
+          "guild_id",
+          "channel_id",
+          "players",
+          "settings",
+          "bans",
+          "pools",
+          "picks",
+          "vote",
+          "cancel_reason",
+          "updated_at"
+        ],
+        "title": "VoteView",
         "type": "object"
       }
     }
@@ -6493,6 +6860,713 @@
           }
         },
         "summary": "Settings Questions",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/votes": {
+      "post": {
+        "description": "A vote open at once, under a code no other open vote here has.",
+        "operationId": "start_vote_api_v2_match_setups_votes_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Vote",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/votes/cancel": {
+      "post": {
+        "description": "The host, or staff, cancel an open vote by its code.",
+        "operationId": "cancel_vote_api_v2_match_setups_votes_cancel_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-is-staff",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "X-Actor-Is-Staff",
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LobbyCancel"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Vote",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/votes/due": {
+      "get": {
+        "description": "Votes and blind picks past their time, for the bot to move on.",
+        "operationId": "votes_due_api_v2_match_setups_votes_due_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VoteView"
+                  },
+                  "title": "Response Votes Due Api V2 Match Setups Votes Due Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Votes Due",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/votes/{vote_id}": {
+      "get": {
+        "operationId": "read_vote_api_v2_match_setups_votes__vote_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vote_id",
+            "required": true,
+            "schema": {
+              "title": "Vote Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Vote",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/votes/{vote_id}/ballot": {
+      "post": {
+        "description": "The ban reactions so far, sent by the bot as the host: a leader or civ\nreaching a majority is banned at once and stays banned.",
+        "operationId": "count_vote_bans_api_v2_match_setups_votes__vote_id__ballot_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vote_id",
+            "required": true,
+            "schema": {
+              "title": "Vote Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LobbyBallot"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Count Vote Bans",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/votes/{vote_id}/finished": {
+      "post": {
+        "operationId": "finish_vote_api_v2_match_setups_votes__vote_id__finished_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vote_id",
+            "required": true,
+            "schema": {
+              "title": "Vote Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finish Vote",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/votes/{vote_id}/messages": {
+      "put": {
+        "description": "Where the bot posted the vote's messages, then the blind picks', acting\nas the host.",
+        "operationId": "place_vote_messages_api_v2_match_setups_votes__vote_id__messages_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vote_id",
+            "required": true,
+            "schema": {
+              "title": "Vote Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoteMessages"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Place Vote Messages",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/votes/{vote_id}/pick": {
+      "post": {
+        "description": "A player's blind pick: a leader, and a civ on civ7.",
+        "operationId": "pick_in_vote_api_v2_match_setups_votes__vote_id__pick_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vote_id",
+            "required": true,
+            "schema": {
+              "title": "Vote Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeaderPick"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pick In Vote",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/votes/{vote_id}/reveal": {
+      "post": {
+        "description": "The blind picks revealed; the bot reveals, acting as the host, once all\nhave picked or the time is up.",
+        "operationId": "reveal_vote_picks_api_v2_match_setups_votes__vote_id__reveal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vote_id",
+            "required": true,
+            "schema": {
+              "title": "Vote Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reveal Vote Picks",
+        "tags": [
+          "match-setups"
+        ]
+      }
+    },
+    "/api/v2/match-setups/votes/{vote_id}/tally": {
+      "post": {
+        "description": "Count the settings, the draft mode and the bans, and deal the draft. The\nbot counts, acting as the host, once all finish or the time is up.",
+        "operationId": "tally_vote_api_v2_match_setups_votes__vote_id__tally_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vote_id",
+            "required": true,
+            "schema": {
+              "title": "Vote Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoteBallot"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tally Vote",
         "tags": [
           "match-setups"
         ]

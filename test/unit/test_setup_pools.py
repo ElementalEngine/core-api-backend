@@ -7,6 +7,7 @@ import pytest
 from app.features.match_setups.pools import (
     NotEnoughPool,
     assign_one_each,
+    civ_target,
     deal,
     deal_civs,
     even_split,
@@ -71,6 +72,20 @@ def test_banning_nothing_removes_nothing():
 
 
 CIVS = [f"CIVILIZATION_{i:02d}" for i in range(44)]
+
+
+@pytest.mark.parametrize(
+    ("game_type", "groups", "expected"),
+    [
+        ("ffa", 10, 4),
+        ("duel", 2, 4),
+        ("teamer", 2, 7),
+        ("teamer", 3, 5),
+        ("teamer", 5, 4),
+    ],
+)
+def test_the_civ_target_is_a_target_not_a_division(game_type, groups, expected):
+    assert civ_target(game_type, groups) == expected
 
 
 def test_civ_pools_are_disjoint_while_the_set_allows_it():

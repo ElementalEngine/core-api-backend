@@ -74,7 +74,7 @@ WRITE_ATTEMPTS = 3
 SEATED_ELSEWHERE = "you are already in another open lobby"
 
 
-async def _open_season_id(db: AsyncMongoClient, edition: str) -> Any:
+async def open_season_id(db: AsyncMongoClient, edition: str) -> Any:
     """The season a game counts towards; none before seasons are seeded."""
     try:
         return (await SeasonsRepository(db).get_current_season(edition))["_id"]
@@ -82,7 +82,7 @@ async def _open_season_id(db: AsyncMongoClient, edition: str) -> Any:
         return None
 
 
-async def _civ_data(db: AsyncMongoClient, edition: str) -> dict[str, Any]:
+async def civ_data_for(db: AsyncMongoClient, edition: str) -> dict[str, Any]:
     civ_data = await CivDataRepository(db).fetch(edition)
     if civ_data["leader_data_version"] is None:
         raise api_error(
@@ -97,18 +97,19 @@ def lobby_view(lobby: Mapping[str, Any]) -> dict[str, Any]:
     return {**lobby, "id": str(lobby["_id"])}
 
 
-async def _change(
+async def change_setup(
     db: AsyncMongoClient,
     lobby_id: str,
     change: Callable[[dict[str, Any]], dict[str, Any]],
+    command: str = "lobby",
 ) -> dict[str, Any]:
-    """Read the lobby, work out the change from what was read, and write it
-    only if nobody changed the lobby in between."""
+    """Read the lobby (or vote), work out the change from what was read, and
+    write it only if nobody changed it in between."""
     setups = MatchSetupRepository(db)
     for _ in range(WRITE_ATTEMPTS):
-        lobby = await setups.lobby(lobby_id)
+        lobby = await setups.lobby(lobby_id, command)
         if lobby is None:
-            raise not_found("there is no such lobby")
+            raise not_found(f"there is no such {command}")
         try:
             changes = change(lobby)
         except NotTheHost as exc:
@@ -123,7 +124,7 @@ async def _change(
             return lobby_view(written)
     raise api_error(
         code="CONFLICT",
-        message="the lobby changed while you acted",
+        message=f"the {command} changed while you acted",
         status_code=status.HTTP_409_CONFLICT,
         retryable=True,
     )
@@ -134,12 +135,12 @@ async def deal_draft_and_record(
     request: DraftRequest, db: AsyncMongoClient = Depends(get_database)
 ) -> dict[str, Any]:
     """/draft: deal the pools, then record the setup."""
-    civ_data = await _civ_data(db, request.edition)
+    civ_data = await civ_data_for(db, request.edition)
     try:
         deal = deal_draft(civ_data, request)
     except DraftRefused as exc:
         raise invalid_request(str(exc)) from exc
-    season_id = await _open_season_id(db, request.edition)
+    season_id = await open_season_id(db, request.edition)
     now = datetime.now(UTC)
     await MatchSetupRepository(db).insert(draft_setup(request, deal, season_id, now))
     return deal
@@ -244,7 +245,7 @@ async def cancel_lobby(
             "closed_at": datetime.now(UTC),
         }
 
-    return await _change(db, str(found["_id"]), cancelled)
+    return await change_setup(db, str(found["_id"]), cancelled)
 
 
 @router.get("/lobbies/{lobby_id}", response_model=LobbyView)
@@ -270,7 +271,7 @@ async def open_lobby(
         questions = questions_for(lobby["edition"], lobby["mode"])
         return went_live(lobby, actor, body.message_id, questions)
 
-    return await _change(db, lobby_id, opened)
+    return await change_setup(db, lobby_id, opened)
 
 
 @router.post("/lobbies/{lobby_id}/join", response_model=LobbyView)
@@ -281,7 +282,7 @@ async def join_lobby(
 ) -> dict[str, Any]:
     """A player sits down; the last seat starts the countdown to the vote."""
     now = datetime.now(UTC)
-    return await _change(db, lobby_id, lambda lobby: joined(lobby, actor, now))
+    return await change_setup(db, lobby_id, lambda lobby: joined(lobby, actor, now))
 
 
 @router.post("/lobbies/{lobby_id}/leave", response_model=LobbyView)
@@ -290,7 +291,7 @@ async def leave_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    return await _change(db, lobby_id, lambda lobby: left(lobby, actor))
+    return await change_setup(db, lobby_id, lambda lobby: left(lobby, actor))
 
 
 @router.put("/lobbies/{lobby_id}/edit", response_model=LobbyView)
@@ -301,7 +302,7 @@ async def edit_lobby(
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     """The host's edit, saved whole."""
-    leaders = [row["token"] for row in (await _civ_data(db, "civ6"))["leaders"]]
+    leaders = [row["token"] for row in (await civ_data_for(db, "civ6"))["leaders"]]
     cap = ban_caps("civ6", None)["leader"]
     try:
         bans = checked_bans(body.bans, leaders, cap, "leader")
@@ -321,7 +322,7 @@ async def edit_lobby(
             now=datetime.now(UTC),
         )
 
-    return await _change(db, lobby_id, saved)
+    return await change_setup(db, lobby_id, saved)
 
 
 @router.post("/lobbies/{lobby_id}/start", response_model=LobbyView)
@@ -333,7 +334,7 @@ async def start_lobby(
     """The host starts, or the bot once a full lobby's countdown ends: the
     seats lock and the bans vote opens."""
     now = datetime.now(UTC)
-    return await _change(db, lobby_id, lambda lobby: started(lobby, actor, now))
+    return await change_setup(db, lobby_id, lambda lobby: started(lobby, actor, now))
 
 
 @router.put("/lobbies/{lobby_id}/vote", response_model=LobbyView)
@@ -344,7 +345,7 @@ async def place_vote(
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     """Where the bot posted the vote, acting as the host."""
-    return await _change(
+    return await change_setup(
         db,
         lobby_id,
         lambda lobby: vote_placed(lobby, actor, body.channel_id, body.messages),
@@ -357,7 +358,7 @@ async def finish_voting(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    return await _change(db, lobby_id, lambda lobby: finished(lobby, actor))
+    return await change_setup(db, lobby_id, lambda lobby: finished(lobby, actor))
 
 
 @router.post("/lobbies/{lobby_id}/ballot", response_model=LobbyView)
@@ -369,12 +370,12 @@ async def count_ballot(
 ) -> dict[str, Any]:
     """The votes so far, sent by the bot as the host while the players vote: a
     leader reaching a majority is banned at once and stays banned."""
-    leaders = [row["token"] for row in (await _civ_data(db, "civ6"))["leaders"]]
-    return await _change(
+    leaders = [row["token"] for row in (await civ_data_for(db, "civ6"))["leaders"]]
+    return await change_setup(
         db,
         lobby_id,
         lambda lobby: ballot_counted(
-            lobby, actor, ban_votes=body.bans, leaders=leaders
+            lobby, actor, ban_votes=body.bans, allowed={"leader": leaders}
         ),
     )
 
@@ -388,8 +389,8 @@ async def tally_vote(
 ) -> dict[str, Any]:
     """Count the bans and deal the draft. The bot counts, acting as the host,
     once all finish or the time is up."""
-    leaders = [row["token"] for row in (await _civ_data(db, "civ6"))["leaders"]]
-    season_id = await _open_season_id(db, "civ6")
+    leaders = [row["token"] for row in (await civ_data_for(db, "civ6"))["leaders"]]
+    season_id = await open_season_id(db, "civ6")
 
     def counted(lobby: dict[str, Any]) -> dict[str, Any]:
         now = datetime.now(UTC)
@@ -397,7 +398,7 @@ async def tally_vote(
         closed = {"closed_at": now} if changes.get("status") == DONE else {}
         return {**changes, "season_id": season_id, **closed}
 
-    return await _change(db, lobby_id, counted)
+    return await change_setup(db, lobby_id, counted)
 
 
 @router.post("/lobbies/{lobby_id}/pick", response_model=LobbyView)
@@ -408,7 +409,9 @@ async def pick_leader(
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     """A player's blind pick."""
-    return await _change(db, lobby_id, lambda lobby: picked(lobby, actor, body.leader))
+    return await change_setup(
+        db, lobby_id, lambda lobby: picked(lobby, actor, body.leader)
+    )
 
 
 @router.post("/lobbies/{lobby_id}/reveal", response_model=LobbyView)
@@ -423,7 +426,7 @@ async def reveal_picks(
     def shown(lobby: dict[str, Any]) -> dict[str, Any]:
         return {**revealed(lobby, actor), "closed_at": datetime.now(UTC)}
 
-    return await _change(db, lobby_id, shown)
+    return await change_setup(db, lobby_id, shown)
 
 
 __all__ = ["router"]
