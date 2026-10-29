@@ -103,8 +103,13 @@ class Session:
 
 
 class Database(dict):
+    hidden: frozenset[str] = frozenset()
+
     async def list_collection_names(self):
-        return list(self.keys())
+        return [name for name in self if name not in self.hidden]
+
+    def __missing__(self, name):
+        return Collection()
 
 
 class Client:
@@ -229,3 +234,14 @@ def test_no_backup_folder_means_no_change():
     with pytest.raises(SeasonBackupUnsetError):
         asyncio.run(SeasonRollover(client).roll("civ6", expected="Season 6"))
     assert len(client.stats["rt_ffa"].docs) == 2
+
+
+def test_a_collection_created_during_the_change_is_cleared(tmp_path):
+    client = Client(_stats())
+    client.stats["rt_duel"] = Collection([{"_id": Int64(14), "mu": 1200.0}])
+    client.stats.hidden = frozenset({"rt_duel"})
+    out = asyncio.run(
+        SeasonRollover(client, str(tmp_path)).roll("civ6", expected="Season 6")
+    )
+    assert out.records == {"pbc_ffa": 1, "rt_duel": 1, "rt_ffa": 2}
+    assert client.stats["rt_duel"].docs == []

@@ -1,8 +1,8 @@
 import re
 
+from app.core.constants import EDITIONS
 from app.features.civdata.seeds import (
     AUTHORING_ONLY,
-    EDITIONS,
     load_seed,
     to_documents,
 )

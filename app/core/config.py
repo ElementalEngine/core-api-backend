@@ -1,17 +1,8 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from urllib.parse import urlsplit
 
-from pydantic import (
-    AliasChoices,
-    AnyHttpUrl,
-    Field,
-    SecretStr,
-    TypeAdapter,
-    computed_field,
-    model_validator,
-)
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -52,12 +43,6 @@ class Settings(BaseSettings):
     )
     api_port: int = Field(
         default=8000, gt=0, lt=65536, validation_alias=AliasChoices("API_PORT")
-    )
-
-    # CORS
-    allowed_origins_raw: str = Field(
-        default="http://localhost:3000",
-        validation_alias=AliasChoices("ALLOWED_ORIGINS"),
     )
 
     # Lady Justice service token — required; startup fails if unset
@@ -169,35 +154,6 @@ class Settings(BaseSettings):
     season_backup_dir: str = Field(
         default="", validation_alias=AliasChoices("SEASON_BACKUP_DIR")
     )
-
-    # mypy does not support decorators stacked on @property
-    @computed_field(return_type=list[str])  # type: ignore[prop-decorator]
-    @property
-    def allowed_origins(self) -> list[str]:
-        raw = (self.allowed_origins_raw or "").strip()
-        items = [u.strip() for u in raw.split(",") if u.strip()] if raw else []
-        if not items:
-            return []
-
-        adapter = TypeAdapter(list[AnyHttpUrl])
-        try:
-            urls = adapter.validate_python(items)
-        except Exception as exc:
-            # Raises rather than returning []: a swallowed error here disables CORS
-            # silently, which is indistinguishable from having configured none.
-            raise ValueError(
-                f"ALLOWED_ORIGINS contains an invalid URL: {items!r}"
-            ) from exc
-
-        origins: list[str] = []
-        seen: set[str] = set()
-        for url in urls:
-            parts = urlsplit(str(url))
-            origin = f"{parts.scheme}://{parts.netloc}"
-            if origin not in seen:
-                seen.add(origin)
-                origins.append(origin)
-        return origins
 
     @model_validator(mode="after")
     def _ensure_mongo_uri_scheme(self) -> Settings:

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import Literal
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from pymongo import AsyncMongoClient
 
+from app.core.constants import Edition
 from app.core.dependencies import get_database, require_any_service_token
 from app.core.errors import ErrorDetail, ErrorResponse
 from app.features.civdata.repository import CivDataRepository
@@ -19,7 +18,7 @@ router = APIRouter(
 
 @router.get("/{edition}", response_model=CivDataResponse)
 async def get_civ_data(
-    edition: Literal["civ6", "civ7"],
+    edition: Edition,
     client: AsyncMongoClient = Depends(get_database),
 ) -> CivDataResponse:
     payload = await CivDataRepository(client).fetch(edition)

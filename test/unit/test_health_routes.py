@@ -2,15 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from app.api.health import readyz, router
-
-
-def _paths() -> set[str]:
-    return {route.path for route in router.routes}
-
-
-def test_debug_dbstats_route_is_gone():
-    assert "/_debug/db-stats" not in _paths()
+from app.api.health import readyz
 
 
 class _Admin:

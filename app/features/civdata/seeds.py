@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from app.core.constants import EDITIONS
+
 SEED_DIR = Path(__file__).resolve().parent / "seed"
-EDITIONS = ("civ6", "civ7")
 
 AUTHORING_ONLY = frozenset({"civ_source", "age_pool_source", "type"})
 
@@ -34,4 +35,4 @@ def to_documents(edition: str) -> list[dict[str, Any]]:
     return docs
 
 
-__all__ = ["AUTHORING_ONLY", "EDITIONS", "load_seed", "to_documents"]
+__all__ = ["AUTHORING_ONLY", "load_seed", "to_documents"]

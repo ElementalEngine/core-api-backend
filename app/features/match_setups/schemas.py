@@ -7,6 +7,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.constants import Edition
+
 MAX_DRAFTS = {"civ6": 14, "civ7": 10}
 StartingAge = Literal["AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"]
 
@@ -17,7 +19,7 @@ class DraftRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     host_id: str = Field(min_length=1, max_length=32)
-    edition: Literal["civ6", "civ7"]
+    edition: Edition
     game_type: Literal["ffa", "teamer", "duel"]
     drafts: int = Field(ge=2, le=14)
     leaders: int = Field(ge=1)
@@ -223,7 +225,7 @@ class VoteRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    edition: Literal["civ6", "civ7"]
+    edition: Edition
     mode: Literal["ffa", "duel", "teamer"]
     # civ7 only; none means every age.
     age: StartingAge | None = None
@@ -255,7 +257,7 @@ class VoteBallot(BaseModel):
 
 
 class VoteView(SetupView):
-    edition: Literal["civ6", "civ7"]
+    edition: Edition
     mode: Literal["ffa", "duel", "teamer"]
     age: StartingAge | None
     phase: Literal["voting", "picking"]

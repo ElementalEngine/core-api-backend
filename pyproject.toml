@@ -6,8 +6,7 @@ target-version = "py314"
 
 [tool.ruff.lint]
 # Rules stated explicitly, since ruff's default set changes between releases.
-# B904 and TRY400 stay off: their only fixes are unsafe and can lose a traceback.
-select = ["E4", "E7", "E9", "F", "B023", "I", "PTH118", "PTH123", "RUF022", "RUF100", "UP"]
+select = ["E4", "E7", "E9", "F", "B023", "B904", "I", "PTH118", "PTH123", "RUF022", "RUF100", "TRY400", "UP"]
 
 [tool.ruff.lint.isort]
 # Keep aliased imports in their block, rather than one statement per `X as Y`.

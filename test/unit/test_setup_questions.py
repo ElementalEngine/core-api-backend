@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from app.core.constants import EDITIONS
 from app.features.match_setups.questions import (
-    EDITIONS,
     UnknownBallot,
     questions_for,
     settings_for,

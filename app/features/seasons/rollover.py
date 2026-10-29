@@ -21,7 +21,7 @@ from app.core.config import settings
 from app.core.constants import COL_RATING_EVENTS, COL_SEASONS, GAMES_DB
 from app.features.matches.repository import COL_PENDING_MATCHES
 from app.features.ratings.events import build_reset_event
-from app.features.ratings.scope import stats_db_name
+from app.features.ratings.scope import stats_collection_name, stats_db_name
 from app.features.seasons.repository import (
     SeasonNotSeededError,
     SeasonsRepository,
@@ -72,6 +72,16 @@ def _write_lines(path: Path, docs: list[dict[str, Any]]) -> None:
             for doc in docs
         ),
     )
+
+
+# Every collection an approve can write, so one it creates during the change
+# is cleared with the rest.
+_KNOWN = frozenset(
+    stats_collection_name(match_type=mode, is_cloud=cloud, is_combined=combined)
+    for mode in ("ffa", "teamer", "duel")
+    for cloud in (False, True)
+    for combined in (False, True)
+)
 
 
 def _sync_folder(path: Path) -> None:
@@ -134,7 +144,8 @@ class SeasonRollover:
             raise SeasonBackupUnsetError("SEASON_BACKUP_DIR is not set.")
         db_name = stats_db_name(civ_version=edition, is_seasonal=True)
         db = self._client[db_name]
-        names = sorted(await db.list_collection_names())
+        listed = set(await db.list_collection_names())
+        names = sorted(listed | _KNOWN)
         records: dict[str, int] = {}
         opened = ""
         session = self._client.start_session()
@@ -161,6 +172,8 @@ class SeasonRollover:
                     events: list[dict[str, Any]] = []
                     for col in names:
                         docs = [d async for d in db[col].find({}, session=session)]
+                        if not docs and col not in listed:
+                            continue
                         _write_lines(partial / f"{db_name}.{col}.json", docs)
                         records[col] = len(docs)
                         events += _reset_events(docs, f"{db_name}.{col}", at)

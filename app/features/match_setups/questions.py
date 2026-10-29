@@ -8,8 +8,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from app.core.constants import EDITIONS
+
 SEED_DIR = Path(__file__).resolve().parent / "seed"
-EDITIONS = ("civ6", "civ7")
 
 
 class UnknownBallot(ValueError):
@@ -44,4 +45,4 @@ def questions_for(edition: str, game_type: str) -> list[dict[str, Any]]:
     return asked
 
 
-__all__ = ["EDITIONS", "UnknownBallot", "questions_for", "settings_for"]
+__all__ = ["UnknownBallot", "questions_for", "settings_for"]

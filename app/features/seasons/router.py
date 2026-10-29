@@ -4,13 +4,13 @@ change to the next one. Mite lets only developers ask for the change."""
 from __future__ import annotations
 
 import logging
-from typing import Literal
 
 from fastapi import APIRouter, Depends
 from pymongo import AsyncMongoClient
 from pymongo.errors import PyMongoError
 
 from app.core.config import settings
+from app.core.constants import Edition
 from app.core.dependencies import actor_discord_id, get_database, require_mito_token
 from app.core.errors import api_error, conflict, invalid_request, not_found
 from app.features.seasons.repository import SeasonNotSeededError
@@ -29,8 +29,6 @@ router = APIRouter(
     tags=["seasons-v2"],
     dependencies=[Depends(require_mito_token)],
 )
-
-Edition = Literal["civ6", "civ7"]
 
 
 @router.get("/{edition}", response_model=SeasonPreview)

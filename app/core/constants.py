@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from typing import Literal, get_args
+
+Edition = Literal["civ6", "civ7"]
+EDITIONS: tuple[Edition, ...] = get_args(Edition)
+
 GAMES_DB = "games"
 
 COL_CIV_DATA = "civ_data"
@@ -23,5 +28,7 @@ __all__ = [
     "COL_SUB_EVENTS",
     "COL_USERS",
     "DB_SERVER_MEMBERS",
+    "EDITIONS",
     "GAMES_DB",
+    "Edition",
 ]

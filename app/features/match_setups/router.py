@@ -10,6 +10,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, Query, status
 from pymongo import AsyncMongoClient
 
+from app.core.constants import Edition
 from app.core.dependencies import (
     actor_discord_id,
     actor_is_staff,
@@ -201,7 +202,7 @@ async def deal_draft_and_record(
 
 @router.get("/settings/{edition}/{game_type}", response_model=list[SettingQuestion])
 async def settings_questions(
-    edition: Literal["civ6", "civ7"], game_type: Literal["ffa", "duel", "teamer"]
+    edition: Edition, game_type: Literal["ffa", "duel", "teamer"]
 ) -> list[dict[str, Any]]:
     """Every setting a game is set up with, draft mode last."""
     try:

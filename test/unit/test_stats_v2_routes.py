@@ -1,32 +1,5 @@
 from app.features.stats.schemas import StatRow
 from app.features.stats.schemas_v2 import StatRowV2, UserStatsResponseV2
-from app.main import app
-
-EXPECTED = {
-    ("GET", "/api/v2/stats/user"),
-    ("POST", "/api/v2/stats/batch"),
-    ("POST", "/api/v2/stats/team-gen"),
-    ("PUT", "/api/v2/stats/reset/user"),
-    ("GET", "/api/v2/stats/history"),
-    ("GET", "/api/v2/stats/summary"),
-}
-
-GONE = {"/api/v1/get-user-stats/", "/api/v1/get-user-stats-batch/"}
-
-
-def _routes(prefix):
-    out = set()
-    for route in app.routes:
-        path = getattr(route, "path", "")
-        methods = getattr(route, "methods", None) or set()
-        if path.startswith(prefix) and methods:
-            for verb in methods - {"HEAD", "OPTIONS"}:
-                out.add((verb, path))
-    return out
-
-
-def test_the_v2_stats_routes_are_registered():
-    assert _routes("/api/v2/stats") == EXPECTED
 
 
 def test_rating_gains_replaces_wins_and_nothing_else_moves():

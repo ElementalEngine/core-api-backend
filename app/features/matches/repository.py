@@ -286,7 +286,9 @@ class MatchRepository:
         except OperationFailure as exc:
             if exc.code != 11000:
                 raise
-            logger.error("Repeated save_file_hash in pending_matches; index not unique")
+            logger.warning(
+                "Repeated save_file_hash in pending_matches; index not unique"
+            )
             await self._pending.create_index(
                 [("save_file_hash", ASCENDING)], name=plain
             )

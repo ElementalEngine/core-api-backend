@@ -13,7 +13,6 @@ def test_config_loads_env(monkeypatch, tmp_path):
     monkeypatch.setenv("TS_BETA", "70")
     monkeypatch.setenv("TS_TAU", "1")
     monkeypatch.setenv("TS_DRAW_PROB", "0")
-    monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:3000,https://example.com")
 
     import app.core.config as cfg
 
@@ -28,4 +27,3 @@ def test_config_loads_env(monkeypatch, tmp_path):
     assert s.ts_beta == 70
     assert s.ts_tau == 1
     assert s.ts_draw_prob == 0
-    assert s.allowed_origins == ["http://localhost:3000", "https://example.com"]

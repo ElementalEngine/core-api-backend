@@ -120,7 +120,7 @@ class MatchService:
             logger.info(f"✅ 🔍 Parsed as {data.get('game')}")
             return data
         except Exception as e:
-            raise ParseError(f"Parse attempt failed: {e}")
+            raise ParseError(f"Parse attempt failed: {e}") from e
 
     async def seat_steam_id(self, discord_id: str) -> str | None:
         """A registered player's Steam id, or None for one who linked another
