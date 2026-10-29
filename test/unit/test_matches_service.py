@@ -115,8 +115,18 @@ class FakeRepo:
     async def start_session(self):
         return self.session
 
-    async def upsert_player_stat_doc(self, **kwargs):
-        self.upserts.append(kwargs)
+    async def write_player_stat_docs(self, *, legs, **kwargs):
+        for (is_seasonal, is_combined), docs in legs.items():
+            for did, doc in docs.items():
+                self.upserts.append(
+                    {
+                        **kwargs,
+                        "is_seasonal": is_seasonal,
+                        "is_combined": is_combined,
+                        "discord_id": did,
+                        "doc": doc,
+                    }
+                )
 
     async def insert_validated_match(self, doc, session=None):
         self.validated = doc

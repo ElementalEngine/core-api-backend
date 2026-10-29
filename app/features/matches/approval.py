@@ -173,6 +173,7 @@ class ApprovalService:
                     )
                     occurred_at = datetime.now(UTC)
                     events: list[dict[str, Any]] = []
+                    written: dict[tuple[bool, bool], dict[str, dict[str, Any]]] = {}
                     # The rating each player's rank role follows, after the revert.
                     rank_after: dict[str, float] = {}
 
@@ -218,15 +219,8 @@ class ApprovalService:
                                 leaders=self.revert_existing_leaders(p, pre.leaders),
                                 step=-1,
                             )
-                            await self._m.ratings.upsert_player_stat_doc(
-                                civ_version=match.game,
-                                is_seasonal=is_seasonal,
-                                match_type=match.game_mode,
-                                is_cloud=match.is_cloud,
-                                is_combined=is_combined,
-                                discord_id=did,
-                                doc=doc,
-                                session=session,
+                            written.setdefault((is_seasonal, is_combined), {})[did] = (
+                                doc
                             )
                             events.append(
                                 build_match_event(
@@ -253,6 +247,13 @@ class ApprovalService:
                         if p.is_sub:
                             await self._m.q.remove_sub_in(did, oid, session=session)
 
+                    await self._m.ratings.write_player_stat_docs(
+                        civ_version=match.game,
+                        match_type=match.game_mode,
+                        is_cloud=match.is_cloud,
+                        legs=written,
+                        session=session,
+                    )
                     await self._m.ratings.insert_events(events, session=session)
 
                     if not await self._m.q.delete_validated_match(oid, session=session):
@@ -349,6 +350,7 @@ class ApprovalService:
 
                         occurred_at = datetime.now(UTC)
                         events: list[dict[str, Any]] = []
+                        written: dict[tuple[bool, bool], dict[str, dict[str, Any]]] = {}
 
                         # Stats writes
                         for i, p in enumerate(match.players):
@@ -400,16 +402,9 @@ class ApprovalService:
                                     ),
                                     step=1,
                                 )
-                                await self._m.ratings.upsert_player_stat_doc(
-                                    civ_version=match.game,
-                                    is_seasonal=is_seasonal,
-                                    match_type=match.game_mode,
-                                    is_cloud=match.is_cloud,
-                                    is_combined=is_combined,
-                                    discord_id=did,
-                                    doc=doc,
-                                    session=session,
-                                )
+                                written.setdefault((is_seasonal, is_combined), {})[
+                                    did
+                                ] = doc
                                 events.append(
                                     build_match_event(
                                         event_type="approve",
@@ -435,6 +430,13 @@ class ApprovalService:
                             if p.is_sub:
                                 await self._m.q.record_sub_in(did, oid, session=session)
 
+                        await self._m.ratings.write_player_stat_docs(
+                            civ_version=match.game,
+                            match_type=match.game_mode,
+                            is_cloud=match.is_cloud,
+                            legs=written,
+                            session=session,
+                        )
                         await self._m.ratings.insert_events(events, session=session)
 
                         now = datetime.now(UTC)

@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from bson.int64 import Int64
-from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
+from pymongo import ASCENDING, DESCENDING, AsyncMongoClient, ReplaceOne
 from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.collection import AsyncCollection
 
@@ -124,28 +124,31 @@ class RatingsRepository:
             out[str(int(did))] = d
         return out
 
-    async def upsert_player_stat_doc(
+    async def write_player_stat_docs(
         self,
         *,
         civ_version: str,
-        is_seasonal: bool,
         match_type: str,
         is_cloud: bool,
-        is_combined: bool,
-        discord_id: str,
-        doc: Mapping[str, Any],
+        legs: Mapping[tuple[bool, bool], Mapping[str, Mapping[str, Any]]],
         session: AsyncClientSession | None = None,
     ) -> None:
-        col = self._stats_collection(
-            civ_version=civ_version,
-            is_seasonal=is_seasonal,
-            match_type=match_type,
-            is_cloud=is_cloud,
-            is_combined=is_combined,
-        )
-        await col.replace_one(
-            {"_id": Int64(discord_id)}, dict(doc), upsert=True, session=session
-        )
+        """Each leg's stat documents, by (is_seasonal, is_combined) and then by
+        player, replaced in one batch per collection."""
+        for (is_seasonal, is_combined), docs in legs.items():
+            col = self._stats_collection(
+                civ_version=civ_version,
+                is_seasonal=is_seasonal,
+                match_type=match_type,
+                is_cloud=is_cloud,
+                is_combined=is_combined,
+            )
+            writes = [
+                ReplaceOne({"_id": Int64(did)}, dict(doc), upsert=True)
+                for did, doc in docs.items()
+            ]
+            if writes:
+                await col.bulk_write(writes, session=session)
 
     async def reset_player_stats(
         self, *, civ_version: str, is_cloud: bool, discord_id: str
