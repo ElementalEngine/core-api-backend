@@ -6,8 +6,7 @@
       "token": "LEADER_ADA_LOVELACE",
       "name": "Ada_Lovelace",
       "display": "Ada Lovelace",
-      "type": "None",
-      "emoji_id": "1464705360970645504"
+      "type": "None"
     },
     {
       "token": "LEADER_ALEXANDER",
@@ -19,71 +18,61 @@
       "token": "LEADER_AMINA",
       "name": "Amina",
       "display": "Amina",
-      "type": "None",
-      "emoji_id": "1464705362446913607"
+      "type": "None"
     },
     {
       "token": "LEADER_ASHOKA",
       "name": "Ashoka_World_Renouncer",
       "display": "Ashoka, World Renouncer",
-      "type": "None",
-      "emoji_id": "1464705365706018918"
+      "type": "None"
     },
     {
       "token": "LEADER_ASHOKA_ALT",
       "name": "Ashoka_World_Conqueror",
       "display": "Ashoka, World Conqueror",
-      "type": "None",
-      "emoji_id": "1464705363948343489"
+      "type": "None"
     },
     {
       "token": "LEADER_AUGUSTUS",
       "name": "Augustus",
       "display": "Augustus",
-      "type": "None",
-      "emoji_id": "1464705367153049777"
+      "type": "None"
     },
     {
       "token": "LEADER_BENJAMIN_FRANKLIN",
       "name": "Benjamin_Franklin",
       "display": "Benjamin Franklin",
-      "type": "None",
-      "emoji_id": "1464705368847421440"
+      "type": "None"
     },
     {
       "token": "LEADER_BOLIVAR",
       "name": "Simon_Bolvar",
       "display": "Simón Bolívar",
-      "type": "None",
-      "emoji_id": "1464705408722665670"
+      "type": "None"
     },
     {
       "token": "LEADER_CATHERINE",
       "name": "Catherine_the_Great",
       "display": "Catherine the Great",
-      "type": "None",
-      "emoji_id": "1464705370315297034"
+      "type": "None"
     },
     {
       "token": "LEADER_CHARLEMAGNE",
       "name": "Charlemagne",
       "display": "Charlemagne",
-      "type": "None",
-      "emoji_id": "1464705372739731486"
+      "type": "None"
     },
     {
       "token": "LEADER_CONFUCIUS",
       "name": "Confucius",
       "display": "Confucius",
-      "type": "None",
-      "emoji_id": "1464705375956893750"
+      "type": "None"
     },
     {
       "token": "LEADER_EDWARD_TEACH",
       "name": "Edward_Teach",
       "display": "Edward Teach",
-      "type": "None",
-      "emoji_id": "1464705377714311321"
+      "type": "None"
     },
     {
       "token": "LEADER_ELIZABETH",
@@ -95,134 +84,115 @@
       "token": "LEADER_FRIEDRICH",
       "name": "Friedrich_Oblique",
       "display": "Friedrich, Oblique",
-      "type": "None",
-      "emoji_id": "1464705380516106281"
+      "type": "None"
     },
     {
       "token": "LEADER_FRIEDRICH_ALT",
       "name": "Friedrich_Baroque",
       "display": "Friedrich, Baroque",
-      "type": "None",
-      "emoji_id": "1464705379253485733"
+      "type": "None"
     },
     {
       "token": "LEADER_GENGHIS_KHAN",
       "name": "GenghisKhan",
       "display": "Genghis Khan",
-      "type": "None",
-      "emoji_id": "1464705382172721162"
+      "type": "None"
     },
     {
       "token": "LEADER_GILGAMESH",
       "name": "Gilgamesh",
       "display": "Gilgamesh",
-      "type": "None",
-      "emoji_id": "1469017372005503046"
+      "type": "None"
     },
     {
       "token": "LEADER_HARRIET_TUBMAN",
       "name": "Harriet_Tubman",
       "display": "Harriet Tubman",
-      "type": "None",
-      "emoji_id": "1464705384198443182"
+      "type": "None"
     },
     {
       "token": "LEADER_HATSHEPSUT",
       "name": "Hatshepsut",
       "display": "Hatshepsut",
-      "type": "None",
-      "emoji_id": "1464705385704194153"
+      "type": "None"
     },
     {
       "token": "LEADER_HIMIKO",
       "name": "Himiko_Queen_of_Wa",
       "display": "Himiko, Queen of Wa",
-      "type": "None",
-      "emoji_id": "1464705388501799216"
+      "type": "None"
     },
     {
       "token": "LEADER_HIMIKO_ALT",
       "name": "Himiko_High_Shaman",
       "display": "Himiko, High Shaman",
-      "type": "None",
-      "emoji_id": "1464705386883055757"
+      "type": "None"
     },
     {
       "token": "LEADER_IBN_BATTUTA",
       "name": "Ibn_Battuta",
       "display": "Ibn Battuta",
-      "type": "None",
-      "emoji_id": "1464705390460669972"
+      "type": "None"
     },
     {
       "token": "LEADER_ISABELLA",
       "name": "Isabella",
       "display": "Isabella",
-      "type": "None",
-      "emoji_id": "1464705392104837180"
+      "type": "None"
     },
     {
       "token": "LEADER_JOSE_RIZAL",
       "name": "Jos",
       "display": "José Rizal",
-      "type": "None",
-      "emoji_id": "1464705393442947275"
+      "type": "None"
     },
     {
       "token": "LEADER_LAFAYETTE",
       "name": "Lafayette",
       "display": "Lafayette",
-      "type": "None",
-      "emoji_id": "1464705394973737141"
+      "type": "None"
     },
     {
       "token": "LEADER_LAKSHMIBAI",
       "name": "Lakshmibai",
       "display": "Lakshmibai",
-      "type": "None",
-      "emoji_id": "1464705396685148392"
+      "type": "None"
     },
     {
       "token": "LEADER_MACHIAVELLI",
       "name": "Machiavelli",
       "display": "Niccolò Machiavelli",
-      "type": "None",
-      "emoji_id": "1464705398195097923"
+      "type": "None"
     },
     {
       "token": "LEADER_NAPOLEON",
       "name": "Napoleon_Emperor",
       "display": "Napoleon, Emperor",
-      "type": "None",
-      "emoji_id": "1464705400149643396"
+      "type": "None"
     },
     {
       "token": "LEADER_NAPOLEON_ALT",
       "name": "Napoleon_Revolutionary",
       "display": "Napoleon, Revolutionary",
-      "type": "None",
-      "emoji_id": "1464705401961582612"
+      "type": "None"
     },
     {
       "token": "LEADER_PACHACUTI",
       "name": "Pachacuti",
       "display": "Pachacuti",
-      "type": "None",
-      "emoji_id": "1464705404813705459"
+      "type": "None"
     },
     {
       "token": "LEADER_SAYYIDA_AL_HURRA",
       "name": "Sayyida_al_Hurra",
       "display": "Sayyida al Hurra",
-      "type": "None",
-      "emoji_id": "1464705407455985767"
+      "type": "None"
     },
     {
       "token": "LEADER_TECUMSEH",
       "name": "Tecumseh",
       "display": "Tecumseh",
-      "type": "None",
-      "emoji_id": "1464705410090144010"
+      "type": "None"
     },
     {
       "token": "LEADER_TOYOTOMI_HIDEYOSHI",
@@ -234,8 +204,7 @@
       "token": "LEADER_TRUNG_TRAC",
       "name": "Trung_Trac",
       "display": "Trưng Trắc",
-      "type": "None",
-      "emoji_id": "1464705411436515491"
+      "type": "None"
     },
     {
       "token": "LEADER_WASHINGTON",
@@ -247,15 +216,13 @@
       "token": "LEADER_XERXES",
       "name": "Xerxes_King_of_Kings",
       "display": "Xerxes, King of Kings",
-      "type": "None",
-      "emoji_id": "1464705414154424454"
+      "type": "None"
     },
     {
       "token": "LEADER_XERXES_ALT",
       "name": "Xerxes_the_Achaemenid",
       "display": "Xerxes, the Achaemenid",
-      "type": "None",
-      "emoji_id": "1464705416398245949"
+      "type": "None"
     },
     {
       "token": "LEADER_YI_SUN_SIN",
@@ -270,32 +237,28 @@
       "name": "Abbasid",
       "display": "Abbasid",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701076069421271"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_AKSUM",
       "name": "Aksumite",
       "display": "Aksum",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "observed",
-      "emoji_id": "1464696342205956249"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_AMERICA",
       "name": "American",
       "display": "America",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "mite",
-      "emoji_id": "1464703951285915790"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_ASSYRIA",
       "name": "Assyria",
       "display": "Assyria",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "mite",
-      "emoji_id": "1464696343917494374"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_BABYLON",
@@ -309,48 +272,42 @@
       "name": "Bugandan",
       "display": "Buganda",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "mite",
-      "emoji_id": "1464703954695880797"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_BULGARIA",
       "name": "Bulgarian",
       "display": "Bulgaria",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701077613052156"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_CARTHAGE",
       "name": "Carthaginian",
       "display": "Carthage",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "observed",
-      "emoji_id": "1464696345448284201"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_CHOLA",
       "name": "Chola",
       "display": "Chola",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701079408214161"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_DAI_VIET",
       "name": "Vietnamese",
       "display": "Đại Việt",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "inferred",
-      "emoji_id": "1464701100849627229"
+      "age_pool_source": "inferred"
     },
     {
       "token": "CIVILIZATION_EGYPT",
       "name": "Egyptian",
       "display": "Egypt",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "observed",
-      "emoji_id": "1464696346492666149"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_ENGLAND",
@@ -364,8 +321,7 @@
       "name": "French_Imperial",
       "display": "French Empire",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "mite",
-      "emoji_id": "1464703956541509695"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_GAUL",
@@ -386,32 +342,28 @@
       "name": "British",
       "display": "Great Britain",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "mite",
-      "emoji_id": "1464703952762441856"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_GREECE",
       "name": "Greek",
       "display": "Greece",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "observed",
-      "emoji_id": "1464696348132769893"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_HAN",
       "name": "Han",
       "display": "Han",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "mite",
-      "emoji_id": "1464696350170939505"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_HAWAII",
       "name": "Hawaiian",
       "display": "Hawaiʻi",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701080670834909"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_HEIAN",
@@ -425,16 +377,14 @@
       "name": "Icelandic",
       "display": "Iceland",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701083493601472"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_INCA",
       "name": "Incan",
       "display": "Inca",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701085435560099"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_JOSEON",
@@ -448,160 +398,140 @@
       "name": "Khmer",
       "display": "Khmer",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "mite",
-      "emoji_id": "1464696352503103692"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_MAJAPAHIT",
       "name": "Majapahit",
       "display": "Majapahit",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701086769221869"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_MAURYA",
       "name": "Mauryan",
       "display": "Maurya",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "observed",
-      "emoji_id": "1464696353924976721"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_MAYA",
       "name": "Maya",
       "display": "Maya",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "observed",
-      "emoji_id": "1464696355665739807"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_MEIJI",
       "name": "Meiji_Japanese",
       "display": "Meiji Japan",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "observed",
-      "emoji_id": "1464703958382547077"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_MEXICO",
       "name": "Mexican",
       "display": "Mexico",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "observed",
-      "emoji_id": "1464703960144281849"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_MING",
       "name": "Ming",
       "display": "Ming",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701088677494794"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_MISSISSIPPIAN",
       "name": "Mississippian",
       "display": "Mississippian",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "observed",
-      "emoji_id": "1464696357414506507"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_MONGOLIA",
       "name": "Mongolian",
       "display": "Mongolia",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701090376450182"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_MUGHAL",
       "name": "Mughal",
       "display": "Mughal",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "observed",
-      "emoji_id": "1464703961159438457"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_NEPAL",
       "name": "Nepalese",
       "display": "Nepal",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "observed",
-      "emoji_id": "1464703962828771429"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_NORMAN",
       "name": "Norman",
       "display": "Normans",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701091953250426"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_OTTOMANS",
       "name": "Ottoman",
       "display": "Ottomans",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "observed",
-      "emoji_id": "1464703964250374335"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_PERSIA",
       "name": "Persian",
       "display": "Persia",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "observed",
-      "emoji_id": "1464696340629164053"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_PIRATE_REPUBLIC",
       "name": "Pirate",
       "display": "Pirate Republic",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701093945802943"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_PRUSSIA",
       "name": "Prussian",
       "display": "Prussia",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "observed",
-      "emoji_id": "1464703966347661353"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_QAJAR",
       "name": "Qajar",
       "display": "Qajar",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "observed",
-      "emoji_id": "1464703967945818134"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_QING",
       "name": "Qing",
       "display": "Qing",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "mite",
-      "emoji_id": "1464703969782665550"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_ROME",
       "name": "Roman",
       "display": "Rome",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "observed",
-      "emoji_id": "1464696359658717395"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_RUSSIA",
       "name": "Russian",
       "display": "Russia",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "observed",
-      "emoji_id": "1464703972215361762"
+      "age_pool_source": "observed"
     },
     {
       "token": "CIVILIZATION_SENGOKU",
@@ -615,48 +545,42 @@
       "name": "Shawnee",
       "display": "Shawnee",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701095673856041"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_SIAM",
       "name": "Siam",
       "display": "Siam",
       "age_pool": "AGE_MODERN",
-      "age_pool_source": "mite",
-      "emoji_id": "1464703973654270176"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_SILLA",
       "name": "Silla",
       "display": "Silla",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "mite",
-      "emoji_id": "1464696361080324270"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_SONGHAI",
       "name": "Songhai",
       "display": "Songhai",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701097322221679"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_SPAIN",
       "name": "Spanish",
       "display": "Spain",
       "age_pool": "AGE_EXPLORATION",
-      "age_pool_source": "mite",
-      "emoji_id": "1464701098886430901"
+      "age_pool_source": "mite"
     },
     {
       "token": "CIVILIZATION_TONGA",
       "name": "Tongan",
       "display": "Tonga",
       "age_pool": "AGE_ANTIQUITY",
-      "age_pool_source": "mite",
-      "emoji_id": "1464696362422632468"
+      "age_pool_source": "mite"
     }
   ]
 }

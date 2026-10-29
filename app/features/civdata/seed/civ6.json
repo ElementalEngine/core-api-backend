@@ -9,8 +9,7 @@
       "civ": "CIVILIZATION_AMERICA",
       "civ_display": "America",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719535990116563"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_ALEXANDER",
@@ -19,8 +18,7 @@
       "civ": "CIVILIZATION_MACEDON",
       "civ_display": "Macedon",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719625379123483"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_AMANITORE",
@@ -29,8 +27,7 @@
       "civ": "CIVILIZATION_NUBIA",
       "civ_display": "Nubia",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719645251600385"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_AMBIORIX",
@@ -39,8 +36,7 @@
       "civ": "CIVILIZATION_GAUL",
       "civ_display": "Gaul",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719590721458391"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_BARBAROSSA",
@@ -49,8 +45,7 @@
       "civ": "CIVILIZATION_GERMANY",
       "civ_display": "Germany",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719594433544466"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_BASIL",
@@ -59,8 +54,7 @@
       "civ": "CIVILIZATION_BYZANTIUM",
       "civ_display": "Byzantium",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719552414875698"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_CATHERINE_DE_MEDICI",
@@ -69,8 +63,7 @@
       "civ": "CIVILIZATION_FRANCE",
       "civ_display": "France",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719584761348147"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_CATHERINE_DE_MEDICI_ALT",
@@ -79,8 +72,7 @@
       "civ": "CIVILIZATION_FRANCE",
       "civ_display": "France",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719586560577732"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_CHANDRAGUPTA",
@@ -89,8 +81,7 @@
       "civ": "CIVILIZATION_INDIA",
       "civ_display": "India",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719606622060719"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_CLEOPATRA",
@@ -99,8 +90,7 @@
       "civ": "CIVILIZATION_EGYPT",
       "civ_display": "Egypt",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719570932596931"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_CLEOPATRA_ALT",
@@ -109,8 +99,7 @@
       "civ": "CIVILIZATION_EGYPT",
       "civ_display": "Egypt",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719572375437527"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_CVS_ANACAONA",
@@ -119,8 +108,7 @@
       "civ": null,
       "civ_display": "Taíno",
       "type": "None",
-      "civ_source": "unmapped",
-      "emoji_id": "1509642049681494146"
+      "civ_source": "unmapped"
     },
     {
       "token": "LEADER_CYRUS",
@@ -129,8 +117,7 @@
       "civ": "CIVILIZATION_PERSIA",
       "civ_display": "Persia",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719651408707751"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_DIDO",
@@ -139,8 +126,7 @@
       "civ": "CIVILIZATION_PHOENICIA",
       "civ_display": "Phoenicia",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719654948831262"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_ELEANOR_ENGLAND",
@@ -149,8 +135,7 @@
       "civ": "CIVILIZATION_ENGLAND",
       "civ_display": "England",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719575668228340"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_ELEANOR_FRANCE",
@@ -159,8 +144,7 @@
       "civ": "CIVILIZATION_FRANCE",
       "civ_display": "France",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719588104077479"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_ELIZABETH",
@@ -169,8 +153,7 @@
       "civ": "CIVILIZATION_ENGLAND",
       "civ_display": "England",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719577165463584"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_GANDHI",
@@ -179,8 +162,7 @@
       "civ": "CIVILIZATION_INDIA",
       "civ_display": "India",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719608513564784"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_GENGHIS_KHAN",
@@ -189,8 +171,7 @@
       "civ": "CIVILIZATION_MONGOLIA",
       "civ_display": "Mongolia",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719633415274517"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_GILGAMESH",
@@ -199,8 +180,7 @@
       "civ": "CIVILIZATION_SUMERIA",
       "civ_display": "Sumeria",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719671541502176"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_GITARJA",
@@ -209,8 +189,7 @@
       "civ": "CIVILIZATION_INDONESIA",
       "civ_display": "Indonesia",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719610442940590"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_GORGO",
@@ -219,8 +198,7 @@
       "civ": "CIVILIZATION_GREECE",
       "civ_display": "Greece",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719599391211591"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_HAMMURABI",
@@ -229,8 +207,7 @@
       "civ": "CIVILIZATION_BABYLON_STK",
       "civ_display": "Babylon",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719549059436545"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_HARALD_ALT",
@@ -239,8 +216,7 @@
       "civ": "CIVILIZATION_NORWAY",
       "civ_display": "Norway",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719643234013224"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_HARDRADA",
@@ -249,8 +225,7 @@
       "civ": "CIVILIZATION_NORWAY",
       "civ_display": "Norway",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719638788313354"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_HOJO",
@@ -259,8 +234,7 @@
       "civ": "CIVILIZATION_JAPAN",
       "civ_display": "Japan",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719612078723279"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_JADWIGA",
@@ -269,8 +243,7 @@
       "civ": "CIVILIZATION_POLAND",
       "civ_display": "Poland",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719657834381333"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_JAYAVARMAN",
@@ -279,8 +252,7 @@
       "civ": "CIVILIZATION_KHMER",
       "civ_display": "Khmer",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719614805152017"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_JFD_OLYMPIAS",
@@ -289,8 +261,7 @@
       "civ": null,
       "civ_display": "Macedon",
       "type": "None",
-      "civ_source": "unmapped",
-      "emoji_id": "1464712215767552000"
+      "civ_source": "unmapped"
     },
     {
       "token": "LEADER_JFD_STANISLAW",
@@ -299,8 +270,7 @@
       "civ": null,
       "civ_display": "Poland",
       "type": "None",
-      "civ_source": "unmapped",
-      "emoji_id": "1509642121693626508"
+      "civ_source": "unmapped"
     },
     {
       "token": "LEADER_JOAO_III",
@@ -309,8 +279,7 @@
       "civ": "CIVILIZATION_PORTUGAL",
       "civ_display": "Portugal",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719659449319616"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_JOHN_CURTIN",
@@ -319,8 +288,7 @@
       "civ": "CIVILIZATION_AUSTRALIA",
       "civ_display": "Australia",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719545909645568"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_JULIUS_CAESAR",
@@ -329,8 +297,7 @@
       "civ": "CIVILIZATION_ROME",
       "civ_display": "Rome",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719660917461055"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_KRISTINA",
@@ -339,8 +306,7 @@
       "civ": "CIVILIZATION_SWEDEN",
       "civ_display": "Sweden",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719673831456881"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_KUBLAI_KHAN_CHINA",
@@ -349,8 +315,7 @@
       "civ": "CIVILIZATION_CHINA",
       "civ_display": "China",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719559289470986"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_KUBLAI_KHAN_MONGOLIA",
@@ -359,8 +324,7 @@
       "civ": "CIVILIZATION_MONGOLIA",
       "civ_display": "Mongolia",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719634891673908"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_KUPE",
@@ -369,8 +333,7 @@
       "civ": "CIVILIZATION_MAORI",
       "civ_display": "Māori",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719622669340764"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_LADY_SIX_SKY",
@@ -379,8 +342,7 @@
       "civ": "CIVILIZATION_MAYA",
       "civ_display": "Maya",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719632228286668"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_LADY_TRIEU",
@@ -389,8 +351,7 @@
       "civ": "CIVILIZATION_VIETNAM",
       "civ_display": "Vietnam",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719675316244643"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_LAURIER",
@@ -399,8 +360,7 @@
       "civ": "CIVILIZATION_CANADA",
       "civ_display": "Canada",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719556638539967"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_LAUTARO",
@@ -409,8 +369,7 @@
       "civ": "CIVILIZATION_MAPUCHE",
       "civ_display": "Mapuche",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719630693302454"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_LIME_PHOE_AHIRAM",
@@ -419,8 +378,7 @@
       "civ": null,
       "civ_display": "Phoenicia",
       "type": "None",
-      "civ_source": "unmapped",
-      "emoji_id": "1464712219278442720"
+      "civ_source": "unmapped"
     },
     {
       "token": "LEADER_LIME_TEO_OWL",
@@ -429,8 +387,7 @@
       "civ": null,
       "civ_display": "Teotihuacan",
       "type": "None",
-      "civ_source": "unmapped",
-      "emoji_id": "1464712223728599190"
+      "civ_source": "unmapped"
     },
     {
       "token": "LEADER_LIME_THULE_DAVE",
@@ -439,8 +396,7 @@
       "civ": "CIVILIZATION_LIME_THULE",
       "civ_display": "Thule",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464712225552994419"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_LL_TEKINICH_II",
@@ -449,8 +405,7 @@
       "civ": null,
       "civ_display": "Maya",
       "type": "None",
-      "civ_source": "unmapped",
-      "emoji_id": "1464712217609109790"
+      "civ_source": "unmapped"
     },
     {
       "token": "LEADER_LUDWIG",
@@ -459,8 +414,7 @@
       "civ": "CIVILIZATION_GERMANY",
       "civ_display": "Germany",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719596077584424"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_MANSA_MUSA",
@@ -469,8 +423,7 @@
       "civ": "CIVILIZATION_MALI",
       "civ_display": "Mali",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719627807494266"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_MATTHIAS_CORVINUS",
@@ -479,8 +432,7 @@
       "civ": "CIVILIZATION_HUNGARY",
       "civ_display": "Hungary",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719602654380063"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_MENELIK",
@@ -489,8 +441,7 @@
       "civ": "CIVILIZATION_ETHIOPIA",
       "civ_display": "Ethiopia",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719583306055732"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_MER_MARIA_THERESA",
@@ -499,8 +450,7 @@
       "civ": null,
       "civ_display": "Austria",
       "type": "None",
-      "civ_source": "unmapped",
-      "emoji_id": "1509642544395325470"
+      "civ_source": "unmapped"
     },
     {
       "token": "LEADER_MER_THEODORIC",
@@ -509,8 +459,7 @@
       "civ": null,
       "civ_display": "Goths",
       "type": "None",
-      "civ_source": "unmapped",
-      "emoji_id": "1509642146045759609"
+      "civ_source": "unmapped"
     },
     {
       "token": "LEADER_MONTEZUMA",
@@ -519,8 +468,7 @@
       "civ": "CIVILIZATION_AZTEC",
       "civ_display": "Aztec",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719547490894084"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_MVEMBA",
@@ -529,8 +477,7 @@
       "civ": "CIVILIZATION_KONGO",
       "civ_display": "Kongo",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719616298455272"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_NADER_SHAH",
@@ -539,8 +486,7 @@
       "civ": "CIVILIZATION_PERSIA",
       "civ_display": "Persia",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719652927312032"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_NZINGA_MBANDE",
@@ -549,8 +495,7 @@
       "civ": "CIVILIZATION_KONGO",
       "civ_display": "Kongo",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719618013921311"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_PACHACUTI",
@@ -559,8 +504,7 @@
       "civ": "CIVILIZATION_INCA",
       "civ_display": "Inca",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719604374044843"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_PEDRO",
@@ -569,8 +513,7 @@
       "civ": "CIVILIZATION_BRAZIL",
       "civ_display": "Brazil",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719550762320046"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_PERICLES",
@@ -579,8 +522,7 @@
       "civ": "CIVILIZATION_GREECE",
       "civ_display": "Greece",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719600770875395"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_PETER_GREAT",
@@ -589,8 +531,7 @@
       "civ": "CIVILIZATION_RUSSIA",
       "civ_display": "Russia",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719664322969600"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_PHILIP_II",
@@ -599,8 +540,7 @@
       "civ": "CIVILIZATION_SPAIN",
       "civ_display": "Spain",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719669398077758"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_POUNDMAKER",
@@ -609,8 +549,7 @@
       "civ": "CIVILIZATION_CREE",
       "civ_display": "Cree",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719569057747127"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_QIN",
@@ -619,8 +558,7 @@
       "civ": "CIVILIZATION_CHINA",
       "civ_display": "China",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719560438448178"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_QIN_ALT",
@@ -629,8 +567,7 @@
       "civ": "CIVILIZATION_CHINA",
       "civ_display": "China",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719562866954250"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_RAMSES",
@@ -639,8 +576,7 @@
       "civ": "CIVILIZATION_EGYPT",
       "civ_display": "Egypt",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719574124466236"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_ROBERT_THE_BRUCE",
@@ -649,8 +585,7 @@
       "civ": "CIVILIZATION_SCOTLAND",
       "civ_display": "Scotland",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719666042765526"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_SALADIN",
@@ -659,8 +594,7 @@
       "civ": "CIVILIZATION_ARABIA",
       "civ_display": "Arabia",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719544198365236"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_SALADIN_ALT",
@@ -669,8 +603,7 @@
       "civ": "CIVILIZATION_ARABIA",
       "civ_display": "Arabia",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719542747009278"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_SEJONG",
@@ -679,8 +612,7 @@
       "civ": "CIVILIZATION_KOREA",
       "civ_display": "Korea",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719619674869983"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_SEONDEOK",
@@ -689,8 +621,7 @@
       "civ": "CIVILIZATION_KOREA",
       "civ_display": "Korea",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719621180362863"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_SHAKA",
@@ -699,8 +630,7 @@
       "civ": "CIVILIZATION_ZULU",
       "civ_display": "Zulu",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719677375779095"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_SIMON_BOLIVAR",
@@ -709,8 +639,7 @@
       "civ": "CIVILIZATION_GRAN_COLOMBIA",
       "civ_display": "Gran Colombia",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719597679939879"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_SUK_AL_HASAN",
@@ -719,8 +648,7 @@
       "civ": "CIVILIZATION_SUK_SWAHILI",
       "civ_display": "Swahili",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464712221341909012"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_SUK_TRISONG_DETSEN",
@@ -729,8 +657,7 @@
       "civ": "CIVILIZATION_SUK_TIBET",
       "civ_display": "Tibet",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464712226978922617"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_SUK_VERCINGETORIX_DLC",
@@ -739,8 +666,7 @@
       "civ": null,
       "civ_display": "Gaul",
       "type": "None",
-      "civ_source": "unmapped",
-      "emoji_id": "1464712214131773532"
+      "civ_source": "unmapped"
     },
     {
       "token": "LEADER_SULEIMAN",
@@ -749,8 +675,7 @@
       "civ": "CIVILIZATION_OTTOMAN",
       "civ_display": "Ottoman",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719647692816655"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_SULEIMAN_ALT",
@@ -759,8 +684,7 @@
       "civ": "CIVILIZATION_OTTOMAN",
       "civ_display": "Ottoman",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719649420742858"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_SUNDIATA_KEITA",
@@ -769,8 +693,7 @@
       "civ": "CIVILIZATION_MALI",
       "civ_display": "Mali",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719629363708059"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_TAMAR",
@@ -779,8 +702,7 @@
       "civ": "CIVILIZATION_GEORGIA",
       "civ_display": "Georgia",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719592399175805"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_THEODORA",
@@ -789,8 +711,7 @@
       "civ": "CIVILIZATION_BYZANTIUM",
       "civ_display": "Byzantium",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719554327609365"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_TOKUGAWA",
@@ -799,8 +720,7 @@
       "civ": "CIVILIZATION_JAPAN",
       "civ_display": "Japan",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719613257449548"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_TOMYRIS",
@@ -809,8 +729,7 @@
       "civ": "CIVILIZATION_SCYTHIA",
       "civ_display": "Scythia",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719667661770795"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_TRAJAN",
@@ -819,8 +738,7 @@
       "civ": "CIVILIZATION_ROME",
       "civ_display": "Rome",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719662741852280"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_T_ROOSEVELT",
@@ -829,8 +747,7 @@
       "civ": "CIVILIZATION_AMERICA",
       "civ_display": "America",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719538145988710"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_T_ROOSEVELT_ROUGHRIDER",
@@ -839,8 +756,7 @@
       "civ": "CIVILIZATION_AMERICA",
       "civ_display": "America",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719540284821624"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_VICTORIA",
@@ -849,8 +765,7 @@
       "civ": "CIVILIZATION_ENGLAND",
       "civ_display": "England",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719579065356370"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_VICTORIA_ALT",
@@ -859,8 +774,7 @@
       "civ": "CIVILIZATION_ENGLAND",
       "civ_display": "England",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719580835615013"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_WILHELMINA",
@@ -869,8 +783,7 @@
       "civ": "CIVILIZATION_NETHERLANDS",
       "civ_display": "Netherlands",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719637160661348"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_WU_ZETIAN",
@@ -879,8 +792,7 @@
       "civ": "CIVILIZATION_CHINA",
       "civ_display": "China",
       "type": "None",
-      "civ_source": "inferred",
-      "emoji_id": "1464719564226167136"
+      "civ_source": "inferred"
     },
     {
       "token": "LEADER_YONGLE",
@@ -889,8 +801,7 @@
       "civ": "CIVILIZATION_CHINA",
       "civ_display": "China",
       "type": "None",
-      "civ_source": "observed",
-      "emoji_id": "1464719566696616000"
+      "civ_source": "observed"
     }
   ]
 }

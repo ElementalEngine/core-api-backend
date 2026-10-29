@@ -255,17 +255,6 @@
             ],
             "title": "Display"
           },
-          "emoji_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Emoji Id"
-          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -997,17 +986,6 @@
               }
             ],
             "title": "Display"
-          },
-          "emoji_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Emoji Id"
           },
           "name": {
             "title": "Name",
