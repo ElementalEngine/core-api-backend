@@ -232,6 +232,7 @@ def test_a_lobby_votes_on_bans_then_drafts_into_a_recorded_setup(setups):
     lobby = hosted(client)
     assert len(lobby["code"]) == 6 and lobby["phase"] == "live"
     assert post(client, lobby, "join", "a").status_code == 200
+    assert post(client, lobby, "join", "b").status_code == 200
     banned = edit(client, lobby, bans=["LEADER_00"])
     assert banned.json()["bans"] == [
         {"token": "LEADER_00", "kind": "leader", "by": "host"}
@@ -252,8 +253,9 @@ def test_a_lobby_votes_on_bans_then_drafts_into_a_recorded_setup(setups):
     assert (drafted["status"], drafted["deadline"]) == ("done", None)
     assert [b["token"] for b in drafted["bans"]] == ["LEADER_00", "LEADER_01"]
     assert [(p["player_id"], len(p["leaders"])) for p in drafted["pools"]] == [
-        ("host", 14),
-        ("a", 14),
+        ("host", 9),
+        ("a", 9),
+        ("b", 9),
     ]
     assert store.docs[ObjectId(lobby["id"])]["season_id"] == SEASON
     assert post(client, lobby, "tally", "host", json=ballot).status_code == 409
@@ -272,13 +274,15 @@ def test_a_full_lobby_counts_down_and_only_the_host_starts_it_sooner(setups):
     assert post(client, duel, "leave", "a").status_code == 409
     ffa = hosted(client, host="other")
     post(client, ffa, "join", "b")
+    assert post(client, ffa, "start", "other").status_code == 409
+    post(client, ffa, "join", "c")
     assert post(client, ffa, "start", "b").status_code == 403
     assert post(client, ffa, "start", "other").json()["phase"] == "voting"
 
 
 def test_a_blind_draft_is_picked_privately_then_revealed(setups):
     client, _ = setups
-    lobby = hosted(client)
+    lobby = hosted(client, shape="duel")
     assert edit(client, lobby, settings={"draft_mode": "blind"}).status_code == 200
     post(client, lobby, "join", "a")
     post(client, lobby, "start", "host")
@@ -493,6 +497,7 @@ def test_civ7_bans_civs_of_its_age_and_blind_picks_a_leader_and_a_civ(setups):
     asked = {
         **START,
         "edition": "civ7",
+        "mode": "duel",
         "players": ["a", "b"],
         "age": "AGE_ANTIQUITY",
     }

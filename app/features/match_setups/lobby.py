@@ -308,16 +308,19 @@ def _groups(lobby: Mapping[str, Any]) -> list[list[str]]:
 
 def started(lobby: Mapping[str, Any], actor_id: str, now: datetime) -> dict[str, Any]:
     """The host starts, or the bot for the host once a full lobby's countdown
-    ends: two duellists, two players, or equal teams. The seats lock while the
-    players vote on more bans."""
+    ends: two duellists, three or more in an FFA, or equal teams of two or
+    more. The seats lock while the players vote on more bans."""
     require_host(lobby, actor_id)
     require_phase(lobby, LIVE)
     players = lobby["players"]
+    sizes = team_sizes(lobby) if lobby["teams"] else []
     if lobby["mode"] == "duel" and len(players) != 2:
         raise LobbyRefused("a duel starts with two players")
-    if len(players) < 2:
-        raise LobbyRefused("the lobby needs at least two players")
-    if lobby["teams"] and len(set(team_sizes(lobby))) != 1:
+    if lobby["mode"] == "ffa" and len(players) < 3:
+        raise LobbyRefused("an FFA starts with three or more players")
+    if sizes and min(sizes) < 2:
+        raise LobbyRefused("each team needs two or more players")
+    if len(set(sizes)) > 1:
         raise LobbyRefused("the teams must be the same size")
     return {
         "phase": VOTING,

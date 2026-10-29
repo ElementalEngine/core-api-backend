@@ -67,7 +67,7 @@ def tally(vote, settings=None, bans=None, civs=(), actor="a"):
 
 def test_a_vote_opens_at_once_for_ten_minutes_with_its_starter_bans_standing():
     made = voting(
-        players=["a", "b", "a"],
+        players=["a", "b", "c", "a"],
         bans=[{"token": "LEADER_01", "kind": "leader"}],
     )
     assert (made["command"], made["phase"], made["deadline"]) == (
@@ -75,7 +75,7 @@ def test_a_vote_opens_at_once_for_ten_minutes_with_its_starter_bans_standing():
         "voting",
         NOW + VOTE_LIMIT,
     )
-    assert [p["discord_id"] for p in made["players"]] == ["a", "b"]
+    assert [p["discord_id"] for p in made["players"]] == ["a", "b", "c"]
     assert (made["settings"], made["draft_mode"]) == ([], None)
     assert made["bans"] == [{"token": "LEADER_01", "kind": "leader", "by": "host"}]
 
@@ -84,6 +84,7 @@ def test_a_vote_opens_at_once_for_ten_minutes_with_its_starter_bans_standing():
     ("fields", "refusal"),
     [
         ({"players": ["a"]}, "2 to 14 players"),
+        ({"players": ["a", "b"]}, "an FFA is three or more"),
         ({"mode": "duel"}, "a duel is two players"),
         ({"mode": "teamer"}, "two teams of two or more"),
     ],
@@ -179,7 +180,7 @@ def test_a_teamer_deals_one_pool_a_team_and_random_one_leader_a_player():
 
 
 def test_civ7_deals_civs_beside_leaders_and_bans_civs_within_their_cap():
-    made = voting(edition="civ7", players=["a", "b"])
+    made = voting(edition="civ7", mode="duel", players=["a", "b"])
     bans = {"LEADER_00": ["a", "b"], "CIVILIZATION_00": ["a", "b"]}
     standard = {"draft_mode": {"standard": ["a"]}}
     done = tally(made, settings=standard, bans=bans, civs=CIVS)
@@ -207,7 +208,7 @@ def test_civ7_deals_civs_beside_leaders_and_bans_civs_within_their_cap():
 
 
 def test_a_civ7_blind_draft_picks_a_leader_and_a_civ_and_the_rest_are_auto_picked():
-    made = voting(edition="civ7", players=["a", "b"])
+    made = voting(edition="civ7", mode="duel", players=["a", "b"])
     picking = tally(made, settings={"draft_mode": {"blind": ["a", "b"]}}, civs=CIVS)
     assert (picking["phase"], picking["status"]) == ("picking", "open")
     assert all(len(p["leaders"]) <= BLIND_POOL for p in picking["pools"])

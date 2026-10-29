@@ -241,9 +241,10 @@ def test_the_host_moves_and_removes_players_but_not_themself():
 @pytest.mark.parametrize(
     ("shape", "players", "refusal"),
     [
-        ("ffa-8", [], "at least two"),
+        ("ffa-8", ["a"], "three or more"),
         ("duel", [], "two players"),
-        ("teamer-3v3", ["a", "b"], "same size"),
+        ("teamer-3v3", ["a", "b"], "two or more"),
+        ("teamer-3v3", ["a", "b", "c", "d"], "same size"),
     ],
 )
 def test_the_host_starts_early_only_when_the_lobby_can_draft(shape, players, refusal):
@@ -252,10 +253,11 @@ def test_the_host_starts_early_only_when_the_lobby_can_draft(shape, players, ref
 
 
 def test_starting_locks_the_seats_for_a_three_minute_bans_vote():
-    made = apply(lobby(players=["a"]), started(lobby(players=["a"]), "host", NOW))
+    seated = lobby(players=["a", "b"])
+    made = apply(seated, started(seated, "host", NOW))
     assert (made["phase"], made["deadline"]) == ("voting", NOW + timedelta(minutes=3))
     for locked in (
-        lambda: joined(made, "b", NOW),
+        lambda: joined(made, "c", NOW),
         lambda: left(made, "a"),
         lambda: edit(made),
         lambda: started(made, "host", NOW),
@@ -273,7 +275,7 @@ def voting(made):
 
 
 def test_the_vote_is_posted_once_and_each_player_finishes_once():
-    made = voting(lobby(players=["a"]))
+    made = voting(lobby(players=["a", "b"]))
     placed = apply(made, vote_placed(made, "host", "v", {"status": "m1"}))
     assert placed["vote"] == {
         "channel_id": "v",
@@ -349,7 +351,8 @@ def test_three_teams_of_two_fill_in_turn_and_draft_by_team():
     full = apply(trio, joined(trio, "e", NOW))
     assert [p["team"] for p in full["players"]][-1] == 3
     assert full["deadline"] == NOW + timedelta(minutes=3)
-    pools = tally(voting(lobby("teamer-2v2v2", players=["a", "b"])))["pools"]
+    six = lobby("teamer-2v2v2", players=["a", "b", "c", "d", "e"])
+    pools = tally(voting(six))["pools"]
     assert [(p["team"], len(p["leaders"])) for p in pools] == [
         (1, 13),
         (2, 13),
@@ -376,7 +379,7 @@ def test_a_teamer_drafts_by_team_and_random_gives_each_player_one():
 
 
 def test_a_blind_draft_deals_at_most_a_menu_each_then_each_player_locks_in():
-    duo = voting(lobby(players=["a"], draft_mode="blind"))
+    duo = voting(lobby("duel", players=["a"], draft_mode="blind"))
     duo = apply(duo, vote_placed(duo, "host", "v", {"status": "m1"}))
     assert [len(p["leaders"]) for p in dealt(duo, [["host"], ["a"]], LEADERS)] == [
         20,
@@ -408,7 +411,7 @@ def test_a_blind_draft_deals_at_most_a_menu_each_then_each_player_locks_in():
 
 
 def test_the_picks_are_revealed_together_and_a_missing_one_is_auto_picked():
-    blind = voting(lobby(players=["a"], draft_mode="blind"))
+    blind = voting(lobby("duel", players=["a"], draft_mode="blind"))
     blind = apply(blind, tally(blind))
     mine = blind["pools"][1]["leaders"]
     blind = apply(blind, picked(blind, "a", mine[2]))

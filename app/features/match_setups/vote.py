@@ -54,6 +54,8 @@ def new_vote(
         raise LobbyRefused(f"a vote needs 2 to {MAX_PLAYERS} players")
     if mode == "duel" and len(voters) != 2:
         raise LobbyRefused("a duel is two players")
+    if mode == "ffa" and len(voters) < 3:
+        raise LobbyRefused("an FFA is three or more players")
     if mode == "teamer" and len(voters) < 2 * TEAMS:
         raise LobbyRefused("a teamer is two teams of two or more")
     return {
