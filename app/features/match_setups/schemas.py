@@ -114,20 +114,22 @@ Voters = Annotated[list[str], Field(max_length=14)]
 
 
 class VotePlace(BaseModel):
-    """Where the bans vote, then the blind picks, are posted: the channel and
-    the one message."""
+    """Where the bans vote, then the blind picks, are posted: the channel, the
+    status message, and one message per setting put to the vote."""
 
     model_config = ConfigDict(extra="forbid")
 
     channel_id: str = Field(min_length=1, max_length=32)
-    messages: dict[str, str] = Field(max_length=1)
+    messages: dict[str, str] = Field(min_length=1, max_length=25)
 
 
 class LobbyBallot(BaseModel):
-    """The players' reactions: per leader, the players banning it."""
+    """The players' reactions: per setting put to the vote, the players backing
+    each option; per leader, the players banning it."""
 
     model_config = ConfigDict(extra="forbid")
 
+    settings: dict[str, dict[str, Voters]] = Field(default_factory=dict, max_length=40)
     bans: dict[str, Voters] = Field(max_length=100)
 
 

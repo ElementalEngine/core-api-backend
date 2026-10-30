@@ -14,14 +14,12 @@ from app.features.match_setups.lobby import (
     revealed,
 )
 from app.features.match_setups.pools import BLIND_POOL
-from app.features.match_setups.questions import questions_for
+from app.features.match_setups.questions import questions_for, seeded_index, winner
 from app.features.match_setups.vote import (
     VOTE_LIMIT,
     new_vote,
-    seeded_index,
     vote_counted,
     vote_tallied,
-    winner,
 )
 
 LEADERS = [f"LEADER_{n:02}" for n in range(40)]

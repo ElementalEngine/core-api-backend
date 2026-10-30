@@ -17,7 +17,7 @@ from app.features.match_setups.pools import (
     leader_pools,
     remaining_after_bans,
 )
-from app.features.match_setups.questions import preset
+from app.features.match_setups.questions import VOTE, preset, settled
 
 _RANDOM = SystemRandom()
 
@@ -95,7 +95,7 @@ def new_lobby(
     questions: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     """A civ6 lobby in setup, its host in the first seat and each setting at
-    its default until the host changes it; one with no default waits for the host."""
+    its default until the host changes it; one with no default is put to the vote."""
     if steam_link is not None and not STEAM_LINK.fullmatch(steam_link):
         raise LobbyRefused("the Steam link is not a Civ6 lobby link")
     chosen = SHAPES[shape]
@@ -274,7 +274,7 @@ def edited(
         for team, count in enumerate(team_sizes({**lobby, "players": players}), 1):
             if count > size:
                 raise LobbyRefused(f"team {team} has more than {size} players")
-    options = {q["id"]: {o["id"] for o in q["options"]} for q in questions}
+    options = {q["id"]: {VOTE, *(o["id"] for o in q["options"])} for q in questions}
     for question, option in settings.items():
         if option not in options.get(question, ()):
             raise LobbyRefused(f"{question} has no option {option}")
@@ -411,18 +411,50 @@ def with_voted_bans(
     return bans
 
 
+def with_voted_settings(
+    lobby: Mapping[str, Any],
+    setting_votes: Mapping[str, Mapping[str, Sequence[str]]],
+    questions: Sequence[Mapping[str, Any]],
+    *,
+    final: bool,
+) -> list[dict[str, Any]]:
+    """The settings, with each one the host put to the vote settled as /vote
+    settles it: at once by a majority, or by the final count."""
+    held = {s["id"]: s for s in lobby["settings"]}
+    asked = [q for q in questions if q["id"] in held]
+    fixed = [s for s in lobby["settings"] if s["value"] != VOTE]
+    won = {
+        s["id"]: s
+        for s in settled(
+            {**lobby, "settings": fixed}, setting_votes, asked, final=final
+        )
+    }
+    return [won.get(q["id"], held[q["id"]]) for q in asked]
+
+
+def _draft_mode(settings: Sequence[Mapping[str, Any]]) -> str | None:
+    return next((s["value"] for s in settings if s["id"] == "draft_mode"), None)
+
+
 def ballot_counted(
     lobby: Mapping[str, Any],
     actor_id: str,
     *,
     ban_votes: Mapping[str, Sequence[str]],
+    setting_votes: Mapping[str, Mapping[str, Sequence[str]]],
     leaders: Sequence[str],
+    questions: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """A running count while the players vote: a leader reaching a majority is
-    banned at once, and stays banned if a vote is then taken back."""
+    """A running count while the players vote: a leader or a setting option
+    reaching a majority wins at once, and stays won if a vote is taken back."""
     require_host(lobby, actor_id)
     require_phase(lobby, VOTING)
-    return {"bans": with_voted_bans(lobby, ban_votes, {"leader": leaders})}
+    settings = with_voted_settings(lobby, setting_votes, questions, final=False)
+    return {
+        "bans": with_voted_bans(lobby, ban_votes, {"leader": leaders}),
+        "settings": settings,
+        "draft_mode": _draft_mode(settings),
+    }
 
 
 def drafted(
@@ -439,18 +471,30 @@ def tallied(
     actor_id: str,
     *,
     ban_votes: Mapping[str, Sequence[str]],
+    setting_votes: Mapping[str, Mapping[str, Sequence[str]]],
     leaders: Sequence[str],
+    questions: Sequence[Mapping[str, Any]],
     now: datetime,
     rng: Any = _RANDOM,
 ) -> dict[str, Any]:
-    """The vote counted and the draft dealt: more leader bans land with a
-    majority of the players, as many as the cap leaves room for. A blind draft
-    then has its players pick; any other is done."""
+    """The vote counted and the draft dealt: every setting put to the vote is
+    settled, and more leader bans land with a majority of the players, as many
+    as the cap leaves room for. A blind draft then has its players pick; any
+    other is done."""
     require_host(lobby, actor_id)
     require_phase(lobby, VOTING)
+    settings = with_voted_settings(lobby, setting_votes, questions, final=True)
+    draft_mode = _draft_mode(settings)
     bans = with_voted_bans(lobby, ban_votes, {"leader": leaders})
-    pools = dealt({**lobby, "bans": bans}, _groups(lobby), leaders, rng)
-    return drafted({"bans": bans, "pools": pools}, lobby["draft_mode"], now)
+    voted = {**lobby, "bans": bans, "draft_mode": draft_mode}
+    pools = dealt(voted, _groups(lobby), leaders, rng)
+    changes = {
+        "settings": settings,
+        "draft_mode": draft_mode,
+        "bans": bans,
+        "pools": pools,
+    }
+    return drafted(changes, draft_mode, now)
 
 
 def picked(
@@ -543,4 +587,5 @@ __all__ = [
     "vote_placed",
     "went_live",
     "with_voted_bans",
+    "with_voted_settings",
 ]

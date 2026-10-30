@@ -384,13 +384,18 @@ async def count_ballot(
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     """The votes so far, sent by the bot as the host while the players vote: a
-    leader reaching a majority is banned at once and stays banned."""
+    leader or a setting option reaching a majority wins at once and stays won."""
     leaders = await civ6_leaders(db)
     return await change_setup(
         db,
         lobby_id,
         lambda lobby: ballot_counted(
-            lobby, actor, ban_votes=body.bans, leaders=leaders
+            lobby,
+            actor,
+            ban_votes=body.bans,
+            setting_votes=body.settings,
+            leaders=leaders,
+            questions=questions_for(lobby["edition"], lobby["mode"]),
         ),
     )
 
@@ -402,14 +407,22 @@ async def tally_vote(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """Count the bans and deal the draft. The bot counts, acting as the host,
-    once all finish or the time is up."""
+    """Settle the settings put to the vote, count the bans and deal the draft.
+    The bot counts, acting as the host, once all finish or the time is up."""
     leaders = await civ6_leaders(db)
     season_id = await open_season_id(db, "civ6")
 
     def counted(lobby: dict[str, Any]) -> dict[str, Any]:
         now = datetime.now(UTC)
-        changes = tallied(lobby, actor, ban_votes=body.bans, leaders=leaders, now=now)
+        changes = tallied(
+            lobby,
+            actor,
+            ban_votes=body.bans,
+            setting_votes=body.settings,
+            leaders=leaders,
+            questions=questions_for(lobby["edition"], lobby["mode"]),
+            now=now,
+        )
         return {**changes, "season_id": season_id}
 
     return await change_setup(db, lobby_id, counted)

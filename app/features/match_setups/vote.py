@@ -4,7 +4,6 @@ the stored document; the router writes what they return."""
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from random import SystemRandom
@@ -27,7 +26,7 @@ from app.features.match_setups.pools import (
     leader_pools,
     remaining_after_bans,
 )
-from app.features.match_setups.questions import preset
+from app.features.match_setups.questions import preset, settled
 
 _RANDOM = SystemRandom()
 VOTE_LIMIT = timedelta(minutes=10)
@@ -85,56 +84,6 @@ def new_vote(
         "created_at": now,
         "updated_at": now,
     }
-
-
-def seeded_index(seed: str, question_id: str, count: int) -> int:
-    """The tie-break, fixed by the vote and the question, so it can be checked."""
-    digest = hashlib.sha256(f"{seed}:{question_id}".encode()).hexdigest()
-    return int(digest[:8], 16) % count
-
-
-def _backing(
-    question: Mapping[str, Any], votes: Mapping[str, Sequence[str]], voters: set[str]
-) -> dict[str, int]:
-    return {
-        o["id"]: len(voters & set(votes.get(o["id"], ()))) for o in question["options"]
-    }
-
-
-def winner(
-    question: Mapping[str, Any],
-    votes: Mapping[str, Sequence[str]],
-    voters: set[str],
-    seed: str,
-) -> str:
-    """The option most players reacted for. A tie, none reacting included, goes
-    to one of the tied options by a fixed hash."""
-    counts = _backing(question, votes, voters)
-    most = max(counts.values(), default=0)
-    tied = sorted(option for option, count in counts.items() if count == most)
-    return tied[seeded_index(seed, question["id"], len(tied))]
-
-
-def settled(
-    vote: Mapping[str, Any],
-    setting_votes: Mapping[str, Mapping[str, Sequence[str]]],
-    questions: Sequence[Mapping[str, Any]],
-    *,
-    final: bool,
-) -> list[dict[str, Any]]:
-    """The settings won so far: one an option has a majority of the players
-    for is won at once and stays won. The final count settles the rest."""
-    voters = {p["discord_id"] for p in vote["players"]}
-    need = len(voters) // 2 + 1
-    chosen = {s["id"]: s for s in vote["settings"]}
-    for q in questions:
-        votes = setting_votes.get(q["id"], {})
-        if q["id"] in chosen:
-            continue
-        if final or max(_backing(q, votes, voters).values(), default=0) >= need:
-            value = winner(q, votes, voters, str(vote["_id"]))
-            chosen[q["id"]] = {"id": q["id"], "value": value, "by": "vote"}
-    return [chosen[q["id"]] for q in questions if q["id"] in chosen]
 
 
 def _pools(
@@ -229,8 +178,6 @@ def vote_tallied(
 __all__ = [
     "VOTE_LIMIT",
     "new_vote",
-    "seeded_index",
     "vote_counted",
     "vote_tallied",
-    "winner",
 ]

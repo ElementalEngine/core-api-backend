@@ -104,19 +104,22 @@ def test_a_lobby_keeps_its_host_s_message_and_lfg_ping():
     assert (made["message"], made["lfg"]) == ("No novices", True)
 
 
-def test_a_lobby_opens_in_setup_at_the_defaults_with_the_map_unset():
+def test_a_lobby_opens_in_setup_at_the_defaults_with_the_map_put_to_the_vote():
     made = hosted()
     assert (made["phase"], made["code"], made["draft_mode"]) == (
         "setup",
         "K7Q2DM",
         "standard",
     )
-    chosen = {s["id"] for s in made["settings"]}
-    assert "map" not in chosen and chosen == {
-        q["id"] for q in questions(made) if q["default_option_id"]
-    }
-    with pytest.raises(LobbyRefused, match="set every setting first: Map$"):
-        went_live(made, "host", "m", questions(made))
+    chosen = {s["id"]: s["value"] for s in made["settings"]}
+    assert list(chosen) == [q["id"] for q in questions(made)]
+    assert chosen["map"] == "vote"
+    assert all(
+        chosen[q["id"]] == q["default_option_id"]
+        for q in questions(made)
+        if q["default_option_id"]
+    )
+    assert went_live(made, "host", "m", questions(made))["phase"] == "live"
     assert made["players"] == [{"discord_id": "host", "team": None}]
     assert hosted("teamer-3v3")["players"] == [{"discord_id": "host", "team": 1}]
     for link in ("steam://joinlobby/1295660/1/76561198000000000", f"{LINK}\n"):
@@ -303,10 +306,28 @@ def test_the_vote_is_posted_once_and_each_player_finishes_once():
         finished(lobby(players=["a"]), "a")
 
 
-def tally(made, ban_votes=None, actor="host"):
+def tally(made, ban_votes=None, actor="host", setting_votes=None):
     rng = random.Random(3)
     return tallied(
-        made, actor, ban_votes=ban_votes or {}, leaders=LEADERS, now=NOW, rng=rng
+        made,
+        actor,
+        ban_votes=ban_votes or {},
+        setting_votes=setting_votes or {},
+        leaders=LEADERS,
+        questions=questions(made),
+        now=NOW,
+        rng=rng,
+    )
+
+
+def ballot(made, actor="host", ban_votes=None, setting_votes=None):
+    return ballot_counted(
+        made,
+        actor,
+        ban_votes=ban_votes or {},
+        setting_votes=setting_votes or {},
+        leaders=LEADERS,
+        questions=questions(made),
     )
 
 
@@ -338,9 +359,7 @@ def test_the_vote_adds_bans_with_a_majority_then_the_draft_is_dealt():
 
 def test_a_leader_reaching_a_majority_mid_vote_is_banned_and_stays_banned():
     made = voting(lobby(players=["a", "b"]))
-    count = lambda m, votes: apply(  # noqa: E731
-        m, ballot_counted(m, "host", ban_votes=votes, leaders=LEADERS)
-    )
+    count = lambda m, votes: apply(m, ballot(m, ban_votes=votes))  # noqa: E731
     one = count(made, {"LEADER_03": ["host"], "LEADER_04": ["a"]})
     assert one["bans"] == []
     two = count(one, {"LEADER_03": ["host", "a"], "LEADER_04": ["a"]})
@@ -349,9 +368,73 @@ def test_a_leader_reaching_a_majority_mid_vote_is_banned_and_stays_banned():
     assert [b["token"] for b in taken_back["bans"]] == ["LEADER_03"]
     assert [b["token"] for b in tally(taken_back)["bans"]] == ["LEADER_03"]
     with pytest.raises(NotTheHost):
-        ballot_counted(made, "a", ban_votes={}, leaders=LEADERS)
+        ballot(made, "a")
     with pytest.raises(LobbyRefused, match="not voting"):
-        ballot_counted(lobby(players=["a"]), "host", ban_votes={}, leaders=LEADERS)
+        ballot(lobby(players=["a"]))
+
+
+def put_to_vote(*ids, players=("a", "b")):
+    made = hosted()
+    made = apply(
+        made, edit(made, settings=every_setting(made, **dict.fromkeys(ids, "vote")))
+    )
+    made = apply(made, went_live(made, "host", "m", questions(made)))
+    for player in players:
+        made = apply(made, joined(made, player, NOW))
+    return {**voting(made), "_id": "lobby-1"}
+
+
+def value(made, setting):
+    return next(s["value"] for s in made["settings"] if s["id"] == setting)
+
+
+def test_a_setting_put_to_the_vote_is_won_at_once_by_a_majority_and_stays_won():
+    made = put_to_vote("map", "huts")
+    assert value(made, "map") == value(made, "huts") == "vote"
+    one = apply(made, ballot(made, setting_votes={"map": {"lakes": ["host"]}}))
+    assert value(one, "map") == "vote"
+    two = apply(one, ballot(one, setting_votes={"map": {"lakes": ["host", "a"]}}))
+    assert next(s for s in two["settings"] if s["id"] == "map") == {
+        "id": "map",
+        "value": "lakes",
+        "by": "vote",
+    }
+    taken_back = apply(two, ballot(two, setting_votes={"map": {"fractal": ["b"]}}))
+    assert value(taken_back, "map") == "lakes"
+    assert value(taken_back, "huts") == "vote"
+
+
+def test_the_final_count_settles_the_rest_by_most_reactions_and_the_host_s_stay():
+    made = put_to_vote("huts")
+    votes = {"huts": {"x1": ["a"], "x1_25": ["b"], "x1_5": ["host", "b"]}}
+    counted = tally(made, setting_votes=votes)
+    settings = {s["id"]: s for s in counted["settings"]}
+    assert settings["huts"] == {"id": "huts", "value": "x1_5", "by": "vote"}
+    assert settings["map"]["value"] == "pangea_classic"
+    assert [s["id"] for s in counted["settings"]] == [q["id"] for q in questions(made)]
+    nobody = tally(put_to_vote("map"))
+    map_ids = {
+        o["id"] for q in questions(made) if q["id"] == "map" for o in q["options"]
+    }
+    assert value(nobody, "map") in map_ids
+
+
+def test_a_draft_mode_put_to_the_vote_decides_the_draft():
+    made = put_to_vote("draft_mode")
+    assert made["draft_mode"] == "vote"
+    blind = tally(made, setting_votes={"draft_mode": {"blind": ["host", "a"]}})
+    assert (blind["draft_mode"], blind["phase"]) == ("blind", "picking")
+    random_mode = tally(made, setting_votes={"draft_mode": {"random": ["a", "b"]}})
+    assert random_mode["draft_mode"] == "random"
+    assert [len(p["leaders"]) for p in random_mode["pools"]] == [1, 1, 1]
+
+
+def test_only_a_real_option_or_the_vote_is_saved():
+    made = hosted()
+    with pytest.raises(LobbyRefused, match="huts has no option nope"):
+        edit(made, settings=every_setting(made, huts="nope"))
+    saved = apply(made, edit(made, settings=every_setting(made, huts="vote")))
+    assert value(saved, "huts") == "vote"
 
 
 def test_three_teams_of_two_fill_in_turn_and_draft_by_team():

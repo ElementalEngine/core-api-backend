@@ -28,9 +28,9 @@ def test_every_default_names_a_real_option_and_only_the_map_has_none(
 
 def test_a_lobby_starts_at_the_defaults_and_a_vote_asks_all_but_host_only():
     ffa = questions_for("civ6", "ffa")
-    assert [s["id"] for s in preset(ffa, host_only=False)] == [
-        q["id"] for q in ffa if q["id"] != "map"
-    ]
+    lobby = {s["id"]: s["value"] for s in preset(ffa, host_only=False)}
+    assert list(lobby) == [q["id"] for q in ffa]
+    assert lobby["map"] == "vote"
     assert all(s["by"] == "default" for s in preset(ffa, host_only=False))
     assert preset(ffa, host_only=True) == []
     teamer = questions_for("civ6", "teamer")
