@@ -2995,8 +2995,20 @@
       "SettingQuestion": {
         "properties": {
           "default_option_id": {
-            "title": "Default Option Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Option Id"
+          },
+          "host_only": {
+            "default": false,
+            "title": "Host Only",
+            "type": "boolean"
           },
           "id": {
             "title": "Id",

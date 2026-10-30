@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from functools import lru_cache
 
 from pydantic import AliasChoices, Field, SecretStr, model_validator
@@ -43,6 +44,12 @@ class Settings(BaseSettings):
     )
     api_port: int = Field(
         default=8000, gt=0, lt=65536, validation_alias=AliasChoices("API_PORT")
+    )
+
+    # Reports uploaded before this count as uploaded then, so none of a queue
+    # that predates the cutover is approved without staff for 48 hours.
+    auto_approve_start: datetime | None = Field(
+        default=None, validation_alias=AliasChoices("AUTO_APPROVE_START")
     )
 
     # Lady Justice service token — required; startup fails if unset

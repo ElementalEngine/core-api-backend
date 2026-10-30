@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
 from pymongo import AsyncMongoClient
 
+from app.core.config import settings
 from app.core.dependencies import (
     actor_discord_id,
     actor_is_staff,
@@ -276,7 +277,11 @@ async def auto_approve_due(
     """Approves, as the actor, every report that needs no staff 48 hours after
     its upload."""
     approved = await auto_approve(
-        MatchService(db), CivDataRepository(db), actor, datetime.now(UTC)
+        MatchService(db),
+        CivDataRepository(db),
+        actor,
+        datetime.now(UTC),
+        start=settings.auto_approve_start,
     )
     return [await _named(db, match) for match in approved]
 

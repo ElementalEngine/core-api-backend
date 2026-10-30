@@ -49,16 +49,24 @@ def is_complete(
 
 
 async def auto_approve(
-    svc: MatchService, civ_data: CivDataRepository, approver: str, now: datetime
+    svc: MatchService,
+    civ_data: CivDataRepository,
+    approver: str,
+    now: datetime,
+    *,
+    start: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Its own approvals still unpublished, answered again, then each report due,
-    approved as `approver` only while it is as checked; one that cannot be waits."""
+    approved as `approver` only while it is as checked; one that cannot be waits.
+    Nothing is due until 48 hours after `start`, where one is set."""
     answers = [
         await _answer(svc, doc, approver)
         for doc in await svc.q.find_unpublished_by(
             approver, since=now - UNPUBLISHED_FOR, limit=BATCH
         )
     ]
+    if start is not None and now < start + AUTO_APPROVE_AFTER:
+        return [a for a in answers if a is not None]
     cutoff = ObjectId.from_datetime(now - AUTO_APPROVE_AFTER)
     known: dict[str, tuple[set[str], set[str]]] = {}
     approved = 0

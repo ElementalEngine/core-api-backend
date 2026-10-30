@@ -26,6 +26,7 @@ from app.features.match_setups.lobby import (
     DONE,
     IDLE_LIMIT,
     SETUP_IDLE_LIMIT,
+    SHAPES,
     LobbyRefused,
     NotTheHost,
     ballot_counted,
@@ -221,7 +222,11 @@ async def host_lobby(
 
     def made(code: str) -> dict[str, Any]:
         return new_lobby(
-            **request.model_dump(), host_id=actor, code=code, now=datetime.now(UTC)
+            **request.model_dump(),
+            host_id=actor,
+            code=code,
+            now=datetime.now(UTC),
+            questions=questions_for("civ6", SHAPES[request.shape].mode),
         )
 
     return await insert_coded(db, made, "lobby")

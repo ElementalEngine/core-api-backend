@@ -98,6 +98,7 @@ async def start_vote(
             bans=bans,
             code=code,
             now=datetime.now(UTC),
+            questions=questions_for(request.edition, request.mode),
         )
 
     return await insert_coded(db, made, VOTE)

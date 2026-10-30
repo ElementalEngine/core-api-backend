@@ -42,6 +42,7 @@ def voting(edition="civ6", mode="ffa", players=("a", "b", "c"), **fields):
             "bans": [],
             "code": "K7Q2DM",
             "now": NOW,
+            "questions": questions_for(edition, mode),
             **fields,
         }
     )

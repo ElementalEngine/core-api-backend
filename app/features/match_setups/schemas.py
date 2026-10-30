@@ -274,7 +274,9 @@ class SettingQuestion(BaseModel):
     id: str
     title: str
     options: list[SettingOption]
-    default_option_id: str
+    # None means the host must choose; a host-only setting is never voted.
+    default_option_id: str | None
+    host_only: bool = False
 
 
 __all__ = [

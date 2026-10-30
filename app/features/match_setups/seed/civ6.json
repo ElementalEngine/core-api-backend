@@ -26,11 +26,11 @@
             "label": "Unlimited"
           }
         ],
-        "default_option_id": "none"
+        "default_option_id": "unlimited"
       },
       {
         "id": "byc_mode",
-        "title": "BYC Mode (Capitals Only)",
+        "title": "BCY Mode (Capitals Only)",
         "options": [
           {
             "id": "balanced",
@@ -48,7 +48,7 @@
             "label": "None"
           }
         ],
-        "default_option_id": "balanced"
+        "default_option_id": "maximum"
       },
       {
         "id": "duration",
@@ -70,7 +70,7 @@
             "label": "Unlimited"
           }
         ],
-        "default_option_id": "6h"
+        "default_option_id": "unlimited"
       },
       {
         "id": "map",
@@ -152,7 +152,7 @@
             "label": "Terra"
           }
         ],
-        "default_option_id": "pangea_standard"
+        "default_option_id": null
       },
       {
         "id": "sea_level",
@@ -174,7 +174,7 @@
             "label": "High"
           }
         ],
-        "default_option_id": "standard"
+        "default_option_id": "low"
       },
       {
         "id": "disasters",
@@ -206,7 +206,7 @@
             "label": "4"
           }
         ],
-        "default_option_id": "2"
+        "default_option_id": "0"
       },
       {
         "id": "huts",
@@ -233,7 +233,7 @@
             "label": "1.75x"
           }
         ],
-        "default_option_id": "x1"
+        "default_option_id": "x1_5"
       },
       {
         "id": "barbarians",
@@ -260,7 +260,7 @@
             "label": "Raging barbs"
           }
         ],
-        "default_option_id": "balanced"
+        "default_option_id": "no_barbs"
       },
       {
         "id": "cc_voting",
@@ -310,7 +310,7 @@
       },
       {
         "id": "byc_mode",
-        "title": "BYC Mode (Capitals Only)",
+        "title": "BCY Mode (Capitals Only)",
         "options": [
           {
             "id": "balanced",
@@ -328,7 +328,7 @@
             "label": "None"
           }
         ],
-        "default_option_id": "balanced"
+        "default_option_id": "maximum"
       },
       {
         "id": "timer",
@@ -426,7 +426,8 @@
             "label": "Abundant"
           }
         ],
-        "default_option_id": "standard"
+        "default_option_id": "abundant",
+        "host_only": true
       },
       {
         "id": "huts",
@@ -453,7 +454,7 @@
             "label": "1.75x"
           }
         ],
-        "default_option_id": "x1"
+        "default_option_id": "x1_5"
       }
     ]
   },

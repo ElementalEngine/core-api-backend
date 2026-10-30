@@ -47,6 +47,7 @@ def hosted(shape="ffa-8", **fields):
             "lfg": False,
             "code": "K7Q2DM",
             "now": NOW,
+            "questions": questions_for("civ6", SHAPES[shape].mode),
             **fields,
         }
     )
@@ -61,7 +62,10 @@ def questions(made):
 
 
 def every_setting(made, **chosen):
-    return {q["id"]: q["default_option_id"] for q in questions(made)} | chosen
+    return {
+        q["id"]: q["default_option_id"] or q["options"][0]["id"]
+        for q in questions(made)
+    } | chosen
 
 
 def lobby(shape="ffa-8", players=(), draft_mode="standard"):
@@ -100,14 +104,19 @@ def test_a_lobby_keeps_its_host_s_message_and_lfg_ping():
     assert (made["message"], made["lfg"]) == ("No novices", True)
 
 
-def test_a_lobby_opens_in_setup_with_no_setting_set():
+def test_a_lobby_opens_in_setup_at_the_defaults_with_the_map_unset():
     made = hosted()
     assert (made["phase"], made["code"], made["draft_mode"]) == (
         "setup",
         "K7Q2DM",
-        None,
+        "standard",
     )
-    assert made["settings"] == []
+    chosen = {s["id"] for s in made["settings"]}
+    assert "map" not in chosen and chosen == {
+        q["id"] for q in questions(made) if q["default_option_id"]
+    }
+    with pytest.raises(LobbyRefused, match="set every setting first: Map$"):
+        went_live(made, "host", "m", questions(made))
     assert made["players"] == [{"discord_id": "host", "team": None}]
     assert hosted("teamer-3v3")["players"] == [{"discord_id": "host", "team": 1}]
     for link in ("steam://joinlobby/1295660/1/76561198000000000", f"{LINK}\n"):

@@ -27,6 +27,7 @@ from app.features.match_setups.pools import (
     leader_pools,
     remaining_after_bans,
 )
+from app.features.match_setups.questions import preset
 
 _RANDOM = SystemRandom()
 VOTE_LIMIT = timedelta(minutes=10)
@@ -46,9 +47,10 @@ def new_vote(
     bans: Sequence[Mapping[str, str]],
     code: str,
     now: datetime,
+    questions: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     """A vote open at once for ten minutes; the bans its starter chose stand,
-    and the players vote on everything else."""
+    host-only settings take their defaults, and the players vote on the rest."""
     voters = list(dict.fromkeys(players))
     if not 2 <= len(voters) <= MAX_PLAYERS:
         raise LobbyRefused(f"a vote needs 2 to {MAX_PLAYERS} players")
@@ -72,7 +74,7 @@ def new_vote(
         "guild_id": guild_id,
         "channel_id": channel_id,
         "players": [{"discord_id": voter, "team": None} for voter in voters],
-        "settings": [],
+        "settings": preset(questions, host_only=True),
         "bans": [{**ban, "by": "host"} for ban in bans],
         "pools": [],
         "picks": [],

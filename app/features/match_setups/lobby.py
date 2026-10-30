@@ -17,6 +17,7 @@ from app.features.match_setups.pools import (
     leader_pools,
     remaining_after_bans,
 )
+from app.features.match_setups.questions import preset
 
 _RANDOM = SystemRandom()
 
@@ -91,12 +92,14 @@ def new_lobby(
     lfg: bool,
     code: str,
     now: datetime,
+    questions: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """A civ6 lobby in setup, its host in the first seat and no setting set
-    until the host sets each one."""
+    """A civ6 lobby in setup, its host in the first seat and each setting at
+    its default until the host changes it; one with no default waits for the host."""
     if steam_link is not None and not STEAM_LINK.fullmatch(steam_link):
         raise LobbyRefused("the Steam link is not a Civ6 lobby link")
     chosen = SHAPES[shape]
+    settings = preset(questions, host_only=False)
     return {
         "command": "lobby",
         "edition": "civ6",
@@ -104,7 +107,9 @@ def new_lobby(
         "shape": shape,
         "seats": chosen.seats,
         "teams": chosen.teams,
-        "draft_mode": None,
+        "draft_mode": next(
+            (s["value"] for s in settings if s["id"] == "draft_mode"), None
+        ),
         "status": OPEN,
         "phase": SETUP,
         "code": code,
@@ -116,7 +121,7 @@ def new_lobby(
         "message": message,
         "lfg": lfg,
         "players": [{"discord_id": host_id, "team": 1 if chosen.teams else None}],
-        "settings": [],
+        "settings": settings,
         "bans": [],
         "pools": [],
         "picks": [],

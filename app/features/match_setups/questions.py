@@ -4,6 +4,7 @@ names their ids, so they change only by release."""
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -45,4 +46,16 @@ def questions_for(edition: str, game_type: str) -> list[dict[str, Any]]:
     return asked
 
 
-__all__ = ["UnknownBallot", "questions_for", "settings_for"]
+def preset(
+    questions: Sequence[Mapping[str, Any]], *, host_only: bool
+) -> list[dict[str, Any]]:
+    """The settings a game starts with: every default for a host to change, or
+    only the host-only ones, which a vote never asks."""
+    return [
+        {"id": q["id"], "value": q["default_option_id"], "by": "default"}
+        for q in questions
+        if q["default_option_id"] and (q.get("host_only") or not host_only)
+    ]
+
+
+__all__ = ["UnknownBallot", "preset", "questions_for", "settings_for"]
