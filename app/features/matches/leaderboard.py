@@ -41,18 +41,13 @@ class LeaderboardService:
         )
 
         out: list[dict[str, Any]] = []
-        for idx, row in enumerate(lb.rows or [], start=1):
+        for row in lb.rows or []:
             did = str(row.get("_id"))
             mu = as_float(row.get("mu"), 0.0)
             games = as_int(row.get("games"), 0)
             out.append(
                 {
-                    "rank": idx,
                     "discord_id": did,
-                    "mu": mu,
-                    "sigma": as_float(row.get("sigma"), 0.0),
-                    "games": games,
-                    # Backwards-compatible aliases for older clients.
                     "rating": int(round(mu)),
                     "games_played": games,
                     "wins": as_int(row.get("wins"), 0),

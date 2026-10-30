@@ -40,9 +40,4 @@ def bump(tally: dict[str, Any], key: str, *, won: bool, step: int) -> dict[str, 
     return tally
 
 
-def is_rated(discord_id: Any) -> bool:
-    """Placeholder ids are skipped by the stat write and the ledger both."""
-    return bool(discord_id) and not str(discord_id).startswith("-")
-
-
-__all__ = ["bump", "is_rated", "read_entry", "stat_legs"]
+__all__ = ["bump", "read_entry", "stat_legs"]

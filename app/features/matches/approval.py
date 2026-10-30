@@ -16,7 +16,7 @@ from app.features.matches.errors import (
 )
 from app.features.matches.models import MatchModel, PlayerModel, StatModel
 from app.features.matches.tallies import bump, stat_legs
-from app.features.matches.validation import approval_refusal
+from app.features.matches.validation import approval_refusal, is_placeholder
 from app.features.ratings.events import build_match_event
 from app.features.ratings.scope import drives_rank_roles, stat_scope
 
@@ -69,44 +69,6 @@ class ApprovalService:
             return tally
         return bump(tally, key, won=won, step=step)
 
-    def update_existing_stat(
-        self,
-        player: PlayerModel,
-        existing_civs: dict[str, Any],
-    ) -> dict[str, Any]:
-        return self._shift_tally(
-            existing_civs, player.civ, won=player.delta > 0, step=+1
-        )
-
-    def revert_existing_stat(
-        self,
-        player: PlayerModel,
-        existing_civs: dict[str, Any],
-    ) -> dict[str, Any]:
-        return self._shift_tally(
-            existing_civs, player.civ, won=player.delta > 0, step=-1
-        )
-
-    def update_existing_leaders(
-        self,
-        player: PlayerModel,
-        existing_leaders: dict[str, Any],
-    ) -> dict[str, Any]:
-        # Older civ6 records have no leader; they are left
-        # out rather than bucketed under a placeholder key.
-        return self._shift_tally(
-            existing_leaders, player.leader, won=player.delta > 0, step=+1
-        )
-
-    def revert_existing_leaders(
-        self,
-        player: PlayerModel,
-        existing_leaders: dict[str, Any],
-    ) -> dict[str, Any]:
-        return self._shift_tally(
-            existing_leaders, player.leader, won=player.delta > 0, step=-1
-        )
-
     def _build_stat_doc(
         self,
         *,
@@ -140,7 +102,7 @@ class ApprovalService:
             "lastModified": datetime.now(UTC),
         }
 
-    async def revert_match(self, match_id: str) -> dict[str, Any]:
+    async def revert_match(self, match_id: str, actor_id: str) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         res = await self._m.q.find_validated_by_id(oid)
         if not res:
@@ -148,7 +110,7 @@ class ApprovalService:
 
         match = MatchModel(**res)
 
-        session = await self._m.q.start_session()
+        session = self._m.q.client.start_session()
         async with session:
             async with await session.start_transaction():
                 try:
@@ -180,11 +142,7 @@ class ApprovalService:
 
                     # Stats writes
                     for i, p in enumerate(match.players):
-                        if (
-                            not p.discord_id
-                            or p.discord_id in ("-1", "-2")
-                            or p.discord_id.startswith("-")
-                        ):
+                        if is_placeholder(p.discord_id):
                             continue
 
                         did = str(p.discord_id)
@@ -216,8 +174,12 @@ class ApprovalService:
                                 mu=mu_after,
                                 sigma=sigma_after,
                                 delta_value=delta_value,
-                                civs=self.revert_existing_stat(p, pre.civs),
-                                leaders=self.revert_existing_leaders(p, pre.leaders),
+                                civs=self._shift_tally(
+                                    pre.civs, p.civ, won=p.delta > 0, step=-1
+                                ),
+                                leaders=self._shift_tally(
+                                    pre.leaders, p.leader, won=p.delta > 0, step=-1
+                                ),
                                 step=-1,
                             )
                             written.setdefault((is_seasonal, is_combined), {})[did] = (
@@ -226,6 +188,7 @@ class ApprovalService:
                             events.append(
                                 build_match_event(
                                     event_type="revert",
+                                    actor_id=actor_id,
                                     match_id=oid,
                                     match_created_at=match.created_at,
                                     occurred_at=occurred_at,
@@ -324,7 +287,7 @@ class ApprovalService:
             # data, and a missing row must fail the approve before any write.
             season = await self._m.seasons.get_current_season(match.game)
 
-            session = await self._m.q.start_session()
+            session = self._m.q.client.start_session()
             async with session:
                 async with await session.start_transaction():
                     try:
@@ -360,11 +323,7 @@ class ApprovalService:
 
                         # Stats writes
                         for i, p in enumerate(match.players):
-                            if (
-                                not p.discord_id
-                                or p.discord_id in ("-1", "-2")
-                                or p.discord_id.startswith("-")
-                            ):
+                            if is_placeholder(p.discord_id):
                                 continue
 
                             did = str(p.discord_id)
@@ -402,9 +361,11 @@ class ApprovalService:
                                     mu=post.mu,
                                     sigma=post.sigma,
                                     delta_value=delta_value,
-                                    civs=self.update_existing_stat(p, pre.civs),
-                                    leaders=self.update_existing_leaders(
-                                        p, pre.leaders
+                                    civs=self._shift_tally(
+                                        pre.civs, p.civ, won=p.delta > 0, step=1
+                                    ),
+                                    leaders=self._shift_tally(
+                                        pre.leaders, p.leader, won=p.delta > 0, step=1
                                     ),
                                     step=1,
                                 )

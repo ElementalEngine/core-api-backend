@@ -153,7 +153,9 @@ async def get_sub_quota(
 
 
 @router.get("/matches/{match_id}", response_model=MatchResponse)
-async def get_match(match_id: str, db=Depends(get_database)) -> dict[str, Any]:
+async def get_match(
+    match_id: str, db: AsyncMongoClient = Depends(get_database)
+) -> dict[str, Any]:
     return await _named(db, await _load(MatchService(db), match_id))
 
 
@@ -302,10 +304,14 @@ async def record_history_post(
 
 
 @router.post("/matches/{match_id}/revert", response_model=MatchResponse)
-async def revert_match(match_id: str, db=Depends(get_database)) -> dict[str, Any]:
+async def revert_match(
+    match_id: str,
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
     svc = MatchService(db)
     try:
-        reverted = await svc.revert_match(match_id)
+        reverted = await svc.revert_match(match_id, actor)
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
     except RetryLaterError as exc:

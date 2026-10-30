@@ -52,7 +52,7 @@ def _error_envelope(
             correlation_id=correlation_id,
         )
     )
-    return {"detail": payload.model_dump()}
+    return payload.model_dump()
 
 
 def api_error(
@@ -69,7 +69,7 @@ def api_error(
         status_code=status_code,
         detail=_error_envelope(
             code=code, message=message, details=details, retryable=retryable
-        )["detail"],
+        ),
     )
 
 
@@ -95,12 +95,14 @@ async def request_validation_exception_handler(
 ) -> JSONResponse:
     return JSONResponse(
         status_code=422,
-        content=_error_envelope(
-            code="INVALID_REQUEST",
-            message="The request failed validation.",
-            details={"errors": jsonable_encoder(exc.errors())},
-            retryable=False,
-        ),
+        content={
+            "detail": _error_envelope(
+                code="INVALID_REQUEST",
+                message="The request failed validation.",
+                details={"errors": jsonable_encoder(exc.errors())},
+                retryable=False,
+            )
+        },
     )
 
 
@@ -110,11 +112,13 @@ async def app_dependency_exception_handler(
     logger.error("App dependency unavailable: %s", exc)
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        content=_error_envelope(
-            code="UNAVAILABLE",
-            message="A backend dependency is unavailable right now. Please try again.",
-            retryable=True,
-        ),
+        content={
+            "detail": _error_envelope(
+                code="UNAVAILABLE",
+                message="A backend dependency is unavailable right now. Please try again.",
+                retryable=True,
+            )
+        },
     )
 
 
@@ -129,10 +133,12 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=_error_envelope(
-            code="INTERNAL",
-            message=INTERNAL_MESSAGE,
-            retryable=False,
-            correlation_id=correlation_id,
-        ),
+        content={
+            "detail": _error_envelope(
+                code="INTERNAL",
+                message=INTERNAL_MESSAGE,
+                retryable=False,
+                correlation_id=correlation_id,
+            )
+        },
     )

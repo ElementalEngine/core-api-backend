@@ -22,10 +22,12 @@ def build_match_event(
     sigma_before: float,
     sigma_after: float,
     applied_delta: float,
+    actor_id: str | None = None,
 ) -> dict[str, Any]:
-    """One ledger event, for one player, in one scope."""
+    """One ledger event, for one player, in one scope; a revert names who did it."""
     return {
         "event_type": event_type,
+        **({"actor_id": actor_id} if actor_id else {}),
         "match_id": match_id,
         "match_created_at": match_created_at,
         "occurred_at": occurred_at,

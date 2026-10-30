@@ -37,7 +37,8 @@ from pymongo import MongoClient, UpdateOne
 
 from app.core.config import settings
 from app.core.constants import EDITIONS, GAMES_DB
-from app.features.matches.tallies import bump, is_rated, stat_legs
+from app.features.matches.tallies import bump, stat_legs
+from app.features.matches.validation import is_placeholder
 from app.features.ratings.scope import stat_scope
 
 MODES = ("ffa", "teamer", "duel")
@@ -86,16 +87,18 @@ def collect(db: Any, edition: str) -> dict[str, dict[int, dict[str, Any]]]:
     )
     matches = 0
     unmigrated = 0
-    for match in db["validated_matches"].find(
-        {"game": edition, "stat_reset": {"$exists": False}}
-    ):
+    for match in db["validated_matches"].find({"game": edition}):
         mode = game_mode(match.get("game_mode"))
         if mode not in MODES:
             print(f"  skipped {match.get('_id')}: game_mode {match.get('game_mode')!r}")
             continue
         matches += 1
         is_cloud = bool(match.get("is_cloud"))
-        players = [p for p in match.get("players", []) if is_rated(p.get("discord_id"))]
+        players = [
+            p
+            for p in match.get("players", [])
+            if not is_placeholder(p.get("discord_id"))
+        ]
         unmigrated += sum(1 for p in players if read_tokens(p)[0] is None)
         for is_seasonal, is_combined in stat_legs(is_cloud=is_cloud):
             scope = stat_scope(

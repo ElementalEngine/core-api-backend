@@ -36,10 +36,7 @@ class BatchStatsRequest(BaseModel):
     discord_ids: list[str]
 
 
-class TeamGenRequest(BaseModel):
-    civ_version: str
-    game_type: str
-    discord_ids: list[str]
+TeamGenRequest = BatchStatsRequest
 
 
 class TeamGenResponse(BaseModel):

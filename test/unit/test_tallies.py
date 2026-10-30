@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.features.matches.tallies import bump, is_rated, read_entry, stat_legs
+from app.features.matches.tallies import bump, read_entry, stat_legs
 
 
 def test_realtime_writes_three_documents():
@@ -53,12 +53,3 @@ def test_approve_then_revert_is_a_round_trip():
     bump(tally, "CIVILIZATION_ROME", won=True, step=1)
     bump(tally, "CIVILIZATION_ROME", won=True, step=-1)
     assert tally == {"CIVILIZATION_ROME": {"games": 0, "wins": 0}}
-
-
-@pytest.mark.parametrize("discord_id", [None, "", "-1", "-2", "-76561198000000000"])
-def test_placeholder_ids_are_not_rated(discord_id):
-    assert is_rated(discord_id) is False
-
-
-def test_a_real_id_is_rated():
-    assert is_rated("267035763240075264") is True

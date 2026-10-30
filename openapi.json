@@ -1322,7 +1322,7 @@
       },
       "LobbyRequest": {
         "additionalProperties": false,
-        "description": "/lobby host. The host is the acting player; the settings start blank.",
+        "description": "/lobby host. The host is the acting player; the settings start at their defaults.",
         "properties": {
           "channel_id": {
             "maxLength": 32,
@@ -3304,32 +3304,6 @@
           "active_category"
         ],
         "title": "SuspensionRecordResponse",
-        "type": "object"
-      },
-      "TeamGenRequest": {
-        "properties": {
-          "civ_version": {
-            "title": "Civ Version",
-            "type": "string"
-          },
-          "discord_ids": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Discord Ids",
-            "type": "array"
-          },
-          "game_type": {
-            "title": "Game Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "civ_version",
-          "game_type",
-          "discord_ids"
-        ],
-        "title": "TeamGenRequest",
         "type": "object"
       },
       "TeamGenResponse": {
@@ -5712,6 +5686,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -5781,6 +5756,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6035,6 +6011,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6113,6 +6090,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6190,6 +6168,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6258,6 +6237,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6325,6 +6305,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6393,6 +6374,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6471,6 +6453,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6549,6 +6532,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6617,6 +6601,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6685,6 +6670,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6763,6 +6749,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6913,6 +6900,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -6982,6 +6970,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -7182,6 +7171,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -7259,6 +7249,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -7327,6 +7318,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -7405,6 +7397,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -7483,6 +7476,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -7551,6 +7545,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -7619,6 +7614,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -7688,6 +7684,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -7914,6 +7911,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -8047,6 +8045,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -8115,6 +8114,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -8180,6 +8180,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -8319,6 +8320,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -8399,6 +8401,16 @@
                 }
               ],
               "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
             }
           }
         ],
@@ -8530,6 +8542,7 @@
             "name": "x-actor-discord-id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
             }
@@ -8895,7 +8908,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TeamGenRequest"
+                "$ref": "#/components/schemas/BatchStatsRequest"
               }
             }
           },

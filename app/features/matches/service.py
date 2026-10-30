@@ -27,16 +27,12 @@ from app.features.matches.models import (
 )
 from app.features.matches.parsers import parse_civ6_save, parse_civ7_save
 from app.features.matches.repository import MatchRepository
+from app.features.matches.validation import is_placeholder
 from app.features.ratings.repository import RatingsRepository
 from app.features.ratings.skill import make_ts_env
 from app.features.seasons.repository import SeasonsRepository
 
 logger = logging.getLogger(__name__)
-
-
-def _placeholder(discord_id: str) -> bool:
-    """A seat with no player: empty, or "-1", "-2" or "-<steam id>"."""
-    return not discord_id or discord_id in ("-1", "-2") or discord_id.startswith("-")
 
 
 def _unrated(discord_id: str | None, index: int) -> StatModel:
@@ -163,7 +159,7 @@ class MatchService:
     ) -> list[StatModel]:
         """Every seat's rating in one scope, read in one query, in seat order."""
         ids = [p.discord_id for p in match.players]
-        real = [i for i in ids if i is not None and not _placeholder(i)]
+        real = [i for i in ids if i is not None and not is_placeholder(i)]
         docs = (
             await self.ratings.get_player_stat_docs_batch(
                 civ_version=match.game,
@@ -179,7 +175,7 @@ class MatchService:
         )
         return [
             _stat_of(i, n, docs.get(i))
-            if i is not None and not _placeholder(i)
+            if i is not None and not is_placeholder(i)
             else _unrated(i, n)
             for n, i in enumerate(ids)
         ]
@@ -320,8 +316,8 @@ class MatchService:
         doc["match_id"] = str(doc.pop("_id"))
         return doc
 
-    async def revert_match(self, match_id: str) -> dict[str, Any]:
-        return await ApprovalService(self).revert_match(match_id)
+    async def revert_match(self, match_id: str, actor_id: str) -> dict[str, Any]:
+        return await ApprovalService(self).revert_match(match_id, actor_id)
 
     async def approve_match(
         self,

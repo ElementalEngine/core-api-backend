@@ -29,7 +29,7 @@
         "default_option_id": "unlimited"
       },
       {
-        "id": "byc_mode",
+        "id": "bcy_mode",
         "title": "BCY Mode (Capitals Only)",
         "options": [
           {
@@ -309,7 +309,7 @@
         "default_option_id": "yes"
       },
       {
-        "id": "byc_mode",
+        "id": "bcy_mode",
         "title": "BCY Mode (Capitals Only)",
         "options": [
           {

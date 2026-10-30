@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.features.matches.models import ContestReport
+
 
 class PlayerSchema(BaseModel):
     steam_id: str | None = None
@@ -22,11 +24,6 @@ class PlayerSchema(BaseModel):
     subbed_out: bool = False
     # The in-game score when the save was read, where the save records it.
     score: int | None = None
-
-
-class ContestReport(BaseModel):
-    contestor_discord_id: str
-    reason: str
 
 
 class AffectedPlayerRating(BaseModel):

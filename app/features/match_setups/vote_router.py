@@ -16,6 +16,7 @@ from app.core.dependencies import (
     require_mito_token,
 )
 from app.core.errors import invalid_request
+from app.features.civdata.router import seeded_civ_data
 from app.features.match_setups.bans import ban_caps, bannable_civs
 from app.features.match_setups.deal import DraftRefused, checked_bans
 from app.features.match_setups.lobby import finished, picked, revealed, vote_placed
@@ -24,7 +25,6 @@ from app.features.match_setups.repository import MatchSetupRepository
 from app.features.match_setups.router import (
     cancel_by_code,
     change_setup,
-    civ_data_for,
     insert_coded,
     lobby_view,
     open_season_id,
@@ -63,7 +63,7 @@ async def _read(
 ) -> tuple[dict[str, Any], list[str], list[str]]:
     """The vote, with the leaders and civs it may ban and deal."""
     vote = await read_setup(db, vote_id, VOTE)
-    civ_data = await civ_data_for(db, vote["edition"])
+    civ_data = await seeded_civ_data(db, vote["edition"])
     return vote, *_draftable(civ_data, vote["age"], vote["edition"])
 
 
@@ -76,7 +76,7 @@ async def start_vote(
     """A vote open at once, under a code no other open vote here has."""
     if request.edition == "civ6" and (request.age or request.civ_bans):
         raise invalid_request("civ6 has no starting age or civ bans")
-    civ_data = await civ_data_for(db, request.edition)
+    civ_data = await seeded_civ_data(db, request.edition)
     leaders, civs = _draftable(civ_data, request.age, request.edition)
     caps = ban_caps(request.edition, request.age)
     try:

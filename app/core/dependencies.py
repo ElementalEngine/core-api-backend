@@ -20,7 +20,7 @@ def actor_is_staff(x_actor_is_staff: bool = Header(default=False)) -> bool:
     return x_actor_is_staff
 
 
-def actor_discord_id(x_actor_discord_id: str = Header()) -> str:
+def actor_discord_id(x_actor_discord_id: str = Header(min_length=1)) -> str:
     """Who is acting, as the bot asserts it."""
     return x_actor_discord_id
 

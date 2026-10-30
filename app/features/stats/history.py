@@ -12,6 +12,7 @@ from pymongo import DESCENDING, AsyncMongoClient
 
 from app.core.constants import COL_STAT_RESETS, GAMES_DB
 from app.features.matches.repository import COL_VALIDATED_MATCHES
+from app.features.stats.constants import scope_of
 from app.features.stats.errors import InvalidStatsRequestError
 from app.features.stats.schemas_v2 import (
     CivRecord,
@@ -31,16 +32,11 @@ _NO_PICK = frozenset({"", "Unknown", "None", "LEADER_NONE", "CIVILIZATION_NONE"}
 def _validate(
     civ_version: str, game_type: str, discord_id: str
 ) -> tuple[str, bool, str]:
-    version = (civ_version or "").strip().lower()
-    kind = (game_type or "").strip().lower()
+    version, is_cloud = scope_of(civ_version, game_type)
     did = (discord_id or "").strip()
-    if version not in ("civ6", "civ7"):
-        raise InvalidStatsRequestError("Invalid civ_version")
-    if kind not in ("realtime", "cloud"):
-        raise InvalidStatsRequestError("Invalid game_type")
     if not did.isdigit():
         raise InvalidStatsRequestError("Invalid discord_id")
-    return version, kind == "cloud", did
+    return version, is_cloud, did
 
 
 def _seat(match: dict[str, Any], discord_id: str) -> dict[str, Any] | None:

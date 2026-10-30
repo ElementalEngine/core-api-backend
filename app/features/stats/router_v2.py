@@ -4,6 +4,7 @@ player's game history and its summary, behind the Mito token."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from pymongo import AsyncMongoClient
 
 from app.core.config import settings
 from app.core.dependencies import get_database, require_mito_token
@@ -36,7 +37,10 @@ router = APIRouter(
 
 @router.get("/stats/user", response_model=UserStatsResponseV2)
 async def get_user_stats(
-    civ_version: str, game_type: str, discord_id: str, db=Depends(get_database)
+    civ_version: str,
+    game_type: str,
+    discord_id: str,
+    db: AsyncMongoClient = Depends(get_database),
 ) -> UserStatsResponseV2:
     try:
         result = await StatsService(db).get_user_stats(
@@ -52,7 +56,7 @@ async def get_user_stats(
 
 @router.post("/stats/batch", response_model=BatchStatsResponseV2)
 async def get_users_stats_batch(
-    payload: BatchStatsRequest, db=Depends(get_database)
+    payload: BatchStatsRequest, db: AsyncMongoClient = Depends(get_database)
 ) -> BatchStatsResponseV2:
     ids = payload.discord_ids or []
     if len(ids) > MAX_BATCH_IDS:
@@ -80,7 +84,7 @@ async def get_users_stats_batch(
 
 @router.post("/stats/team-gen", response_model=TeamGenResponse)
 async def get_team_gen(
-    payload: TeamGenRequest, db=Depends(get_database)
+    payload: TeamGenRequest, db: AsyncMongoClient = Depends(get_database)
 ) -> TeamGenResponse:
     ids = payload.discord_ids or []
     if len(ids) > MAX_BATCH_IDS:
@@ -98,7 +102,10 @@ async def get_team_gen(
 
 @router.put("/stats/reset/user", response_model=ResetStatsResponseV2)
 async def reset_user_stats(
-    civ_version: str, game_type: str, discord_id: str, db=Depends(get_database)
+    civ_version: str,
+    game_type: str,
+    discord_id: str,
+    db: AsyncMongoClient = Depends(get_database),
 ) -> ResetStatsResponseV2:
     try:
         result = await StatsService(db).reset_user_stats(
@@ -120,7 +127,7 @@ async def get_history(
     game_type: str,
     discord_id: str,
     page: int = 0,
-    db=Depends(get_database),
+    db: AsyncMongoClient = Depends(get_database),
 ) -> HistoryPage:
     try:
         return await MatchHistory(db).page(
@@ -135,7 +142,10 @@ async def get_history(
 
 @router.get("/stats/summary", response_model=StatsSummary)
 async def get_summary(
-    civ_version: str, game_type: str, discord_id: str, db=Depends(get_database)
+    civ_version: str,
+    game_type: str,
+    discord_id: str,
+    db: AsyncMongoClient = Depends(get_database),
 ) -> StatsSummary:
     try:
         return await MatchHistory(db).summary(

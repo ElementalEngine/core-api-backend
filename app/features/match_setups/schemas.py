@@ -77,7 +77,7 @@ LobbyShape = Literal[
 
 
 class LobbyRequest(BaseModel):
-    """/lobby host. The host is the acting player; the settings start blank."""
+    """/lobby host. The host is the acting player; the settings start at their defaults."""
 
     model_config = ConfigDict(extra="forbid")
 

@@ -38,15 +38,12 @@ class MatchRepository:
     """Every read and write against the match collections."""
 
     def __init__(self, client: AsyncMongoClient) -> None:
-        self._client = client
+        self.client = client
         mr = client[GAMES_DB]
         self._pending: AsyncCollection = mr[COL_PENDING_MATCHES]
         self._validated: AsyncCollection = mr[COL_VALIDATED_MATCHES]
         self._sub_events: AsyncCollection = mr[COL_SUB_EVENTS]
         self._users: AsyncCollection = client[DB_SERVER_MEMBERS][COL_USERS]
-
-    async def start_session(self) -> AsyncClientSession:
-        return self._client.start_session()
 
     async def get_user_by_discord_id(self, discord_id: str) -> dict[str, Any] | None:
         return await self._users.find_one({"discord_id": discord_id})

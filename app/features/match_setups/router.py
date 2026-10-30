@@ -18,7 +18,7 @@ from app.core.dependencies import (
     require_mito_token,
 )
 from app.core.errors import api_error, conflict, forbidden, invalid_request, not_found
-from app.features.civdata.repository import CivDataRepository
+from app.features.civdata.router import seeded_civ_data
 from app.features.match_setups.bans import ban_caps
 from app.features.match_setups.deal import DraftRefused, checked_bans, deal_draft
 from app.features.match_setups.lobby import (
@@ -85,17 +85,6 @@ async def open_season_id(db: AsyncMongoClient, edition: str) -> Any:
         return None
 
 
-async def civ_data_for(db: AsyncMongoClient, edition: str) -> dict[str, Any]:
-    civ_data = await CivDataRepository(db).fetch(edition)
-    if civ_data["leader_data_version"] is None:
-        raise api_error(
-            code="CIV_DATA_NOT_SEEDED",
-            message=f"civ_data holds no documents for {edition}.",
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        )
-    return civ_data
-
-
 def lobby_view(lobby: Mapping[str, Any]) -> dict[str, Any]:
     return {**lobby, "id": str(lobby["_id"])}
 
@@ -110,7 +99,7 @@ def _try_again(message: str) -> Exception:
 
 
 async def civ6_leaders(db: AsyncMongoClient) -> list[str]:
-    return [row["token"] for row in (await civ_data_for(db, "civ6"))["leaders"]]
+    return [row["token"] for row in (await seeded_civ_data(db, "civ6"))["leaders"]]
 
 
 async def read_setup(
@@ -190,7 +179,7 @@ async def deal_draft_and_record(
     request: DraftRequest, db: AsyncMongoClient = Depends(get_database)
 ) -> dict[str, Any]:
     """/draft: deal the pools, then record the setup."""
-    civ_data = await civ_data_for(db, request.edition)
+    civ_data = await seeded_civ_data(db, request.edition)
     try:
         deal = deal_draft(civ_data, request)
     except DraftRefused as exc:
@@ -453,7 +442,6 @@ async def reveal_picks(
 __all__ = [
     "cancel_by_code",
     "change_setup",
-    "civ_data_for",
     "insert_coded",
     "lobby_view",
     "open_season_id",

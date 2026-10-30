@@ -112,8 +112,15 @@ class FakeRepo:
     async def get_player_stat_docs_batch(self, *, discord_ids, **kwargs):
         return {d: dict(self.stat_doc) for d in discord_ids} if self.stat_doc else {}
 
-    async def start_session(self):
-        return self.session
+    @property
+    def client(self):
+        repo = self
+
+        class Client:
+            def start_session(self):
+                return repo.session
+
+        return Client()
 
     async def write_player_stat_docs(self, *, legs, **kwargs):
         for (is_seasonal, is_combined), docs in legs.items():
@@ -318,11 +325,13 @@ def test_revert_match_tolerates_missing_deltas_and_clamps_counters():
     players = [make_player(season_delta=None, combined_delta=None)]
     repo = FakeRepo(match_doc=make_match_doc(players), stat_doc=None)
 
-    result = asyncio.run(make_service(repo).revert_match(OID))
+    result = asyncio.run(make_service(repo).revert_match(OID, "staff-1"))
 
     assert result["match_id"] == OID
     assert repo.session.committed
     assert repo.deleted_validated
+    # The ledger names who reverted, on every event the revert wrote.
+    assert repo.events and all(e["actor_id"] == "staff-1" for e in repo.events)
     assert len(repo.upserts) == 3  # lifetime + seasonal + combined
     for upsert in repo.upserts:
         doc = upsert["doc"]
@@ -343,7 +352,7 @@ def test_revert_doc_math_uses_per_scope_deltas():
     players = [make_player(delta=5.0, season_delta=None, combined_delta=None)]
     repo = FakeRepo(match_doc=make_match_doc(players), stat_doc=stored)
 
-    asyncio.run(make_service(repo).revert_match(OID))
+    asyncio.run(make_service(repo).revert_match(OID, "staff-1"))
 
     docs = {(u["is_seasonal"], u["is_combined"]): u["doc"] for u in repo.upserts}
     assert docs[(False, False)]["mu"] == pytest.approx(25.0)  # 30 - 5 (lifetime)
@@ -473,7 +482,7 @@ def test_reverting_an_earlier_seasons_match_leaves_this_season_alone():
     earlier = ObjectId()
     repo = FakeRepo(match_doc={**doc, "season_id": earlier}, stat_doc=stored)
 
-    out = asyncio.run(make_service(repo).revert_match(OID))
+    out = asyncio.run(make_service(repo).revert_match(OID, "staff-1"))
 
     assert out["season_id"] == earlier
 
@@ -523,7 +532,7 @@ def test_a_v1_match_without_a_contest_list_or_created_at_can_be_reverted():
     del doc["contest_report_list"]
     repo = FakeRepo(match_doc=doc, stat_doc=stored)
 
-    result = asyncio.run(make_service(repo).revert_match(OID))
+    result = asyncio.run(make_service(repo).revert_match(OID, "staff-1"))
 
     assert result["contest_report_list"] == []
     assert result["created_at"] == ObjectId(OID).generation_time
@@ -542,7 +551,10 @@ def test_rank_roles_follow_ffa_and_cloud_games_only():
     stored = {"_id": 123, "mu": 30.0, "sigma": 5.0, "games": 10, "wins": 4, "first": 2}
     teamer = {**make_match_doc([make_player()]), "game_mode": "Teamer"}
     repo = FakeRepo(match_doc=teamer, stat_doc=stored)
-    assert asyncio.run(make_service(repo).revert_match(OID))["affected_players"] == []
+    assert (
+        asyncio.run(make_service(repo).revert_match(OID, "staff-1"))["affected_players"]
+        == []
+    )
 
 
 def test_approve_stamps_the_season_open_inside_its_transaction():
