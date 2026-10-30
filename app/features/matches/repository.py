@@ -287,6 +287,11 @@ class MatchRepository:
         await self._validated.create_index(
             [("save_file_hash", ASCENDING)], name="validated_matches_save_file_hash_idx"
         )
+        # The bot's own approvals of the last week, answered again if unpublished.
+        await self._validated.create_index(
+            [("approver_discord_id", ASCENDING), ("approved_at", DESCENDING)],
+            name="validated_matches_approver_recent_idx",
+        )
         # A player's games, newest first: the stats history and its summary.
         await self._validated.create_index(
             [("players.discord_id", ASCENDING), ("_id", DESCENDING)],

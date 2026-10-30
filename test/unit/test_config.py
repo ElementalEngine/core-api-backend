@@ -1,3 +1,4 @@
+import datetime
 import importlib
 
 
@@ -27,3 +28,15 @@ def test_config_loads_env(monkeypatch, tmp_path):
     assert s.ts_beta == 70
     assert s.ts_tau == 1
     assert s.ts_draw_prob == 0
+
+
+def test_an_auto_approve_start_without_a_zone_is_utc(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("LJ_SERVICE_TOKEN", "lj-test-token")
+    monkeypatch.setenv("AUTO_APPROVE_START", "2026-11-01T00:00:00")
+    import app.core.config as cfg
+
+    importlib.reload(cfg)
+    start = cfg.settings.auto_approve_start
+    assert start is not None and start.utcoffset() == datetime.timedelta(0)
+    assert start > datetime.datetime(2026, 10, 1, tzinfo=datetime.UTC)

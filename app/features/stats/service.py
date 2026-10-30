@@ -205,6 +205,8 @@ class StatsService:
             )
         if any(not discord_id.isdigit() for discord_id in ids):
             raise InvalidStatsRequestError("Invalid discord_ids")
+        if len(ids) < 2:
+            raise InvalidStatsRequestError("Team generation needs at least two players")
 
         players_ranking = await self._load_stat_set(
             civ_version=version,

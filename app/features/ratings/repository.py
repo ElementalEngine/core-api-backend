@@ -56,6 +56,16 @@ class RatingsRepository:
             ],
             name="rating_events_player_history_idx",
         )
+        # A player's latest reset in a scope, which the stats summary cuts on.
+        await self._resets.create_index(
+            [
+                ("civ_version", ASCENDING),
+                ("is_cloud", ASCENDING),
+                ("discord_id", ASCENDING),
+                ("occurred_at", DESCENDING),
+            ],
+            name="stat_resets_player_latest_idx",
+        )
 
     async def insert_events(
         self,
@@ -213,7 +223,8 @@ class RatingsRepository:
                     await session.commit_transaction()
                 except Exception:
                     logger.exception("Stat reset transaction failed; aborting")
-                    await session.abort_transaction()
+                    if session.in_transaction:
+                        await session.abort_transaction()
                     raise
 
     async def get_leaderboard(

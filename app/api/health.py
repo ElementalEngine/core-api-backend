@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 import time
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pymongo import AsyncMongoClient
 
 from app.core.dependencies import get_database
+from app.core.errors import api_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["health"])
@@ -37,4 +38,9 @@ async def readyz(client: AsyncMongoClient = Depends(get_database)):
         Exception
     ) as exc:  # pragma: no cover - exercised in integration, not unit tests
         logger.warning("MongoDB not ready: %s", exc)
-        raise HTTPException(status_code=503, detail=f"DB not ready: {exc!s}") from exc
+        raise api_error(
+            code="UNAVAILABLE",
+            message="Database not ready",
+            status_code=503,
+            retryable=True,
+        ) from exc

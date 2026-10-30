@@ -107,6 +107,16 @@ def test_team_gen_partitions_all_players_into_two_teams():
     assert response.game_quality > 0.0
 
 
+def test_team_gen_with_one_player_is_refused():
+    svc = make_service(FakeStatsRepo())
+    with pytest.raises(InvalidStatsRequestError, match="at least two"):
+        asyncio.run(
+            svc.get_team_gen(
+                civ_version="civ6", game_type="realtime", discord_ids=["1", " "]
+            )
+        )
+
+
 def test_team_gen_empty_ids_returns_empty_teams():
     svc = make_service(FakeStatsRepo())
     response = asyncio.run(

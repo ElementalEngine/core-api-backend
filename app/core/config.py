@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import lru_cache
 
-from pydantic import AliasChoices, Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -161,6 +161,13 @@ class Settings(BaseSettings):
     season_backup_dir: str = Field(
         default="", validation_alias=AliasChoices("SEASON_BACKUP_DIR")
     )
+
+    @field_validator("auto_approve_start")
+    @classmethod
+    def _utc(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
 
     @model_validator(mode="after")
     def _ensure_mongo_uri_scheme(self) -> Settings:
