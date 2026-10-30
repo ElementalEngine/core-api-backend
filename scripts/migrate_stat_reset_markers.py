@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """migrate_stat_reset_markers [--apply]
 
-Playbook Entry 6. Moves the stat_reset markers out of validated_matches and
+Moves the stat_reset markers out of validated_matches and
 into stat_resets, so every document in validated_matches is a match.
 
 The markers carry no timestamp -- the reset date lives only inside the

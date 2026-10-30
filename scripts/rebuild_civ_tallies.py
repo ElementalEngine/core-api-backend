@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """rebuild_civ_tallies [--apply] [--edition civ6|civ7]
 
-Playbook Entry 5. Rebuilds the civs tally on every stat document from
+Rebuilds the civs tally on every stat document from
 validated_matches, and builds the leaders tally beside it.
 
 Counting is tallies.bump(), the same function the approve path calls, so a
@@ -11,10 +11,10 @@ tallies.stat_legs(): lifetime and combined always, season only for realtime.
 Every scope is cleared, not only the ones with matches -- a scope whose
 matches were all reverted must end up empty, not stale.
 
-A record still holding a LEADER_* token in civ has not been through the
-Entry 10 migration, or its leader has no civ token yet. The leader is known
+A record still holding a LEADER_* token in civ has not been through
+migrate_civ6_leader_field, or its leader has no civ token yet. The leader is known
 there and the civ is not, so it counts once, in leaders. A value that is not
-a token at all -- 'Unknown', 'None', a name key from before Entry 10 --
+a token at all -- 'Unknown', 'None', a name key from before that migration --
 counts nowhere.
 
 Never creates a stat document. A player with matches and no document was

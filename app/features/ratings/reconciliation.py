@@ -4,7 +4,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-# Set by fixture 8, not chosen: 4.547e-13 was the largest accumulation over
+# Measured, not chosen: 4.547e-13 was the largest accumulation over
 # 3,600 trials up to 1,000 events, so this carries ~2,200x headroom.
 EPSILON = 1e-9
 

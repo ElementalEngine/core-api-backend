@@ -232,7 +232,7 @@ class MatchService:
             for player_index, player in enumerate(team):
                 if match.players[player.index].is_sub:
                     raise ValueError(
-                        "This should not happen: player is a sub but being processed in wo_subs team."
+                        "a sub reached the rating of the team without its subs"
                     )
                 r = new_ts_wo_subs[team_idx][player_index]
                 post[player.index] = StatModel(

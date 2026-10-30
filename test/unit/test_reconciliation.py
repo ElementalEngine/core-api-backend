@@ -24,7 +24,7 @@ def ev(player_id, scope, mu_before, mu_after, minute=0, event_type="approve"):
     }
 
 
-def test_fixture_1_three_approves_no_reverts():
+def test_three_approves_no_reverts():
     events = [
         ev(1, FFA, 1250.0, 1263.0, 0),
         ev(1, FFA, 1263.0, 1250.5, 1),
@@ -33,7 +33,7 @@ def test_fixture_1_three_approves_no_reverts():
     assert reconcile(events, {(1, FFA): 1272.0}, initial_mu=INITIAL_MU) == []
 
 
-def test_fixture_2_revert_nets_out():
+def test_revert_nets_out():
     """
     A query filtering to event_type 'approve' would report every reverted match as
     divergence. Summing all events nets them naturally.
@@ -46,7 +46,7 @@ def test_fixture_2_revert_nets_out():
     assert reconcile(events, {(1, FFA): 1263.0}, initial_mu=INITIAL_MU) == []
 
 
-def test_fixture_3_reset_carries_its_movement():
+def test_reset_carries_its_movement():
     events = [
         ev(1, FFA, 1250.0, 1300.0, 0),
         ev(1, FFA, 1300.0, INITIAL_MU, 1, "reset"),
@@ -55,7 +55,7 @@ def test_fixture_3_reset_carries_its_movement():
     assert reconcile(events, {(1, FFA): 1275.0}, initial_mu=INITIAL_MU) == []
 
 
-def test_fixture_3b_reset_leaves_no_stat_document():
+def test_reset_leaves_no_stat_document():
     """
     A reset deletes the document. Missing is initial_mu, not an error -- otherwise
     every reset player diverges by exactly their whole rating.
@@ -67,11 +67,11 @@ def test_fixture_3b_reset_leaves_no_stat_document():
     assert reconcile(events, {(1, FFA): None}, initial_mu=INITIAL_MU) == []
 
 
-def test_fixture_4_player_with_zero_events_is_skipped():
+def test_player_with_zero_events_is_skipped():
     assert reconcile([], {(9, FFA): 1400.0}, initial_mu=INITIAL_MU) == []
 
 
-def test_fixture_5_placeholder_player_is_skipped():
+def test_placeholder_player_is_skipped():
     """
     Placeholders have neither side of the equation; the ledger writes skip them by
     the same guard.
@@ -79,7 +79,7 @@ def test_fixture_5_placeholder_player_is_skipped():
     assert reconcile([ev(-1, FFA, 1250.0, 1300.0)], {}, initial_mu=INITIAL_MU) == []
 
 
-def test_fixture_6_scopes_reconcile_independently():
+def test_scopes_reconcile_independently():
     """
     One approve writes three stat documents per player. Summing across scopes
     produces a number that means nothing.
@@ -93,7 +93,7 @@ def test_fixture_6_scopes_reconcile_independently():
     assert reconcile(events, actual, initial_mu=INITIAL_MU) == []
 
 
-def test_fixture_7_broken_set_is_reported():
+def test_broken_set_is_reported():
     """: a test must be able to fail for the reason it exists."""
     events = [
         ev(1, FFA, 1250.0, 1263.0, 0),
@@ -106,7 +106,7 @@ def test_fixture_7_broken_set_is_reported():
     assert found[0].event_count == 2
 
 
-def test_fixture_8_float_accumulation_sets_epsilon():
+def test_float_accumulation_sets_epsilon():
     """
     The worst accumulation found over 3,600 trials, reproduced exactly. It must be
     non-zero -- a fixture that never accumulates sets nothing.

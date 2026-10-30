@@ -150,6 +150,11 @@
             "id": "terra",
             "emoji": "🦖",
             "label": "Terra"
+          },
+          {
+            "id": "riverlands",
+            "emoji": "🏞️",
+            "label": "Riverlands"
           }
         ],
         "default_option_id": null

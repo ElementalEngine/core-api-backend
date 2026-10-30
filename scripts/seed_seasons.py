@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """seed_seasons [--dry-run]
 
-Playbook Entry 11 step 3. Creates the two seed rows in `seasons`, one per
+Creates the two seed rows in `seasons`, one per
 edition. `started_at` is the migration timestamp, recorded as the TRACKING
 start, not the true start of either season.
 
 Deliberately NOT idempotent: a second run must fail with E11000 against
-unique_label_per_edition (Entry 11 checks 5 and 6). That index is what stops
+unique_label_per_edition. That index is what stops
 the future rollover script running twice, so proving it here proves that too.
 
 Not run at startup. The indexes are ensured there; the data is a deliberate

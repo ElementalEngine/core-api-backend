@@ -11,12 +11,8 @@ class StatModel(BaseModel):
     """Stat row used for ranking/stats calculations."""
 
     index: int
-
-    # Canonical outward identifier.
     discord_id: str
-
-    # Back-compat: some call sites / docs refer to the stats document id.
-    # We keep it optional and derive from discord_id where possible.
+    # The stat document's own id: the Discord id as an int.
     id: int | None = None
 
     mu: float
@@ -25,15 +21,14 @@ class StatModel(BaseModel):
     wins: int
     first: int
 
-    # Subbing fields are not present in older docs; keep safe defaults.
+    # Older documents have no sub counters.
     subbedIn: int = 0
     subbedOut: int = 0
 
-    # Civs map is historically {"CivName": <int games>}.
+    # Games per civ token, and below per leader token: Civ7 picks the two
+    # independently, so they are different questions.
     civs: dict[str, Any] | None = None
 
-    # Same shape, keyed on the leader token. Civ7 picks a leader and a civ
-    # independently, so the two tallies are different questions.
     leaders: dict[str, Any] | None = None
 
     lastModified: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -44,12 +39,11 @@ class StatModel(BaseModel):
         if not isinstance(data, dict):
             return data
 
-        # Accept Mongo-style `_id` or legacy `id`.
+        # The id comes as `id` or as Mongo's `_id`; the Discord id follows from it.
         raw_id = data.get("id")
         if raw_id is None and "_id" in data:
             raw_id = data.get("_id")
 
-        # Accept legacy `discord_id`.
         raw_discord_id = data.get("discord_id")
         if raw_discord_id is None and raw_id is not None:
             raw_discord_id = str(raw_id)
@@ -57,7 +51,6 @@ class StatModel(BaseModel):
         if raw_discord_id is not None:
             data["discord_id"] = str(raw_discord_id)
 
-        # Best-effort int id (used when writing stats docs).
         if raw_id is None and raw_discord_id is not None:
             try:
                 data["id"] = int(str(raw_discord_id))
@@ -68,10 +61,6 @@ class StatModel(BaseModel):
                 data["id"] = int(str(raw_id))
             except TypeError, ValueError:
                 data["id"] = None
-
-        # Defaults for older docs.
-        data.setdefault("subbedIn", 0)
-        data.setdefault("subbedOut", 0)
         return data
 
 

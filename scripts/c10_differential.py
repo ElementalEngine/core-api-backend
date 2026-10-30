@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+"""c10_differential run <label> <base_url> | restore | diff <a> <b>
+
+Every infractions route, in lifecycle order, and the auth reads, called on
+one test player against a running core-api, so v1 and v2 can be compared.
+
+  run      capture the answers and what landed in Mongo, to $DIFF_DIR
+  restore  delete the test player's suspensions
+  diff     compare two captures, times ignored
+
+Dev cluster only, unless MONGO_URL_ALLOW_ANY is set.
+"""
+
 from __future__ import annotations
 
 import json

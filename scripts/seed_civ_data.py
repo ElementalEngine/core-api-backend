@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """seed_civ_data [--dry-run]
 
-Playbook Entry 9 step 3. Upserts the authored seed files into civ_data and
+Upserts the authored seed files into civ_data and
 prunes tokens the files no longer carry. Idempotent: a second run reports
 zero upserted and zero pruned, which is also how a partial run resumes.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Gate condition 5: v1, production's own code, against v2 on approve, on every
+# v1, production's own code, against v2 on approve, on every
 # validated match on dev and a read-only sample of production's. Every
 # document the run writes is put back, and the dev cluster's fingerprint must
 # be identical before and after. Dev box only; sudo reads production's .env.

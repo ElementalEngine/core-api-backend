@@ -57,7 +57,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("LJ_SERVICE_TOKEN"),
     )
 
-    # Mito service token — required; startup fails if unset
+    # Mite's service token; unset, Mite's routes answer 503.
     mito_service_token: SecretStr = Field(
         default=SecretStr(""),
         validation_alias=AliasChoices("MITO_SERVICE_TOKEN"),

@@ -147,7 +147,7 @@ def test_duplicate_seat_entries_rejected():
     assert rules(got) == [Rule.DUPLICATE_SEAT]
 
 
-def test_too_few_teams_surfaces_item_61_shape():
+def test_a_quit_that_leaves_one_team_is_refused():
     one = M(P(0, 0, "a"), P(0, 1, "b"))
     assert Rule.TOO_FEW_TEAMS in rules(check(one, [SeatPatch(0, quit=True)]))
 

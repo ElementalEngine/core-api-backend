@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """migrate_civ6_leader_field [--apply]
 
-Playbook Entry 10 Half B. Civ6 match records reach this in three shapes, and
+Civ6 match records reach this in three shapes, and
 every one is corrected to a CIVILIZATION_* token in civ and a LEADER_* token
 in leader:
 
