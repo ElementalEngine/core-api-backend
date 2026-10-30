@@ -228,9 +228,6 @@ def test_steam_validation_playtime_threshold(monkeypatch):
         )
 
 
-# --- Method/policy coverage added with the platform-method change set ---
-
-
 @pytest.mark.parametrize(
     ("method", "linked_platform", "eligible"),
     [

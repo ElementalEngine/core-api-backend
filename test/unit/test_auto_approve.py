@@ -1,5 +1,4 @@
-"""A report needing no staff is approved 48 hours after its upload; withdrawing
-a contest is the contester's own."""
+"""A report needing no staff is approved 48 hours after its upload."""
 
 from __future__ import annotations
 
@@ -8,12 +7,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from bson import ObjectId
-from pydantic import ValidationError
 
 from app.features.matches.auto_approve import auto_approve, is_complete
-from app.features.matches.editing import EditingService
-from app.features.matches.errors import ApprovingError, MatchServiceError, NotFoundError
-from app.features.matches.schemas_v2 import ContestBody
+from app.features.matches.errors import ApprovingError, NotFoundError
 
 NOW = datetime(2026, 10, 30, 12, 0, tzinfo=UTC)
 LEADERS = {"LEADER_A", "LEADER_B"}
@@ -124,52 +120,6 @@ def test_its_own_unpublished_approvals_are_answered_again_first():
     assert out[0] == {"match_id": str(lost)} and len(out) == 2
     assert svc.approved[0] == (str(lost), "999", None)
     assert svc.q.since == NOW - timedelta(days=7)
-
-
-class Pending:
-    def __init__(self, doc, pulled):
-        self.doc, self.pulled = doc, pulled
-
-    async def pull_contest(self, oid, contestor, *, now):
-        return self.pulled
-
-    async def find_pending_by_id(self, oid):
-        return dict(self.doc) if self.doc else None
-
-
-class Matches:
-    def __init__(self, q):
-        self.q = q
-
-    def _to_oid(self, match_id):
-        return ObjectId(match_id)
-
-    async def refusal(self, oid):
-        return ApprovingError("This report is being approved.")
-
-
-def test_only_the_contester_withdraws_their_contest():
-    oid = ObjectId()
-    doc = {"_id": oid, "contest_report_list": [{"contestor_discord_id": "1"}]}
-    done = asyncio.run(
-        EditingService(Matches(Pending(doc, True))).withdraw_contest(str(oid), "1")
-    )
-    assert done["match_id"] == str(oid)
-    with pytest.raises(MatchServiceError, match="not contested"):
-        asyncio.run(
-            EditingService(Matches(Pending(doc, False))).withdraw_contest(str(oid), "2")
-        )
-    with pytest.raises(ApprovingError):
-        asyncio.run(
-            EditingService(Matches(Pending(doc, False))).withdraw_contest(str(oid), "1")
-        )
-
-
-def test_a_contest_reason_is_trimmed_and_bounded():
-    assert ContestBody(reason="  wrong order  ").reason == "wrong order"
-    for bad in ("   ", "x" * 501):
-        with pytest.raises(ValidationError):
-            ContestBody(reason=bad)
 
 
 def test_held_reports_do_not_block_newer_ones_and_a_call_approves_five_at_most():

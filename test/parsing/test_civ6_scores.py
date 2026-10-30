@@ -2,8 +2,6 @@ import os
 import random
 import zlib
 
-import pytest
-
 from app.features.matches.parsers import civ6, civ6_scores
 from app.features.matches.parsers.civ6_scores import final_scores
 
@@ -11,10 +9,7 @@ _SAVES = os.path.join(os.path.dirname(__file__), "..", "data", "civ6TestSaves")
 
 
 def _read(name):
-    path = os.path.join(_SAVES, name)
-    if not os.path.exists(path):
-        pytest.skip(f"{name} not present")
-    with open(path, "rb") as f:
+    with open(os.path.join(_SAVES, name), "rb") as f:
         return f.read()
 
 

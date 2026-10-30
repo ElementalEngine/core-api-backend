@@ -44,7 +44,7 @@ def test_reset_without_stats_404s_and_never_touches_the_db():
             )
         )
 
-    assert repo.reset_calls == []  # pre-fix: a stat_reset marker was inserted anyway
+    assert repo.reset_calls == []
 
 
 def test_reset_with_stats_returns_pre_reset_stats_and_resets_once():

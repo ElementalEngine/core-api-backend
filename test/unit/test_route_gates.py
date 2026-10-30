@@ -122,3 +122,16 @@ def test_the_draft_route_carries_mite_s_own_gate():
     assert require_mito_token in gate_callables(
         resolve("POST", "/api/v2/match-setups/draft")
     )
+
+
+def test_the_routes_only_mite_calls_take_mite_s_token():
+    # A route moved to another bot's token would refuse Mite with a 401.
+    mite = (
+        "/api/v2/matches",
+        "/api/v2/stats",
+        "/api/v2/match-setups",
+        "/api/v2/seasons",
+    )
+    routes = [r for r in api_routes() if r.path.startswith(mite)]
+    assert routes
+    assert [r.path for r in routes if require_mito_token not in gate_callables(r)] == []

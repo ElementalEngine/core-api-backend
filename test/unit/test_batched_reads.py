@@ -39,10 +39,6 @@ class _Ratings:
         self.docs = docs
         self.batches = []
 
-    async def get_player_stat_doc(self, *, discord_id, **_):
-        doc = self.docs.get(discord_id)
-        return dict(doc) if doc else None
-
     async def get_player_stat_docs_batch(self, *, discord_ids, session=None, **_):
         self.batches.append((list(discord_ids), session))
         return {d: dict(self.docs[d]) for d in discord_ids if d in self.docs}

@@ -106,9 +106,6 @@ class FakeRepo:
     async def find_validated_by_id(self, oid):
         return dict(self.match_doc) if self.match_doc else None
 
-    async def get_player_stat_doc(self, **kwargs):
-        return dict(self.stat_doc) if self.stat_doc else None
-
     async def get_player_stat_docs_batch(self, *, discord_ids, **kwargs):
         return {d: dict(self.stat_doc) for d in discord_ids} if self.stat_doc else {}
 
@@ -337,9 +334,6 @@ def test_revert_match_tolerates_missing_deltas_and_clamps_counters():
         doc = upsert["doc"]
         for counter in ("games", "wins", "first", "subbedIn", "subbedOut"):
             assert doc[counter] >= 0, f"{counter} went negative: {doc[counter]}"
-
-
-# --- numeric field validation (400, not 500) ---
 
 
 # --- update-match whitelist ---

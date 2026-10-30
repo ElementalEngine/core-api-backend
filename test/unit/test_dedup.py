@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 
 import pytest
+from bson import ObjectId
 from pymongo.errors import DuplicateKeyError
 
 from app.features.matches.ingest import IngestService
@@ -72,8 +73,6 @@ class _Q:
         self.inserted = doc
         if self._insert_raises:
             raise DuplicateKeyError("dup")
-        from bson import ObjectId
-
         return ObjectId()
 
 
@@ -95,8 +94,6 @@ async def _upload(svc):
 
 
 def test_same_bytes_in_pending_is_repeated_by_file(monkeypatch):
-    from bson import ObjectId
-
     q = _Q(pending_bytes={"_id": ObjectId(), "save_bytes_sha256": BYTES_HASH})
     res = asyncio.run(_upload(_svc(q, monkeypatch)))
     assert res["repeated"] is True
@@ -104,8 +101,6 @@ def test_same_bytes_in_pending_is_repeated_by_file(monkeypatch):
 
 
 def test_approved_match_blocks_reupload(monkeypatch):
-    from bson import ObjectId
-
     q = _Q(validated_bytes={"_id": ObjectId(), "save_bytes_sha256": BYTES_HASH})
     res = asyncio.run(_upload(_svc(q, monkeypatch)))
     assert res["repeated"] is True
@@ -113,8 +108,6 @@ def test_approved_match_blocks_reupload(monkeypatch):
 
 
 def test_same_lineup_different_file_is_repeated_by_composition(monkeypatch):
-    from bson import ObjectId
-
     q = _Q(pending_hash={"_id": ObjectId(), "save_file_hash": "x"})
     res = asyncio.run(_upload(_svc(q, monkeypatch)))
     assert res["repeated"] is True
@@ -132,8 +125,6 @@ def _registered(svc, monkeypatch):
 
 
 def test_another_save_of_an_approved_game_points_to_it(monkeypatch):
-    from bson import ObjectId
-
     approved = {
         "_id": ObjectId(),
         "players": [{"discord_id": "11"}, {"discord_id": "22"}],
@@ -147,8 +138,6 @@ def test_another_save_of_an_approved_game_points_to_it(monkeypatch):
 
 
 def test_a_seat_staff_assigned_still_counts_as_the_same_game(monkeypatch):
-    from bson import ObjectId
-
     # The save maps one seat to a registered player; staff assigned the other.
     approved = {
         "_id": ObjectId(),
@@ -168,8 +157,6 @@ def test_a_seat_staff_assigned_still_counts_as_the_same_game(monkeypatch):
 
 
 def test_the_same_picks_by_other_players_are_a_new_game(monkeypatch):
-    from bson import ObjectId
-
     approved = {
         "_id": ObjectId(),
         "players": [{"discord_id": "11"}, {"discord_id": "33"}],
@@ -181,8 +168,6 @@ def test_the_same_picks_by_other_players_are_a_new_game(monkeypatch):
 
 
 def test_insert_race_returns_repeated_not_500(monkeypatch):
-    from bson import ObjectId
-
     q = _Q(insert_raises=True)
     winner = {"_id": ObjectId(), "save_bytes_sha256": BYTES_HASH}
 
@@ -201,7 +186,6 @@ def test_insert_race_returns_repeated_not_500(monkeypatch):
 def test_a_composition_race_returns_repeated_not_500(monkeypatch):
     """Two different saves of one game, uploaded at once: the unique
     composition index refuses the second insert."""
-    from bson import ObjectId
 
     q = _Q(insert_raises=True)
     winner = {"_id": ObjectId(), "save_file_hash": "x"}

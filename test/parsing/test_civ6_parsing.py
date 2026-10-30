@@ -11,16 +11,13 @@ def _test_parse_civ6_save(
     expected_map_type,
     expected_players,
 ):
-    # Path to a test Civ6 save file
     test_save_path = os.path.join(os.path.dirname(__file__), file_path)
     assert os.path.exists(test_save_path), f"Save file not found: {test_save_path}"
 
     with open(test_save_path, "rb") as f:
         buffer = f.read()
-    # Parse the save file
     result = civ6.parse_civ6_save(buffer)
 
-    # Assert the result is a dict and contains expected keys (customize as needed)
     assert isinstance(result, dict)
     assert "players" in result
     assert result["game"] == expected_game

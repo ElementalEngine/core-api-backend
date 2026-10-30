@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from pydantic import SecretStr
 
@@ -63,3 +65,20 @@ def test_an_edition_with_no_season_is_refused_by_name(monkeypatch):
     res = _client(monkeypatch).post(f"/api/v2/matches/{OID}/approve", headers=HEADERS)
     assert res.status_code == 404
     assert res.json()["detail"]["error"]["message"] == "No season is recorded for civ7."
+
+
+def test_form_and_query_values_the_schema_cannot_bound_are_refused():
+    from fastapi import HTTPException
+
+    from app.features.matches import router_v2
+
+    with pytest.raises(HTTPException) as quota:
+        asyncio.run(router_v2.get_sub_quota(discord_id="99999999999999999999", db=None))
+    assert quota.value.status_code == 400
+    with pytest.raises(HTTPException) as upload:
+        asyncio.run(
+            router_v2.upload_match(
+                file=None, is_cloud="true", discord_message_id="1", actor="1", db=None
+            )
+        )
+    assert upload.value.status_code == 400

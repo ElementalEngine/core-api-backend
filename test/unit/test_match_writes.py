@@ -6,11 +6,13 @@ from types import SimpleNamespace
 
 import pytest
 from bson import ObjectId
+from pydantic import ValidationError
 from pymongo.errors import OperationFailure
 
 from app.features.matches.editing import EditingService
-from app.features.matches.errors import ApprovingError, NotFoundError
+from app.features.matches.errors import ApprovingError, MatchServiceError, NotFoundError
 from app.features.matches.repository import CLAIM_TTL, MatchRepository, _editable
+from app.features.matches.schemas_v2 import ContestBody
 from app.features.matches.service import MatchService
 from app.features.matches.validation import SeatPatch
 
@@ -282,18 +284,47 @@ def test_a_clashing_rating_write_can_be_retried_and_nothing_leaks():
     assert "secret" not in str(other)
 
 
-def test_form_and_query_values_the_schema_cannot_bound_are_refused():
-    from fastapi import HTTPException
+class Pending:
+    def __init__(self, doc, pulled):
+        self.doc, self.pulled = doc, pulled
 
-    from app.features.matches import router_v2
+    async def pull_contest(self, oid, contestor, *, now):
+        return self.pulled
 
-    with pytest.raises(HTTPException) as quota:
-        asyncio.run(router_v2.get_sub_quota(discord_id="99999999999999999999", db=None))
-    assert quota.value.status_code == 400
-    with pytest.raises(HTTPException) as upload:
+    async def find_pending_by_id(self, oid):
+        return dict(self.doc) if self.doc else None
+
+
+class Matches:
+    def __init__(self, q):
+        self.q = q
+
+    def _to_oid(self, match_id):
+        return ObjectId(match_id)
+
+    async def refusal(self, oid):
+        return ApprovingError("This report is being approved.")
+
+
+def test_only_the_contester_withdraws_their_contest():
+    oid = ObjectId()
+    doc = {"_id": oid, "contest_report_list": [{"contestor_discord_id": "1"}]}
+    done = asyncio.run(
+        EditingService(Matches(Pending(doc, True))).withdraw_contest(str(oid), "1")
+    )
+    assert done["match_id"] == str(oid)
+    with pytest.raises(MatchServiceError, match="not contested"):
         asyncio.run(
-            router_v2.upload_match(
-                file=None, is_cloud="true", discord_message_id="1", actor="1", db=None
-            )
+            EditingService(Matches(Pending(doc, False))).withdraw_contest(str(oid), "2")
         )
-    assert upload.value.status_code == 400
+    with pytest.raises(ApprovingError):
+        asyncio.run(
+            EditingService(Matches(Pending(doc, False))).withdraw_contest(str(oid), "1")
+        )
+
+
+def test_a_contest_reason_is_trimmed_and_bounded():
+    assert ContestBody(reason="  wrong order  ").reason == "wrong order"
+    for bad in ("   ", "x" * 501):
+        with pytest.raises(ValidationError):
+            ContestBody(reason=bad)

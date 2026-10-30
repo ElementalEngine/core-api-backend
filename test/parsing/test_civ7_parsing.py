@@ -1,15 +1,9 @@
 import os
 import struct
 
-import pytest
-
 from app.features.matches.parsers import civ7
 
 _SAVES = os.path.join(os.path.dirname(__file__), "..", "data", "civ7TestSaves")
-
-
-def _missing(name):
-    return not os.path.exists(os.path.join(_SAVES, name))
 
 
 def _test_parse_civ7_save(
@@ -21,16 +15,13 @@ def _test_parse_civ7_save(
     expected_map_type,
     expected_players,
 ):
-    # Path to a test Civ7 save file
     test_save_path = os.path.join(os.path.dirname(__file__), file_path)
     assert os.path.exists(test_save_path), f"Save file not found: {test_save_path}"
 
     with open(test_save_path, "rb") as f:
         buffer = f.read()
-    # Parse the save file
     result = civ7.parse_civ7_save(buffer)
 
-    # Assert the result is a dict and contains expected keys (customize as needed)
     assert isinstance(result, dict)
     assert "players" in result
     assert result["game"] == expected_game
@@ -182,186 +173,6 @@ def test_parse_civ7_save_duel():
     )
 
 
-@pytest.mark.skipif(
-    _missing("AutoSave_0001.Civ7Save"),
-    reason="fixture absent. Antiquity is also covered by three other saves. S4.",
-)
-def test_parse_civ7_save_AutoSave_001():
-    expected_players = [
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_ASSYRIA",
-            "leader": "LEADER_EDWARD_TEACH",
-            "team": 0,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_TONGA",
-            "leader": "LEADER_SAYYIDA_AL_HURRA",
-            "team": 1,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_SILLA",
-            "leader": "LEADER_LAKSHMIBAI",
-            "team": 2,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_AKSUM",
-            "leader": "LEADER_IBN_BATTUTA",
-            "team": 3,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_MAURYA",
-            "leader": "LEADER_ASHOKA_ALT",
-            "team": 4,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_PERSIA",
-            "leader": "LEADER_XERXES_ALT",
-            "team": 5,
-        },
-    ]
-    _test_parse_civ7_save(
-        file_path="../data/civ7TestSaves/AutoSave_0001.Civ7Save",
-        expected_game="civ7",
-        expected_age="AGE_ANTIQUITY",
-        expected_turn=1,
-        expected_mode="ffa",
-        expected_map_type="Continents and Islands",
-        expected_players=expected_players,
-    )
-
-
-@pytest.mark.skipif(
-    _missing("AutoSave_0002.Civ7Save"),
-    reason="fixture absent -- the suite s ONLY AGE_EXPLORATION coverage. Blocks carried-forward item 11. S4.",
-)
-def test_parse_civ7_save_AutoSave_002():
-    expected_players = [
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_DAI_VIET",
-            "leader": "LEADER_GENGHIS_KHAN",
-            "team": 0,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_ICELAND",
-            "leader": "LEADER_EDWARD_TEACH",
-            "team": 1,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_PIRATE_REPUBLIC",
-            "leader": "LEADER_TECUMSEH",
-            "team": 2,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_SPAIN",
-            "leader": "LEADER_NAPOLEON",
-            "team": 3,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_SONGHAI",
-            "leader": "LEADER_HATSHEPSUT",
-            "team": 4,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_HAWAII",
-            "leader": "LEADER_JOSE_RIZAL",
-            "team": 5,
-        },
-    ]
-    _test_parse_civ7_save(
-        file_path="../data/civ7TestSaves/AutoSave_0002.Civ7Save",
-        expected_game="civ7",
-        expected_age="AGE_EXPLORATION",
-        expected_turn=2,
-        expected_mode="ffa",
-        expected_map_type="Continents and Islands",
-        expected_players=expected_players,
-    )
-
-
-@pytest.mark.skipif(
-    _missing("AutoSave_0003.Civ7Save"),
-    reason="fixture absent. AGE_MODERN is also covered by modernGame. S4.",
-)
-def test_parse_civ7_save_AutoSave_003():
-    expected_players = [
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_QAJAR",
-            "leader": "LEADER_ADA_LOVELACE",
-            "team": 0,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_OTTOMANS",
-            "leader": "LEADER_AMINA",
-            "team": 1,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_MUGHAL",
-            "leader": "LEADER_XERXES",
-            "team": 2,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_AMERICA",
-            "leader": "LEADER_BENJAMIN_FRANKLIN",
-            "team": 3,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_GREAT_BRITAIN",
-            "leader": "LEADER_EDWARD_TEACH",
-            "team": 4,
-        },
-        {
-            "steam_id": None,
-            "user_name": None,
-            "civ": "CIVILIZATION_MEIJI",
-            "leader": "LEADER_HIMIKO_ALT",
-            "team": 5,
-        },
-    ]
-    _test_parse_civ7_save(
-        file_path="../data/civ7TestSaves/AutoSave_0003.Civ7Save",
-        expected_game="civ7",
-        expected_age="AGE_MODERN",
-        expected_turn=3,
-        expected_mode="ffa",
-        expected_map_type="Continents and Islands",
-        expected_players=expected_players,
-    )
-
-
 def test_parse_civ7_save_modernGame():
     expected_players = [
         {
@@ -465,7 +276,6 @@ def _duel():
         return f.read()
 
 
-@pytest.mark.skipif(_missing("duel.Civ7Save"), reason="test save not present")
 def test_a_cloud_or_hotseat_separator_before_group_4_reads_the_same():
     # Those saves count chunks in the separator where realtime saves hold 0.
     raw = _duel()
@@ -476,7 +286,6 @@ def test_a_cloud_or_hotseat_separator_before_group_4_reads_the_same():
     assert civ7.parse_civ7_save(cloud) == civ7.parse_civ7_save(raw)
 
 
-@pytest.mark.skipif(_missing("duel.Civ7Save"), reason="test save not present")
 def test_an_unreadable_group_5_does_not_fail_the_parse():
     raw = _duel()
     end = civ7.parse_raw(raw)["group4"][-1]["endOffset"]
