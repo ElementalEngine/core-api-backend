@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
+from collections.abc import Mapping
 from typing import Any
 
 from bson import ObjectId
@@ -323,9 +324,15 @@ class MatchService:
         return await ApprovalService(self).revert_match(match_id)
 
     async def approve_match(
-        self, match_id: str, approver_discord_id: str
+        self,
+        match_id: str,
+        approver_discord_id: str,
+        *,
+        expect: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        return await ApprovalService(self).approve_match(match_id, approver_discord_id)
+        return await ApprovalService(self).approve_match(
+            match_id, approver_discord_id, expect=expect
+        )
 
 
 __all__ = [

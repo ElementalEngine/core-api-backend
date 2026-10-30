@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
 from pymongo import AsyncMongoClient
 
 from app.core.dependencies import (
@@ -14,6 +15,7 @@ from app.core.dependencies import (
 )
 from app.core.errors import api_error, forbidden, invalid_request, not_found
 from app.features.civdata.repository import CivDataRepository
+from app.features.matches.auto_approve import auto_approve
 from app.features.matches.editing import EditingService
 from app.features.matches.errors import (
     ApprovingError,
@@ -28,6 +30,7 @@ from app.features.matches.leaderboard import LeaderboardService
 from app.features.matches.schemas import LeaderboardRankingResponse, MatchResponse
 from app.features.matches.schemas_v2 import (
     ContestBody,
+    HistoryPost,
     PlayersPatch,
     SubQuotaResponse,
     UploadResponse,
@@ -244,6 +247,53 @@ async def contest_match(
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc
     return await _named(db, contested)
+
+
+@router.delete("/matches/{match_id}/contest", response_model=MatchResponse)
+async def withdraw_contest(
+    match_id: str,
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> dict[str, Any]:
+    """A player takes back their own contest."""
+    svc = MatchService(db)
+    try:
+        withdrawn = await EditingService(svc).withdraw_contest(match_id, actor)
+    except NotFoundError as exc:
+        raise not_found("Match not found") from exc
+    except ApprovingError as exc:
+        raise _retry_later(exc) from exc
+    except MatchServiceError as exc:
+        raise invalid_request(str(exc)) from exc
+    return await _named(db, withdrawn)
+
+
+@router.post("/matches/auto-approve", response_model=list[MatchResponse])
+async def auto_approve_due(
+    actor: str = Depends(actor_discord_id),
+    db: AsyncMongoClient = Depends(get_database),
+) -> list[dict[str, Any]]:
+    """Approves, as the actor, every report that needs no staff 48 hours after
+    its upload."""
+    approved = await auto_approve(
+        MatchService(db), CivDataRepository(db), actor, datetime.now(UTC)
+    )
+    return [await _named(db, match) for match in approved]
+
+
+@router.put("/matches/{match_id}/history-post", status_code=204)
+async def record_history_post(
+    match_id: str, body: HistoryPost, db: AsyncMongoClient = Depends(get_database)
+) -> Response:
+    """The approved result's post, so a revert can redraw it."""
+    svc = MatchService(db)
+    try:
+        found = await svc.q.set_history_message(svc._to_oid(match_id), body.message_id)
+    except InvalidIDError as exc:
+        raise invalid_request(str(exc)) from exc
+    if not found:
+        raise not_found("Match not found")
+    return Response(status_code=204)
 
 
 @router.post("/matches/{match_id}/revert", response_model=MatchResponse)

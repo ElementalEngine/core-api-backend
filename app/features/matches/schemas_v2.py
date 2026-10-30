@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from app.features.matches.schemas import MatchResponse
 from app.features.matches.validation import SeatPatch
@@ -64,7 +64,13 @@ class PlayersPatch(BaseModel):
 
 
 class ContestBody(BaseModel):
-    reason: str
+    reason: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
+    ]
+
+
+class HistoryPost(BaseModel):
+    message_id: str = Field(min_length=1, max_length=32)
 
 
 class UploadResponse(MatchResponse):

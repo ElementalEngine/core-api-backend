@@ -96,7 +96,7 @@ class FakeRepo:
     async def find_pending_by_id(self, oid):
         return dict(self.match_doc) if self.match_doc else None
 
-    async def claim_pending_match(self, oid, *, now=None):
+    async def claim_pending_match(self, oid, *, now=None, expect=None):
         self.claims.append(oid)
         return dict(self.match_doc) if self.match_doc else None
 
@@ -558,7 +558,7 @@ def test_approve_stamps_the_season_open_inside_its_transaction():
 
 def test_a_repeated_approve_answers_with_the_season_it_was_approved_in():
     class Approved(FakeRepo):
-        async def claim_pending_match(self, oid, *, now=None):
+        async def claim_pending_match(self, oid, *, now=None, expect=None):
             return None
 
     stored = {"_id": 123, "mu": 30.0, "sigma": 5.0, "games": 10, "wins": 4, "first": 2}

@@ -11,6 +11,9 @@ EXPECTED = {
     ("PATCH", "/api/v2/matches/{match_id}/players"),
     ("POST", "/api/v2/matches/{match_id}/approve"),
     ("POST", "/api/v2/matches/{match_id}/contest"),
+    ("DELETE", "/api/v2/matches/{match_id}/contest"),
+    ("POST", "/api/v2/matches/auto-approve"),
+    ("PUT", "/api/v2/matches/{match_id}/history-post"),
     ("POST", "/api/v2/matches/{match_id}/revert"),
     ("DELETE", "/api/v2/matches/{match_id}"),
 }

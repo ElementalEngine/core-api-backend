@@ -76,7 +76,7 @@ class _Q:
     async def take_pending_match(self, oid, *, now):
         return None if self.held else (dict(self.doc) if self.doc else None)
 
-    async def claim_pending_match(self, oid, *, now):
+    async def claim_pending_match(self, oid, *, now, expect=None):
         return None
 
     async def find_validated_by_id(self, oid):

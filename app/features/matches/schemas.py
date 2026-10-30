@@ -56,6 +56,8 @@ class MatchResponse(BaseModel):
     affected_players: list[AffectedPlayerRating] | None = None
     # The season it was approved in, else the open one, such as "Season 6".
     season_label: str | None = None
+    # The approved result's post in the history channel, where one was recorded.
+    history_message_id: str | None = None
 
 
 class PlayerLeaderboard(BaseModel):

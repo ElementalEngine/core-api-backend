@@ -61,6 +61,25 @@ class EditingService:
         logger.info("✅ 🔄 Match %s contested by %s", match_id, contestor_discord_id)
         return await self._reload_pending(oid)
 
+    async def withdraw_contest(
+        self, match_id: str, contestor_discord_id: str
+    ) -> dict[str, Any]:
+        oid = self._m._to_oid(match_id)
+        if await self._m.q.pull_contest(
+            oid, contestor_discord_id, now=datetime.now(UTC)
+        ):
+            logger.info(
+                "Match %s contest withdrawn by %s", match_id, contestor_discord_id
+            )
+            return await self._reload_pending(oid)
+        doc = await self._m.q.find_pending_by_id(oid)
+        contests = (doc or {}).get("contest_report_list") or []
+        if doc is not None and all(
+            c.get("contestor_discord_id") != contestor_discord_id for c in contests
+        ):
+            raise MatchServiceError("You have not contested this report.")
+        raise await self._m.refusal(oid)
+
     async def patch_players(
         self,
         match_id: str,

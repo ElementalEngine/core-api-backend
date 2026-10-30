@@ -290,6 +290,8 @@
       "ContestBody": {
         "properties": {
           "reason": {
+            "maxLength": 500,
+            "minLength": 1,
             "title": "Reason",
             "type": "string"
           }
@@ -920,6 +922,21 @@
           "games"
         ],
         "title": "HistoryPage",
+        "type": "object"
+      },
+      "HistoryPost": {
+        "properties": {
+          "message_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Message Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "title": "HistoryPost",
         "type": "object"
       },
       "LeaderPick": {
@@ -1841,6 +1858,17 @@
           "game_mode": {
             "title": "Game Mode",
             "type": "string"
+          },
+          "history_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "History Message Id"
           },
           "is_cloud": {
             "title": "Is Cloud",
@@ -3495,6 +3523,17 @@
           "game_mode": {
             "title": "Game Mode",
             "type": "string"
+          },
+          "history_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "History Message Id"
           },
           "is_cloud": {
             "title": "Is Cloud",
@@ -7611,6 +7650,69 @@
         ]
       }
     },
+    "/api/v2/matches/auto-approve": {
+      "post": {
+        "description": "Approves, as the actor, every report that needs no staff 48 hours after\nits upload.",
+        "operationId": "auto_approve_due_api_v2_matches_auto_approve_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MatchResponse"
+                  },
+                  "title": "Response Auto Approve Due Api V2 Matches Auto Approve Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auto Approve Due",
+        "tags": [
+          "matches-v2"
+        ]
+      }
+    },
     "/api/v2/matches/leaderboard": {
       "get": {
         "operationId": "get_leaderboard_api_v2_matches_leaderboard_get",
@@ -7967,6 +8069,72 @@
       }
     },
     "/api/v2/matches/{match_id}/contest": {
+      "delete": {
+        "description": "A player takes back their own contest.",
+        "operationId": "withdraw_contest_api_v2_matches__match_id__contest_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-discord-id",
+            "required": true,
+            "schema": {
+              "title": "X-Actor-Discord-Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Withdraw Contest",
+        "tags": [
+          "matches-v2"
+        ]
+      },
       "post": {
         "operationId": "contest_match_api_v2_matches__match_id__contest_post",
         "parameters": [
@@ -8038,6 +8206,68 @@
           }
         },
         "summary": "Contest Match",
+        "tags": [
+          "matches-v2"
+        ]
+      }
+    },
+    "/api/v2/matches/{match_id}/history-post": {
+      "put": {
+        "description": "The approved result's post, so a revert can redraw it.",
+        "operationId": "record_history_post_api_v2_matches__match_id__history_post_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HistoryPost"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record History Post",
         "tags": [
           "matches-v2"
         ]

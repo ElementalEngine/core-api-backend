@@ -10,6 +10,7 @@ from bson.int64 import Int64
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
 from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.collection import AsyncCollection
+from pymongo.asynchronous.cursor import AsyncCursor
 from pymongo.errors import OperationFailure
 
 from app.core.constants import COL_SUB_EVENTS, COL_USERS, DB_SERVER_MEMBERS, GAMES_DB
@@ -112,11 +113,12 @@ class MatchRepository:
         return await self._validated.find_one({"_id": oid})
 
     async def claim_pending_match(
-        self, oid: ObjectId, *, now: datetime
+        self, oid: ObjectId, *, now: datetime, expect: Mapping[str, Any] | None = None
     ) -> dict[str, Any] | None:
-        """Claim a pending match for approval; None means already claimed or gone."""
+        """Claim a pending match for approval; None means already claimed, gone,
+        or no longer as `expect` describes it."""
         return await self._pending.find_one_and_update(
-            {"_id": oid, **_editable(now)},
+            {"_id": oid, **_editable(now), **(expect or {})},
             {"$set": {"approving_at": now}},
         )
 
@@ -169,6 +171,50 @@ class MatchRepository:
     ) -> bool:
         res = await self._pending.delete_one({"_id": oid}, session=session)
         return res.deleted_count == 1
+
+    async def pull_contest(
+        self, oid: ObjectId, contestor_discord_id: str, *, now: datetime
+    ) -> bool:
+        res = await self._pending.update_one(
+            {
+                "_id": oid,
+                **_editable(now),
+                "contest_report_list.contestor_discord_id": contestor_discord_id,
+            },
+            {
+                "$pull": {
+                    "contest_report_list": {
+                        "contestor_discord_id": contestor_discord_id
+                    }
+                }
+            },
+        )
+        return res.matched_count == 1
+
+    def pending_uploaded_before(self, cutoff: ObjectId) -> AsyncCursor[dict[str, Any]]:
+        """Uncontested pending reports uploaded before the cutoff, oldest first."""
+        return self._pending.find(
+            {"_id": {"$lte": cutoff}, "contest_report_list": {"$size": 0}}
+        ).sort("_id", ASCENDING)
+
+    async def find_unpublished_by(
+        self, approver: str, *, since: datetime, limit: int
+    ) -> list[dict[str, Any]]:
+        """Matches the approver approved since then with no history post recorded."""
+        cursor = self._validated.find(
+            {
+                "approver_discord_id": approver,
+                "approved_at": {"$gte": since},
+                "history_message_id": {"$exists": False},
+            }
+        )
+        return await cursor.sort("_id", ASCENDING).limit(limit).to_list()
+
+    async def set_history_message(self, oid: ObjectId, message_id: str) -> bool:
+        res = await self._validated.update_one(
+            {"_id": oid}, {"$set": {"history_message_id": message_id}}
+        )
+        return res.matched_count == 1
 
     async def delete_validated_match(
         self, oid: ObjectId, *, session: AsyncClientSession | None = None

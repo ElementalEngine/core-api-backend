@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -275,14 +276,19 @@ class ApprovalService:
             **match.model_dump(),
             "affected_players": affected,
             "season_id": res.get("season_id"),
+            "history_message_id": res.get("history_message_id"),
         }
 
     async def approve_match(
-        self, match_id: str, approver_discord_id: str
+        self,
+        match_id: str,
+        approver_discord_id: str,
+        *,
+        expect: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
         claimed_at = datetime.now(UTC)
-        res = await self._m.q.claim_pending_match(oid, now=claimed_at)
+        res = await self._m.q.claim_pending_match(oid, now=claimed_at, expect=expect)
         if res is None:
             # Approved already, perhaps by a request whose answer was lost: the
             # same answer again lets the bot finish posting the result.
