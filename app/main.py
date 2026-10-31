@@ -16,7 +16,7 @@ from app.core.middleware import CorrelationIdMiddleware
 
 configure_logging()
 
-app = FastAPI(title="core-api", lifespan=db_lifespan)
+app = FastAPI(title="core-api", version="2.0.0", lifespan=db_lifespan)
 # Starlette types the handler for bare Exception; registering a narrower one is
 # the documented FastAPI pattern.
 app.add_exception_handler(RequestValidationError, request_validation_exception_handler)  # type: ignore[arg-type]
