@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from random import SystemRandom
 from typing import Any
 
+from app.features.civdata.seeds import leader_types
 from app.features.match_setups.bans import ban_caps, bannable_civs
 from app.features.match_setups.pools import (
     NotEnoughPool,
@@ -50,6 +51,7 @@ def deal_draft(
             remaining_after_bans(leaders, leader_bans),
             request.drafts,
             request.leaders,
+            leader_types(request.edition),
             rng,
         )
         civ_pools: list[list[str]] = [[] for _ in leader_pools]

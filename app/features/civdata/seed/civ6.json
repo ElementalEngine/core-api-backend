@@ -8,7 +8,7 @@
       "display": "Abraham Lincoln",
       "civ": "CIVILIZATION_AMERICA",
       "civ_display": "America",
-      "type": "None",
+      "type": "Industrial",
       "civ_source": "inferred"
     },
     {
@@ -17,7 +17,7 @@
       "display": "Alexander",
       "civ": "CIVILIZATION_MACEDON",
       "civ_display": "Macedon",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -26,7 +26,7 @@
       "display": "Amanitore",
       "civ": "CIVILIZATION_NUBIA",
       "civ_display": "Nubia",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -35,7 +35,7 @@
       "display": "Ambiorix",
       "civ": "CIVILIZATION_GAUL",
       "civ_display": "Gaul",
-      "type": "None",
+      "type": "Industrial",
       "civ_source": "inferred"
     },
     {
@@ -44,7 +44,7 @@
       "display": "Frederick Barbarossa",
       "civ": "CIVILIZATION_GERMANY",
       "civ_display": "Germany",
-      "type": "None",
+      "type": "Industrial",
       "civ_source": "observed"
     },
     {
@@ -53,7 +53,7 @@
       "display": "Basil II",
       "civ": "CIVILIZATION_BYZANTIUM",
       "civ_display": "Byzantium",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -62,7 +62,7 @@
       "display": "Catherine de Medici (Black Queen)",
       "civ": "CIVILIZATION_FRANCE",
       "civ_display": "France",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -71,7 +71,7 @@
       "display": "Catherine de Medici (Magnificence)",
       "civ": "CIVILIZATION_FRANCE",
       "civ_display": "France",
-      "type": "None",
+      "type": "Culture",
       "civ_source": "inferred"
     },
     {
@@ -80,7 +80,7 @@
       "display": "Chandragupta",
       "civ": "CIVILIZATION_INDIA",
       "civ_display": "India",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -98,7 +98,7 @@
       "display": "Cleopatra (Ptolemaic)",
       "civ": "CIVILIZATION_EGYPT",
       "civ_display": "Egypt",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -116,7 +116,7 @@
       "display": "Cyrus",
       "civ": "CIVILIZATION_PERSIA",
       "civ_display": "Persia",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -125,7 +125,7 @@
       "display": "Dido",
       "civ": "CIVILIZATION_PHOENICIA",
       "civ_display": "Phoenicia",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -134,7 +134,7 @@
       "display": "Eleanor of Aquitaine",
       "civ": "CIVILIZATION_ENGLAND",
       "civ_display": "England",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "inferred"
     },
     {
@@ -143,7 +143,7 @@
       "display": "Eleanor of Aquitaine",
       "civ": "CIVILIZATION_FRANCE",
       "civ_display": "France",
-      "type": "None",
+      "type": "Culture",
       "civ_source": "inferred"
     },
     {
@@ -152,7 +152,7 @@
       "display": "Elizabeth I",
       "civ": "CIVILIZATION_ENGLAND",
       "civ_display": "England",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -161,7 +161,7 @@
       "display": "Gandhi",
       "civ": "CIVILIZATION_INDIA",
       "civ_display": "India",
-      "type": "None",
+      "type": "Religious",
       "civ_source": "inferred"
     },
     {
@@ -170,7 +170,7 @@
       "display": "Genghis Khan",
       "civ": "CIVILIZATION_MONGOLIA",
       "civ_display": "Mongolia",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -179,7 +179,7 @@
       "display": "Gilgamesh",
       "civ": "CIVILIZATION_SUMERIA",
       "civ_display": "Sumeria",
-      "type": "None",
+      "type": "Science",
       "civ_source": "observed"
     },
     {
@@ -188,7 +188,7 @@
       "display": "Gitarja",
       "civ": "CIVILIZATION_INDONESIA",
       "civ_display": "Indonesia",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -197,7 +197,7 @@
       "display": "Gorgo",
       "civ": "CIVILIZATION_GREECE",
       "civ_display": "Greece",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -206,7 +206,7 @@
       "display": "Hammurabi",
       "civ": "CIVILIZATION_BABYLON_STK",
       "civ_display": "Babylon",
-      "type": "None",
+      "type": "Science",
       "civ_source": "observed"
     },
     {
@@ -215,7 +215,7 @@
       "display": "Harald Hardrada (Varangian)",
       "civ": "CIVILIZATION_NORWAY",
       "civ_display": "Norway",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "inferred"
     },
     {
@@ -224,7 +224,7 @@
       "display": "Harald Hardrada (Konge)",
       "civ": "CIVILIZATION_NORWAY",
       "civ_display": "Norway",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "inferred"
     },
     {
@@ -233,7 +233,7 @@
       "display": "Hojo Tokimune",
       "civ": "CIVILIZATION_JAPAN",
       "civ_display": "Japan",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "inferred"
     },
     {
@@ -242,7 +242,7 @@
       "display": "Jadwiga",
       "civ": "CIVILIZATION_POLAND",
       "civ_display": "Poland",
-      "type": "None",
+      "type": "Religious",
       "civ_source": "observed"
     },
     {
@@ -251,7 +251,7 @@
       "display": "Jayavarman VII",
       "civ": "CIVILIZATION_KHMER",
       "civ_display": "Khmer",
-      "type": "None",
+      "type": "Religious",
       "civ_source": "inferred"
     },
     {
@@ -260,7 +260,7 @@
       "display": "Olympias",
       "civ": null,
       "civ_display": "Macedon",
-      "type": "None",
+      "type": "War",
       "civ_source": "unmapped"
     },
     {
@@ -269,7 +269,7 @@
       "display": "Stanislaw II",
       "civ": null,
       "civ_display": "Poland",
-      "type": "None",
+      "type": "War",
       "civ_source": "unmapped"
     },
     {
@@ -278,7 +278,7 @@
       "display": "João III",
       "civ": "CIVILIZATION_PORTUGAL",
       "civ_display": "Portugal",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -287,7 +287,7 @@
       "display": "John Curtin",
       "civ": "CIVILIZATION_AUSTRALIA",
       "civ_display": "Australia",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -296,7 +296,7 @@
       "display": "Julius Caesar",
       "civ": "CIVILIZATION_ROME",
       "civ_display": "Rome",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -305,7 +305,7 @@
       "display": "Kristina",
       "civ": "CIVILIZATION_SWEDEN",
       "civ_display": "Sweden",
-      "type": "None",
+      "type": "Culture",
       "civ_source": "inferred"
     },
     {
@@ -323,7 +323,7 @@
       "display": "Kublai Khan",
       "civ": "CIVILIZATION_MONGOLIA",
       "civ_display": "Mongolia",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -332,7 +332,7 @@
       "display": "Kupe",
       "civ": "CIVILIZATION_MAORI",
       "civ_display": "Māori",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -341,7 +341,7 @@
       "display": "Lady Six Sky",
       "civ": "CIVILIZATION_MAYA",
       "civ_display": "Maya",
-      "type": "None",
+      "type": "Science",
       "civ_source": "observed"
     },
     {
@@ -350,7 +350,7 @@
       "display": "Bà Triệu",
       "civ": "CIVILIZATION_VIETNAM",
       "civ_display": "Vietnam",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -359,7 +359,7 @@
       "display": "Wilfrid Laurier",
       "civ": "CIVILIZATION_CANADA",
       "civ_display": "Canada",
-      "type": "None",
+      "type": "Culture",
       "civ_source": "observed"
     },
     {
@@ -368,7 +368,7 @@
       "display": "Lautaro",
       "civ": "CIVILIZATION_MAPUCHE",
       "civ_display": "Mapuche",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -377,7 +377,7 @@
       "display": "Ahiram",
       "civ": null,
       "civ_display": "Phoenicia",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "unmapped"
     },
     {
@@ -395,7 +395,7 @@
       "display": "Kiviuq",
       "civ": "CIVILIZATION_LIME_THULE",
       "civ_display": "Thule",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -404,7 +404,7 @@
       "display": "Te' K'inich II",
       "civ": null,
       "civ_display": "Maya",
-      "type": "None",
+      "type": "Science",
       "civ_source": "unmapped"
     },
     {
@@ -413,7 +413,7 @@
       "display": "Ludwig II",
       "civ": "CIVILIZATION_GERMANY",
       "civ_display": "Germany",
-      "type": "None",
+      "type": "Industrial",
       "civ_source": "inferred"
     },
     {
@@ -422,7 +422,7 @@
       "display": "Mansa Musa",
       "civ": "CIVILIZATION_MALI",
       "civ_display": "Mali",
-      "type": "None",
+      "type": "Religious",
       "civ_source": "inferred"
     },
     {
@@ -431,7 +431,7 @@
       "display": "Matthias Corvinus",
       "civ": "CIVILIZATION_HUNGARY",
       "civ_display": "Hungary",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -440,7 +440,7 @@
       "display": "Menelik II",
       "civ": "CIVILIZATION_ETHIOPIA",
       "civ_display": "Ethiopia",
-      "type": "None",
+      "type": "Religious",
       "civ_source": "inferred"
     },
     {
@@ -449,7 +449,7 @@
       "display": "Maria Theresa",
       "civ": null,
       "civ_display": "Austria",
-      "type": "None",
+      "type": "Industrial",
       "civ_source": "unmapped"
     },
     {
@@ -458,7 +458,7 @@
       "display": "Theodoric",
       "civ": null,
       "civ_display": "Goths",
-      "type": "None",
+      "type": "Religious",
       "civ_source": "unmapped"
     },
     {
@@ -467,7 +467,7 @@
       "display": "Montezuma",
       "civ": "CIVILIZATION_AZTEC",
       "civ_display": "Aztec",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -476,7 +476,7 @@
       "display": "Mvemba a Nzinga",
       "civ": "CIVILIZATION_KONGO",
       "civ_display": "Kongo",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -485,7 +485,7 @@
       "display": "Nader Shah",
       "civ": "CIVILIZATION_PERSIA",
       "civ_display": "Persia",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -494,7 +494,7 @@
       "display": "Nzinga Mbande",
       "civ": "CIVILIZATION_KONGO",
       "civ_display": "Kongo",
-      "type": "None",
+      "type": "Culture",
       "civ_source": "observed"
     },
     {
@@ -503,7 +503,7 @@
       "display": "Pachacuti",
       "civ": "CIVILIZATION_INCA",
       "civ_display": "Inca",
-      "type": "None",
+      "type": "Science",
       "civ_source": "inferred"
     },
     {
@@ -512,7 +512,7 @@
       "display": "Pedro II",
       "civ": "CIVILIZATION_BRAZIL",
       "civ_display": "Brazil",
-      "type": "None",
+      "type": "Science",
       "civ_source": "inferred"
     },
     {
@@ -521,7 +521,7 @@
       "display": "Pericles",
       "civ": "CIVILIZATION_GREECE",
       "civ_display": "Greece",
-      "type": "None",
+      "type": "Culture",
       "civ_source": "observed"
     },
     {
@@ -530,7 +530,7 @@
       "display": "Peter the Great",
       "civ": "CIVILIZATION_RUSSIA",
       "civ_display": "Russia",
-      "type": "None",
+      "type": "Culture",
       "civ_source": "inferred"
     },
     {
@@ -539,7 +539,7 @@
       "display": "Philip II",
       "civ": "CIVILIZATION_SPAIN",
       "civ_display": "Spain",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -557,7 +557,7 @@
       "display": "Qin Shi Huang (Mandate of Heaven)",
       "civ": "CIVILIZATION_CHINA",
       "civ_display": "China",
-      "type": "None",
+      "type": "Culture",
       "civ_source": "inferred"
     },
     {
@@ -566,7 +566,7 @@
       "display": "Qin Shi Huang (Unifier)",
       "civ": "CIVILIZATION_CHINA",
       "civ_display": "China",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -575,7 +575,7 @@
       "display": "Ramses II",
       "civ": "CIVILIZATION_EGYPT",
       "civ_display": "Egypt",
-      "type": "None",
+      "type": "Culture",
       "civ_source": "inferred"
     },
     {
@@ -584,7 +584,7 @@
       "display": "Robert the Bruce",
       "civ": "CIVILIZATION_SCOTLAND",
       "civ_display": "Scotland",
-      "type": "None",
+      "type": "Science",
       "civ_source": "observed"
     },
     {
@@ -593,7 +593,7 @@
       "display": "Saladin (Vizier)",
       "civ": "CIVILIZATION_ARABIA",
       "civ_display": "Arabia",
-      "type": "None",
+      "type": "Science",
       "civ_source": "observed"
     },
     {
@@ -602,7 +602,7 @@
       "display": "Saladin (Sultan)",
       "civ": "CIVILIZATION_ARABIA",
       "civ_display": "Arabia",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -611,7 +611,7 @@
       "display": "Sejong",
       "civ": "CIVILIZATION_KOREA",
       "civ_display": "Korea",
-      "type": "None",
+      "type": "Science",
       "civ_source": "inferred"
     },
     {
@@ -620,7 +620,7 @@
       "display": "Seondeok",
       "civ": "CIVILIZATION_KOREA",
       "civ_display": "Korea",
-      "type": "None",
+      "type": "Science",
       "civ_source": "inferred"
     },
     {
@@ -629,7 +629,7 @@
       "display": "Shaka",
       "civ": "CIVILIZATION_ZULU",
       "civ_display": "Zulu",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -638,7 +638,7 @@
       "display": "Simón Bolívar",
       "civ": "CIVILIZATION_GRAN_COLOMBIA",
       "civ_display": "Gran Colombia",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {
@@ -647,7 +647,7 @@
       "display": "Al-Hasan",
       "civ": "CIVILIZATION_SUK_SWAHILI",
       "civ_display": "Swahili",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -656,7 +656,7 @@
       "display": "Trisong Detsen",
       "civ": "CIVILIZATION_SUK_TIBET",
       "civ_display": "Tibet",
-      "type": "None",
+      "type": "Religious",
       "civ_source": "observed"
     },
     {
@@ -665,7 +665,7 @@
       "display": "Vercingetorix",
       "civ": null,
       "civ_display": "Gaul",
-      "type": "None",
+      "type": "Industrial",
       "civ_source": "unmapped"
     },
     {
@@ -674,7 +674,7 @@
       "display": "Suleiman (Kanuni)",
       "civ": "CIVILIZATION_OTTOMAN",
       "civ_display": "Ottoman",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -692,7 +692,7 @@
       "display": "Sundiata Keita",
       "civ": "CIVILIZATION_MALI",
       "civ_display": "Mali",
-      "type": "None",
+      "type": "Religious",
       "civ_source": "inferred"
     },
     {
@@ -701,7 +701,7 @@
       "display": "Tamar",
       "civ": "CIVILIZATION_GEORGIA",
       "civ_display": "Georgia",
-      "type": "None",
+      "type": "Religious",
       "civ_source": "observed"
     },
     {
@@ -710,7 +710,7 @@
       "display": "Theodora",
       "civ": "CIVILIZATION_BYZANTIUM",
       "civ_display": "Byzantium",
-      "type": "None",
+      "type": "Religious",
       "civ_source": "inferred"
     },
     {
@@ -719,7 +719,7 @@
       "display": "Tokugawa",
       "civ": "CIVILIZATION_JAPAN",
       "civ_display": "Japan",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "inferred"
     },
     {
@@ -728,7 +728,7 @@
       "display": "Tomyris",
       "civ": "CIVILIZATION_SCYTHIA",
       "civ_display": "Scythia",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -746,7 +746,7 @@
       "display": "Teddy Roosevelt (Bull Moose)",
       "civ": "CIVILIZATION_AMERICA",
       "civ_display": "America",
-      "type": "None",
+      "type": "Culture",
       "civ_source": "observed"
     },
     {
@@ -755,7 +755,7 @@
       "display": "Teddy Roosevelt (Rough Rider)",
       "civ": "CIVILIZATION_AMERICA",
       "civ_display": "America",
-      "type": "None",
+      "type": "War",
       "civ_source": "observed"
     },
     {
@@ -764,7 +764,7 @@
       "display": "Victoria (Age of Empire)",
       "civ": "CIVILIZATION_ENGLAND",
       "civ_display": "England",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -773,7 +773,7 @@
       "display": "Victoria (Age of Steam)",
       "civ": "CIVILIZATION_ENGLAND",
       "civ_display": "England",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -782,7 +782,7 @@
       "display": "Wilhelmina",
       "civ": "CIVILIZATION_NETHERLANDS",
       "civ_display": "Netherlands",
-      "type": "None",
+      "type": "Naval",
       "civ_source": "observed"
     },
     {
@@ -791,7 +791,7 @@
       "display": "Wu Zetian",
       "civ": "CIVILIZATION_CHINA",
       "civ_display": "China",
-      "type": "None",
+      "type": "War",
       "civ_source": "inferred"
     },
     {

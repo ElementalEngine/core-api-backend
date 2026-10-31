@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from random import SystemRandom
 from typing import Any
 
+from app.features.civdata.seeds import leader_types
 from app.features.match_setups.bans import BAN_KINDS
 from app.features.match_setups.lobby import (
     OPEN,
@@ -106,7 +107,11 @@ def _pools(
     target = 1 if draft_mode == "random" else civ_target(shape, groups)
     try:
         leader_pool = leader_pools(
-            remaining_after_bans(leaders, banned["leader"]), groups, draft_mode, rng
+            remaining_after_bans(leaders, banned["leader"]),
+            groups,
+            draft_mode,
+            leader_types(vote["edition"]),
+            rng,
         )
         civ_pool = (
             deal_civs(remaining_after_bans(civs, banned["civ"]), groups, target, rng)

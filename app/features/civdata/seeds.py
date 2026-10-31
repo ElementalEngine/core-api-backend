@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +22,13 @@ def load_seed(edition: str) -> dict[str, Any]:
     return data
 
 
+@lru_cache(maxsize=len(EDITIONS))
+def leader_types(edition: str) -> Mapping[str, str]:
+    """Each leader's type, read from the seed file: it shapes draft pools and is
+    never stored, so changing one needs no reseed."""
+    return {row["token"]: row["type"] for row in load_seed(edition)["leaders"]}
+
+
 def to_documents(edition: str) -> list[dict[str, Any]]:
     """Flatten one edition's seed into civ_data documents."""
     seed = load_seed(edition)
@@ -35,4 +44,4 @@ def to_documents(edition: str) -> list[dict[str, Any]]:
     return docs
 
 
-__all__ = ["AUTHORING_ONLY", "load_seed", "to_documents"]
+__all__ = ["AUTHORING_ONLY", "leader_types", "load_seed", "to_documents"]

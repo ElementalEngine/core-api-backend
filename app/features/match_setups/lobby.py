@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from random import SystemRandom
 from typing import Any
 
+from app.features.civdata.seeds import leader_types
 from app.features.match_setups.bans import ban_caps, voted_bans
 from app.features.match_setups.pools import (
     NotEnoughPool,
@@ -376,7 +377,13 @@ def dealt(
     team_of = {p: i + 1 for i, team in enumerate(teams) for p in team}
     groups = teams if by_team else [[p] for team in teams for p in team]
     try:
-        pools = leader_pools(remaining, len(groups), lobby["draft_mode"], rng)
+        pools = leader_pools(
+            remaining,
+            len(groups),
+            lobby["draft_mode"],
+            leader_types(lobby["edition"]),
+            rng,
+        )
     except NotEnoughPool as exc:
         raise LobbyRefused(f"not enough leaders to deal: {exc}") from exc
     return [

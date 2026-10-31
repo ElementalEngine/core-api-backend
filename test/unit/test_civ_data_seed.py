@@ -3,9 +3,11 @@ import re
 from app.core.constants import EDITIONS
 from app.features.civdata.seeds import (
     AUTHORING_ONLY,
+    leader_types,
     load_seed,
     to_documents,
 )
+from app.features.match_setups.pools import LEADER_TYPES
 
 AGE_POOLS = {"AGE_ANTIQUITY", "AGE_EXPLORATION", "AGE_MODERN"}
 CIV_SOURCES = {"observed", "inferred", "unmapped"}
@@ -34,6 +36,14 @@ def test_civ6_leaders():
             assert row["civ"] is None
         else:
             assert row["civ"].startswith("CIVILIZATION_")
+
+
+def test_every_leader_has_a_type_the_deal_spreads():
+    for edition in EDITIONS:
+        tokens = {row["token"] for row in load_seed(edition)["leaders"]}
+        types = leader_types(edition)
+        assert set(types) == tokens
+        assert set(types.values()) <= set(LEADER_TYPES), edition
 
 
 def test_civ6_has_no_civ_documents():
