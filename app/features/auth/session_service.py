@@ -3,13 +3,8 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from secrets import token_urlsafe
 from typing import cast
-from urllib.parse import urlencode
 
 from app.core.config import settings
-from app.features.auth.constants import (
-    DISCORD_OAUTH_AUTHORIZE_URL,
-    DISCORD_OAUTH_SCOPES,
-)
 from app.features.auth.enums import (
     RegistrationPlatform,
     RegistrationSessionStatus,
@@ -25,6 +20,7 @@ from app.features.auth.errors import (
     SessionNotValidatedError,
     SessionStateConflictError,
 )
+from app.features.auth.oauth_service import authorize_url
 from app.features.auth.repository import AuthRepository
 from app.features.auth.schemas import (
     CreateRegistrationSessionRequest,
@@ -308,12 +304,4 @@ class SessionService:
 
     @staticmethod
     def _build_authorize_url(state_token: str) -> str:
-        params = {
-            "client_id": settings.auth_discord_client_id,
-            "redirect_uri": settings.auth_discord_redirect_uri,
-            "response_type": "code",
-            "scope": " ".join(DISCORD_OAUTH_SCOPES),
-            "prompt": "consent",
-            "state": state_token,
-        }
-        return f"{DISCORD_OAUTH_AUTHORIZE_URL}?{urlencode(params)}"
+        return authorize_url(state_token)

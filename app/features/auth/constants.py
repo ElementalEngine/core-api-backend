@@ -27,3 +27,6 @@ DEFAULT_STEAM_PLAYTIME_MINUTES: Final[dict[str, int]] = {
 STEAM_OWNED_GAMES_URL: Final[str] = (
     "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
 )
+STEAM_PLAYER_SUMMARIES_URL: Final[str] = (
+    "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/"
+)

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, status
+from fastapi.responses import JSONResponse
 
 from app.core.errors import ErrorDetail, ErrorResponse
+
+logger = logging.getLogger(__name__)
 
 
 class AuthError(Exception):
@@ -306,6 +310,19 @@ class RankRoleEligibilityError(AuthError):
         )
 
 
+class RankRoleNeedsSteamError(AuthError):
+    def __init__(self, discord_user_id: str) -> None:
+        super().__init__(
+            code="RANK_ROLE_NEEDS_STEAM",
+            message=(
+                "A second rank role needs a Steam registration verified by the bot. "
+                "Please ask staff to add it."
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details={"discord_user_id": discord_user_id},
+        )
+
+
 class SelfServiceRegistrationNotAllowedError(AuthError):
     def __init__(self, *, game: str, platform: str) -> None:
         super().__init__(
@@ -327,3 +344,25 @@ def to_http_exception(error: AuthError) -> HTTPException:
         )
     )
     return HTTPException(status_code=error.status_code, detail=payload.model_dump())
+
+
+async def auth_error_handler(request: Request, exc: AuthError) -> JSONResponse:
+    """An auth refusal in the envelope, with the request's correlation id."""
+    correlation_id = getattr(request.state, "correlation_id", None)
+    logger.info(
+        "Auth refusal code=%s path=%s correlation_id=%s",
+        exc.code,
+        request.url.path,
+        correlation_id,
+    )
+    error = ErrorDetail(
+        code=exc.code,
+        message=exc.message,
+        details=exc.details,
+        retryable=exc.retryable,
+        correlation_id=correlation_id,
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": ErrorResponse(error=error).model_dump(mode="json")},
+    )

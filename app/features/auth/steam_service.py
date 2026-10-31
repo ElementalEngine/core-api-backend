@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from datetime import UTC, datetime
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -13,6 +14,7 @@ from app.features.auth.constants import (
     DEFAULT_STEAM_APP_IDS,
     DEFAULT_STEAM_PLAYTIME_MINUTES,
     STEAM_OWNED_GAMES_URL,
+    STEAM_PLAYER_SUMMARIES_URL,
 )
 from app.features.auth.enums import SupportedGame
 from app.features.auth.errors import (
@@ -106,79 +108,80 @@ class SteamService:
             "ownership_verified_at": datetime.now(UTC),
         }
 
+    async def account_created(self, steam_id: str) -> datetime | None:
+        """When the Steam account was made, if Steam says; None when it cannot."""
+        try:
+            payload = await self._get_json(
+                STEAM_PLAYER_SUMMARIES_URL, {"steamids": steam_id}
+            )
+        except SteamValidationError:
+            return None
+        response = payload.get("response")
+        players = response.get("players") if isinstance(response, dict) else None
+        first = players[0] if isinstance(players, list) and players else None
+        created = first.get("timecreated") if isinstance(first, dict) else None
+        return (
+            datetime.fromtimestamp(created, UTC) if isinstance(created, int) else None
+        )
+
     async def _get_owned_games(
         self, *, steam_id: str, app_id: int
     ) -> dict[str, object]:
-        def _request() -> dict[str, object]:
-            api_key = settings.auth_steam_api_key.get_secret_value()
-            timeout_seconds = max(1, int(settings.auth_steam_timeout_seconds))
+        return await self._get_json(
+            STEAM_OWNED_GAMES_URL,
+            {
+                "steamid": steam_id,
+                "appids_filter[0]": str(app_id),
+                "include_played_free_games": "1",
+            },
+        )
 
+    async def _get_json(self, url: str, params: dict[str, str]) -> dict[str, Any]:
+        def _request() -> dict[str, Any]:
             query = urlencode(
-                {
-                    "key": api_key,
-                    "steamid": steam_id,
-                    "appids_filter[0]": str(app_id),
-                    "include_played_free_games": "1",
-                },
+                {"key": settings.auth_steam_api_key.get_secret_value(), **params},
                 safe="[]",
             )
             req = Request(
-                f"{STEAM_OWNED_GAMES_URL}?{query}",
+                f"{url}?{query}",
                 headers={
                     "Accept": "application/json",
                     "User-Agent": STEAM_HTTP_USER_AGENT,
                 },
                 method="GET",
             )
-
+            timeout_seconds = max(1, int(settings.auth_steam_timeout_seconds))
             try:
                 with urlopen(req, timeout=timeout_seconds) as resp:
-                    status_code = int(resp.status)
-                    body = resp.read().decode("utf-8")
+                    body = resp.read().decode("utf-8", errors="replace")
             except HTTPError as exc:
-                response_body = ""
-                try:
-                    response_body = exc.read().decode("utf-8", errors="replace")
-                except Exception:
-                    response_body = "<unavailable>"
+                response = exc.read().decode("utf-8", errors="replace")
                 logger.warning(
-                    "Steam owned-games request failed. steam_id=%s app_id=%s status=%s response=%s",
-                    steam_id,
-                    app_id,
+                    "Steam request failed. url=%s params=%s status=%s response=%s",
+                    url,
+                    params,
                     exc.code,
-                    response_body[:1000],
+                    response[:1000],
                 )
                 raise SteamValidationError() from exc
             except (URLError, TimeoutError) as exc:
                 logger.warning(
-                    "Steam owned-games network failure. steam_id=%s app_id=%s error=%r",
-                    steam_id,
-                    app_id,
-                    exc,
+                    "Steam request failed. url=%s params=%s error=%r", url, params, exc
                 )
                 raise SteamValidationError() from exc
-
-            if status_code != 200:
-                logger.warning(
-                    "Steam owned-games request failed. steam_id=%s app_id=%s status=%s response=%s",
-                    steam_id,
-                    app_id,
-                    status_code,
-                    body[:1000],
-                )
-                raise SteamValidationError()
-
             try:
-                return json.loads(body)
+                payload = json.loads(body)
             except ValueError as exc:
                 logger.warning(
-                    "Steam owned-games returned invalid JSON. steam_id=%s app_id=%s error=%r body=%s",
-                    steam_id,
-                    app_id,
-                    exc,
+                    "Steam returned invalid JSON. url=%s params=%s body=%s",
+                    url,
+                    params,
                     body[:1000],
                 )
                 raise SteamValidationError() from exc
+            if not isinstance(payload, dict):
+                raise SteamValidationError()
+            return payload
 
         return await asyncio.to_thread(_request)
 

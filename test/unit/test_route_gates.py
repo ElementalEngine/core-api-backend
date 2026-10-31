@@ -4,7 +4,11 @@ from fastapi.routing import APIRoute
 from starlette.routing import Match
 
 from app.core import dependencies
-from app.core.dependencies import require_any_service_token, require_mito_token
+from app.core.dependencies import (
+    require_any_service_token,
+    require_mito_token,
+    require_service_token,
+)
 from app.main import app
 
 GATES = frozenset(
@@ -135,3 +139,11 @@ def test_the_routes_only_mite_calls_take_mite_s_token():
     routes = [r for r in api_routes() if r.path.startswith(mite)]
     assert routes
     assert [r.path for r in routes if require_mito_token not in gate_callables(r)] == []
+
+
+def test_the_v2_auth_routes_take_auth_s_own_token():
+    routes = [r for r in api_routes() if r.path.startswith("/api/v2/auth")]
+    assert len(routes) == 8
+    assert [
+        r.path for r in routes if require_service_token not in gate_callables(r)
+    ] == []

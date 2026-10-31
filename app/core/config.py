@@ -126,6 +126,13 @@ class Settings(BaseSettings):
         ge=0,
         validation_alias=AliasChoices("AUTH_STEAM_CIV7_REQUIRED_MINUTES"),
     )
+    # A registration from an account younger than this is flagged for staff.
+    auth_young_discord_days: int = Field(
+        default=7, ge=0, validation_alias=AliasChoices("AUTH_YOUNG_DISCORD_DAYS")
+    )
+    auth_young_steam_days: int = Field(
+        default=30, ge=0, validation_alias=AliasChoices("AUTH_YOUNG_STEAM_DAYS")
+    )
 
     # Team gen parameters
     team_gen_tries: int = Field(

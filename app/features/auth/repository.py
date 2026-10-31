@@ -178,6 +178,7 @@ class AuthRepository:
         method: str,
         ownership_verified_at: datetime | None,
         playtime_minutes: int | None,
+        entry_extra: Mapping[str, Any] | None = None,
     ) -> None:
         now = datetime.now(UTC)
         existing = await self._users.find_one(
@@ -204,6 +205,8 @@ class AuthRepository:
             ownership_verified_at=ownership_verified_at,
             playtime_minutes=playtime_minutes,
         )
+        if entry_extra:
+            registration_doc.update(entry_extra)
 
         if existing is None:
             await self._users.insert_one(

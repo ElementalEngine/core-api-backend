@@ -13,6 +13,8 @@ from app.core.config import settings
 from app.features.auth.constants import (
     DISCORD_API_CONNECTIONS_URL,
     DISCORD_API_ME_URL,
+    DISCORD_OAUTH_AUTHORIZE_URL,
+    DISCORD_OAUTH_SCOPES,
     DISCORD_OAUTH_TOKEN_URL,
 )
 from app.features.auth.enums import RegistrationPlatform
@@ -24,6 +26,18 @@ from app.features.auth.errors import (
 
 logger = logging.getLogger(__name__)
 DISCORD_HTTP_USER_AGENT = "CivPlayersAuth/1.0 (+https://elementalengine.net)"
+
+
+def authorize_url(state_token: str) -> str:
+    params = {
+        "client_id": settings.auth_discord_client_id,
+        "redirect_uri": settings.auth_discord_redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(DISCORD_OAUTH_SCOPES),
+        "prompt": "consent",
+        "state": state_token,
+    }
+    return f"{DISCORD_OAUTH_AUTHORIZE_URL}?{urlencode(params)}"
 
 
 class DiscordOAuthService:

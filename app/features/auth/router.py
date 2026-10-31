@@ -22,6 +22,7 @@ from app.features.auth.manual_registration_service import ManualRegistrationServ
 from app.features.auth.oauth_service import DiscordOAuthService
 from app.features.auth.operation_service import OperationService
 from app.features.auth.registration_service import RegistrationService
+from app.features.auth.registration_v2 import STATE_PREFIX, RegistrationFlow
 from app.features.auth.repository import AuthRepository
 from app.features.auth.schemas import (
     CompleteRegistrationSessionRequest,
@@ -427,6 +428,9 @@ async def discord_oauth_callback(
     error: Annotated[str | None, Query()] = None,
     db: AsyncMongoClient = Depends(get_database),
 ) -> DiscordOAuthCallbackResult:
+    if state and state.startswith(STATE_PREFIX):
+        return await RegistrationFlow(db).callback(code=code, state=state, error=error)
+
     repository = _repo(db)
     session_service = SessionService(repository)
     oauth_service = DiscordOAuthService()

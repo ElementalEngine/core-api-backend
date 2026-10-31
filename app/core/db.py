@@ -8,6 +8,7 @@ from pymongo import AsyncMongoClient
 
 from app.core.config import settings
 from app.core.constants import DB_SERVER_MEMBERS, GAMES_DB
+from app.features.auth.registration_v2 import SessionStore
 from app.features.auth.repository import AuthRepository
 from app.features.civdata.repository import CivDataRepository
 from app.features.infractions.repository import (
@@ -51,6 +52,7 @@ async def db_lifespan(app: FastAPI):
         )
 
         await AuthRepository(client).ensure_indexes()
+        await SessionStore(client).ensure_indexes()
         logger.info("🟢 Auth indexes ensured")
 
         await create_infraction_indexes(client)
