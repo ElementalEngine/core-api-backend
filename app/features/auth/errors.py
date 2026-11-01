@@ -323,6 +323,15 @@ class RankRoleNeedsSteamError(AuthError):
         )
 
 
+class StaffRequiredError(AuthError):
+    def __init__(self) -> None:
+        super().__init__(
+            code="FORBIDDEN",
+            message="Only staff may register a player by hand.",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+
 class SelfServiceRegistrationNotAllowedError(AuthError):
     def __init__(self, *, game: str, platform: str) -> None:
         super().__init__(

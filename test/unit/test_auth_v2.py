@@ -31,7 +31,11 @@ from app.features.auth.registration_v2 import (
     status_of,
 )
 from app.features.auth.router_v2 import _flow
-from app.features.auth.schemas_v2 import ManualRegistrationBody, SessionStart
+from app.features.auth.schemas_v2 import (
+    ManualRegistrationBody,
+    Registration,
+    SessionStart,
+)
 from app.features.auth.steam_service import SteamService
 from app.main import app
 
@@ -54,9 +58,16 @@ class Collection:
 
     def _match(self, flt):
         def ok(value, want):
-            return value > want["$gt"] if isinstance(want, dict) else value == want
+            if isinstance(want, dict):
+                return value in want["$in"] if "$in" in want else value > want["$gt"]
+            return value == want
 
         return [d for d in self.docs if all(ok(d.get(k), v) for k, v in flt.items())]
+
+    async def find(self, flt):
+        for doc in self._match(flt):
+            await asyncio.sleep(0)
+            yield dict(doc)
 
     async def find_one(self, flt, projection=None):
         await asyncio.sleep(0)
@@ -90,6 +101,13 @@ class Users:
         self.by_discord = by_discord or {}
         self.by_steam = by_steam or {}
         self.upserts = []
+
+    async def find_users_by_discord_id(self, discord_id):
+        found = self.by_discord.get(discord_id)
+        return [found] if found else []
+
+    async def find_users_by_linked_account_id(self, account_id):
+        return list(self.by_steam.get(account_id) or [])
 
     async def get_user_by_discord_id(self, discord_id):
         return self.by_discord.get(discord_id)
@@ -279,12 +297,18 @@ def test_a_clash_with_the_player_s_own_record_names_no_standing():
 def test_young_accounts_are_flagged_and_old_ones_are_not():
     young = snowflake(NOW - timedelta(days=2))
     old = snowflake(NOW - timedelta(days=400))
-    assert account_flags(young, NOW - timedelta(days=5), NOW) == [
+    week_old = NOW - timedelta(days=5)
+    assert account_flags(young, NOW, steam=True, steam_created=week_old) == [
         "young_discord",
         "young_steam",
     ]
-    assert account_flags(old, NOW - timedelta(days=400), NOW) == []
-    assert account_flags(old, None, NOW) == []
+    year_old = NOW - timedelta(days=400)
+    assert account_flags(old, NOW, steam=True, steam_created=year_old) == []
+    assert account_flags(old, NOW, steam=False, steam_created=None) == []
+    # Steam would not say how old the account is: staff should look.
+    assert account_flags(old, NOW, steam=True, steam_created=None) == [
+        "unknown_steam_age"
+    ]
 
 
 def test_a_rank_role_keeps_the_player_names():
@@ -335,6 +359,110 @@ def test_a_manual_registration_records_who_and_why():
     assert result.registration_method.value == "admin_steam_family_share"
 
 
+def test_a_steam_link_by_hand_must_be_a_steam_id():
+    with pytest.raises(ValueError):
+        manual(account="12345")
+    two_k = manual(account="any-2k-id", platform=ManualRegistrationChoice.TWOK)
+    assert two_k.platform_account_id == "any-2k-id"
+
+
+def test_a_lookup_shows_who_registered_by_hand_the_flags_and_the_standing():
+    user = {
+        "discord_id": PLAYER,
+        "linked_platform": "steam",
+        "linked_account_id": STEAM,
+        "registrations": {
+            "civ6": {
+                "method": "admin_staff_attested",
+                "actor_discord_id": STAFF,
+                "reason": "verified in voice",
+                "flags": ["young_discord"],
+            },
+            "civ5": {"method": "old"},
+        },
+    }
+    f, members = flow(users=Users(by_discord={PLAYER: user}))
+    members["suspensions"].docs.append(
+        {"discord_id": PLAYER, "suspended": True, "quit": {"tier": 6}}
+    )
+    record = run(f.by_discord(PLAYER)).records[0]
+    entry = record.registrations[0]
+    assert [e.game.value for e in record.registrations] == ["civ6"]
+    assert (entry.actor_discord_id, entry.reason) == (STAFF, "verified in voice")
+    assert entry.flags == ["young_discord"]
+    assert record.standing.at_ban_threshold is True
+    assert record.standing.suspended is True
+
+
+def test_a_sign_in_that_fails_on_a_bug_keeps_the_answer_s_correlation_id(
+    monkeypatch,
+):
+    client_db = defaultdict(lambda: defaultdict(Collection))
+    client_db["server_members"]["registration_sessions"].docs.append(
+        {
+            "session_id": "s1",
+            "state_token": "v2.state",
+            "discord_user_id": PLAYER,
+            "game": "civ6",
+            "status": "pending_auth",
+            "expires_at": NOW + timedelta(minutes=5),
+        }
+    )
+
+    class Broken:
+        async def fetch_identity_and_connection(self, *, code, platform):
+            raise RuntimeError("bug")
+
+    monkeypatch.setattr(registration_v2, "DiscordOAuthService", Broken)
+    app.dependency_overrides[dependencies.get_database] = lambda: client_db
+    try:
+        answer = TestClient(app, raise_server_exceptions=False).get(
+            "/oauth/discord/callback", params={"code": "c", "state": "v2.state"}
+        )
+    finally:
+        app.dependency_overrides.clear()
+    stored = client_db["server_members"]["registration_sessions"].docs[0]["failure"]
+    sent = answer.json()["detail"]["error"]
+    assert (answer.status_code, sent["code"], stored["code"]) == (
+        500,
+        "INTERNAL",
+        "INTERNAL",
+    )
+    assert stored["correlation_id"] == sent["correlation_id"]
+
+
+def test_a_linked_lookup_returns_every_holder_and_tolerates_old_entries():
+    holders = [
+        {
+            "discord_id": PLAYER,
+            "steam_id": STEAM,
+            "registrations": {"civ6": {"method": "oauth"}},
+        },
+        {
+            "discord_id": OTHER,
+            "linked_platform": "steam",
+            "linked_account_id": STEAM,
+            "registrations": {
+                "civ7": {
+                    "method": 5,
+                    "actor_discord_id": 999,
+                    "flags": ["retired", "young_steam"],
+                }
+            },
+        },
+        {"steam_id": STEAM},
+    ]
+    f, _ = flow(users=Users(by_steam={STEAM: holders}))
+    records = run(f.by_linked(STEAM)).records
+    assert [r.discord_id for r in records] == [PLAYER, OTHER]
+    entry = records[1].registrations[0]
+    assert (entry.method, entry.actor_discord_id, entry.flags) == (
+        "5",
+        "999",
+        ["young_steam"],
+    )
+
+
 def test_a_discord_id_must_be_ascii_digits():
     with pytest.raises(ValueError):
         SessionStart(discord_user_id="١" * 18, game="civ6")
@@ -346,6 +474,16 @@ def test_v2_answers_a_refusal_a_bug_and_a_bad_actor_in_the_envelope(monkeypatch)
     )
 
     class Failing:
+        async def manual(self, actor, body):
+            return Registration(
+                discord_user_id=body.subject_discord_id,
+                game=body.game,
+                linked_platform="steam",
+                linked_account_id=body.platform_account_id,
+                registration_method="admin_staff_attested",
+                role_intents=[],
+            )
+
         async def state(self, session_id):
             if session_id == "refused":
                 raise AuthError(code="X_REFUSED", message="no", status_code=409)
@@ -358,10 +496,25 @@ def test_v2_answers_a_refusal_a_bug_and_a_bad_actor_in_the_envelope(monkeypatch)
         refused = client.get("/api/v2/auth/sessions/refused", headers=token)
         bug = client.get("/api/v2/auth/sessions/other", headers=token)
         denied = client.get("/api/v2/auth/sessions/refused")
+        body = json.loads(manual().model_dump_json())
         bad_actor = client.post(
             "/api/v2/auth/manual-registrations",
-            headers={**token, "X-Actor-Discord-Id": "staff"},
-            json=json.loads(manual().model_dump_json()),
+            headers={
+                **token,
+                "X-Actor-Discord-Id": "staff",
+                "X-Actor-Is-Staff": "true",
+            },
+            json=body,
+        )
+        not_staff = client.post(
+            "/api/v2/auth/manual-registrations",
+            headers={**token, "X-Actor-Discord-Id": STAFF},
+            json={"not": "checked before the staff header"},
+        )
+        staff = client.post(
+            "/api/v2/auth/manual-registrations",
+            headers={**token, "X-Actor-Discord-Id": STAFF, "X-Actor-Is-Staff": "true"},
+            json=body,
         )
     finally:
         app.dependency_overrides.clear()
@@ -371,6 +524,9 @@ def test_v2_answers_a_refusal_a_bug_and_a_bad_actor_in_the_envelope(monkeypatch)
     assert (bug.status_code, bug.json()["detail"]["error"]["code"]) == (500, "INTERNAL")
     assert denied.status_code == 401
     assert bad_actor.status_code == 422
+    assert not_staff.status_code == 403
+    assert not_staff.json()["detail"]["error"]["correlation_id"]
+    assert (staff.status_code, staff.json()["linked_account_id"]) == (200, STEAM)
 
 
 def test_steam_reads_account_age_and_its_failures_are_steam_failures(monkeypatch):
@@ -399,3 +555,84 @@ def test_steam_reads_account_age_and_its_failures_are_steam_failures(monkeypatch
 
     monkeypatch.setattr(steam, "_get_json", odd)
     assert run(steam.account_created(STEAM)) is None
+
+
+# Every code v2 can answer with. The bot words each one, so a new code must be
+# added here and to the bot together.
+V2_CODES = {
+    "ACCOUNT_NOT_FOUND",
+    "ALREADY_REGISTERED",
+    "AUTH_MISCONFIGURED",
+    "DISCORD_ID_CONFLICT",
+    "DISCORD_LINKED_ACCOUNT_FETCH_FAILED",
+    "DISCORD_LINKED_ACCOUNT_NOT_FOUND",
+    "DISCORD_OAUTH_FAILED",
+    "DISCORD_USER_MISMATCH",
+    "FORBIDDEN",
+    "INVALID_AUTH_STATE",
+    "LINKED_ACCOUNT_CONFLICT",
+    "RANK_ROLE_NEEDS_STEAM",
+    "RANK_ROLE_NOT_ELIGIBLE",
+    "REGISTRATION_SESSION_EXPIRED",
+    "REGISTRATION_SESSION_NOT_FOUND",
+    "REGISTRATION_SESSION_NOT_READY",
+    "STEAM_API_FAILURE",
+    "STEAM_ID_CONFLICT",
+    "STEAM_OWNERSHIP_MISSING",
+    "STEAM_PLAYTIME_BELOW_THRESHOLD",
+    "STEAM_PROFILE_PRIVATE",
+}
+# Answered by the app around the routes, not by an auth error.
+TRANSPORT_CODES = {
+    "AUTH_SERVICE_MISCONFIGURED",
+    "INTERNAL",
+    "INVALID_REQUEST",
+    "UNAUTHORIZED",
+    "UNAVAILABLE",
+}
+
+
+def test_v2_answers_only_its_pinned_codes():
+    import ast
+    from pathlib import Path
+
+    auth = Path(__file__).resolve().parents[2] / "app" / "features" / "auth"
+    codes = {}
+    for node in ast.parse((auth / "errors.py").read_text()).body:
+        if isinstance(node, ast.ClassDef):
+            for call in ast.walk(node):
+                for kw in getattr(call, "keywords", []):
+                    if kw.arg == "code" and isinstance(kw.value, ast.Constant):
+                        codes[node.name] = kw.value.value
+
+    def raised(tree):
+        found = set()
+        for n in ast.walk(tree):
+            if isinstance(n, ast.Raise) and n.exc is not None:
+                # Only `raise Error(...)` can be read; anything else fails here.
+                assert isinstance(n.exc, ast.Call), ast.unparse(n)
+                assert isinstance(n.exc.func, ast.Name), ast.unparse(n)
+                found.add(n.exc.func.id)
+        return found
+
+    names = set()
+    for module in ("registration_v2", "router_v2", "steam_service", "oauth_service"):
+        names |= raised(ast.parse((auth / f"{module}.py").read_text()))
+    shared = ast.parse((auth / "registration_service.py").read_text())
+    conflicts = next(
+        n
+        for n in ast.walk(shared)
+        if isinstance(n, ast.AsyncFunctionDef)
+        and n.name == "assert_registration_conflicts"
+    )
+    names |= raised(conflicts)
+    assert {codes[n] for n in names if n in codes} == V2_CODES
+    core = Path(__file__).resolve().parents[2] / "app" / "core"
+    literals = {
+        n.value
+        for f in ("dependencies.py", "errors.py")
+        for n in ast.walk(ast.parse((core / f).read_text()))
+        if isinstance(n, ast.Constant) and isinstance(n.value, str)
+    }
+    assert TRANSPORT_CODES <= literals
+    assert all(n in codes for n in names), sorted(n for n in names if n not in codes)

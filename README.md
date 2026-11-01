@@ -35,7 +35,7 @@ Lady Justice ─┘
 | **Match setups** | drafts, Civ6 lobbies, voice-channel votes, the settings each game asks | Mite |
 | **Seasons** | the open season, and starting the next one | Mite |
 | **Civ data** | every leader and civ, with display names and emoji | all three bots |
-| **Auth** | Discord OAuth and Steam checks for registration, account lookups, rank-role requests | Auth |
+| **Auth** | Discord OAuth and Steam checks for registration, account lookups with standing, rank-role requests; v2 keeps only the registered player, in `server_members.users` | Auth |
 | **Infractions** | tiered and flat suspensions, days added or removed, overdue suspensions | Lady Justice |
 
 **How a game is rated.** Mite uploads the save. The parser reads the placements, leaders and civs, and the match waits as a report the players can fix and contest. On approve, ratings move in one transaction, and every change is written to a ledger of rating events beside it. A revert writes the opposite events, so the ledger always sums to the stats. A report that needs no staff (every seat registered, every leader and civ known, no quit, sub or contest) is approved 48 hours after upload.
@@ -80,6 +80,8 @@ Every error has the same shape. A bot retries only when `retryable` is true:
 ```
 
 The codes Mite's routes can answer with are a closed set: `INVALID_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `UNAVAILABLE` and `INTERNAL`, plus a named code when the server itself is set up wrong (`MITO_SERVICE_MISCONFIGURED`, `CIV_DATA_NOT_SEEDED`). An `INTERNAL` error carries a correlation id that matches the log line.
+
+Auth's routes, under `/api/v2/auth`, answer with their own codes, such as `STEAM_PROFILE_PRIVATE` or `STEAM_ID_CONFLICT`, and a `message` written for the player. A clash names the other Discord account and its standing with Lady Justice in `details`, for staff. A refusal from the auth service itself carries a correlation id. Registering a player by hand also takes `x-actor-is-staff: true`; without it the answer is `FORBIDDEN`.
 
 `/healthz` answers while the process is up, and `/readyz` once the database answers too.
 

@@ -1,6 +1,108 @@
 {
   "components": {
     "schemas": {
+      "AccountLookup": {
+        "description": "Every record that matches; more than one is worth a look.",
+        "properties": {
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/AccountRecord"
+            },
+            "title": "Records",
+            "type": "array"
+          }
+        },
+        "required": [
+          "records"
+        ],
+        "title": "AccountLookup",
+        "type": "object"
+      },
+      "AccountRecord": {
+        "properties": {
+          "discord_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discord Display Name"
+          },
+          "discord_id": {
+            "title": "Discord Id",
+            "type": "string"
+          },
+          "discord_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discord Username"
+          },
+          "linked_account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Account Id"
+          },
+          "linked_account_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Account Name"
+          },
+          "linked_platform": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationPlatform"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "registrations": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrationEntry"
+            },
+            "title": "Registrations",
+            "type": "array"
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "discord_id",
+          "registrations"
+        ],
+        "title": "AccountRecord",
+        "type": "object"
+      },
       "ActiveSuspension": {
         "properties": {
           "discord_id": {
@@ -2427,7 +2529,8 @@
             "items": {
               "enum": [
                 "young_discord",
-                "young_steam"
+                "young_steam",
+                "unknown_steam_age"
               ],
               "type": "string"
             },
@@ -2475,6 +2578,76 @@
           "role_intents"
         ],
         "title": "Registration",
+        "type": "object"
+      },
+      "RegistrationEntry": {
+        "properties": {
+          "actor_discord_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Discord Id"
+          },
+          "flags": {
+            "default": [],
+            "items": {
+              "enum": [
+                "young_discord",
+                "young_steam",
+                "unknown_steam_age"
+              ],
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "game": {
+            "$ref": "#/components/schemas/SupportedGame"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "registered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registered At"
+          }
+        },
+        "required": [
+          "game"
+        ],
+        "title": "RegistrationEntry",
         "type": "object"
       },
       "RegistrationMethod": {
@@ -3460,6 +3633,56 @@
           "by"
         ],
         "title": "SetupBan",
+        "type": "object"
+      },
+      "Standing": {
+        "description": "An account's record with Lady Justice.",
+        "properties": {
+          "active_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Category"
+          },
+          "at_ban_threshold": {
+            "title": "At Ban Threshold",
+            "type": "boolean"
+          },
+          "ends": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends"
+          },
+          "suspended": {
+            "title": "Suspended",
+            "type": "boolean"
+          },
+          "tiers": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Tiers",
+            "type": "object"
+          }
+        },
+        "required": [
+          "suspended",
+          "tiers",
+          "at_ban_threshold"
+        ],
+        "title": "Standing",
         "type": "object"
       },
       "StartNextSeason": {
@@ -6016,7 +6239,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DiscordLookupResponse"
+                  "$ref": "#/components/schemas/AccountLookup"
                 }
               }
             },
@@ -6076,7 +6299,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LinkedAccountLookupResponse"
+                  "$ref": "#/components/schemas/AccountLookup"
                 }
               }
             },
@@ -6117,6 +6340,16 @@
                 }
               ],
               "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-is-staff",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "X-Actor-Is-Staff",
+              "type": "boolean"
             }
           },
           {

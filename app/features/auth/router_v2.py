@@ -5,10 +5,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Path
 from pymongo import AsyncMongoClient
 
-from app.core.dependencies import get_database, require_service_token
+from app.core.dependencies import actor_is_staff, get_database, require_service_token
+from app.features.auth.errors import StaffRequiredError
 from app.features.auth.registration_v2 import RegistrationFlow
-from app.features.auth.schemas import DiscordLookupResponse, LinkedAccountLookupResponse
 from app.features.auth.schemas_v2 import (
+    AccountLookup,
     ManualRegistrationBody,
     RankRoleBody,
     Registration,
@@ -33,6 +34,12 @@ def _actor(
 ) -> str:
     """The staff member registering a player, as the bot asserts it."""
     return x_actor_discord_id
+
+
+def _staff_only(staff: bool = Depends(actor_is_staff)) -> None:
+    """Refused before the body is read, so a non-staff caller learns nothing."""
+    if not staff:
+        raise StaffRequiredError()
 
 
 def _flow(db: AsyncMongoClient = Depends(get_database)) -> RegistrationFlow:
@@ -64,11 +71,13 @@ async def add_rank_role(body: RankRoleBody, flow: Flow) -> Registration:
     return await flow.rank_role(body.discord_user_id, body.game)
 
 
-@router.post("/manual-registrations", response_model=Registration)
+@router.post(
+    "/manual-registrations",
+    response_model=Registration,
+    dependencies=[Depends(_staff_only)],
+)
 async def register_manually(
-    body: ManualRegistrationBody,
-    flow: Flow,
-    actor: str = Depends(_actor),
+    body: ManualRegistrationBody, flow: Flow, actor: str = Depends(_actor)
 ) -> Registration:
     return await flow.manual(actor, body)
 
@@ -78,17 +87,15 @@ async def register_two_k(body: TwoKRegistrationBody, flow: Flow) -> Registration
     return await flow.two_k(body)
 
 
-@router.get("/accounts/discord/{discord_id}", response_model=DiscordLookupResponse)
+@router.get("/accounts/discord/{discord_id}", response_model=AccountLookup)
 async def lookup_discord(
     discord_id: Annotated[str, Path(pattern=r"^[0-9]{17,20}$")], flow: Flow
-) -> DiscordLookupResponse:
+) -> AccountLookup:
     return await flow.by_discord(discord_id)
 
 
-@router.get(
-    "/accounts/linked/{linked_account_id}", response_model=LinkedAccountLookupResponse
-)
+@router.get("/accounts/linked/{linked_account_id}", response_model=AccountLookup)
 async def lookup_linked(
     linked_account_id: Annotated[str, Path(min_length=1, max_length=128)], flow: Flow
-) -> LinkedAccountLookupResponse:
+) -> AccountLookup:
     return await flow.by_linked(linked_account_id)

@@ -7,7 +7,7 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 from secrets import token_urlsafe
-from typing import Any, cast
+from typing import Any, cast, get_args
 
 from pymongo import ASCENDING, AsyncMongoClient, ReturnDocument
 from pymongo.asynchronous.collection import AsyncCollection
@@ -15,6 +15,7 @@ from pymongo.asynchronous.collection import AsyncCollection
 from app.core.config import settings
 from app.core.constants import DB_SERVER_MEMBERS
 from app.core.errors import ErrorDetail
+from app.core.middleware import current_correlation_id
 from app.features.auth.enums import (
     STEAM_API_REGISTRATION_METHODS,
     RegistrationMethod,
@@ -43,25 +44,31 @@ from app.features.auth.oauth_service import DiscordOAuthService, authorize_url
 from app.features.auth.registration_service import (
     RegistrationService,
     _build_registration_role_intents,
+    _normalize_discord_username,
+    _normalize_display_name,
+    _normalize_linked_account_id,
+    _normalize_linked_account_name,
+    _normalize_platform,
     _rank_role_for_game,
 )
 from app.features.auth.repository import AuthRepository
-from app.features.auth.schemas import (
-    DiscordLookupResponse,
-    DiscordOAuthCallbackResult,
-    LinkedAccountLookupResponse,
-)
+from app.features.auth.schemas import DiscordOAuthCallbackResult
 from app.features.auth.schemas_v2 import (
     AccountFlag,
+    AccountLookup,
+    AccountRecord,
     ManualRegistrationBody,
     Registration,
+    RegistrationEntry,
     SessionStarted,
     SessionState,
     SessionStatus,
+    Standing,
     TwoKRegistrationBody,
 )
 from app.features.auth.steam_service import SteamService
-from app.features.infractions.repository import find_suspension
+from app.features.infractions.models import SuspensionDocument
+from app.features.infractions.repository import suspensions_col
 from app.features.infractions.service import TIER_CAPS
 
 logger = logging.getLogger(__name__)
@@ -81,6 +88,8 @@ SNAPSHOT = (
     "discord_mfa_enabled",
 )
 CLASHES = (SteamIdConflictError, LinkedAccountConflictError, DiscordSteamConflictError)
+GAMES = {game.value for game in SupportedGame}
+FLAGS = set(get_args(AccountFlag))
 
 
 class SessionStore:
@@ -148,34 +157,86 @@ def discord_created(discord_id: str) -> datetime:
 
 
 def account_flags(
-    discord_id: str, steam_created: datetime | None, now: datetime
+    discord_id: str, now: datetime, *, steam: bool, steam_created: datetime | None
 ) -> list[AccountFlag]:
+    """Young accounts are worth a look; so is a Steam account whose age Steam
+    would not give."""
     flags: list[AccountFlag] = []
     if now - discord_created(discord_id) < timedelta(
         days=settings.auth_young_discord_days
     ):
         flags.append("young_discord")
-    if steam_created and now - steam_created < timedelta(
+    if steam and steam_created is None:
+        flags.append("unknown_steam_age")
+    elif steam_created and now - steam_created < timedelta(
         days=settings.auth_young_steam_days
     ):
         flags.append("young_steam")
     return flags
 
 
-async def standing(client: AsyncMongoClient, discord_id: str) -> dict[str, Any] | None:
-    """The account's record with Lady Justice, or None when it has none."""
-    doc = await find_suspension(client, discord_id)
-    if doc is None:
-        return None
-    tiers = {name: getattr(doc, name).tier for name in TIER_CAPS}
-    return {
-        "suspended": doc.suspended
-        and (doc.ends is None or doc.ends > datetime.now(UTC)),
-        "ends": doc.ends,
-        "active_category": doc.active_category,
-        "tiers": {name: tier for name, tier in tiers.items() if tier},
-        "at_ban_threshold": any(tiers[name] >= cap for name, cap in TIER_CAPS.items()),
-    }
+async def standings(
+    client: AsyncMongoClient, discord_ids: list[str]
+) -> dict[str, Standing]:
+    """Each account's record with Lady Justice, for those that have one."""
+    now = datetime.now(UTC)
+    found: dict[str, Standing] = {}
+    async for raw in suspensions_col(client).find({"discord_id": {"$in": discord_ids}}):
+        doc = SuspensionDocument.model_validate(raw)
+        tiers = {name: getattr(doc, name).tier for name in TIER_CAPS}
+        found[doc.discord_id] = Standing(
+            suspended=doc.suspended and (doc.ends is None or doc.ends > now),
+            ends=doc.ends,
+            active_category=doc.active_category,
+            tiers={name: tier for name, tier in tiers.items() if tier},
+            at_ban_threshold=any(tiers[name] >= cap for name, cap in TIER_CAPS.items()),
+        )
+    return found
+
+
+def _text(value: object) -> str | None:
+    return str(value) if value not in (None, "") else None
+
+
+def _entries(doc: dict[str, Any]) -> list[RegistrationEntry]:
+    """A record's registrations, tolerating what older writers stored."""
+    entries = []
+    for game, entry in (doc.get("registrations") or {}).items():
+        if game not in GAMES or not isinstance(entry, dict):
+            continue
+        registered_at = entry.get("registered_at")
+        entries.append(
+            RegistrationEntry(
+                game=SupportedGame(game),
+                method=_text(entry.get("method")),
+                registered_at=registered_at
+                if isinstance(registered_at, datetime)
+                else None,
+                actor_discord_id=_text(entry.get("actor_discord_id")),
+                reason=_text(entry.get("reason")),
+                flags=[f for f in entry.get("flags") or [] if f in FLAGS],
+            )
+        )
+    return sorted(entries, key=lambda e: e.game.value)
+
+
+def _log_registration(
+    discord_id: str,
+    game: SupportedGame,
+    method: RegistrationMethod,
+    account_id: str,
+    flags: list[AccountFlag],
+    actor: str | None,
+) -> None:
+    logger.info(
+        "Registered discord_id=%s game=%s method=%s account=%s flags=%s actor=%s",
+        discord_id,
+        game.value,
+        method.value,
+        account_id,
+        flags,
+        actor,
+    )
 
 
 class RegistrationFlow:
@@ -390,6 +451,14 @@ class RegistrationFlow:
             ownership_verified_at=cast(datetime, validation["ownership_verified_at"]),
             playtime_minutes=cast(int, validation["playtime_minutes"]),
         )
+        _log_registration(
+            discord_user_id,
+            game,
+            RegistrationMethod.OAUTH_STEAM_API,
+            str(steam_id),
+            [],
+            None,
+        )
         return Registration(
             discord_user_id=discord_user_id,
             game=game,
@@ -431,19 +500,43 @@ class RegistrationFlow:
             display_name=body.discord_display_name,
         )
 
-    async def by_discord(self, discord_id: str) -> DiscordLookupResponse:
-        found = await self._registrations.lookup_by_discord_id(discord_id)
-        if found is None:
+    async def by_discord(self, discord_id: str) -> AccountLookup:
+        docs = await self._users.find_users_by_discord_id(discord_id)
+        if not docs:
             raise AccountLookupNotFoundError(field="discord_id", value=discord_id)
-        return found
+        return await self._lookup(docs)
 
-    async def by_linked(self, linked_account_id: str) -> LinkedAccountLookupResponse:
-        found = await self._registrations.lookup_by_linked_account_id(linked_account_id)
-        if found is None:
+    async def by_linked(self, linked_account_id: str) -> AccountLookup:
+        docs = await self._users.find_users_by_linked_account_id(linked_account_id)
+        if not docs:
             raise AccountLookupNotFoundError(
                 field="linked_account_id", value=linked_account_id
             )
-        return found
+        return await self._lookup(docs)
+
+    async def _lookup(self, docs: list[dict[str, Any]]) -> AccountLookup:
+        docs = [doc for doc in docs if doc.get("discord_id")]
+        ids = [str(doc["discord_id"]) for doc in docs]
+        try:
+            standing_of = await standings(self._client, ids)
+        except Exception:
+            logger.exception("Could not read standings for discord_ids=%s", ids)
+            standing_of = {}
+        return AccountLookup(
+            records=[
+                AccountRecord(
+                    discord_id=discord_id,
+                    discord_username=_normalize_discord_username(doc),
+                    discord_display_name=_normalize_display_name(doc),
+                    linked_platform=_normalize_platform(doc),
+                    linked_account_id=_normalize_linked_account_id(doc),
+                    linked_account_name=_normalize_linked_account_name(doc),
+                    registrations=_entries(doc),
+                    standing=standing_of.get(discord_id),
+                )
+                for discord_id, doc in zip(ids, docs, strict=True)
+            ]
+        )
 
     async def _load(self, session_id: str) -> dict[str, Any]:
         session = await self._sessions.get(session_id)
@@ -459,7 +552,12 @@ class RegistrationFlow:
             "validating",
             {
                 "status": "failed",
-                "failure": {"code": code, "message": message, "details": details},
+                "failure": {
+                    "code": code,
+                    "message": message,
+                    "details": details,
+                    "correlation_id": current_correlation_id.get(),
+                },
             },
         )
 
@@ -493,7 +591,12 @@ class RegistrationFlow:
                 cast(dict[str, Any], exc.details), discord_user_id
             )
             raise
-        flags = account_flags(discord_user_id, steam_created, datetime.now(UTC))
+        flags = account_flags(
+            discord_user_id,
+            datetime.now(UTC),
+            steam=method.value in STEAM_API_REGISTRATION_METHODS,
+            steam_created=steam_created,
+        )
         extra = {**(extra or {}), **({"flags": flags} if flags else {})}
         await self._users.upsert_registered_user(
             discord_user_id=discord_user_id,
@@ -507,6 +610,14 @@ class RegistrationFlow:
             ownership_verified_at=ownership_verified_at,
             playtime_minutes=playtime_minutes,
             entry_extra=extra,
+        )
+        _log_registration(
+            discord_user_id,
+            game,
+            method,
+            account_id,
+            flags,
+            extra.get("actor_discord_id"),
         )
         return Registration(
             discord_user_id=discord_user_id,
@@ -526,6 +637,7 @@ class RegistrationFlow:
         if not other or other == caller:
             return
         try:
-            details["standing"] = await standing(self._client, other)
+            found = (await standings(self._client, [other])).get(other)
+            details["standing"] = found.model_dump() if found else None
         except Exception:
             logger.exception("Could not read the standing of discord_id=%s", other)

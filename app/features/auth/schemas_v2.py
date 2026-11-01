@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, StringConstraints
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    StringConstraints,
+    model_validator,
+)
 
 from app.core.errors import ErrorDetail
 from app.features.auth.enums import (
@@ -38,7 +45,8 @@ SessionStatus = Literal[
     "failed",
     "expired",
 ]
-AccountFlag = Literal["young_discord", "young_steam"]
+AccountFlag = Literal["young_discord", "young_steam", "unknown_steam_age"]
+STEAM_ID = re.compile(r"^7656119[0-9]{10}$")
 
 
 class _Body(BaseModel):
@@ -71,6 +79,13 @@ class ManualRegistrationBody(_Body):
         Annotated[str, StringConstraints(max_length=500)] | None,
         BeforeValidator(_blank_is_none),
     ] = None
+
+    @model_validator(mode="after")
+    def _a_steam_link_is_a_steam_id(self) -> ManualRegistrationBody:
+        steam = self.platform is not ManualRegistrationChoice.TWOK
+        if steam and not STEAM_ID.match(self.platform_account_id):
+            raise ValueError("a Steam account id is 17 digits starting 7656119")
+        return self
 
 
 class TwoKRegistrationBody(_Body):
@@ -113,3 +128,39 @@ class Registration(BaseModel):
     registration_method: RegistrationMethod
     role_intents: list[RoleIntent]
     flags: list[AccountFlag] = []
+
+
+class Standing(BaseModel):
+    """An account's record with Lady Justice."""
+
+    suspended: bool
+    ends: datetime | None = None
+    active_category: str | None = None
+    tiers: dict[str, int]
+    at_ban_threshold: bool
+
+
+class RegistrationEntry(BaseModel):
+    game: SupportedGame
+    method: str | None = None
+    registered_at: datetime | None = None
+    flags: list[AccountFlag] = []
+    actor_discord_id: str | None = None
+    reason: str | None = None
+
+
+class AccountRecord(BaseModel):
+    discord_id: str
+    discord_username: str | None = None
+    discord_display_name: str | None = None
+    linked_platform: RegistrationPlatform | None = None
+    linked_account_id: str | None = None
+    linked_account_name: str | None = None
+    registrations: list[RegistrationEntry]
+    standing: Standing | None = None
+
+
+class AccountLookup(BaseModel):
+    """Every record that matches; more than one is worth a look."""
+
+    records: list[AccountRecord]
