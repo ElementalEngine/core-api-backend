@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """c10_differential run <label> <base_url> | restore | diff <a> <b>
 
-Every infractions route, in lifecycle order, and the auth reads, called on
-one test player against a running core-api, so v1 and v2 can be compared.
+Every infractions route, in lifecycle order, called on one test player
+against a running core-api, so two builds can be compared.
 
   run      capture the answers and what landed in Mongo, to $DIFF_DIR
   restore  delete the test player's suspensions
@@ -29,7 +29,6 @@ OUT = Path(os.environ.get("DIFF_DIR", "/home/cisco/s2-baseline"))
 UID = os.environ.get("C10_TEST_ID", "999999999999999901")
 ROLES = ["111111111111111111", "222222222222222222"]
 INFRA = "/api/v1/infractions"
-AUTH = "/api/v1/auth"
 
 
 def connect() -> MongoClient:
@@ -62,8 +61,8 @@ def call(
     return {"method": method, "path": path, "status": status, "body": parsed}
 
 
-def sequence(c: MongoClient, base: str, lj: str, auth: str) -> tuple[list[dict], dict]:
-    """Every infractions route, in lifecycle order, plus the reachable auth reads."""
+def sequence(c: MongoClient, base: str, lj: str) -> tuple[list[dict], dict]:
+    """Every infractions route, in lifecycle order."""
     steps: list[dict] = []
     add = steps.append
     disk: dict = {}
@@ -118,15 +117,8 @@ def sequence(c: MongoClient, base: str, lj: str, auth: str) -> tuple[list[dict],
     add(call(base, "POST", f"{INFRA}/{UID}/unsuspend", lj))
     add(call(base, "GET", f"{INFRA}/{UID}", lj))
 
-    # auth: the four reachable read paths, on an id that does not exist
-    add(call(base, "GET", f"{AUTH}/admin/accounts/discord/{UID}", auth))
-    add(call(base, "GET", f"{AUTH}/admin/accounts/linked-account/{UID}", auth))
-    add(call(base, "GET", f"{AUTH}/admin/accounts/steam/{UID}", auth))
-    add(call(base, "GET", f"{AUTH}/registration-sessions/nonexistent-session", auth))
-
-    # both gates reject a bad token identically
+    # the gate rejects a bad token
     add(call(base, "GET", f"{INFRA}/active", "not-a-real-token"))
-    add(call(base, "GET", f"{AUTH}/admin/accounts/discord/{UID}", "not-a-real-token"))
     return steps, disk
 
 
@@ -144,9 +136,7 @@ def on_disk(c: MongoClient) -> dict:
 
 def cmd_run(label: str, base_url: str) -> None:
     c = connect()
-    steps, disk = sequence(
-        c, base_url, os.environ["LJ_SERVICE_TOKEN"], os.environ["AUTH_SERVICE_TOKEN"]
-    )
+    steps, disk = sequence(c, base_url, os.environ["LJ_SERVICE_TOKEN"])
     payload = {"steps": steps, "disk_after_flat": disk}
     OUT.mkdir(mode=0o700, parents=True, exist_ok=True)
     p = OUT / f"capture-c10-{label}.json"
@@ -198,6 +188,8 @@ def cmd_diff(a: str, b: str) -> None:
     ca = json_util.loads((OUT / f"capture-c10-{a}.json").read_text())
     cb = json_util.loads((OUT / f"capture-c10-{b}.json").read_text())
     diffs = []
+    if len(ca["steps"]) != len(cb["steps"]):
+        diffs.append(("step count", len(ca["steps"]), len(cb["steps"])))
 
     for i, (sa, sb) in enumerate(zip(ca["steps"], cb["steps"])):
         na, nb = normalise(scope_lists(sa)), normalise(scope_lists(sb))

@@ -8,20 +8,12 @@ class SupportedGame(StrEnum):
     CIV7 = "civ7"
 
 
+# Epic and Xbox are only read from older records; nothing registers them.
 class RegistrationPlatform(StrEnum):
     STEAM = "steam"
     EPIC = "epic"
     TWOK = "2k"
     XBOX = "xbox"
-
-    @property
-    def discord_connection_type(self) -> str:
-        return {
-            RegistrationPlatform.STEAM: "steam",
-            RegistrationPlatform.EPIC: "epicgames",
-            RegistrationPlatform.TWOK: "2k",
-            RegistrationPlatform.XBOX: "xbox",
-        }[self]
 
 
 class RegistrationMethod(StrEnum):
@@ -55,21 +47,6 @@ class ManualRegistrationChoice(StrEnum):
                 RegistrationMethod.ADMIN_STAFF_ATTESTED,
             ),
         }[self]
-
-
-class RegistrationSessionStatus(StrEnum):
-    PENDING_AUTH = "pending_auth"
-    VALIDATING = "validating"
-    VALIDATED = "validated"
-    FAILED = "failed"
-    EXPIRED = "expired"
-    COMPLETED = "completed"
-
-
-class RegistrationOperationStatus(StrEnum):
-    PENDING = "pending"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
 
 
 class RoleIntent(StrEnum):

@@ -16,11 +16,12 @@ from app.core.config import settings
 from app.core.constants import DB_SERVER_MEMBERS
 from app.core.errors import ErrorDetail
 from app.core.middleware import current_correlation_id
+from app.features.auth.constants import COL_REGISTRATION_SESSIONS
 from app.features.auth.enums import (
     STEAM_API_REGISTRATION_METHODS,
     RegistrationMethod,
     RegistrationPlatform,
-    RegistrationSessionStatus,
+    RoleIntent,
     SupportedGame,
 )
 from app.features.auth.errors import (
@@ -28,7 +29,6 @@ from app.features.auth.errors import (
     AlreadyRegisteredError,
     AuthConfigurationError,
     AuthError,
-    DiscordOAuthError,
     DiscordSteamConflictError,
     DiscordUserMismatchError,
     InvalidStateError,
@@ -38,21 +38,18 @@ from app.features.auth.errors import (
     SessionExpiredError,
     SessionNotFoundError,
     SessionNotValidatedError,
+    SignInCancelledError,
     SteamIdConflictError,
 )
 from app.features.auth.oauth_service import DiscordOAuthService, authorize_url
-from app.features.auth.registration_service import (
-    RegistrationService,
-    _build_registration_role_intents,
-    _normalize_discord_username,
-    _normalize_display_name,
-    _normalize_linked_account_id,
-    _normalize_linked_account_name,
-    _normalize_platform,
-    _rank_role_for_game,
+from app.features.auth.repository import (
+    AuthRepository,
+    account_id_of,
+    account_name_of,
+    display_name_of,
+    platform_of,
+    username_of,
 )
-from app.features.auth.repository import AuthRepository
-from app.features.auth.schemas import DiscordOAuthCallbackResult
 from app.features.auth.schemas_v2 import (
     AccountFlag,
     AccountLookup,
@@ -73,10 +70,7 @@ from app.features.infractions.service import TIER_CAPS
 
 logger = logging.getLogger(__name__)
 
-COL_REGISTRATION_SESSIONS = "registration_sessions"
 DISCORD_EPOCH_MS = 1420070400000
-# Marks a v2 session's state, so the shared callback knows whose it is.
-STATE_PREFIX = "v2."
 OPEN = ("pending_auth", "validating", "validated", "completing")
 SNAPSHOT = (
     "linked_account_id",
@@ -194,6 +188,84 @@ async def standings(
     return found
 
 
+def rank_role_for(game: SupportedGame) -> RoleIntent:
+    return {
+        SupportedGame.CIV6: RoleIntent.GRANT_CIV6_RANK,
+        SupportedGame.CIV7: RoleIntent.GRANT_CIV7_RANK,
+    }[game]
+
+
+def role_intents(
+    game: SupportedGame, platform: RegistrationPlatform
+) -> list[RoleIntent]:
+    return [
+        rank_role_for(game),
+        RoleIntent.GRANT_NOVICE,
+        RoleIntent.GRANT_SERVER_NEWS,
+        RoleIntent.GRANT_CIV6_NEWS
+        if game is SupportedGame.CIV6
+        else RoleIntent.GRANT_CIV7_NEWS,
+        RoleIntent.GRANT_PC_STEAM
+        if platform is RegistrationPlatform.STEAM
+        else RoleIntent.GRANT_2K_CROSSPLATFORM,
+        RoleIntent.REMOVE_NON_VERIFIED,
+    ]
+
+
+async def refuse_clash(
+    users: AuthRepository,
+    *,
+    discord_user_id: str,
+    platform: RegistrationPlatform,
+    account_id: str,
+    game: str,
+) -> None:
+    """Refuse an account another player holds, a player who already holds a
+    different account, and a game the player already has."""
+    by_discord = await users.get_user_by_discord_id(discord_user_id)
+    by_linked = (
+        await users.get_user_by_steam_id(account_id)
+        if platform is RegistrationPlatform.STEAM
+        else await users.get_user_by_linked_account(platform.value, account_id)
+    )
+    if by_linked and str(by_linked.get("discord_id")) != discord_user_id:
+        holder = str(by_linked.get("discord_id", ""))
+        if platform is RegistrationPlatform.STEAM:
+            raise SteamIdConflictError(steam_id=account_id, existing_discord_id=holder)
+        raise LinkedAccountConflictError(
+            platform=platform.value, account_id=account_id, existing_discord_id=holder
+        )
+    if not by_discord:
+        return
+    held_platform = by_discord.get("linked_platform")
+    held_account = by_discord.get("linked_account_id")
+    held_steam = by_discord.get("steam_id")
+    if (
+        platform is RegistrationPlatform.STEAM
+        and held_steam
+        and str(held_steam) != account_id
+    ):
+        raise DiscordSteamConflictError(
+            discord_user_id=discord_user_id, existing_steam_id=str(held_steam)
+        )
+    if (
+        held_platform
+        and held_account
+        and (str(held_platform) != platform.value or str(held_account) != account_id)
+    ):
+        if str(held_platform) == RegistrationPlatform.STEAM.value:
+            raise DiscordSteamConflictError(
+                discord_user_id=discord_user_id, existing_steam_id=str(held_account)
+            )
+        raise LinkedAccountConflictError(
+            platform=str(held_platform),
+            account_id=str(held_account),
+            existing_discord_id=discord_user_id,
+        )
+    if game in (by_discord.get("registrations") or {}):
+        raise AlreadyRegisteredError(game)
+
+
 def _text(value: object) -> str | None:
     return str(value) if value not in (None, "") else None
 
@@ -243,7 +315,6 @@ class RegistrationFlow:
     def __init__(self, client: AsyncMongoClient) -> None:
         self._client = client
         self._users = AuthRepository(client)
-        self._registrations = RegistrationService(self._users)
         self._sessions = SessionStore(client)
         self._steam = SteamService()
         self._discord = DiscordOAuthService()
@@ -254,6 +325,7 @@ class RegistrationFlow:
             raise AlreadyRegisteredError(game.value)
         if (
             not settings.auth_discord_client_id
+            or not settings.auth_discord_client_secret.get_secret_value()
             or not settings.auth_discord_redirect_uri
         ):
             raise AuthConfigurationError(
@@ -262,7 +334,7 @@ class RegistrationFlow:
         now = datetime.now(UTC)
         session: dict[str, Any] = {
             "session_id": token_urlsafe(24),
-            "state_token": STATE_PREFIX + token_urlsafe(32),
+            "state_token": token_urlsafe(32),
             "discord_user_id": discord_user_id,
             "game": game.value,
             "status": "pending_auth",
@@ -290,7 +362,7 @@ class RegistrationFlow:
 
     async def callback(
         self, *, code: str | None, state: str, error: str | None
-    ) -> DiscordOAuthCallbackResult:
+    ) -> None:
         """Discord sends the player's browser here after sign-in."""
         now = datetime.now(UTC)
         session = await self._sessions.claim(
@@ -304,12 +376,8 @@ class RegistrationFlow:
         session_id = str(session["session_id"])
         try:
             if error or not code:
-                raise DiscordOAuthError(
-                    "Discord sign-in was cancelled or did not finish. Please start again."
-                )
-            user, connection = await self._discord.fetch_identity_and_connection(
-                code=code, platform=RegistrationPlatform.STEAM
-            )
+                raise SignInCancelledError()
+            user, connection = await self._discord.fetch_identity_and_steam(code=code)
             if str(user.get("id")) != session["discord_user_id"]:
                 raise DiscordUserMismatchError(
                     session_user_id=session["discord_user_id"],
@@ -354,13 +422,6 @@ class RegistrationFlow:
         )
         if not settled:
             raise InvalidStateError()
-        return DiscordOAuthCallbackResult(
-            session_id=session_id,
-            status=RegistrationSessionStatus.VALIDATED,
-            platform=RegistrationPlatform.STEAM,
-            linked_account_id=steam_id,
-            linked_account_name=linked_name,
-        )
 
     async def complete(self, session_id: str, discord_user_id: str) -> Registration:
         """Register a signed-in player once; a repeat answers the same result."""
@@ -466,7 +527,7 @@ class RegistrationFlow:
             linked_account_id=str(steam_id),
             linked_account_name=name,
             registration_method=RegistrationMethod.OAUTH_STEAM_API,
-            role_intents=[_rank_role_for_game(game)],
+            role_intents=[rank_role_for(game)],
         )
 
     async def manual(
@@ -526,11 +587,11 @@ class RegistrationFlow:
             records=[
                 AccountRecord(
                     discord_id=discord_id,
-                    discord_username=_normalize_discord_username(doc),
-                    discord_display_name=_normalize_display_name(doc),
-                    linked_platform=_normalize_platform(doc),
-                    linked_account_id=_normalize_linked_account_id(doc),
-                    linked_account_name=_normalize_linked_account_name(doc),
+                    discord_username=username_of(doc),
+                    discord_display_name=display_name_of(doc),
+                    linked_platform=platform_of(doc),
+                    linked_account_id=account_id_of(doc),
+                    linked_account_name=account_name_of(doc),
                     registrations=_entries(doc),
                     standing=standing_of.get(discord_id),
                 )
@@ -580,7 +641,8 @@ class RegistrationFlow:
         """Refuse a clash, naming the other account's standing; else write the
         player's record."""
         try:
-            await self._registrations.assert_registration_conflicts(
+            await refuse_clash(
+                self._users,
                 discord_user_id=discord_user_id,
                 platform=platform,
                 account_id=account_id,
@@ -626,7 +688,7 @@ class RegistrationFlow:
             linked_account_id=account_id,
             linked_account_name=account_name,
             registration_method=method,
-            role_intents=_build_registration_role_intents(game, platform),
+            role_intents=role_intents(game, platform),
             flags=flags,
         )
 

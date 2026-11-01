@@ -17,8 +17,8 @@ from app.features.auth.constants import (
     DISCORD_OAUTH_SCOPES,
     DISCORD_OAUTH_TOKEN_URL,
 )
-from app.features.auth.enums import RegistrationPlatform
 from app.features.auth.errors import (
+    AuthConfigurationError,
     DiscordOAuthError,
     LinkedAccountFetchError,
     LinkedAccountNotFoundError,
@@ -26,6 +26,14 @@ from app.features.auth.errors import (
 
 logger = logging.getLogger(__name__)
 DISCORD_HTTP_USER_AGENT = "CivPlayersAuth/1.0 (+https://elementalengine.net)"
+
+
+def _oauth_error(body: str) -> object:
+    try:
+        parsed = json.loads(body)
+    except ValueError:
+        return None
+    return parsed.get("error") if isinstance(parsed, dict) else None
 
 
 def authorize_url(state_token: str) -> str:
@@ -47,7 +55,9 @@ class DiscordOAuthService:
             or not settings.auth_discord_client_secret.get_secret_value()
             or not settings.auth_discord_redirect_uri
         ):
-            raise DiscordOAuthError("Discord OAuth is not configured on the backend.")
+            raise AuthConfigurationError(
+                "Discord OAuth is not configured for auth registration."
+            )
 
         def _exchange() -> str:
             payload = urlencode(
@@ -84,6 +94,13 @@ class DiscordOAuthService:
                     settings.auth_discord_redirect_uri,
                     response_body[:1000],
                 )
+                if exc.code in (400, 401) and _oauth_error(response_body) == (
+                    "invalid_client"
+                ):
+                    # A wrong client id or secret: ours to fix, not the player's.
+                    raise AuthConfigurationError(
+                        "Discord OAuth is not configured for auth registration."
+                    ) from exc
                 raise DiscordOAuthError(
                     "Discord rejected the authentication callback. Please try again."
                 ) from exc
@@ -124,29 +141,22 @@ class DiscordOAuthService:
             raise LinkedAccountFetchError()
         return [item for item in payload if isinstance(item, dict)]
 
-    async def fetch_identity_and_connection(
-        self,
-        *,
-        code: str,
-        platform: RegistrationPlatform,
+    async def fetch_identity_and_steam(
+        self, *, code: str
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         token = await self.exchange_code(code)
         user, connections = await asyncio.gather(
             self.fetch_current_user(token),
             self.fetch_connections(token),
         )
-        return user, self._pick_connection(connections, platform)
+        return user, self._steam_connection(connections)
 
     @staticmethod
-    def _pick_connection(
-        connections: Iterable[dict[str, Any]],
-        platform: RegistrationPlatform,
-    ) -> dict[str, Any]:
-        expected = platform.discord_connection_type
+    def _steam_connection(connections: Iterable[dict[str, Any]]) -> dict[str, Any]:
         for connection in connections:
-            if connection.get("type") == expected:
+            if connection.get("type") == "steam":
                 return connection
-        raise LinkedAccountNotFoundError(platform.value)
+        raise LinkedAccountNotFoundError()
 
     async def _get_json(
         self, url: str, *, access_token: str

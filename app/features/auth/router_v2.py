@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Path
+from fastapi import APIRouter, Depends, Header, Path, Query
+from fastapi.responses import HTMLResponse
 from pymongo import AsyncMongoClient
 
 from app.core.dependencies import actor_is_staff, get_database, require_service_token
-from app.features.auth.errors import StaffRequiredError
+from app.core.middleware import current_correlation_id
+from app.features.auth.errors import AuthError, InvalidStateError, StaffRequiredError
+from app.features.auth.page import sign_in_page
 from app.features.auth.registration_v2 import RegistrationFlow
 from app.features.auth.schemas_v2 import (
     AccountLookup,
@@ -20,11 +24,15 @@ from app.features.auth.schemas_v2 import (
     TwoKRegistrationBody,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(
     prefix="/api/v2/auth",
     tags=["auth-v2"],
     dependencies=[Depends(require_service_token)],
 )
+# Discord sends the player's browser here, so it carries no service token.
+public_router = APIRouter(tags=["auth-public"])
 
 SessionId = Annotated[str, Path(min_length=1, max_length=64)]
 
@@ -99,3 +107,43 @@ async def lookup_linked(
     linked_account_id: Annotated[str, Path(min_length=1, max_length=128)], flow: Flow
 ) -> AccountLookup:
     return await flow.by_linked(linked_account_id)
+
+
+# The bot reads the outcome from the session; the page only reports it.
+@public_router.get("/oauth/discord/callback", response_class=HTMLResponse)
+async def discord_oauth_callback(
+    code: Annotated[str | None, Query(max_length=512)] = None,
+    state: Annotated[str | None, Query(max_length=512)] = None,
+    error: Annotated[str | None, Query(max_length=512)] = None,
+    db: AsyncMongoClient = Depends(get_database),
+) -> HTMLResponse:
+    ref = current_correlation_id.get()
+    try:
+        if not state:
+            raise InvalidStateError()
+        await RegistrationFlow(db).callback(code=code, state=state, error=error)
+    except AuthError as exc:
+        logger.info("Sign-in refused code=%s correlation_id=%s", exc.code, ref)
+        # As in the bot: a server set up wrong is not the player's to read.
+        hidden = exc.code.endswith("MISCONFIGURED")
+        return sign_in_page(
+            exc.status_code,
+            "Sign-in did not finish",
+            "Something went wrong on our side. Staff can look into it."
+            if hidden
+            else exc.message,
+            ref if exc.status_code >= 500 else None,
+        )
+    except Exception:
+        logger.exception("Sign-in failed correlation_id=%s", ref)
+        return sign_in_page(
+            500,
+            "Sign-in did not finish",
+            "Something went wrong on our side. Please try again.",
+            ref,
+        )
+    return sign_in_page(
+        200,
+        "Signed in",
+        "Discord sign-in worked. The bot is finishing your registration.",
+    )

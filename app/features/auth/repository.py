@@ -9,50 +9,19 @@ from pymongo import ASCENDING, AsyncMongoClient
 from pymongo.asynchronous.collection import AsyncCollection
 
 from app.core.constants import COL_USERS, DB_SERVER_MEMBERS
-from app.features.auth.constants import (
-    AUTH_DB_NAME,
-    COL_REGISTRATION_OPERATIONS,
-    COL_REGISTRATION_SESSIONS,
-)
+from app.features.auth.enums import RegistrationPlatform
+
+# A lookup lists at most this many records for one id.
+LOOKUP_LIMIT = 25
 
 
 class AuthRepository:
+    """The players' records in `users`."""
+
     def __init__(self, client: AsyncMongoClient) -> None:
-        auth_db = client[AUTH_DB_NAME]
-        members = client[DB_SERVER_MEMBERS]
-        self._sessions: AsyncCollection = auth_db[COL_REGISTRATION_SESSIONS]
-        self._operations: AsyncCollection = auth_db[COL_REGISTRATION_OPERATIONS]
-        self._users: AsyncCollection = members[COL_USERS]
+        self._users: AsyncCollection = client[DB_SERVER_MEMBERS][COL_USERS]
 
     async def ensure_indexes(self) -> None:
-        await self._sessions.create_index(
-            [("session_id", ASCENDING)],
-            unique=True,
-            name="auth_session_id_uq",
-        )
-        await self._sessions.create_index(
-            [("state_token", ASCENDING)],
-            unique=True,
-            name="auth_state_token_uq",
-        )
-        await self._sessions.create_index(
-            [("expires_at", ASCENDING)],
-            expireAfterSeconds=0,
-            name="auth_session_ttl",
-        )
-        await self._sessions.create_index(
-            [("discord_user_id", ASCENDING)],
-            name="auth_session_discord_id_idx",
-        )
-        await self._operations.create_index(
-            [("operation_id", ASCENDING)],
-            unique=True,
-            name="auth_operation_id_uq",
-        )
-        await self._operations.create_index(
-            [("discord_user_id", ASCENDING)],
-            name="auth_operation_discord_id_idx",
-        )
         await self._users.create_index(
             [("discord_id", ASCENDING)],
             name="auth_user_discord_id_idx",
@@ -74,9 +43,7 @@ class AuthRepository:
     async def get_user_by_discord_id(self, discord_id: str) -> dict[str, Any] | None:
         return await self._users.find_one({"discord_id": discord_id})
 
-    async def find_users_by_discord_id(
-        self, discord_id: str, *, limit: int = 25
-    ) -> list[dict[str, Any]]:
+    async def find_users_by_discord_id(self, discord_id: str) -> list[dict[str, Any]]:
         cursor = (
             self._users.find({"discord_id": discord_id})
             .sort(
@@ -86,9 +53,9 @@ class AuthRepository:
                     ("steam_id", ASCENDING),
                 ]
             )
-            .limit(max(1, limit))
+            .limit(LOOKUP_LIMIT)
         )
-        return await cursor.to_list(length=max(1, limit))
+        return await cursor.to_list(length=LOOKUP_LIMIT)
 
     async def get_user_by_steam_id(self, steam_id: str) -> dict[str, Any] | None:
         return await self._users.find_one(
@@ -101,7 +68,7 @@ class AuthRepository:
         )
 
     async def find_users_by_linked_account_id(
-        self, linked_account_id: str, *, limit: int = 25
+        self, linked_account_id: str
     ) -> list[dict[str, Any]]:
         cursor = (
             self._users.find(
@@ -119,9 +86,9 @@ class AuthRepository:
                     ("linked_account_id", ASCENDING),
                 ]
             )
-            .limit(max(1, limit))
+            .limit(LOOKUP_LIMIT)
         )
-        return await cursor.to_list(length=max(1, limit))
+        return await cursor.to_list(length=LOOKUP_LIMIT)
 
     async def get_user_by_linked_account(
         self, platform: str, account_id: str
@@ -129,41 +96,6 @@ class AuthRepository:
         return await self._users.find_one(
             {"linked_platform": platform, "linked_account_id": account_id}
         )
-
-    async def insert_registration_session(self, doc: Mapping[str, Any]) -> None:
-        await self._sessions.insert_one(dict(doc))
-
-    async def get_registration_session(self, session_id: str) -> dict[str, Any] | None:
-        return await self._sessions.find_one({"session_id": session_id})
-
-    async def get_registration_session_by_state(
-        self, state_token: str
-    ) -> dict[str, Any] | None:
-        return await self._sessions.find_one({"state_token": state_token})
-
-    async def update_registration_session(
-        self, session_id: str, changes: Mapping[str, Any]
-    ) -> bool:
-        res = await self._sessions.update_one(
-            {"session_id": session_id}, {"$set": dict(changes)}
-        )
-        return res.matched_count == 1
-
-    async def insert_registration_operation(self, doc: Mapping[str, Any]) -> None:
-        await self._operations.insert_one(dict(doc))
-
-    async def get_registration_operation(
-        self, operation_id: str
-    ) -> dict[str, Any] | None:
-        return await self._operations.find_one({"operation_id": operation_id})
-
-    async def update_registration_operation(
-        self, operation_id: str, changes: Mapping[str, Any]
-    ) -> bool:
-        res = await self._operations.update_one(
-            {"operation_id": operation_id}, {"$set": dict(changes)}
-        )
-        return res.matched_count == 1
 
     async def upsert_registered_user(
         self,
@@ -383,3 +315,40 @@ def _resolve_server_registered_at(
                 if isinstance(registered_at, datetime):
                     candidates.append(registered_at)
     return min(candidates) if candidates else None
+
+
+# Readers of a record, which older writers kept under other field names.
+def platform_of(doc: Mapping[str, Any]) -> RegistrationPlatform | None:
+    if doc.get("linked_platform"):
+        return RegistrationPlatform(str(doc["linked_platform"]))
+    if doc.get("steam_id"):
+        return RegistrationPlatform.STEAM
+    return None
+
+
+def account_id_of(doc: Mapping[str, Any]) -> str | None:
+    if doc.get("linked_account_id"):
+        return str(doc["linked_account_id"])
+    if doc.get("steam_id"):
+        return str(doc["steam_id"])
+    return None
+
+
+def account_name_of(doc: Mapping[str, Any]) -> str | None:
+    if doc.get("linked_account_name"):
+        return str(doc["linked_account_name"])
+    if doc.get("steam_name"):
+        return str(doc["steam_name"])
+    return None
+
+
+def username_of(doc: Mapping[str, Any]) -> str | None:
+    if doc.get("discord_username"):
+        return str(doc["discord_username"])
+    if doc.get("user_name"):
+        return str(doc["user_name"])
+    return None
+
+
+def display_name_of(doc: Mapping[str, Any]) -> str | None:
+    return str(doc["display_name"]) if doc.get("display_name") else None

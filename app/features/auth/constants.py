@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import Final
 
-AUTH_DB_NAME: Final[str] = "auth"
 COL_REGISTRATION_SESSIONS: Final[str] = "registration_sessions"
-COL_REGISTRATION_OPERATIONS: Final[str] = "registration_operations"
 
 DISCORD_OAUTH_AUTHORIZE_URL: Final[str] = "https://discord.com/oauth2/authorize"
 DISCORD_OAUTH_TOKEN_URL: Final[str] = "https://discord.com/api/oauth2/token"

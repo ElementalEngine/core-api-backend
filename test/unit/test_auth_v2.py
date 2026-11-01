@@ -11,9 +11,10 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from app.core import dependencies
-from app.features.auth import registration_v2, router as auth_router, steam_service
+from app.features.auth import registration_v2, steam_service
 from app.features.auth.enums import ManualRegistrationChoice, SupportedGame
 from app.features.auth.errors import (
+    AuthConfigurationError,
     AuthError,
     InvalidStateError,
     LinkedAccountConflictError,
@@ -23,7 +24,6 @@ from app.features.auth.errors import (
     SteamProfilePrivateError,
     SteamValidationError,
 )
-from app.features.auth.registration_service import RegistrationService
 from app.features.auth.registration_v2 import (
     DISCORD_EPOCH_MS,
     RegistrationFlow,
@@ -124,7 +124,7 @@ class Users:
 
 
 class Discord:
-    async def fetch_identity_and_connection(self, *, code, platform):
+    async def fetch_identity_and_steam(self, *, code):
         await asyncio.sleep(0)
         return {"id": PLAYER, "username": "player"}, {"id": STEAM, "name": "Steamy"}
 
@@ -146,7 +146,6 @@ def flow(users=None, steam=None):
     client = defaultdict(lambda: defaultdict(Collection))
     f = RegistrationFlow(client)
     f._users = users or Users()
-    f._registrations = RegistrationService(f._users)
     f._steam = steam or Steam()
     f._discord = Discord()
     return f, client["server_members"]
@@ -157,6 +156,9 @@ def oauth_configured(monkeypatch):
     monkeypatch.setattr(registration_v2.settings, "auth_discord_client_id", "client")
     monkeypatch.setattr(
         registration_v2.settings, "auth_discord_redirect_uri", "https://x/cb"
+    )
+    monkeypatch.setattr(
+        registration_v2.settings, "auth_discord_client_secret", SecretStr("secret")
     )
 
 
@@ -177,7 +179,6 @@ def test_a_session_runs_from_sign_in_to_a_registered_player():
     session_id = signed_in(f, members)
     sessions = members["registration_sessions"].docs
     assert len(sessions) == 1  # a new start replaces the player's earlier one
-    assert sessions[0]["state_token"].startswith(registration_v2.STATE_PREFIX)
     assert run(f.state(session_id)).status == "validated"
 
     result = run(f.complete(session_id, PLAYER))
@@ -222,27 +223,6 @@ def test_a_second_callback_for_one_sign_in_is_refused_and_changes_nothing():
     assert isinstance(second, InvalidStateError)
     session = members["registration_sessions"].docs[0]
     assert (session["status"], session.get("failure")) == ("validated", None)
-
-
-def test_the_shared_callback_hands_a_v2_state_to_the_v2_flow(monkeypatch):
-    seen = {}
-
-    class Flow:
-        def __init__(self, db):
-            pass
-
-        async def callback(self, *, code, state, error):
-            seen["state"] = state
-            return "v2"
-
-    monkeypatch.setattr(auth_router, "RegistrationFlow", Flow)
-    answer = run(
-        auth_router.discord_oauth_callback(
-            code="c", state="v2.abc", error=None, db=None
-        )
-    )
-    assert answer == "v2"
-    assert seen == {"state": "v2.abc"}
 
 
 def test_a_failed_sign_in_is_kept_on_the_session_for_the_bot():
@@ -401,7 +381,7 @@ def test_a_sign_in_that_fails_on_a_bug_keeps_the_answer_s_correlation_id(
     client_db["server_members"]["registration_sessions"].docs.append(
         {
             "session_id": "s1",
-            "state_token": "v2.state",
+            "state_token": "the-state",
             "discord_user_id": PLAYER,
             "game": "civ6",
             "status": "pending_auth",
@@ -410,25 +390,21 @@ def test_a_sign_in_that_fails_on_a_bug_keeps_the_answer_s_correlation_id(
     )
 
     class Broken:
-        async def fetch_identity_and_connection(self, *, code, platform):
+        async def fetch_identity_and_steam(self, *, code):
             raise RuntimeError("bug")
 
     monkeypatch.setattr(registration_v2, "DiscordOAuthService", Broken)
     app.dependency_overrides[dependencies.get_database] = lambda: client_db
     try:
         answer = TestClient(app, raise_server_exceptions=False).get(
-            "/oauth/discord/callback", params={"code": "c", "state": "v2.state"}
+            "/oauth/discord/callback", params={"code": "c", "state": "the-state"}
         )
     finally:
         app.dependency_overrides.clear()
     stored = client_db["server_members"]["registration_sessions"].docs[0]["failure"]
-    sent = answer.json()["detail"]["error"]
-    assert (answer.status_code, sent["code"], stored["code"]) == (
-        500,
-        "INTERNAL",
-        "INTERNAL",
-    )
-    assert stored["correlation_id"] == sent["correlation_id"]
+    assert (answer.status_code, stored["code"]) == (500, "INTERNAL")
+    assert answer.headers["content-type"].startswith("text/html")
+    assert f"Reference: {stored['correlation_id']}" in answer.text
 
 
 def test_a_linked_lookup_returns_every_holder_and_tolerates_old_entries():
@@ -618,14 +594,6 @@ def test_v2_answers_only_its_pinned_codes():
     names = set()
     for module in ("registration_v2", "router_v2", "steam_service", "oauth_service"):
         names |= raised(ast.parse((auth / f"{module}.py").read_text()))
-    shared = ast.parse((auth / "registration_service.py").read_text())
-    conflicts = next(
-        n
-        for n in ast.walk(shared)
-        if isinstance(n, ast.AsyncFunctionDef)
-        and n.name == "assert_registration_conflicts"
-    )
-    names |= raised(conflicts)
     assert {codes[n] for n in names if n in codes} == V2_CODES
     core = Path(__file__).resolve().parents[2] / "app" / "core"
     literals = {
@@ -636,3 +604,29 @@ def test_v2_answers_only_its_pinned_codes():
     }
     assert TRANSPORT_CODES <= literals
     assert all(n in codes for n in names), sorted(n for n in names if n not in codes)
+
+
+def test_a_session_does_not_start_while_the_client_secret_is_unset(monkeypatch):
+    monkeypatch.setattr(
+        registration_v2.settings, "auth_discord_client_secret", SecretStr("")
+    )
+    f, members = flow()
+    with pytest.raises(AuthConfigurationError) as caught:
+        run(f.start(PLAYER, SupportedGame.CIV6))
+    assert caught.value.code == "AUTH_MISCONFIGURED"
+    assert members["registration_sessions"].docs == []
+
+
+def test_a_player_who_cancels_on_discord_is_told_plainly_not_to_retry():
+    f, members = flow()
+    run(f.start(PLAYER, SupportedGame.CIV6))
+    state = members["registration_sessions"].docs[0]["state_token"]
+    with pytest.raises(AuthError) as caught:
+        run(f.callback(code=None, state=state, error="access_denied"))
+    error = caught.value
+    assert (error.code, error.status_code, error.retryable) == (
+        "DISCORD_OAUTH_FAILED",
+        400,
+        False,
+    )
+    assert members["registration_sessions"].docs[0]["status"] == "failed"

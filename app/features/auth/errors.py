@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import HTTPException, Request, status
+from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from app.core.errors import ErrorDetail, ErrorResponse
@@ -93,42 +93,15 @@ class LinkedAccountFetchError(AuthError):
 
 
 class LinkedAccountNotFoundError(AuthError):
-    def __init__(self, platform: str) -> None:
-        message = {
-            "steam": (
+    def __init__(self) -> None:
+        super().__init__(
+            code="DISCORD_LINKED_ACCOUNT_NOT_FOUND",
+            message=(
                 "No linked Steam account was found on your Discord profile. "
                 "Open Discord Settings → Connections, add Steam, enable Display on profile, then try again."
             ),
-            "epic": "We could not confirm a linked Epic account on your Discord profile.",
-            "xbox": "We could not confirm a linked Xbox account on your Discord profile.",
-        }.get(platform, "No supported linked account was found.")
-        super().__init__(
-            code="DISCORD_LINKED_ACCOUNT_NOT_FOUND",
-            message=message,
             status_code=status.HTTP_400_BAD_REQUEST,
-            details={"platform": platform},
-        )
-
-
-class ManualRegistrationRequiredError(AuthError):
-    def __init__(self, platform: str, account_name: str | None = None) -> None:
-        message = {
-            "epic": (
-                "Your Epic account is linked to Discord, but automatic Epic registration "
-                "is not supported. Please contact staff for manual registration or use Steam auth."
-            ),
-            "xbox": (
-                "Your Xbox account is linked to Discord, but automatic Xbox registration "
-                "is not supported. Please contact staff for manual registration or use Steam auth."
-            ),
-        }.get(
-            platform, "Automatic registration is not supported for this account type."
-        )
-        super().__init__(
-            code=f"{platform.upper()}_MANUAL_REQUIRED",
-            message=message,
-            status_code=status.HTTP_400_BAD_REQUEST,
-            details={"platform": platform, "account_name": account_name},
+            details={"platform": "steam"},
         )
 
 
@@ -141,6 +114,17 @@ class DiscordOAuthError(AuthError):
             message=message,
             status_code=status.HTTP_502_BAD_GATEWAY,
             retryable=True,
+        )
+
+
+class SignInCancelledError(AuthError):
+    """The player stopped on Discord's page: nothing failed, so not retryable."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            code="DISCORD_OAUTH_FAILED",
+            message="Discord sign-in was cancelled or did not finish. Please start again.",
+            status_code=status.HTTP_400_BAD_REQUEST,
         )
 
 
@@ -163,16 +147,6 @@ class InvalidStateError(AuthError):
         )
 
 
-class SessionStateConflictError(AuthError):
-    def __init__(self, session_id: str, status_value: str) -> None:
-        super().__init__(
-            code="INVALID_AUTH_STATE",
-            message="The registration link is invalid or has already been used.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-            details={"session_id": session_id, "status": status_value},
-        )
-
-
 class DiscordUserMismatchError(AuthError):
     def __init__(self, *, session_user_id: str, request_user_id: str) -> None:
         super().__init__(
@@ -183,26 +157,6 @@ class DiscordUserMismatchError(AuthError):
                 "session_user_id": session_user_id,
                 "request_user_id": request_user_id,
             },
-        )
-
-
-class OperationNotFoundError(AuthError):
-    def __init__(self, operation_id: str) -> None:
-        super().__init__(
-            code="REGISTRATION_OPERATION_NOT_FOUND",
-            message="Registration operation was not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-            details={"operation_id": operation_id},
-        )
-
-
-class OperationStateConflictError(AuthError):
-    def __init__(self, operation_id: str, status_value: str) -> None:
-        super().__init__(
-            code="REGISTRATION_OPERATION_STATE_CONFLICT",
-            message="Registration operation is no longer pending.",
-            status_code=status.HTTP_409_CONFLICT,
-            details={"operation_id": operation_id, "status": status_value},
         )
 
 
@@ -330,29 +284,6 @@ class StaffRequiredError(AuthError):
             message="Only staff may register a player by hand.",
             status_code=status.HTTP_403_FORBIDDEN,
         )
-
-
-class SelfServiceRegistrationNotAllowedError(AuthError):
-    def __init__(self, *, game: str, platform: str) -> None:
-        super().__init__(
-            code="SELF_SERVICE_REGISTRATION_NOT_ALLOWED",
-            message="Self-service manual registration is only available for Civ 7 on 2K.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-            details={"game": game, "platform": platform},
-        )
-
-
-def to_http_exception(error: AuthError) -> HTTPException:
-    payload = ErrorResponse(
-        error=ErrorDetail(
-            code=error.code,
-            message=error.message,
-            details=error.details,
-            retryable=error.retryable,
-            correlation_id=None,
-        )
-    )
-    return HTTPException(status_code=error.status_code, detail=payload.model_dump())
 
 
 async def auth_error_handler(request: Request, exc: AuthError) -> JSONResponse:
