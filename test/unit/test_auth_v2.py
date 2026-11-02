@@ -272,6 +272,10 @@ def test_a_clash_with_the_player_s_own_record_names_no_standing():
         run(f.manual(STAFF, manual()))
     assert caught.value.details["existing_discord_id"] == PLAYER
     assert "standing" not in caught.value.details
+    assert caught.value.code == "LINKED_ACCOUNT_CONFLICT"
+    assert caught.value.message.startswith(
+        "This Discord account already has a different 2K account linked."
+    )
 
 
 def test_young_accounts_are_flagged_and_old_ones_are_not():

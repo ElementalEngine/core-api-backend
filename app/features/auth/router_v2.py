@@ -145,5 +145,5 @@ async def discord_oauth_callback(
     return sign_in_page(
         200,
         "Signed in",
-        "Discord sign-in worked. The bot is finishing your registration.",
+        "Discord sign-in worked. Go back to Discord to see the result.",
     )

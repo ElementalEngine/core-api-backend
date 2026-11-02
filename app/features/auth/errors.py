@@ -11,6 +11,9 @@ from app.core.errors import ErrorDetail, ErrorResponse
 logger = logging.getLogger(__name__)
 
 
+PLATFORM_LABELS = {"steam": "Steam", "epic": "Epic", "2k": "2K", "xbox": "Xbox"}
+
+
 class AuthError(Exception):
     def __init__(
         self,
@@ -227,11 +230,20 @@ class SteamIdConflictError(AuthError):
 
 class LinkedAccountConflictError(AuthError):
     def __init__(
-        self, *, platform: str, account_id: str, existing_discord_id: str
+        self,
+        *,
+        platform: str,
+        account_id: str,
+        existing_discord_id: str,
+        own: bool = False,
     ) -> None:
+        label = PLATFORM_LABELS.get(platform, platform)
         super().__init__(
             code="LINKED_ACCOUNT_CONFLICT",
-            message="This linked account is already connected to another Discord account. Please contact staff if you believe this is a mistake.",
+            # The record holding the account may be the player's own.
+            message=f"This Discord account already has a different {label} account linked. Please contact staff to change it."
+            if own
+            else "This linked account is already connected to another Discord account. Please contact staff if you believe this is a mistake.",
             status_code=status.HTTP_409_CONFLICT,
             details={
                 "platform": platform,

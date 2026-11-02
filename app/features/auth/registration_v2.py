@@ -261,6 +261,7 @@ async def refuse_clash(
             platform=str(held_platform),
             account_id=str(held_account),
             existing_discord_id=discord_user_id,
+            own=True,
         )
     if game in (by_discord.get("registrations") or {}):
         raise AlreadyRegisteredError(game)

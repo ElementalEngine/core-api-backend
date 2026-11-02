@@ -97,6 +97,7 @@ def test_a_2k_account_held_by_another_player_is_a_linked_account_clash():
             )
         )
     assert caught.value.details["existing_discord_id"] == "2"
+    assert "connected to another Discord account" in caught.value.message
 
 
 def test_steam_validation_private_profile(monkeypatch):

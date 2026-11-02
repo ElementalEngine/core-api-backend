@@ -7,14 +7,16 @@ from html import escape
 
 from fastapi.responses import HTMLResponse
 
-# Nothing loads from elsewhere, no site can frame the page, and the address
-# (which holds the sign-in code) is never sent on.
+# Nothing loads, frames or submits from elsewhere, and the address (which
+# holds the sign-in code) is never sent on.
 HEADERS = {
     "Cache-Control": "no-store",
     "Content-Security-Policy": (
-        "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
+        "default-src 'none'; style-src 'unsafe-inline'; "
+        "frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
     ),
     "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
 }
 
 TEMPLATE = """<!doctype html>

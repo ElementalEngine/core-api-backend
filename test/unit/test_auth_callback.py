@@ -48,14 +48,19 @@ def test_a_finished_sign_in_answers_a_page_sending_the_player_back(monkeypatch):
     assert answer.status_code == 200
     assert answer.headers["content-type"].startswith("text/html")
     assert "go back to Discord" in answer.text
+    # The player may have cancelled in Discord already, so it promises nothing.
+    assert "Go back to Discord to see the result." in answer.text
+    assert "finishing" not in answer.text
 
 
 def test_the_page_loads_nothing_cannot_be_framed_and_is_not_kept(monkeypatch):
     for outcome in (None, SteamProfilePrivateError(game="civ6"), RuntimeError()):
         headers = call_back(monkeypatch, outcome).headers
         assert headers["content-security-policy"] == (
-            "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
+            "default-src 'none'; style-src 'unsafe-inline'; "
+            "frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
         )
+        assert headers["x-content-type-options"] == "nosniff"
         assert headers["cache-control"] == "no-store"
         assert headers["referrer-policy"] == "no-referrer"
 

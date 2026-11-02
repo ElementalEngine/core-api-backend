@@ -1,4 +1,4 @@
-"""differential_gate.py <fingerprint | fpdiff A B | rating | sample OUT | v1 TREE PORT>
+"""differential_gate.py <fingerprint | fpdiff A B | rating | sample OUT | v1 TREE PORT | unauth BEFORE>
 
 The pieces scripts/differential_gate.sh runs to compare v1, production's own
 code, against v2 on approve:
@@ -11,6 +11,8 @@ code, against v2 on approve:
                 what dev has never played; the URL arrives on stdin
   v1 TREE PORT  exec v1 from TREE on 127.0.0.1:PORT against the dev cluster,
                 with v2's rating settings, so the comparison is of code alone
+  unauth BEFORE drop the `auth` database v1 builds at startup, when the
+                fingerprint BEFORE shows none (v2 keeps none)
 
 Secrets arrive on stdin or from the dev .env and are never printed.
 """
@@ -187,6 +189,20 @@ def v1(tree: str, port: str) -> int:
     os.execve(python, [python, "-m", "app"], env)
 
 
+def unauth(before: str) -> int:
+    had = json_util.loads(Path(before).read_text(encoding="utf-8"))
+    if any(key.startswith("auth.") for key in had):
+        return 0
+    c: MongoClient = MongoClient(settings.mongo_url.get_secret_value())
+    try:
+        if "auth" in c.list_database_names():
+            c.drop_database("auth")
+            print("dropped the auth database v1 built")
+    finally:
+        c.close()
+    return 0
+
+
 def main(argv: list[str]) -> int:
     match argv:
         case ["fingerprint"]:
@@ -199,6 +215,8 @@ def main(argv: list[str]) -> int:
             return sample(out)
         case ["v1", tree, port]:
             return v1(tree, port)
+        case ["unauth", before]:
+            return unauth(before)
     print(__doc__)
     return 2
 

@@ -91,6 +91,7 @@ set -e
 say "6. stop v1"
 kill "$V1PID"; wait "$V1PID" 2>/dev/null || true; V1PID=""
 echo "stopped"
+"$PY" -I "$H" unauth "$WORK/before.json"
 
 say "7. state after: identical to before"
 "$PY" scripts/reconcile.py
