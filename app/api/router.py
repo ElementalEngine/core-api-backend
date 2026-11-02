@@ -7,6 +7,7 @@ from app.features.auth.router_v2 import (
 )
 from app.features.civdata.router import router as civ_data_router
 from app.features.infractions.router import router as infractions_router
+from app.features.infractions.router_v2 import router as infractions_v2_router
 from app.features.match_setups.router import router as match_setups_router
 from app.features.match_setups.vote_router import router as votes_router
 from app.features.matches.router_v2 import router as matches_v2_router
@@ -20,6 +21,7 @@ router.include_router(auth_v2_router)
 router.include_router(matches_v2_router)
 router.include_router(stats_v2_router)
 router.include_router(infractions_router)
+router.include_router(infractions_v2_router)
 router.include_router(civ_data_router)
 router.include_router(match_setups_router)
 router.include_router(votes_router)
