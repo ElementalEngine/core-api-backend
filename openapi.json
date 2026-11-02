@@ -3335,7 +3335,7 @@
         "type": "string"
       },
       "SuspensionCleared": {
-        "description": "A suspension ended, with the roles the bot should give back.",
+        "description": "A suspension ended, with the roles the bot should give back; `suspended`\nis the record after the call, so a repeat can tell it ended or never did.",
         "properties": {
           "cleared": {
             "title": "Cleared",
@@ -3344,6 +3344,10 @@
           "discord_id": {
             "title": "Discord Id",
             "type": "string"
+          },
+          "suspended": {
+            "title": "Suspended",
+            "type": "boolean"
           },
           "suspended_roles": {
             "items": {
@@ -3356,6 +3360,7 @@
         "required": [
           "discord_id",
           "cleared",
+          "suspended",
           "suspended_roles"
         ],
         "title": "SuspensionCleared",

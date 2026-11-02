@@ -79,10 +79,12 @@ class TierRemoved(BaseModel):
 
 
 class SuspensionCleared(BaseModel):
-    """A suspension ended, with the roles the bot should give back."""
+    """A suspension ended, with the roles the bot should give back; `suspended`
+    is the record after the call, so a repeat can tell it ended or never did."""
 
     discord_id: str
     cleared: bool
+    suspended: bool
     suspended_roles: list[str]
 
 

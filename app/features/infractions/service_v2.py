@@ -105,6 +105,10 @@ def _restart(doc: SuspensionDocument, now: datetime) -> dict[str, Any]:
     return {f"{served}.decays": now + timedelta(days=DECAY_DAYS[str(served)])}
 
 
+def _kept(doc: SuspensionDocument, roles: list[str]) -> list[str]:
+    return list(dict.fromkeys([*doc.suspendedRoles, *roles]))
+
+
 def _suspend(
     doc: SuspensionDocument,
     ends: datetime | None,
@@ -119,8 +123,8 @@ def _suspend(
     }
     if doc.active_category != category:
         changes |= _restart(doc, now)
-    if not doc.suspended:
-        changes["suspendedRoles"] = roles
+    # A role regained during a running suspension is kept with the first ones.
+    changes["suspendedRoles"] = _kept(doc, roles) if doc.suspended else roles
     return changes
 
 
@@ -180,8 +184,11 @@ class Infractions:
                 + timedelta(days=DECAY_DAYS[category.value]),
             }
             days = 0
-            if warning or _held(doc):
+            held = _held(doc)
+            if warning or held:
                 ends = doc.ends
+                if held and not warning:
+                    changes["suspendedRoles"] = _kept(doc, roles)
             elif threshold:
                 ends = None
                 changes |= _suspend(doc, None, category.value, roles, now)
@@ -198,7 +205,8 @@ class Infractions:
                 ends=ends,
                 suspended=suspended,
                 held=suspended and ends is None,
-                is_ban_threshold=threshold,
+                # Reached by this infraction; a member already held is not held again.
+                is_ban_threshold=threshold and not held,
                 is_warning_only=warning,
             )
 
@@ -310,7 +318,10 @@ class Infractions:
             due = doc.ends is not None and doc.ends <= now
             if not doc.suspended or (due_only and not due):
                 return {}, SuspensionCleared(
-                    discord_id=discord_id, cleared=False, suspended_roles=roles
+                    discord_id=discord_id,
+                    cleared=False,
+                    suspended=doc.suspended,
+                    suspended_roles=roles,
                 )
             changes: dict[str, Any] = {
                 "suspended": False,
@@ -319,7 +330,10 @@ class Infractions:
                 **_restart(doc, now),
             }
             return changes, SuspensionCleared(
-                discord_id=discord_id, cleared=True, suspended_roles=roles
+                discord_id=discord_id,
+                cleared=True,
+                suspended=False,
+                suspended_roles=roles,
             )
 
         return await self._change(discord_id, work)
@@ -383,9 +397,30 @@ class Infractions:
         )
 
     async def apply_pending(self, discord_id: str, roles: list[str]) -> PendingApplied:
-        """On joining: keep the roles the bot removes, then close the entry."""
+        """On joining: a running suspension applies again, with or without a
+        pending entry, keeping the roles the bot removes; the entry is closed."""
         entry: dict[str, Any] | None = await self._due.find_one({"_id": discord_id})
-        if entry is None:
+
+        def work(
+            doc: SuspensionDocument, now: datetime
+        ) -> tuple[dict[str, Any], SuspensionDocument | None]:
+            if not _serving(doc, now):
+                return {}, None
+            return {"suspendedRoles": _kept(doc, roles)}, doc
+
+        served = await self._change(discord_id, work)
+        if entry is not None:
+            # A newer entry written meanwhile is left for the next join; null
+            # matches an older entry stored without a time.
+            await self._due.delete_one(
+                {"_id": discord_id, "created_at": entry.get("created_at")}
+            )
+        logger.info(
+            "Infraction pending applied discord_id=%s applied=%s",
+            discord_id,
+            served is not None,
+        )
+        if served is None:
             return PendingApplied(
                 discord_id=discord_id,
                 applied=False,
@@ -394,29 +429,12 @@ class Infractions:
                 ends=None,
                 held=False,
             )
-
-        def work(
-            doc: SuspensionDocument, now: datetime
-        ) -> tuple[dict[str, Any], tuple[bool, datetime | None]]:
-            if not _serving(doc, now):
-                return {}, (False, None)
-            kept = list(dict.fromkeys([*doc.suspendedRoles, *roles]))
-            return {"suspendedRoles": kept}, (True, doc.ends)
-
-        applied, ends = await self._change(discord_id, work)
-        # A newer entry written meanwhile is left for the next join; null matches
-        # an older entry stored without a time.
-        await self._due.delete_one(
-            {"_id": discord_id, "created_at": entry.get("created_at")}
-        )
-        logger.info(
-            "Infraction pending applied discord_id=%s applied=%s", discord_id, applied
-        )
+        kind = entry.get("punishment_type") if entry else served.active_category
         return PendingApplied(
             discord_id=discord_id,
-            applied=applied,
-            punishment_type=str(entry.get("punishment_type")),
-            reason=entry.get("reason"),
-            ends=ends,
-            held=applied and ends is None,
+            applied=True,
+            punishment_type=str(kind) if kind else None,
+            reason=entry.get("reason") if entry else None,
+            ends=served.ends,
+            held=served.ends is None,
         )

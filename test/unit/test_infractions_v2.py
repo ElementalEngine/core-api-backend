@@ -27,6 +27,7 @@ from app.main import app
 PLAYER = "123456789012345678"
 STAFF = "999999999999999999"
 ROLE = "111111111111111111"
+OTHER = "222222222222222222"
 NOW = datetime(2026, 11, 2, 12, 0, tzinfo=UTC)
 DAY = timedelta(days=1)
 ZERO = {"tier": 0, "decays": None}
@@ -164,6 +165,17 @@ def test_days_stack_on_a_running_suspension_and_its_roles_are_kept():
     assert stored(members)["suspendedRoles"] == [ROLE]
 
 
+def test_a_role_regained_during_a_suspension_is_kept_with_the_first_ones():
+    service, members = setup(
+        suspended=True,
+        ends=NOW + 5 * DAY,
+        suspendedRoles=[ROLE],
+        active_category="quit",
+    )
+    run(service.tier(PLAYER, TierCategory.quit, body(OTHER), STAFF))
+    assert stored(members)["suspendedRoles"] == [ROLE, OTHER]
+
+
 def test_a_minor_warning_changes_no_suspension():
     # v1 set suspended false and cleared the end on a warning.
     service, members = setup(suspended=True, ends=NOW + 3 * DAY, active_category="flat")
@@ -193,6 +205,20 @@ def test_the_ban_threshold_holds_the_suspension_until_staff_act():
         run(service.flat(PLAYER, FlatType.comp, body(), STAFF))
     cleared = run(service.unsuspend(PLAYER, "appeal upheld", STAFF))
     assert (cleared.cleared, cleared.suspended_roles) == (True, [ROLE])
+
+
+def test_a_tier_during_a_hold_keeps_a_regained_role_and_is_no_new_threshold():
+    # Each further tier pinged moderators and restarted the appeal, as if newly held.
+    service, members = setup(
+        suspended=True,
+        ends=None,
+        suspendedRoles=[ROLE],
+        active_category="extreme",
+        extreme={"tier": 2, "decays": NOW + DAY},
+    )
+    result = run(service.tier(PLAYER, TierCategory.extreme, body(OTHER), STAFF))
+    assert (result.held, result.is_ban_threshold, result.tier) == (True, False, 2)
+    assert stored(members)["suspendedRoles"] == [ROLE, OTHER]
 
 
 def test_tiers_decay_once_for_each_full_period_and_keep_their_clock():
@@ -286,6 +312,14 @@ def test_unsuspend_clears_once_and_a_repeat_still_returns_the_roles():
     assert (stored(members)["suspended"], stored(members)["ends"]) == (False, None)
 
 
+def test_a_repeat_says_whether_the_record_is_still_suspended():
+    # A lost answer is asked again; only a record no longer suspended gives roles back.
+    service, _ = setup(suspended=True, ends=NOW + DAY, suspendedRoles=[ROLE])
+    assert run(service.expire(PLAYER)).suspended is True
+    assert run(service.unsuspend(PLAYER, None, STAFF)).suspended is False
+    assert run(service.expire(PLAYER)).suspended is False
+
+
 def test_release_restarts_the_served_category_clock():
     # Time served is not clean time, so a long hold does not decay on release.
     service, members = setup(
@@ -358,7 +392,37 @@ def test_joining_keeps_the_roles_removed_and_closes_the_pending_entry():
     )
     assert stored(members)["suspendedRoles"] == [ROLE]
     assert members["suspensions_due"].docs == []
-    assert run(service.apply_pending(PLAYER, [ROLE])).applied is False
+
+
+def test_rejoining_while_suspended_applies_again_without_a_pending_entry():
+    # Leaving and rejoining shed the Suspended role, since only an entry applied.
+    service, members = setup(
+        suspended=True,
+        ends=NOW + DAY,
+        suspendedRoles=[ROLE],
+        active_category="quit",
+    )
+    applied = run(service.apply_pending(PLAYER, [OTHER, ROLE]))
+    assert (applied.applied, applied.punishment_type, applied.reason) == (
+        True,
+        "quit",
+        None,
+    )
+    assert (applied.ends, applied.held) == (NOW + DAY, False)
+    assert stored(members)["suspendedRoles"] == [ROLE, OTHER]
+
+
+def test_a_hold_applies_again_on_joining():
+    service, _ = setup(suspended=True, ends=None, active_category="extreme")
+    applied = run(service.apply_pending(PLAYER, []))
+    assert (applied.applied, applied.held, applied.ends) == (True, True, None)
+
+
+def test_a_member_without_a_record_who_joins_is_left_alone():
+    service, members = setup()
+    applied = run(service.apply_pending(PLAYER, [ROLE]))
+    assert (applied.applied, applied.punishment_type) == (False, None)
+    assert members["suspensions"].docs == []
 
 
 def test_a_pending_entry_written_while_joining_is_kept(monkeypatch):
@@ -477,6 +541,7 @@ def test_the_routes_need_the_token_and_staff_writes_need_the_actor(monkeypatch):
     assert expired.json() == {
         "discord_id": PLAYER,
         "cleared": False,
+        "suspended": False,
         "suspended_roles": [],
     }
 
