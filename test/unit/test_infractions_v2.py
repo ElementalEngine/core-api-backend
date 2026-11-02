@@ -189,7 +189,8 @@ def test_the_ban_threshold_holds_the_suspension_until_staff_act():
     assert run(service.due()).discord_ids == []
     with pytest.raises(SuspensionHeld):
         run(service.days(PLAYER, 3, STAFF))
-    assert run(service.flat(PLAYER, FlatType.comp, body(), STAFF)).held
+    with pytest.raises(SuspensionHeld):
+        run(service.flat(PLAYER, FlatType.comp, body(), STAFF))
     cleared = run(service.unsuspend(PLAYER, "appeal upheld", STAFF))
     assert (cleared.cleared, cleared.suspended_roles) == (True, [ROLE])
 
@@ -210,6 +211,26 @@ def test_a_new_infraction_escalates_from_the_decayed_tier():
     service, _ = setup(quit={"tier": 4, "decays": NOW - 400 * DAY})
     result = run(service.tier(PLAYER, TierCategory.quit, body(), STAFF))
     assert (result.tier, result.days_added) == (1, 1)
+
+
+def test_a_category_taken_over_restarts_its_clock():
+    # Its served time is not clean time, even when another suspension replaces it.
+    service, members = setup(
+        suspended=True,
+        ends=NOW + DAY,
+        active_category="major",
+        major={"tier": 2, "decays": NOW - 10 * DAY},
+    )
+    run(service.flat(PLAYER, FlatType.comp, body(), STAFF))
+    assert stored(members)["major"] == {"tier": 2, "decays": NOW + 90 * DAY}
+    run(service.unsuspend(PLAYER, None, STAFF))
+    assert stored(members)["major"]["tier"] == 2
+
+
+def test_a_warning_on_an_overdue_suspension_reports_it_over():
+    service, _ = setup(suspended=True, ends=NOW - DAY, active_category="flat")
+    result = run(service.tier(PLAYER, TierCategory.minor, body(), STAFF))
+    assert (result.is_warning_only, result.suspended) == (True, False)
 
 
 def test_the_category_being_served_does_not_decay():
@@ -234,7 +255,10 @@ def test_days_need_a_suspension_with_an_end():
 def test_days_added_stack_on_the_end_and_days_removed_come_off_it():
     service, _ = setup(suspended=True, ends=NOW + 2 * DAY, active_category="quit")
     assert run(service.days(PLAYER, 3, STAFF)).ends == NOW + 5 * DAY
-    assert run(service.days(PLAYER, -4, STAFF)).ends == NOW + DAY
+    shorter = run(service.days(PLAYER, -4, STAFF))
+    assert (shorter.ends, shorter.suspended) == (NOW + DAY, True)
+    ended = run(service.days(PLAYER, -2, STAFF))
+    assert (ended.ends, ended.suspended) == (NOW - DAY, False)
 
 
 def test_a_tier_is_removed_only_while_the_member_is_not_suspended():
@@ -339,17 +363,23 @@ def test_joining_keeps_the_roles_removed_and_closes_the_pending_entry():
 
 def test_a_pending_entry_written_while_joining_is_kept(monkeypatch):
     service, members = setup(suspended=True, ends=NOW + DAY)
-    run(service.set_pending(PLAYER, FlatType.smurf, None, STAFF))
-    older = SimpleNamespace(punishment_type="quit", reason=None, created_at=NOW - DAY)
+    due = members["suspensions_due"]
+    due.docs.append({"_id": PLAYER, "punishment_type": "smurf", "created_at": NOW})
+    older = {"_id": PLAYER, "punishment_type": "quit", "created_at": NOW - DAY}
 
-    async def read_before_the_newer_write(client, discord_id):
-        return older
+    async def read_before_the_newer_write(flt, projection=None, sort=None):
+        return dict(older)
 
-    monkeypatch.setattr(
-        service_v2, "find_pending_suspension", read_before_the_newer_write
-    )
+    monkeypatch.setattr(due, "find_one", read_before_the_newer_write)
     assert run(service.apply_pending(PLAYER, [ROLE])).applied is True
-    assert [d["punishment_type"] for d in members["suspensions_due"].docs] == ["smurf"]
+    assert [d["punishment_type"] for d in due.docs] == ["smurf"]
+
+
+def test_a_pending_entry_stored_without_a_time_is_still_closed():
+    service, members = setup(suspended=True, ends=NOW + DAY)
+    members["suspensions_due"].docs.append({"_id": PLAYER, "punishment_type": "quit"})
+    assert run(service.apply_pending(PLAYER, [ROLE])).applied is True
+    assert members["suspensions_due"].docs == []
 
 
 def test_a_pending_entry_whose_suspension_ended_is_closed_without_applying():

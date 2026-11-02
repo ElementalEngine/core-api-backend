@@ -61,14 +61,14 @@ class FlatResult(BaseModel):
     discord_id: str
     type: FlatType
     days_added: int
-    ends: datetime | None
-    held: bool
+    ends: datetime
 
 
 class DaysResult(BaseModel):
     discord_id: str
     days: int
     ends: datetime
+    suspended: bool
 
 
 class TierRemoved(BaseModel):
@@ -78,7 +78,7 @@ class TierRemoved(BaseModel):
     was_changed: bool
 
 
-class Cleared(BaseModel):
+class SuspensionCleared(BaseModel):
     """A suspension ended, with the roles the bot should give back."""
 
     discord_id: str
@@ -86,12 +86,12 @@ class Cleared(BaseModel):
     suspended_roles: list[str]
 
 
-class Due(BaseModel):
+class DueSuspensions(BaseModel):
     discord_ids: list[str]
     next_ends: datetime | None
 
 
-class Applied(BaseModel):
+class PendingApplied(BaseModel):
     discord_id: str
     applied: bool
     punishment_type: str | None

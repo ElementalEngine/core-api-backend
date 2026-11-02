@@ -20,17 +20,16 @@ from app.features.infractions.errors import (
 from app.features.infractions.models import FlatType, SuspensionDocument, TierCategory
 from app.features.infractions.repository import (
     create_pending_suspension,
-    find_pending_suspension,
     suspensions_col,
     suspensions_due_col,
 )
 from app.features.infractions.schemas_v2 import (
-    Applied,
-    Cleared,
     DaysResult,
-    Due,
+    DueSuspensions,
     FlatResult,
     InfractionBody,
+    PendingApplied,
+    SuspensionCleared,
     TierRemoved,
     TierResult,
 )
@@ -96,14 +95,30 @@ def _start(doc: SuspensionDocument, now: datetime) -> datetime:
     return doc.ends if doc.ends and doc.ends > now else now
 
 
+def _restart(doc: SuspensionDocument, now: datetime) -> dict[str, Any]:
+    """A category stops being served: its decay clock starts again from now."""
+    served = doc.active_category
+    if not doc.suspended or served not in TIER_CAPS:
+        return {}
+    if getattr(doc, str(served)).tier <= 0:
+        return {}
+    return {f"{served}.decays": now + timedelta(days=DECAY_DAYS[str(served)])}
+
+
 def _suspend(
-    doc: SuspensionDocument, ends: datetime | None, category: str, roles: list[str]
+    doc: SuspensionDocument,
+    ends: datetime | None,
+    category: str,
+    roles: list[str],
+    now: datetime,
 ) -> dict[str, Any]:
     changes: dict[str, Any] = {
         "suspended": True,
         "ends": ends,
         "active_category": category,
     }
+    if doc.active_category != category:
+        changes |= _restart(doc, now)
     if not doc.suspended:
         changes["suspendedRoles"] = roles
     return changes
@@ -113,6 +128,7 @@ class Infractions:
     def __init__(self, client: AsyncMongoClient) -> None:  # type: ignore[type-arg]
         self._client = client
         self._col = suspensions_col(client)
+        self._due = suspensions_due_col(client)
 
     async def _change(self, discord_id: str, work: Work[T]) -> T:
         for _ in range(ATTEMPTS):
@@ -168,12 +184,12 @@ class Infractions:
                 ends = doc.ends
             elif threshold:
                 ends = None
-                changes |= _suspend(doc, None, category.value, roles)
+                changes |= _suspend(doc, None, category.value, roles, now)
             else:
                 days = durations[tier - 1]
                 ends = _start(doc, now) + timedelta(days=days)
-                changes |= _suspend(doc, ends, category.value, roles)
-            suspended = doc.suspended or "suspended" in changes
+                changes |= _suspend(doc, ends, category.value, roles, now)
+            suspended = "suspended" in changes or _serving(doc, now)
             return changes, TierResult(
                 discord_id=discord_id,
                 category=category,
@@ -207,21 +223,14 @@ class Infractions:
             doc: SuspensionDocument, now: datetime
         ) -> tuple[dict[str, Any], FlatResult]:
             if _held(doc):
-                return {}, FlatResult(
-                    discord_id=discord_id,
-                    type=flat_type,
-                    days_added=0,
-                    ends=None,
-                    held=True,
-                )
+                raise SuspensionHeld()
             days = FLAT_DAYS[flat_type.value]
             ends = _start(doc, now) + timedelta(days=days)
-            return _suspend(doc, ends, "flat", roles), FlatResult(
+            return _suspend(doc, ends, "flat", roles, now), FlatResult(
                 discord_id=discord_id,
                 type=flat_type,
                 days_added=days,
                 ends=ends,
-                held=False,
             )
 
         result = await self._change(discord_id, work)
@@ -243,10 +252,9 @@ class Infractions:
                 raise NoSuspension()
             if doc.ends is None:
                 raise SuspensionHeld()
-            base = _start(doc, now) if days > 0 else doc.ends
-            ends = base + timedelta(days=days)
+            ends = doc.ends + timedelta(days=days)
             return {"ends": ends}, DaysResult(
-                discord_id=discord_id, days=days, ends=ends
+                discord_id=discord_id, days=days, ends=ends, suspended=ends > now
             )
 
         result = await self._change(discord_id, work)
@@ -291,30 +299,26 @@ class Infractions:
         )
         return result
 
-    async def _clear(self, discord_id: str, due_only: bool) -> Cleared:
+    async def _clear(self, discord_id: str, due_only: bool) -> SuspensionCleared:
         """Ends a suspension and restarts the served category's decay clock. The
         roles stay on the record, so a repeated call still returns them."""
 
         def work(
             doc: SuspensionDocument, now: datetime
-        ) -> tuple[dict[str, Any], Cleared]:
+        ) -> tuple[dict[str, Any], SuspensionCleared]:
             roles = list(doc.suspendedRoles)
             due = doc.ends is not None and doc.ends <= now
             if not doc.suspended or (due_only and not due):
-                return {}, Cleared(
+                return {}, SuspensionCleared(
                     discord_id=discord_id, cleared=False, suspended_roles=roles
                 )
             changes: dict[str, Any] = {
                 "suspended": False,
                 "ends": None,
                 "active_category": None,
+                **_restart(doc, now),
             }
-            served = doc.active_category
-            if served in TIER_CAPS and getattr(doc, str(served)).tier > 0:
-                changes[f"{served}.decays"] = now + timedelta(
-                    days=DECAY_DAYS[str(served)]
-                )
-            return changes, Cleared(
+            return changes, SuspensionCleared(
                 discord_id=discord_id, cleared=True, suspended_roles=roles
             )
 
@@ -322,7 +326,7 @@ class Infractions:
 
     async def unsuspend(
         self, discord_id: str, reason: str | None, actor: str
-    ) -> Cleared:
+    ) -> SuspensionCleared:
         result = await self._clear(discord_id, due_only=False)
         logger.info(
             "Infraction unsuspend discord_id=%s actor=%s cleared=%s reason=%r",
@@ -333,7 +337,7 @@ class Infractions:
         )
         return result
 
-    async def expire(self, discord_id: str) -> Cleared:
+    async def expire(self, discord_id: str) -> SuspensionCleared:
         """Ends a suspension only once its end has passed, so a fresh extension
         is never undone and a second call changes nothing."""
         result = await self._clear(discord_id, due_only=True)
@@ -341,7 +345,7 @@ class Infractions:
             logger.info("Infraction expired discord_id=%s", discord_id)
         return result
 
-    async def due(self) -> Due:
+    async def due(self) -> DueSuspensions:
         now = now_utc()
         cursor = (
             self._col.find(
@@ -357,7 +361,9 @@ class Infractions:
             {"ends": 1, "_id": 0},
             sort=[("ends", 1)],
         )
-        return Due(discord_ids=ids, next_ends=upcoming["ends"] if upcoming else None)
+        return DueSuspensions(
+            discord_ids=ids, next_ends=upcoming["ends"] if upcoming else None
+        )
 
     async def set_pending(
         self,
@@ -376,11 +382,11 @@ class Infractions:
             punishment.value,
         )
 
-    async def apply_pending(self, discord_id: str, roles: list[str]) -> Applied:
+    async def apply_pending(self, discord_id: str, roles: list[str]) -> PendingApplied:
         """On joining: keep the roles the bot removes, then close the entry."""
-        pending = await find_pending_suspension(self._client, discord_id)
-        if pending is None:
-            return Applied(
+        entry: dict[str, Any] | None = await self._due.find_one({"_id": discord_id})
+        if entry is None:
+            return PendingApplied(
                 discord_id=discord_id,
                 applied=False,
                 punishment_type=None,
@@ -398,18 +404,19 @@ class Infractions:
             return {"suspendedRoles": kept}, (True, doc.ends)
 
         applied, ends = await self._change(discord_id, work)
-        # A newer entry written meanwhile is left for the next join.
-        await suspensions_due_col(self._client).delete_one(
-            {"_id": discord_id, "created_at": pending.created_at}
+        # A newer entry written meanwhile is left for the next join; null matches
+        # an older entry stored without a time.
+        await self._due.delete_one(
+            {"_id": discord_id, "created_at": entry.get("created_at")}
         )
         logger.info(
             "Infraction pending applied discord_id=%s applied=%s", discord_id, applied
         )
-        return Applied(
+        return PendingApplied(
             discord_id=discord_id,
             applied=applied,
-            punishment_type=pending.punishment_type,
-            reason=pending.reason,
+            punishment_type=str(entry.get("punishment_type")),
+            reason=entry.get("reason"),
             ends=ends,
             held=applied and ends is None,
         )

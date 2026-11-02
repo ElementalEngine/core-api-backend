@@ -8,17 +8,17 @@ from pymongo import AsyncMongoClient
 from app.core.dependencies import get_database, require_lj_token
 from app.features.infractions.models import FlatType, TierCategory
 from app.features.infractions.schemas_v2 import (
-    Applied,
-    Cleared,
     DaysBody,
     DaysResult,
-    Due,
+    DueSuspensions,
     FlatResult,
     InfractionBody,
+    PendingApplied,
     PendingBody,
     ReasonBody,
     RemoveTierBody,
     RolesBody,
+    SuspensionCleared,
     TierRemoved,
     TierResult,
 )
@@ -48,8 +48,8 @@ Service = Annotated[Infractions, Depends(_service)]
 Actor = Annotated[str, Depends(_actor)]
 
 
-@router.get("/due", response_model=Due)
-async def due(service: Service) -> Due:
+@router.get("/due", response_model=DueSuspensions)
+async def due(service: Service) -> DueSuspensions:
     return await service.due()
 
 
@@ -89,18 +89,18 @@ async def remove_tier(
     return await service.remove_tier(discord_id, body.category, actor)
 
 
-@router.post("/{discord_id}/unsuspend", response_model=Cleared)
+@router.post("/{discord_id}/unsuspend", response_model=SuspensionCleared)
 async def unsuspend(
     discord_id: MemberId,
     service: Service,
     actor: Actor,
     body: ReasonBody = ReasonBody(),
-) -> Cleared:
+) -> SuspensionCleared:
     return await service.unsuspend(discord_id, body.reason, actor)
 
 
-@router.post("/{discord_id}/expire", response_model=Cleared)
-async def expire(discord_id: MemberId, service: Service) -> Cleared:
+@router.post("/{discord_id}/expire", response_model=SuspensionCleared)
+async def expire(discord_id: MemberId, service: Service) -> SuspensionCleared:
     return await service.expire(discord_id)
 
 
@@ -111,8 +111,8 @@ async def set_pending(
     await service.set_pending(discord_id, body.punishment_type, body.reason, actor)
 
 
-@router.post("/{discord_id}/pending/apply", response_model=Applied)
+@router.post("/{discord_id}/pending/apply", response_model=PendingApplied)
 async def apply_pending(
     discord_id: MemberId, service: Service, body: RolesBody = RolesBody()
-) -> Applied:
+) -> PendingApplied:
     return await service.apply_pending(discord_id, body.suspended_roles)

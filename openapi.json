@@ -140,66 +140,6 @@
         "title": "AffectedPlayerRating",
         "type": "object"
       },
-      "Applied": {
-        "properties": {
-          "applied": {
-            "title": "Applied",
-            "type": "boolean"
-          },
-          "discord_id": {
-            "title": "Discord Id",
-            "type": "string"
-          },
-          "ends": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ends"
-          },
-          "held": {
-            "title": "Held",
-            "type": "boolean"
-          },
-          "punishment_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Punishment Type"
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
-          }
-        },
-        "required": [
-          "discord_id",
-          "applied",
-          "punishment_type",
-          "reason",
-          "ends",
-          "held"
-        ],
-        "title": "Applied",
-        "type": "object"
-      },
       "BatchStatsRequest": {
         "properties": {
           "civ_version": {
@@ -434,33 +374,6 @@
         "title": "CivRow",
         "type": "object"
       },
-      "Cleared": {
-        "description": "A suspension ended, with the roles the bot should give back.",
-        "properties": {
-          "cleared": {
-            "title": "Cleared",
-            "type": "boolean"
-          },
-          "discord_id": {
-            "title": "Discord Id",
-            "type": "string"
-          },
-          "suspended_roles": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Suspended Roles",
-            "type": "array"
-          }
-        },
-        "required": [
-          "discord_id",
-          "cleared",
-          "suspended_roles"
-        ],
-        "title": "Cleared",
-        "type": "object"
-      },
       "ContestBody": {
         "properties": {
           "reason": {
@@ -547,12 +460,17 @@
             "format": "date-time",
             "title": "Ends",
             "type": "string"
+          },
+          "suspended": {
+            "title": "Suspended",
+            "type": "boolean"
           }
         },
         "required": [
           "discord_id",
           "days",
-          "ends"
+          "ends",
+          "suspended"
         ],
         "title": "DaysResult",
         "type": "object"
@@ -718,7 +636,7 @@
         "title": "DraftRequest",
         "type": "object"
       },
-      "Due": {
+      "DueSuspensions": {
         "properties": {
           "discord_ids": {
             "items": {
@@ -744,7 +662,7 @@
           "discord_ids",
           "next_ends"
         ],
-        "title": "Due",
+        "title": "DueSuspensions",
         "type": "object"
       },
       "ErrorDetail": {
@@ -807,20 +725,9 @@
             "type": "string"
           },
           "ends": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ends"
-          },
-          "held": {
-            "title": "Held",
-            "type": "boolean"
+            "format": "date-time",
+            "title": "Ends",
+            "type": "string"
           },
           "type": {
             "$ref": "#/components/schemas/FlatType"
@@ -830,8 +737,7 @@
           "discord_id",
           "type",
           "days_added",
-          "ends",
-          "held"
+          "ends"
         ],
         "title": "FlatResult",
         "type": "object"
@@ -2038,6 +1944,66 @@
           "new_ends"
         ],
         "title": "ModifyDaysResponse",
+        "type": "object"
+      },
+      "PendingApplied": {
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "discord_id": {
+            "title": "Discord Id",
+            "type": "string"
+          },
+          "ends": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends"
+          },
+          "held": {
+            "title": "Held",
+            "type": "boolean"
+          },
+          "punishment_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Punishment Type"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "discord_id",
+          "applied",
+          "punishment_type",
+          "reason",
+          "ends",
+          "held"
+        ],
+        "title": "PendingApplied",
         "type": "object"
       },
       "PendingBody": {
@@ -3367,6 +3333,33 @@
         ],
         "title": "SupportedGame",
         "type": "string"
+      },
+      "SuspensionCleared": {
+        "description": "A suspension ended, with the roles the bot should give back.",
+        "properties": {
+          "cleared": {
+            "title": "Cleared",
+            "type": "boolean"
+          },
+          "discord_id": {
+            "title": "Discord Id",
+            "type": "string"
+          },
+          "suspended_roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Suspended Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "discord_id",
+          "cleared",
+          "suspended_roles"
+        ],
+        "title": "SuspensionCleared",
+        "type": "object"
       },
       "SuspensionRecordResponse": {
         "properties": {
@@ -5700,7 +5693,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Due"
+                  "$ref": "#/components/schemas/DueSuspensions"
                 }
               }
             },
@@ -5838,7 +5831,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Cleared"
+                  "$ref": "#/components/schemas/SuspensionCleared"
                 }
               }
             },
@@ -6068,7 +6061,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Applied"
+                  "$ref": "#/components/schemas/PendingApplied"
                 }
               }
             },
@@ -6313,7 +6306,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Cleared"
+                  "$ref": "#/components/schemas/SuspensionCleared"
                 }
               }
             },
