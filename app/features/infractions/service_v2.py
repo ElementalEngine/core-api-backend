@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any, TypeVar
+from typing import Any, Final, TypeVar
 
 from pymongo import AsyncMongoClient
 from pymongo.errors import DuplicateKeyError
@@ -33,14 +33,39 @@ from app.features.infractions.schemas_v2 import (
     TierRemoved,
     TierResult,
 )
-from app.features.infractions.service import (
-    DECAY_DAYS,
-    FLAT_DAYS,
-    TIER_CAPS,
-    TIER_DURATIONS,
-)
 
 logger = logging.getLogger(__name__)
+
+# The tier ladders. The last tier of each is the ban threshold, which has no duration.
+TIER_CAPS: Final[dict[str, int]] = {
+    "quit": 6,
+    "minor": 7,
+    "moderate": 6,
+    "major": 4,
+    "extreme": 2,
+}
+
+TIER_DURATIONS: Final[dict[str, list[int]]] = {
+    "quit": [1, 3, 7, 14, 30],
+    "minor": [0, 1, 2, 4, 7, 14],
+    "moderate": [1, 4, 7, 14, 30],
+    "major": [7, 14, 30],
+    "extreme": [30],
+}
+
+DECAY_DAYS: Final[dict[str, int]] = {
+    "quit": 90,
+    "minor": 90,
+    "moderate": 90,
+    "major": 90,
+    "extreme": 1460,
+}
+
+FLAT_DAYS: Final[dict[str, int]] = {
+    "smurf": 30,
+    "oversub": 3,
+    "comp": 7,
+}
 
 T = TypeVar("T")
 Work = Callable[[SuspensionDocument, datetime], tuple[dict[str, Any], T]]
@@ -298,13 +323,14 @@ class Infractions:
             )
 
         result = await self._change(discord_id, work)
-        logger.info(
-            "Infraction remove-tier discord_id=%s actor=%s category=%s tier=%s",
-            discord_id,
-            actor,
-            category.value,
-            result.tier,
-        )
+        if result.was_changed:
+            logger.info(
+                "Infraction remove-tier discord_id=%s actor=%s category=%s tier=%s",
+                discord_id,
+                actor,
+                category.value,
+                result.tier,
+            )
         return result
 
     async def _clear(self, discord_id: str, due_only: bool) -> SuspensionCleared:

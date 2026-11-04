@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import HTTPException, Request, status as http_status
+from fastapi import Request, status as http_status
 from fastapi.responses import JSONResponse
 
 from app.core.errors import ErrorDetail, ErrorResponse
@@ -24,15 +24,6 @@ class InfractionError(Exception):
         self.message = message
         self.status_code = status_code
         self.retryable = retryable
-
-
-class NotSuspendedError(InfractionError):
-    def __init__(self, discord_id: str) -> None:
-        super().__init__(
-            code="USER_NOT_SUSPENDED",
-            message=f"User {discord_id} has no active suspension to modify.",
-            status_code=http_status.HTTP_400_BAD_REQUEST,
-        )
 
 
 class NoSuspension(InfractionError):
@@ -93,14 +84,3 @@ async def infraction_error_handler(
         status_code=exc.status_code,
         content={"detail": ErrorResponse(error=error).model_dump(mode="json")},
     )
-
-
-def to_http_exception(error: InfractionError) -> HTTPException:
-    payload = ErrorResponse(
-        error=ErrorDetail(
-            code=error.code,
-            message=error.message,
-            retryable=error.retryable,
-        )
-    )
-    return HTTPException(status_code=error.status_code, detail=payload.model_dump())

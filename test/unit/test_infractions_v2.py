@@ -302,6 +302,16 @@ def test_a_tier_is_removed_only_while_the_member_is_not_suspended():
     )
 
 
+def test_a_removal_that_changes_nothing_is_not_logged_as_a_write(caplog):
+    service, _ = setup(quit={"tier": 1, "decays": NOW + DAY})
+    with caplog.at_level("INFO", logger="app.features.infractions.service_v2"):
+        run(service.remove_tier(PLAYER, TierCategory.quit, STAFF))
+        run(service.remove_tier(PLAYER, TierCategory.quit, STAFF))
+    assert [r.message for r in caplog.records if "remove-tier" in r.message] == [
+        f"Infraction remove-tier discord_id={PLAYER} actor={STAFF} category=quit tier=0"
+    ]
+
+
 def test_unsuspend_clears_once_and_a_repeat_still_returns_the_roles():
     # An answer lost on the way back must not lose the member's roles.
     service, members = setup(suspended=True, ends=NOW + DAY, suspendedRoles=[ROLE])

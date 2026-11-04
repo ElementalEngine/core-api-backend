@@ -136,7 +136,7 @@ app/
     ratings/       TrueSkill, the rating ledger and its reconciliation
     seasons/       seasons and the season change
     stats/         stats, history, team generation
-scripts/        seeding, migrations, export, reconcile, the v1 differential
+scripts/        seeding, migrations, export, reconcile, the differential
 test/           unit/, parsing/ and the save files in data/
 ```
 

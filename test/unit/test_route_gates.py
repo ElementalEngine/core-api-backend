@@ -78,6 +78,11 @@ def test_every_mounted_route_is_gated_or_explicitly_public():
     assert not ungated, f"routes with no service-token gate: {ungated}"
 
 
+def test_no_route_is_left_on_v1():
+    v1 = sorted(r.path for r in api_routes() if r.path.startswith("/api/v1"))
+    assert not v1, f"v1 routes still mounted: {v1}"
+
+
 def test_no_public_path_is_stale():
     # A path removed from the app but left in PUBLIC_PATHS would silently
     # widen the exemption for whatever later takes that path.

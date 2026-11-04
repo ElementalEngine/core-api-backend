@@ -1,18 +1,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, Final
+from typing import Final
 
 from pymongo import ASCENDING, AsyncMongoClient
 from pymongo.asynchronous.collection import AsyncCollection
-from pymongo.collection import ReturnDocument
 
 from app.core.constants import DB_SERVER_MEMBERS
-from app.features.infractions.models import (
-    ActiveSuspension,
-    PendingSuspensionDocument,
-    SuspensionDocument,
-)
 
 COL_SUSPENSIONS: Final[str] = "suspensions"
 COL_SUSPENSIONS_DUE: Final[str] = "suspensions_due"
@@ -45,73 +39,7 @@ async def create_indexes(db: AsyncMongoClient) -> None:
     )
 
 
-# ─── Core CRUD ────────────────────────────────────────────────────────────────
-
-
-async def find_suspension(
-    db: AsyncMongoClient, discord_id: str
-) -> SuspensionDocument | None:
-    col = suspensions_col(db)
-    result: dict[str, Any] | None = await col.find_one({"discord_id": discord_id})
-    if result is None:
-        return None
-    return SuspensionDocument.model_validate(result)
-
-
-async def upsert_suspension(
-    db: AsyncMongoClient, discord_id: str, update: dict[str, Any]
-) -> None:
-    col = suspensions_col(db)
-    await col.update_one(
-        {"discord_id": discord_id},
-        {"$set": update},
-        upsert=True,
-    )
-
-
-async def find_or_create_suspension(
-    db: AsyncMongoClient, discord_id: str
-) -> SuspensionDocument:
-    """Atomic upsert — never a read-then-write race."""
-    col = suspensions_col(db)
-    _default_ir: dict[str, Any] = {"tier": 0, "decays": None}
-    result: dict[str, Any] | None = await col.find_one_and_update(
-        {"discord_id": discord_id},
-        {
-            "$setOnInsert": {
-                "discord_id": discord_id,
-                "suspended": False,
-                "ends": None,
-                "suspendedRoles": [],
-                "quit": _default_ir,
-                "minor": _default_ir,
-                "moderate": _default_ir,
-                "major": _default_ir,
-                "extreme": _default_ir,
-                "active_category": None,
-            }
-        },
-        upsert=True,
-        return_document=ReturnDocument.AFTER,
-    )
-    if result is None:
-        raise RuntimeError(
-            f"find_one_and_update with upsert returned None for discord_id={discord_id!r}"
-        )
-    return SuspensionDocument.model_validate(result)
-
-
 # ─── Pending suspensions ──────────────────────────────────────────────────────
-
-
-async def find_pending_suspension(
-    db: AsyncMongoClient, discord_id: str
-) -> PendingSuspensionDocument | None:
-    col = suspensions_due_col(db)
-    result: dict[str, Any] | None = await col.find_one({"_id": discord_id})
-    if result is None:
-        return None
-    return PendingSuspensionDocument.model_validate(result)
 
 
 async def create_pending_suspension(
@@ -132,36 +60,3 @@ async def create_pending_suspension(
         },
         upsert=True,
     )
-
-
-async def delete_pending_suspension(db: AsyncMongoClient, discord_id: str) -> None:
-    col = suspensions_due_col(db)
-    await col.delete_one({"_id": discord_id})
-
-
-# ─── Scheduler recovery ───────────────────────────────────────────────────────
-
-
-async def get_active_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]:
-    """Query uses compound index { suspended: 1, ends: 1 }."""
-    col = suspensions_col(db)
-    now = datetime.now(UTC)
-    cursor = col.find(
-        {"suspended": True, "ends": {"$gt": now}},
-        {"discord_id": 1, "ends": 1, "_id": 0},
-    )
-    results: list[dict[str, Any]] = await cursor.to_list(length=None)
-    return [ActiveSuspension.model_validate(r) for r in results]
-
-
-async def get_overdue_suspensions(db: AsyncMongoClient) -> list[ActiveSuspension]:
-    """Suspensions past their end that were never cleared, as happens when the bot
-    was offline when the expiry timer should have fired."""
-    col = suspensions_col(db)
-    now = datetime.now(UTC)
-    cursor = col.find(
-        {"suspended": True, "ends": {"$lte": now}},
-        {"discord_id": 1, "ends": 1, "_id": 0},
-    )
-    results: list[dict[str, Any]] = await cursor.to_list(length=None)
-    return [ActiveSuspension.model_validate(r) for r in results]

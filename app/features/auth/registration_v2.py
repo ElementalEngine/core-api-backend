@@ -66,7 +66,7 @@ from app.features.auth.schemas_v2 import (
 from app.features.auth.steam_service import SteamService
 from app.features.infractions.models import SuspensionDocument
 from app.features.infractions.repository import suspensions_col
-from app.features.infractions.service import TIER_CAPS
+from app.features.infractions.service_v2 import TIER_CAPS
 
 logger = logging.getLogger(__name__)
 
