@@ -98,7 +98,7 @@ def decay(doc: SuspensionDocument, now: datetime) -> dict[str, Any]:
     return updates
 
 
-def _decayed(doc: SuspensionDocument, updates: dict[str, Any]) -> SuspensionDocument:
+def decayed(doc: SuspensionDocument, updates: dict[str, Any]) -> SuspensionDocument:
     data = doc.model_dump()
     for key, value in updates.items():
         category, field = key.split(".")
@@ -168,7 +168,7 @@ class Infractions:
             rev = int((raw or {}).get("rev") or 0)
             now = now_utc()
             fresh = decay(doc, now)
-            changes, result = work(_decayed(doc, fresh), now)
+            changes, result = work(decayed(doc, fresh), now)
             update = {**fresh, **changes}
             if not update:
                 return result

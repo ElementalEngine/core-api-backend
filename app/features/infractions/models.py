@@ -23,7 +23,7 @@ class FlatType(StrEnum):
     comp = "comp"
 
 
-# ─── Sub-document (matches IInfraction shape in Mongoose exactly) ─────────────
+# ─── Sub-document ─────────────────────────────────────────────────────────────
 
 
 class InfractionRecord(BaseModel):

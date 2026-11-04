@@ -66,7 +66,7 @@ from app.features.auth.schemas_v2 import (
 from app.features.auth.steam_service import SteamService
 from app.features.infractions.models import SuspensionDocument
 from app.features.infractions.repository import suspensions_col
-from app.features.infractions.service_v2 import TIER_CAPS
+from app.features.infractions.service_v2 import TIER_CAPS, decay, decayed
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +176,9 @@ async def standings(
     now = datetime.now(UTC)
     found: dict[str, Standing] = {}
     async for raw in suspensions_col(client).find({"discord_id": {"$in": discord_ids}}):
+        # Read as the next infraction write would see it: tiers decayed, nothing written.
         doc = SuspensionDocument.model_validate(raw)
+        doc = decayed(doc, decay(doc, now))
         tiers = {name: getattr(doc, name).tier for name in TIER_CAPS}
         found[doc.discord_id] = Standing(
             suspended=doc.suspended and (doc.ends is None or doc.ends > now),

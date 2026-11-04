@@ -302,6 +302,13 @@ def test_a_tier_is_removed_only_while_the_member_is_not_suspended():
     )
 
 
+def test_each_tier_ladder_has_a_duration_for_every_tier_below_the_threshold():
+    for category in TierCategory:
+        cap = service_v2.TIER_CAPS[category.value]
+        assert len(service_v2.TIER_DURATIONS[category.value]) == cap - 1
+        assert service_v2.DECAY_DAYS[category.value] > 0
+
+
 def test_a_removal_that_changes_nothing_is_not_logged_as_a_write(caplog):
     service, _ = setup(quit={"tier": 1, "decays": NOW + DAY})
     with caplog.at_level("INFO", logger="app.features.infractions.service_v2"):
