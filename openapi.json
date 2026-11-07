@@ -903,6 +903,45 @@
         "title": "InfractionBody",
         "type": "object"
       },
+      "Lagger": {
+        "properties": {
+          "discord_id": {
+            "title": "Discord Id",
+            "type": "string"
+          },
+          "strikes": {
+            "title": "Strikes",
+            "type": "integer"
+          },
+          "tagged": {
+            "title": "Tagged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "discord_id",
+          "strikes",
+          "tagged"
+        ],
+        "title": "Lagger",
+        "type": "object"
+      },
+      "Laggers": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/Lagger"
+            },
+            "title": "Members",
+            "type": "array"
+          }
+        },
+        "required": [
+          "members"
+        ],
+        "title": "Laggers",
+        "type": "object"
+      },
       "LeaderPick": {
         "additionalProperties": false,
         "description": "A blind pick: a leader, and a civ where the pool has civs.",
@@ -1857,6 +1896,10 @@
             "title": "Held",
             "type": "boolean"
           },
+          "lagger_tagged": {
+            "title": "Lagger Tagged",
+            "type": "boolean"
+          },
           "punishment_type": {
             "anyOf": [
               {
@@ -1886,7 +1929,8 @@
           "punishment_type",
           "reason",
           "ends",
-          "held"
+          "held",
+          "lagger_tagged"
         ],
         "title": "PendingApplied",
         "type": "object"
@@ -3121,6 +3165,71 @@
         "title": "SuspensionCleared",
         "type": "object"
       },
+      "SuspensionRecord": {
+        "description": "A member's record read as the next write would see it, nothing written;\na member without one reads as a zero record.",
+        "properties": {
+          "active_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Category"
+          },
+          "discord_id": {
+            "title": "Discord Id",
+            "type": "string"
+          },
+          "ends": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends"
+          },
+          "held": {
+            "title": "Held",
+            "type": "boolean"
+          },
+          "lagger_tagged": {
+            "title": "Lagger Tagged",
+            "type": "boolean"
+          },
+          "suspended": {
+            "title": "Suspended",
+            "type": "boolean"
+          },
+          "tiers": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/TierCategory"
+            },
+            "title": "Tiers",
+            "type": "object"
+          }
+        },
+        "required": [
+          "discord_id",
+          "suspended",
+          "ends",
+          "held",
+          "active_category",
+          "tiers",
+          "lagger_tagged"
+        ],
+        "title": "SuspensionRecord",
+        "type": "object"
+      },
       "TeamGenResponse": {
         "properties": {
           "civ_version": {
@@ -3161,7 +3270,8 @@
           "minor",
           "moderate",
           "major",
-          "extreme"
+          "extreme",
+          "lagger"
         ],
         "title": "TierCategory",
         "type": "string"
@@ -4570,6 +4680,114 @@
           }
         },
         "summary": "Due",
+        "tags": [
+          "infractions-v2"
+        ]
+      }
+    },
+    "/api/v2/infractions/laggers": {
+      "get": {
+        "operationId": "laggers_api_v2_infractions_laggers_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Laggers"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Laggers",
+        "tags": [
+          "infractions-v2"
+        ]
+      }
+    },
+    "/api/v2/infractions/{discord_id}": {
+      "get": {
+        "operationId": "record_api_v2_infractions__discord_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "discord_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9]{17,20}$",
+              "title": "Discord Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuspensionRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record",
         "tags": [
           "infractions-v2"
         ]

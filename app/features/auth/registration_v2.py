@@ -185,7 +185,11 @@ async def standings(
             ends=doc.ends,
             active_category=doc.active_category,
             tiers={name: tier for name, tier in tiers.items() if tier},
-            at_ban_threshold=any(tiers[name] >= cap for name, cap in TIER_CAPS.items()),
+            at_ban_threshold=any(
+                tiers[name] >= cap
+                for name, cap in TIER_CAPS.items()
+                if name != "lagger"
+            ),
         )
     return found
 

@@ -15,6 +15,8 @@ class TierCategory(StrEnum):
     moderate = "moderate"
     major = "major"
     extreme = "extreme"
+    # Three strikes tag a member; no suspension, no decay.
+    lagger = "lagger"
 
 
 class FlatType(StrEnum):
@@ -44,6 +46,7 @@ class SuspensionDocument(BaseModel):
     moderate: InfractionRecord = Field(default_factory=InfractionRecord)
     major: InfractionRecord = Field(default_factory=InfractionRecord)
     extreme: InfractionRecord = Field(default_factory=InfractionRecord)
+    lagger: InfractionRecord = Field(default_factory=InfractionRecord)
     active_category: TierCategory | Literal["flat"] | None = (
         None  # additive — None on old docs is safe
     )

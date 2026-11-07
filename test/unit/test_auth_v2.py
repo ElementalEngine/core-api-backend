@@ -389,6 +389,13 @@ def test_a_lookup_reads_tiers_as_decayed_without_writing():
     assert members["suspensions"].docs[0]["quit"]["tier"] == 6
 
 
+def test_three_lagger_strikes_show_in_a_lookup_but_are_no_ban_threshold():
+    f, members = flow(users=Users(by_discord={PLAYER: {"discord_id": PLAYER}}))
+    members["suspensions"].docs.append({"discord_id": PLAYER, "lagger": {"tier": 3}})
+    standing = run(f.by_discord(PLAYER)).records[0].standing
+    assert (standing.tiers, standing.at_ban_threshold) == ({"lagger": 3}, False)
+
+
 def test_a_sign_in_that_fails_on_a_bug_keeps_the_answer_s_correlation_id(
     monkeypatch,
 ):

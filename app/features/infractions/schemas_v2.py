@@ -100,3 +100,28 @@ class PendingApplied(BaseModel):
     reason: str | None
     ends: datetime | None
     held: bool
+    # Whether the member wears the lagger tag on the record, so a rejoin gets the role back.
+    lagger_tagged: bool
+
+
+class SuspensionRecord(BaseModel):
+    """A member's record read as the next write would see it, nothing written;
+    a member without one reads as a zero record."""
+
+    discord_id: str
+    suspended: bool
+    ends: datetime | None
+    held: bool
+    active_category: str | None
+    tiers: dict[TierCategory, int]
+    lagger_tagged: bool
+
+
+class Lagger(BaseModel):
+    discord_id: str
+    strikes: int
+    tagged: bool
+
+
+class Laggers(BaseModel):
+    members: list[Lagger]

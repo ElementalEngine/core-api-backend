@@ -28,21 +28,26 @@ from app.features.infractions.schemas_v2 import (
     DueSuspensions,
     FlatResult,
     InfractionBody,
+    Lagger,
+    Laggers,
     PendingApplied,
     SuspensionCleared,
+    SuspensionRecord,
     TierRemoved,
     TierResult,
 )
 
 logger = logging.getLogger(__name__)
 
-# The tier ladders. The last tier of each is the ban threshold, which has no duration.
+# The tier ladders. The last tier of each is the ban threshold, which has no duration;
+# the lagger ladder never suspends and never decays: its cap is the tag.
 TIER_CAPS: Final[dict[str, int]] = {
     "quit": 6,
     "minor": 7,
     "moderate": 6,
     "major": 4,
     "extreme": 2,
+    "lagger": 3,
 }
 
 TIER_DURATIONS: Final[dict[str, list[int]]] = {
@@ -51,6 +56,7 @@ TIER_DURATIONS: Final[dict[str, list[int]]] = {
     "moderate": [1, 4, 7, 14, 30],
     "major": [7, 14, 30],
     "extreme": [30],
+    "lagger": [],
 }
 
 DECAY_DAYS: Final[dict[str, int]] = {
@@ -115,6 +121,10 @@ def _held(doc: SuspensionDocument) -> bool:
     return doc.suspended and doc.ends is None
 
 
+def _tagged(doc: SuspensionDocument) -> bool:
+    return doc.lagger.tier >= TIER_CAPS["lagger"]
+
+
 def _start(doc: SuspensionDocument, now: datetime) -> datetime:
     """Days stack on a running suspension's end, else on now."""
     return doc.ends if doc.ends and doc.ends > now else now
@@ -123,7 +133,7 @@ def _start(doc: SuspensionDocument, now: datetime) -> datetime:
 def _restart(doc: SuspensionDocument, now: datetime) -> dict[str, Any]:
     """A category stops being served: its decay clock starts again from now."""
     served = doc.active_category
-    if not doc.suspended or served not in TIER_CAPS:
+    if not doc.suspended or served not in DECAY_DAYS:
         return {}
     if getattr(doc, str(served)).tier <= 0:
         return {}
@@ -203,14 +213,16 @@ class Infractions:
             tier = min(getattr(doc, category.value).tier + 1, cap)
             threshold = tier >= cap
             warning = category == TierCategory.minor and tier == 1
-            changes: dict[str, Any] = {
-                f"{category.value}.tier": tier,
-                f"{category.value}.decays": now
-                + timedelta(days=DECAY_DAYS[category.value]),
-            }
+            changes: dict[str, Any] = {f"{category.value}.tier": tier}
+            if category.value in DECAY_DAYS:
+                changes[f"{category.value}.decays"] = now + timedelta(
+                    days=DECAY_DAYS[category.value]
+                )
             days = 0
             held = _held(doc)
-            if warning or held:
+            if category == TierCategory.lagger:
+                ends = doc.ends
+            elif warning or held:
                 ends = doc.ends
                 if held and not warning:
                     changes["suspendedRoles"] = _kept(doc, roles)
@@ -231,7 +243,9 @@ class Infractions:
                 suspended=suspended,
                 held=suspended and ends is None,
                 # Reached by this infraction; a member already held is not held again.
-                is_ban_threshold=threshold and not held,
+                # For a lagger it is the tag, reached or already worn.
+                is_ban_threshold=threshold
+                and (category == TierCategory.lagger or not held),
                 is_warning_only=warning,
             )
 
@@ -306,7 +320,7 @@ class Infractions:
         def work(
             doc: SuspensionDocument, now: datetime
         ) -> tuple[dict[str, Any], TierRemoved]:
-            if _serving(doc, now):
+            if category != TierCategory.lagger and _serving(doc, now):
                 raise StillSuspended()
             current = getattr(doc, category.value).tier
             if current <= 0:
@@ -314,11 +328,12 @@ class Infractions:
                     discord_id=discord_id, category=category, tier=0, was_changed=False
                 )
             tier = current - 1
-            decays = now + timedelta(days=DECAY_DAYS[category.value]) if tier else None
-            return {
-                f"{category.value}.tier": tier,
-                f"{category.value}.decays": decays,
-            }, TierRemoved(
+            changes: dict[str, Any] = {f"{category.value}.tier": tier}
+            if category.value in DECAY_DAYS:
+                changes[f"{category.value}.decays"] = (
+                    now + timedelta(days=DECAY_DAYS[category.value]) if tier else None
+                )
+            return changes, TierRemoved(
                 discord_id=discord_id, category=category, tier=tier, was_changed=True
             )
 
@@ -385,6 +400,40 @@ class Infractions:
             logger.info("Infraction expired discord_id=%s", discord_id)
         return result
 
+    async def record(self, discord_id: str) -> SuspensionRecord:
+        raw: dict[str, Any] | None = await self._col.find_one(
+            {"discord_id": discord_id}
+        )
+        doc = SuspensionDocument.model_validate(raw or {"discord_id": discord_id})
+        now = now_utc()
+        doc = decayed(doc, decay(doc, now))
+        return SuspensionRecord(
+            discord_id=discord_id,
+            suspended=_serving(doc, now),
+            ends=doc.ends if _serving(doc, now) else None,
+            held=_held(doc),
+            active_category=doc.active_category if _serving(doc, now) else None,
+            tiers={c: getattr(doc, c.value).tier for c in TierCategory},
+            lagger_tagged=_tagged(doc),
+        )
+
+    async def laggers(self) -> Laggers:
+        """Every member with a strike, the tagged first. Strikes never decay,
+        so the stored tier is the current one."""
+        cursor = self._col.find(
+            {"lagger.tier": {"$gt": 0}}, {"discord_id": 1, "lagger.tier": 1, "_id": 0}
+        )
+        members = [
+            Lagger(
+                discord_id=str(doc["discord_id"]),
+                strikes=int(doc["lagger"]["tier"]),
+                tagged=int(doc["lagger"]["tier"]) >= TIER_CAPS["lagger"],
+            )
+            for doc in await cursor.to_list()
+        ]
+        members.sort(key=lambda m: (-m.strikes, m.discord_id))
+        return Laggers(members=members)
+
     async def due(self) -> DueSuspensions:
         now = now_utc()
         cursor = (
@@ -429,12 +478,13 @@ class Infractions:
 
         def work(
             doc: SuspensionDocument, now: datetime
-        ) -> tuple[dict[str, Any], SuspensionDocument | None]:
+        ) -> tuple[dict[str, Any], tuple[SuspensionDocument, bool]]:
             if not _serving(doc, now):
-                return {}, None
-            return {"suspendedRoles": _kept(doc, roles)}, doc
+                return {}, (doc, False)
+            return {"suspendedRoles": _kept(doc, roles)}, (doc, True)
 
-        served = await self._change(discord_id, work)
+        doc, serving = await self._change(discord_id, work)
+        served = doc if serving else None
         if entry is not None:
             # A newer entry written meanwhile is left for the next join; null
             # matches an older entry stored without a time.
@@ -454,6 +504,7 @@ class Infractions:
                 reason=None,
                 ends=None,
                 held=False,
+                lagger_tagged=_tagged(doc),
             )
         kind = entry.get("punishment_type") if entry else served.active_category
         return PendingApplied(
@@ -463,4 +514,5 @@ class Infractions:
             reason=entry.get("reason") if entry else None,
             ends=served.ends,
             held=served.ends is None,
+            lagger_tagged=_tagged(doc),
         )

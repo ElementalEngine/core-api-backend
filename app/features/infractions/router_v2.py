@@ -13,12 +13,14 @@ from app.features.infractions.schemas_v2 import (
     DueSuspensions,
     FlatResult,
     InfractionBody,
+    Laggers,
     PendingApplied,
     PendingBody,
     ReasonBody,
     RemoveTierBody,
     RolesBody,
     SuspensionCleared,
+    SuspensionRecord,
     TierRemoved,
     TierResult,
 )
@@ -51,6 +53,16 @@ Actor = Annotated[str, Depends(_actor)]
 @router.get("/due", response_model=DueSuspensions)
 async def due(service: Service) -> DueSuspensions:
     return await service.due()
+
+
+@router.get("/laggers", response_model=Laggers)
+async def laggers(service: Service) -> Laggers:
+    return await service.laggers()
+
+
+@router.get("/{discord_id}", response_model=SuspensionRecord)
+async def record(discord_id: MemberId, service: Service) -> SuspensionRecord:
+    return await service.record(discord_id)
 
 
 @router.post("/{discord_id}/tier/{category}", response_model=TierResult)

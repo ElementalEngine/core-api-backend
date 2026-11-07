@@ -19,7 +19,7 @@ from app.features.infractions.errors import (
     StillSuspended,
     SuspensionHeld,
 )
-from app.features.infractions.models import FlatType, TierCategory
+from app.features.infractions.models import FlatType, SuspensionDocument, TierCategory
 from app.features.infractions.schemas_v2 import InfractionBody
 from app.features.infractions.service_v2 import Infractions
 from app.main import app
@@ -305,8 +305,92 @@ def test_a_tier_is_removed_only_while_the_member_is_not_suspended():
 def test_each_tier_ladder_has_a_duration_for_every_tier_below_the_threshold():
     for category in TierCategory:
         cap = service_v2.TIER_CAPS[category.value]
+        if category == TierCategory.lagger:
+            assert service_v2.TIER_DURATIONS["lagger"] == []
+            assert "lagger" not in service_v2.DECAY_DAYS
+            continue
         assert len(service_v2.TIER_DURATIONS[category.value]) == cap - 1
         assert service_v2.DECAY_DAYS[category.value] > 0
+
+
+def test_lagger_strikes_tag_at_three_and_never_suspend_or_decay():
+    service, members = setup(suspended=True, ends=NOW + DAY, active_category="quit")
+    first = run(service.tier(PLAYER, TierCategory.lagger, body(), STAFF))
+    assert (first.tier, first.days_added, first.is_ban_threshold) == (1, 0, False)
+    assert (first.suspended, first.ends) == (True, NOW + DAY)
+    run(service.tier(PLAYER, TierCategory.lagger, body(), STAFF))
+    third = run(service.tier(PLAYER, TierCategory.lagger, body(), STAFF))
+    assert (third.tier, third.is_ban_threshold) == (3, True)
+    doc = stored(members)
+    assert doc["lagger"] == {"tier": 3, "decays": None}
+    assert (doc["suspended"], doc["ends"], doc["active_category"]) == (
+        True,
+        NOW + DAY,
+        "quit",
+    )
+    fourth = run(service.tier(PLAYER, TierCategory.lagger, body(), STAFF))
+    assert (fourth.tier, fourth.is_ban_threshold) == (3, True)
+    held, _ = setup(
+        suspended=True,
+        ends=None,
+        active_category="extreme",
+        lagger={"tier": 2, "decays": None},
+    )
+    tagged = run(held.tier(PLAYER, TierCategory.lagger, body(), STAFF))
+    assert (tagged.is_ban_threshold, tagged.held, tagged.suspended) == (
+        True,
+        True,
+        True,
+    )
+    assert (
+        service_v2.decay(SuspensionDocument.model_validate(doc), NOW + 1000 * DAY) == {}
+    )
+
+
+def test_a_lagger_strike_comes_off_even_while_suspended_and_shows_in_the_record():
+    service, members = setup(
+        suspended=True,
+        ends=NOW + DAY,
+        active_category="quit",
+        lagger={"tier": 3, "decays": None},
+    )
+    removed = run(service.remove_tier(PLAYER, TierCategory.lagger, STAFF))
+    assert (removed.tier, removed.was_changed) == (2, True)
+    assert stored(members)["lagger"] == {"tier": 2, "decays": None}
+    record = run(service.record(PLAYER))
+    assert (record.suspended, record.held, record.active_category) == (
+        True,
+        False,
+        "quit",
+    )
+    assert (record.tiers[TierCategory.lagger], record.lagger_tagged) == (2, False)
+    assert run(service.record("999999999999999999")).tiers[TierCategory.quit] == 0
+
+
+def test_the_record_reads_tiers_as_decayed_without_writing():
+    service, members = setup(quit={"tier": 4, "decays": NOW - 400 * DAY})
+    record = run(service.record(PLAYER))
+    assert (record.tiers[TierCategory.quit], record.suspended) == (0, False)
+    assert stored(members)["quit"]["tier"] == 4
+
+
+def test_the_laggers_list_names_every_strike_with_the_tagged_first():
+    service, members = setup(lagger={"tier": 1, "decays": None})
+    other = {"discord_id": "999999999999999903", "suspended": False, "ends": None}
+    other |= {c.value: dict(ZERO) for c in TierCategory}
+    other["lagger"] = {"tier": 3, "decays": None}
+    members["suspensions"].docs.append(other)
+    listed = run(service.laggers()).members
+    assert [(m.discord_id, m.strikes, m.tagged) for m in listed] == [
+        ("999999999999999903", 3, True),
+        (PLAYER, 1, False),
+    ]
+
+
+def test_a_rejoin_says_whether_the_member_wears_the_lagger_tag():
+    service, _ = setup(lagger={"tier": 3, "decays": None})
+    applied = run(service.apply_pending(PLAYER, []))
+    assert (applied.applied, applied.lagger_tagged) == (False, True)
 
 
 def test_a_removal_that_changes_nothing_is_not_logged_as_a_write(caplog):
