@@ -2853,6 +2853,11 @@
             "title": "Options",
             "type": "array"
           },
+          "standard_draft_only": {
+            "default": false,
+            "title": "Standard Draft Only",
+            "type": "boolean"
+          },
           "title": {
             "title": "Title",
             "type": "string"

@@ -279,6 +279,8 @@ class SettingQuestion(BaseModel):
     # None means the host must choose; a host-only setting is never voted.
     default_option_id: str | None
     host_only: bool = False
+    # Asked whatever the draft, but in force only when it resolves to Standard.
+    standard_draft_only: bool = False
 
 
 __all__ = [

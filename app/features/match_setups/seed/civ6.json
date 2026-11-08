@@ -293,6 +293,292 @@
           }
         ],
         "default_option_id": "no_change"
+      },
+      {
+        "id": "trade_forbidden",
+        "title": "Trade Forbidden",
+        "options": [
+          {
+            "id": "yes",
+            "emoji": "✅",
+            "label": "Yes"
+          },
+          {
+            "id": "no",
+            "emoji": "⛔",
+            "label": "No"
+          }
+        ],
+        "default_option_id": "no",
+        "standard_draft_only": true
+      }
+    ],
+    "duel": [
+      {
+        "id": "bcy_mode",
+        "title": "BCY Mode (Capitals Only)",
+        "options": [
+          {
+            "id": "balanced",
+            "emoji": "🇧",
+            "label": "Balanced"
+          },
+          {
+            "id": "maximum",
+            "emoji": "🇲",
+            "label": "Maximum"
+          },
+          {
+            "id": "none",
+            "emoji": "⛔",
+            "label": "None"
+          }
+        ],
+        "default_option_id": "maximum"
+      },
+      {
+        "id": "duration",
+        "title": "Game Duration",
+        "options": [
+          {
+            "id": "4h",
+            "emoji": "4️⃣",
+            "label": "4 Hours"
+          },
+          {
+            "id": "6h",
+            "emoji": "6️⃣",
+            "label": "6 Hours"
+          },
+          {
+            "id": "unlimited",
+            "emoji": "♾️",
+            "label": "Unlimited"
+          }
+        ],
+        "default_option_id": "unlimited"
+      },
+      {
+        "id": "map",
+        "title": "Map",
+        "options": [
+          {
+            "id": "pangea_classic",
+            "emoji": "🇵",
+            "label": "Pangea Classic Ridges"
+          },
+          {
+            "id": "pangea_standard",
+            "emoji": "⛰️",
+            "label": "Pangea Standard"
+          },
+          {
+            "id": "pangaea_ultima",
+            "emoji": "🌐",
+            "label": "Pangaea Ultima"
+          },
+          {
+            "id": "primordial",
+            "emoji": "🌋",
+            "label": "Primordial"
+          },
+          {
+            "id": "seven_seas",
+            "emoji": "7️⃣",
+            "label": "7 Seas"
+          },
+          {
+            "id": "continents_islands",
+            "emoji": "🏝️",
+            "label": "Continents & Islands"
+          },
+          {
+            "id": "highlands",
+            "emoji": "🏔️",
+            "label": "Highlands"
+          },
+          {
+            "id": "rich_highlands",
+            "emoji": "💰",
+            "label": "Rich Highlands"
+          },
+          {
+            "id": "lakes",
+            "emoji": "🇱",
+            "label": "Lakes"
+          },
+          {
+            "id": "tilted_axis",
+            "emoji": "🇹",
+            "label": "Tilted Axis"
+          },
+          {
+            "id": "inland_sea",
+            "emoji": "🌊",
+            "label": "Inland Sea"
+          },
+          {
+            "id": "fractal",
+            "emoji": "🇫",
+            "label": "Fractal"
+          },
+          {
+            "id": "island_plates",
+            "emoji": "🏖️",
+            "label": "Island Plates"
+          },
+          {
+            "id": "wetlands",
+            "emoji": "💦",
+            "label": "Wetlands"
+          },
+          {
+            "id": "terra",
+            "emoji": "🦖",
+            "label": "Terra"
+          },
+          {
+            "id": "riverlands",
+            "emoji": "🏞️",
+            "label": "Riverlands"
+          }
+        ],
+        "default_option_id": null
+      },
+      {
+        "id": "sea_level",
+        "title": "Sea Level",
+        "options": [
+          {
+            "id": "low",
+            "emoji": "🇱",
+            "label": "Low"
+          },
+          {
+            "id": "standard",
+            "emoji": "🇸",
+            "label": "Standard"
+          },
+          {
+            "id": "high",
+            "emoji": "🇭",
+            "label": "High"
+          }
+        ],
+        "default_option_id": "low"
+      },
+      {
+        "id": "disasters",
+        "title": "Disasters",
+        "options": [
+          {
+            "id": "0",
+            "emoji": "0️⃣",
+            "label": "0"
+          },
+          {
+            "id": "1",
+            "emoji": "1️⃣",
+            "label": "1"
+          },
+          {
+            "id": "2",
+            "emoji": "2️⃣",
+            "label": "2"
+          },
+          {
+            "id": "3",
+            "emoji": "3️⃣",
+            "label": "3"
+          },
+          {
+            "id": "4",
+            "emoji": "4️⃣",
+            "label": "4"
+          }
+        ],
+        "default_option_id": "0"
+      },
+      {
+        "id": "huts",
+        "title": "Goody Huts",
+        "options": [
+          {
+            "id": "x1",
+            "emoji": "1️⃣",
+            "label": "1x"
+          },
+          {
+            "id": "x1_25",
+            "emoji": "2️⃣",
+            "label": "1.25x"
+          },
+          {
+            "id": "x1_5",
+            "emoji": "3️⃣",
+            "label": "1.5x"
+          },
+          {
+            "id": "x1_75",
+            "emoji": "4️⃣",
+            "label": "1.75x"
+          }
+        ],
+        "default_option_id": "x1_5"
+      },
+      {
+        "id": "barbarians",
+        "title": "Barbarians Mode",
+        "options": [
+          {
+            "id": "no_barbs",
+            "emoji": "⛔",
+            "label": "No barbs"
+          },
+          {
+            "id": "civilized",
+            "emoji": "🇨",
+            "label": "Civilized barbs"
+          },
+          {
+            "id": "balanced",
+            "emoji": "🇧",
+            "label": "Balanced barbs"
+          },
+          {
+            "id": "raging",
+            "emoji": "🇷",
+            "label": "Raging barbs"
+          }
+        ],
+        "default_option_id": "no_barbs"
+      },
+      {
+        "id": "cc_voting",
+        "title": "CC Voting",
+        "options": [
+          {
+            "id": "minus10",
+            "emoji": "⬇️",
+            "label": "10 turns earlier"
+          },
+          {
+            "id": "no_change",
+            "emoji": "⏺️",
+            "label": "No change"
+          },
+          {
+            "id": "plus10",
+            "emoji": "⬆️",
+            "label": "10 turns later"
+          },
+          {
+            "id": "plus20",
+            "emoji": "⏫",
+            "label": "20 turns later"
+          }
+        ],
+        "default_option_id": "no_change"
       }
     ],
     "teamer": [
@@ -334,6 +620,93 @@
           }
         ],
         "default_option_id": "maximum"
+      },
+      {
+        "id": "map",
+        "title": "Map",
+        "options": [
+          {
+            "id": "pangea_classic",
+            "emoji": "🇵",
+            "label": "Pangea Classic Ridges"
+          },
+          {
+            "id": "pangea_standard",
+            "emoji": "⛰️",
+            "label": "Pangea Standard"
+          },
+          {
+            "id": "pangaea_ultima",
+            "emoji": "🌐",
+            "label": "Pangaea Ultima"
+          },
+          {
+            "id": "primordial",
+            "emoji": "🌋",
+            "label": "Primordial"
+          },
+          {
+            "id": "seven_seas",
+            "emoji": "7️⃣",
+            "label": "7 Seas"
+          },
+          {
+            "id": "continents_islands",
+            "emoji": "🏝️",
+            "label": "Continents & Islands"
+          },
+          {
+            "id": "highlands",
+            "emoji": "🏔️",
+            "label": "Highlands"
+          },
+          {
+            "id": "rich_highlands",
+            "emoji": "💰",
+            "label": "Rich Highlands"
+          },
+          {
+            "id": "lakes",
+            "emoji": "🇱",
+            "label": "Lakes"
+          },
+          {
+            "id": "tilted_axis",
+            "emoji": "🇹",
+            "label": "Tilted Axis"
+          },
+          {
+            "id": "inland_sea",
+            "emoji": "🌊",
+            "label": "Inland Sea"
+          },
+          {
+            "id": "fractal",
+            "emoji": "🇫",
+            "label": "Fractal"
+          },
+          {
+            "id": "island_plates",
+            "emoji": "🏖️",
+            "label": "Island Plates"
+          },
+          {
+            "id": "wetlands",
+            "emoji": "💦",
+            "label": "Wetlands"
+          },
+          {
+            "id": "terra",
+            "emoji": "🦖",
+            "label": "Terra"
+          },
+          {
+            "id": "riverlands",
+            "emoji": "🏞️",
+            "label": "Riverlands"
+          }
+        ],
+        "default_option_id": null
       },
       {
         "id": "timer",
@@ -465,7 +838,7 @@
   },
   "settings_for": {
     "ffa": "ffa",
-    "duel": "ffa",
+    "duel": "duel",
     "teamer": "teamer"
   },
   "draft_mode": {

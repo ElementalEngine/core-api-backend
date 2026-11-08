@@ -9,6 +9,7 @@ from app.features.match_setups.questions import (
     questions_for,
     settings_for,
 )
+from app.features.match_setups.schemas import SettingQuestion
 
 GAME_TYPES = ("ffa", "duel", "teamer")
 EVERY_BALLOT = [(e, g) for e in EDITIONS for g in GAME_TYPES]
@@ -94,6 +95,36 @@ def test_settings_are_the_ballot_without_its_draft_mode():
     huts = next(q for q in settings_for("civ6", "ffa") if q["id"] == "huts")
     assert [o["label"] for o in huts["options"]] == ["1x", "1.25x", "1.5x", "1.75x"]
     assert "draft_mode" not in [q["id"] for q in settings_for("civ6", "teamer")]
+
+
+def test_civ6_asks_trade_only_in_an_ffa_and_friends_not_in_a_duel():
+    ffa = [q["id"] for q in settings_for("civ6", "ffa")]
+    duel = [q["id"] for q in settings_for("civ6", "duel")]
+    assert ffa[0] == "friends_allies" and ffa[-1] == "trade_forbidden"
+    assert duel == [i for i in ffa if i not in ("friends_allies", "trade_forbidden")]
+
+
+def test_a_civ6_teamer_votes_on_the_ffa_maps():
+    teamer = {q["id"]: q for q in settings_for("civ6", "teamer")}
+    ffa = {q["id"]: q for q in settings_for("civ6", "ffa")}
+    assert teamer["map"] == ffa["map"]
+    assert len(teamer["map"]["options"]) == 16
+    assert "riverlands" in [o["id"] for o in teamer["map"]["options"]]
+
+
+@pytest.mark.parametrize(("edition", "game_type"), EVERY_BALLOT)
+def test_only_trade_forbidden_waits_for_a_standard_draft(edition, game_type):
+    served = [
+        SettingQuestion.model_validate(q).model_dump()
+        for q in questions_for(edition, game_type)
+    ]
+    flagged = [q["id"] for q in served if q["standard_draft_only"]]
+    wanted = ["trade_forbidden"] if (edition, game_type) == ("civ6", "ffa") else []
+    assert flagged == wanted
+    if wanted:
+        trade = served[[q["id"] for q in served].index("trade_forbidden")]
+        assert [o["id"] for o in trade["options"]] == ["yes", "no"]
+        assert trade["default_option_id"] == "no"
 
 
 def _one_emoji(emoji: str) -> bool:
