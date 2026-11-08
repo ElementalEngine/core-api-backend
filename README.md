@@ -2,7 +2,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/python-3.14-3776AB" alt="Python 3.14" />
-  <img src="https://img.shields.io/badge/FastAPI-0.128-009688" alt="FastAPI 0.128" />
+  <img src="https://img.shields.io/badge/FastAPI-0.136-009688" alt="FastAPI 0.136" />
   <img src="https://img.shields.io/badge/MongoDB-Atlas-47A248" alt="MongoDB Atlas" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT" />
 </p>
