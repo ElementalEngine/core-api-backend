@@ -19,6 +19,7 @@ from app.features.infractions.schemas_v2 import (
     ReasonBody,
     RemoveTierBody,
     RolesBody,
+    Suspended,
     SuspensionCleared,
     SuspensionRecord,
     TierRemoved,
@@ -58,6 +59,11 @@ async def due(service: Service) -> DueSuspensions:
 @router.get("/laggers", response_model=Laggers)
 async def laggers(service: Service) -> Laggers:
     return await service.laggers()
+
+
+@router.get("/suspended", response_model=Suspended)
+async def suspended(service: Service) -> Suspended:
+    return await service.suspended()
 
 
 @router.get("/{discord_id}", response_model=SuspensionRecord)

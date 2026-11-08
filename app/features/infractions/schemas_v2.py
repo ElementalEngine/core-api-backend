@@ -93,6 +93,10 @@ class DueSuspensions(BaseModel):
     next_ends: datetime | None
 
 
+class Suspended(BaseModel):
+    discord_ids: list[str]
+
+
 class PendingApplied(BaseModel):
     discord_id: str
     applied: bool

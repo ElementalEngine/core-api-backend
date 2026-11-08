@@ -31,6 +31,7 @@ from app.features.infractions.schemas_v2 import (
     Lagger,
     Laggers,
     PendingApplied,
+    Suspended,
     SuspensionCleared,
     SuspensionRecord,
     TierRemoved,
@@ -78,6 +79,7 @@ Work = Callable[[SuspensionDocument, datetime], tuple[dict[str, Any], T]]
 
 ATTEMPTS = 3
 DUE_LIMIT = 100
+SUSPENDED_LIMIT = 1000
 
 
 def now_utc() -> datetime:
@@ -452,6 +454,15 @@ class Infractions:
         )
         return DueSuspensions(
             discord_ids=ids, next_ends=upcoming["ends"] if upcoming else None
+        )
+
+    async def suspended(self) -> Suspended:
+        """Every member serving a suspension, which Lady Justice watches for a return."""
+        cursor = self._col.find({"suspended": True}, {"discord_id": 1, "_id": 0}).limit(
+            SUSPENDED_LIMIT
+        )
+        return Suspended(
+            discord_ids=[str(doc["discord_id"]) for doc in await cursor.to_list()]
         )
 
     async def set_pending(
