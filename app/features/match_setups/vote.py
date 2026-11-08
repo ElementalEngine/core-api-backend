@@ -28,10 +28,10 @@ from app.features.match_setups.pools import (
     remaining_after_bans,
 )
 from app.features.match_setups.questions import preset, settled
+from app.features.match_setups.schemas import MAX_DRAFTS
 
 _RANDOM = SystemRandom()
 VOTE_LIMIT = timedelta(minutes=10)
-MAX_PLAYERS = 14
 TEAMS = 2
 
 
@@ -52,8 +52,10 @@ def new_vote(
     """A vote open at once for ten minutes; the bans its starter chose stand,
     host-only settings take their defaults, and the players vote on the rest."""
     voters = list(dict.fromkeys(players))
-    if not 2 <= len(voters) <= MAX_PLAYERS:
-        raise LobbyRefused(f"a vote needs 2 to {MAX_PLAYERS} players")
+    # One draft a player at most, and civ7's leaders cover fewer.
+    most = MAX_DRAFTS[edition]
+    if not 2 <= len(voters) <= most:
+        raise LobbyRefused(f"a {edition} vote needs 2 to {most} players")
     if mode == "duel" and len(voters) != 2:
         raise LobbyRefused("a duel is two players")
     if mode == "ffa" and len(voters) < 3:
