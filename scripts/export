@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""export <db>.<collection> [...] [--out DIR]
+"""export <db>.<collection> [...] | --all [--out DIR]
 
 Writes one JSON document per line, plus a manifest carrying the count taken
-at export time. This is the rollback mechanism for a cluster with no
-PITR, so the count is recorded rather than re-queried later against a
-collection that has moved on.
+at export time, and each collection's options and indexes, which `restore`
+puts back. This is the rollback mechanism for a cluster with no PITR, so the
+count is recorded rather than re-queried later against a collection that has
+moved on. --all takes every collection of every database, listed at run time.
 
 Default output: /home/cisco/exports/<timestamp>/
 """
@@ -20,6 +21,7 @@ from bson import json_util
 from pymongo import MongoClient
 
 DEFAULT_ROOT = Path(os.environ.get("EXPORT_ROOT", "/home/cisco/exports"))
+SYSTEM_DBS = {"admin", "config", "local"}
 
 
 def connect() -> MongoClient:
@@ -52,24 +54,37 @@ def export_one(c: MongoClient, db: str, coll: str, out: Path) -> dict:
     if not ok:
         sys.exit(f"count mismatch on {db}.{coll}; the export is not trustworthy")
 
+    listed = next(c[db].list_collections(filter={"name": coll}), {})
     return {"database": db, "collection": coll, "count": written,
-            "file": path.name}
+            "file": path.name, "options": listed.get("options", {}),
+            "indexes": list(c[db][coll].list_indexes())}
+
+
+def every_collection(c: MongoClient) -> list[tuple[str, str]]:
+    return [(db, coll)
+            for db in sorted(set(c.list_database_names()) - SYSTEM_DBS)
+            for coll in sorted(c[db].list_collection_names())
+            if not coll.startswith("system.")]
 
 
 def main(argv: list[str]) -> None:
-    targets, out_dir = [], None
+    targets, out_dir, everything = [], None, False
     i = 0
     while i < len(argv):
         if argv[i] == "--out":
             out_dir = Path(argv[i + 1])
             i += 2
             continue
+        if argv[i] == "--all":
+            everything = True
+            i += 1
+            continue
         if "." not in argv[i]:
             sys.exit(f"expected <db>.<collection>, got {argv[i]!r}")
         targets.append(tuple(argv[i].split(".", 1)))
         i += 1
 
-    if not targets:
+    if everything == bool(targets):
         sys.exit(__doc__)
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
@@ -77,6 +92,8 @@ def main(argv: list[str]) -> None:
     out.mkdir(mode=0o700, parents=True, exist_ok=True)
 
     c = connect()
+    if everything:
+        targets = every_collection(c)
     print(f"export -> {out}")
     entries = [export_one(c, db, coll, out) for db, coll in targets]
 

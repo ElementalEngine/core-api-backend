@@ -55,7 +55,7 @@ class StatsService:
         normalized_discord_id = str(discord_id).strip()
         if not normalized_discord_id:
             raise InvalidStatsRequestError("Missing discord_id")
-        if not normalized_discord_id.isdigit():
+        if not (normalized_discord_id.isascii() and normalized_discord_id.isdigit()):
             raise InvalidStatsRequestError("Invalid discord_id")
 
         lifetime_map = await self._load_stat_set(
@@ -96,7 +96,7 @@ class StatsService:
         ids = [str(value).strip() for value in discord_ids if str(value).strip()]
         if not ids:
             return []
-        if any(not discord_id.isdigit() for discord_id in ids):
+        if not all(d.isascii() and d.isdigit() for d in ids):
             raise InvalidStatsRequestError("Invalid discord_ids")
 
         lifetime_map = await self._load_stat_set(
@@ -156,7 +156,7 @@ class StatsService:
                 game_quality=0.0,
                 teams=[[], []],
             )
-        if any(not discord_id.isdigit() for discord_id in ids):
+        if not all(d.isascii() and d.isdigit() for d in ids):
             raise InvalidStatsRequestError("Invalid discord_ids")
         if len(ids) < 2:
             raise InvalidStatsRequestError("Team generation needs at least two players")

@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING, Any
 
 from bson import ObjectId
 
-from app.features.matches.errors import MatchServiceError, NotFoundError
+from app.features.matches.errors import (
+    MatchServiceError,
+    NotFoundError,
+    RetryLaterError,
+)
 from app.features.matches.models import ContestReport, MatchModel, PlayerModel
 from app.features.matches.validation import (
     SeatPatch,
@@ -131,7 +135,12 @@ class EditingService:
         match = await self._m._recompute_deltas(match)
 
         players = match.model_dump()["players"]
-        if not await self._m.q.set_pending_players(oid, players, now=datetime.now(UTC)):
+        if not await self._m.q.set_pending_players(
+            oid, players, was=res["players"], now=datetime.now(UTC)
+        ):
+            current = await self._m.q.find_pending_by_id(oid)
+            if current is not None and current.get("players") != res["players"]:
+                raise RetryLaterError("Another edit changed this report first.")
             raise await self._m.refusal(oid)
         logger.info(
             "PATCH applied to %d seat(s) on match %s",

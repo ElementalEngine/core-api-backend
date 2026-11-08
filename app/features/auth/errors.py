@@ -100,8 +100,8 @@ class LinkedAccountNotFoundError(AuthError):
         super().__init__(
             code="DISCORD_LINKED_ACCOUNT_NOT_FOUND",
             message=(
-                "No linked Steam account was found on your Discord profile. "
-                "Open Discord Settings → Connections, add Steam, enable Display on profile, then try again."
+                "No verified Steam account was found on your Discord profile. "
+                "Open Discord Settings → Connections, add Steam (or remove and add it again), enable Display on profile, then try again."
             ),
             status_code=status.HTTP_400_BAD_REQUEST,
             details={"platform": "steam"},

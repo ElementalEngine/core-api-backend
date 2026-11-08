@@ -63,8 +63,8 @@ class _Q:
     async def find_pending_by_id(self, oid):
         return dict(self.doc) if self.doc else None
 
-    async def set_pending_players(self, oid, players, *, now):
-        if self.held or not self.doc:
+    async def set_pending_players(self, oid, players, *, was, now):
+        if self.held or not self.doc or was != self.doc["players"]:
             return False
         self.players = players
         return True

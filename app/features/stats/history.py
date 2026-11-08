@@ -34,7 +34,7 @@ def _validate(
 ) -> tuple[str, bool, str]:
     version, is_cloud = scope_of(civ_version, game_type)
     did = (discord_id or "").strip()
-    if not did.isdigit():
+    if not (did.isascii() and did.isdigit()):
         raise InvalidStatsRequestError("Invalid discord_id")
     return version, is_cloud, did
 

@@ -19,6 +19,7 @@ from app.features.matches.tallies import bump, stat_legs
 from app.features.matches.validation import approval_refusal, is_placeholder
 from app.features.ratings.events import build_match_event
 from app.features.ratings.scope import drives_rank_roles, stat_scope
+from app.features.seasons.repository import SEED_LABELS
 
 if TYPE_CHECKING:
     from app.features.matches.service import MatchService
@@ -36,6 +37,18 @@ def _write_failure(what: str, exc: Exception) -> MatchServiceError | NotFoundErr
     ):
         return RetryLaterError(f"The {what} clashed with another change. Try again.")
     return MatchServiceError(f"The {what} could not be saved.")
+
+
+def _from_past_season(
+    match: dict[str, Any], open_season: dict[str, Any] | None, edition: str
+) -> bool:
+    """A match approved before v2 has no season: it belongs to the seeded season,
+    and so is from a past one once a later season opens."""
+    if open_season is None:
+        return match.get("season_id") is not None
+    if match.get("season_id") is None:
+        return open_season.get("label") != SEED_LABELS.get(edition)
+    return match["season_id"] != open_season["_id"]
 
 
 def _affected(match: MatchModel, ratings: list[StatModel]) -> list[dict[str, Any]]:
@@ -119,10 +132,7 @@ class ApprovalService:
                     open_season = await self._m.seasons.read_open(
                         match.game, session=session
                     )
-                    past_season = res.get("season_id") not in (
-                        None,
-                        open_season["_id"] if open_season else None,
-                    )
+                    past_season = _from_past_season(res, open_season, match.game)
                     # Read inside the transaction, so an approve committed
                     # meanwhile is a write conflict, not a lost update.
                     pre_lifetime = await self._m.get_players_ranking(

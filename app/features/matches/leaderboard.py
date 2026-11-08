@@ -9,6 +9,7 @@ from typing import Any
 from pymongo import AsyncMongoClient
 
 from app.core.coerce import as_float, as_int
+from app.core.constants import EDITIONS
 from app.features.ratings.repository import RatingsRepository
 
 MIN_GAMES = 3
@@ -28,6 +29,8 @@ class LeaderboardService:
         is_combined: bool,
         civ_version: str,
     ) -> dict[str, Any]:
+        if civ_version not in EDITIONS:
+            raise ValueError(f"Unknown edition: {civ_version!r}")
         is_cloud_game = str(is_cloud).strip().lower() in CLOUD_VALUES
 
         lb = await self.ratings.get_leaderboard(

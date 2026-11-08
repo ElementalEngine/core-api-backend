@@ -8,6 +8,8 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from pymongo.errors import ConnectionFailure
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +108,28 @@ async def request_validation_exception_handler(
     )
 
 
+# Codes for the errors the framework raises itself, such as an unknown route.
+FRAMEWORK_CODES = {401: "UNAUTHORIZED", 403: "FORBIDDEN", 404: "NOT_FOUND"}
+
+
+async def http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
+    """Our errors pass as raised; the framework's own get the envelope too."""
+    detail: Any = exc.detail
+    if not isinstance(detail, dict):
+        detail = _error_envelope(
+            code=FRAMEWORK_CODES.get(exc.status_code, "INVALID_REQUEST"),
+            message=str(detail),
+            retryable=False,
+        )
+    return JSONResponse(
+        status_code=exc.status_code, content={"detail": detail}, headers=exc.headers
+    )
+
+
 async def app_dependency_exception_handler(
-    request: Request, exc: AppDependencyError
+    request: Request, exc: AppDependencyError | ConnectionFailure
 ) -> JSONResponse:
     logger.error("App dependency unavailable: %s", exc)
     return JSONResponse(

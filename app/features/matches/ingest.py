@@ -15,10 +15,23 @@ if TYPE_CHECKING:
 
 
 def _played_in(match: MatchModel, approved: dict[str, Any]) -> bool:
-    """Every registered player in the save played in the approved game."""
+    """Every registered player in the save played in the approved game; a save
+    with none says nothing about who played."""
     theirs = {str(p.get("discord_id")) for p in approved.get("players") or []}
     ours = {p.discord_id for p in match.players if not is_placeholder(p.discord_id)}
-    return ours <= theirs
+    return bool(ours) and ours <= theirs
+
+
+def _fingerprints(parsed: dict[str, Any]) -> list[str]:
+    """The game's composition hash first. A civ6 game also gets v1's, which
+    named a seat by its leader alone, so a game reported before v2 is found."""
+    head = [parsed["game"], parsed["map_type"]]
+    seats = [p["civ"] + (p.get("leader") or "") for p in parsed["players"]]
+    shapes = [head + seats]
+    if parsed["game"] == "civ6":
+        shapes.append(head + [p.get("leader") or p["civ"] for p in parsed["players"]])
+    hashes = [hashlib.sha256(",".join(s).encode("utf-8")).hexdigest() for s in shapes]
+    return list(dict.fromkeys(hashes))
 
 
 class IngestService:
@@ -61,15 +74,10 @@ class IngestService:
         if len({p["team"] for p in parsed["players"]}) < 2:
             raise MatchServiceError("A report needs at least two players or teams.")
 
-        m = hashlib.sha256()
-        unique_data = ",".join(
-            [parsed["game"], parsed["map_type"]]
-            + [p["civ"] + (p.get("leader") or "") for p in parsed["players"]]
-        )
-        m.update(unique_data.encode("utf-8"))
-        save_file_hash = m.hexdigest()
+        hashes = _fingerprints(parsed)
+        save_file_hash = hashes[0]
 
-        existing = await self._m.q.find_pending_by_hash(save_file_hash)
+        existing = await self._m.q.find_pending_by_hash(hashes)
         if existing:
             return self._repeated(existing, "composition")
 
@@ -83,7 +91,7 @@ class IngestService:
         match = MatchModel(**parsed)
         match = await self._m.match_id_to_discord(match)
         # Another save of a game already rated would rate it twice.
-        for approved in await self._m.q.find_validated_by_hash(save_file_hash):
+        for approved in await self._m.q.find_validated_by_hash(hashes):
             if _played_in(match, approved):
                 return self._repeated(approved, "approved")
         match = await self._m._recompute_deltas(match)
@@ -99,7 +107,7 @@ class IngestService:
             winner = await self._m.q.find_pending_by_bytes(save_bytes_sha256)
             if winner is not None:
                 return self._repeated(winner, "file")
-            winner = await self._m.q.find_pending_by_hash(save_file_hash)
+            winner = await self._m.q.find_pending_by_hash(hashes)
             if winner is None:
                 raise
             return self._repeated(winner, "composition")

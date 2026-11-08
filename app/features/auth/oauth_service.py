@@ -23,6 +23,7 @@ from app.features.auth.errors import (
     LinkedAccountFetchError,
     LinkedAccountNotFoundError,
 )
+from app.features.auth.schemas_v2 import STEAM_ID
 
 logger = logging.getLogger(__name__)
 DISCORD_HTTP_USER_AGENT = "CivPlayersAuth/1.0 (+https://elementalengine.net)"
@@ -153,8 +154,13 @@ class DiscordOAuthService:
 
     @staticmethod
     def _steam_connection(connections: Iterable[dict[str, Any]]) -> dict[str, Any]:
+        """The first Steam connection Discord has verified, holding a SteamID64."""
         for connection in connections:
-            if connection.get("type") == "steam":
+            if (
+                connection.get("type") == "steam"
+                and connection.get("verified") is True
+                and STEAM_ID.match(str(connection.get("id") or ""))
+            ):
                 return connection
         raise LinkedAccountNotFoundError()
 

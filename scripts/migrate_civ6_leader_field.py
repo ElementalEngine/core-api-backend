@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """migrate_civ6_leader_field [--apply]
 
-Civ6 match records reach this in three shapes, and
+Civ6 match records, approved and pending, reach this in three shapes, and
 every one is corrected to a CIVILIZATION_* token in civ and a LEADER_* token
 in leader:
 
@@ -36,7 +36,8 @@ from pymongo import MongoClient
 from app.core.config import settings
 from app.core.constants import COL_CIV_DATA, GAMES_DB
 
-COL = "validated_matches"
+# Pending reports too: one approved after the move would otherwise keep v1's shape.
+COLS = ("validated_matches", "pending_matches")
 CIV6 = {"game": "civ6"}
 
 Row = Mapping[str, Any]
@@ -61,9 +62,9 @@ def correction(
     return None
 
 
-def distinct_pairs(db: Any) -> dict[Pair, int]:
+def distinct_pairs(db: Any, col: str) -> dict[Pair, int]:
     """Every (civ, leader) a civ6 player entry holds, with its count."""
-    rows = db[COL].aggregate(
+    rows = db[col].aggregate(
         [
             {"$match": CIV6},
             {"$unwind": "$players"},
@@ -100,14 +101,14 @@ def report(pairs: Mapping[Pair, int], plan: Mapping[Pair, Pair]) -> None:
         print(f"  left alone: civ={civ!r} leader={leader!r} x{n}")
 
 
-def build_plan(db: Any) -> tuple[dict[Pair, int], dict[Pair, Pair]]:
+def build_plan(db: Any, col: str) -> tuple[dict[Pair, int], dict[Pair, Pair]]:
     """The entries as they are, and the correction for each pair that has one."""
     rows = list(db[COL_CIV_DATA].find({"edition": "civ6", "kind": "leader"}))
     if not rows:
         raise SystemExit("civ_data holds no civ6 leaders -- run seed_civ_data first")
     by_token = {r["token"]: r for r in rows}
     by_name = {r["name"]: r for r in rows if r.get("name")}
-    pairs = distinct_pairs(db)
+    pairs = distinct_pairs(db, col)
     plan: dict[Pair, Pair] = {}
     for civ, leader in pairs:
         fixed = correction(civ, leader, by_name, by_token)
@@ -116,14 +117,14 @@ def build_plan(db: Any) -> tuple[dict[Pair, int], dict[Pair, Pair]]:
     return pairs, plan
 
 
-def apply_plan(db: Any, plan: Mapping[Pair, Pair]) -> int:
+def apply_plan(db: Any, col: str, plan: Mapping[Pair, Pair]) -> int:
     """One update per pair, filtered on the shape it corrects."""
     modified = 0
     for (civ, leader), (new_civ, new_leader) in sorted(
         plan.items(), key=lambda kv: (kv[0][0], kv[0][1] or "")
     ):
         shape = {"civ": civ, "leader": leader}
-        result = db[COL].update_many(
+        result = db[col].update_many(
             {**CIV6, "players": {"$elemMatch": shape}},
             {"$set": {"players.$[p].civ": new_civ, "players.$[p].leader": new_leader}},
             array_filters=[{"p.civ": civ, "p.leader": leader}],
@@ -143,16 +144,19 @@ def main(argv: list[str]) -> int:
     client = MongoClient(settings.mongo_url.get_secret_value())
     try:
         db = client[GAMES_DB]
-        pairs, plan = build_plan(db)
-        report(pairs, plan)
+        for col in COLS:
+            print(f"== {col}")
+            pairs, plan = build_plan(db, col)
+            report(pairs, plan)
+            if "--apply" not in argv:
+                continue
+            print(f"\n{apply_plan(db, col, plan)} documents modified")
+            after = distinct_pairs(db, col)
+            still = sum(n for p, n in after.items() if p in plan)
+            print(f"check: entries still in a corrected shape: {still}")
+            report(after, {})
         if "--apply" not in argv:
             print("\ndry run -- nothing written. pass --apply to write.")
-            return 0
-        print(f"\n{apply_plan(db, plan)} documents modified")
-        after = distinct_pairs(db)
-        still = sum(n for p, n in after.items() if p in plan)
-        print(f"check: entries still in a corrected shape: {still}")
-        report(after, {})
     finally:
         client.close()
     return 0

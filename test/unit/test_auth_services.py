@@ -14,10 +14,12 @@ def test_oauth_service_picks_the_steam_connection():
     picked = DiscordOAuthService._steam_connection(
         [
             {"id": "2", "type": "epicgames", "name": "epic-user"},
-            {"id": "1", "type": "steam", "name": "steam-user"},
+            {"id": "76561190000000001", "type": "steam", "verified": False},
+            {"id": "3", "type": "steam", "verified": True},
+            {"id": "76561198000000002", "type": "steam", "verified": True},
         ]
     )
-    assert picked["id"] == "1"
+    assert picked["id"] == "76561198000000002"
 
 
 def test_oauth_service_raises_when_steam_is_not_linked():

@@ -17,6 +17,10 @@ there and the civ is not, so it counts once, in leaders. A value that is not
 a token at all -- 'Unknown', 'None', a name key from before that migration --
 counts nowhere.
 
+Each player's tally counts their newest matches, as many as the stat document's
+own games: a reset or a new season starts that count again, so games from
+before either are left out.
+
 Never creates a stat document. A player with matches and no document was
 reset; the reset deleted their tally with it and that is correct.
 
@@ -28,6 +32,7 @@ from __future__ import annotations
 import sys
 import time
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -80,13 +85,16 @@ def read_tokens(player: dict[str, Any]) -> tuple[str | None, str | None]:
     )
 
 
-def collect(db: Any, edition: str) -> dict[str, dict[int, dict[str, Any]]]:
-    """One pass over an edition's matches, bucketed into every scope."""
-    scopes: dict[str, dict[int, dict[str, Any]]] = defaultdict(
-        lambda: defaultdict(lambda: {"civs": {}, "leaders": {}})
-    )
+# One player's seat in one match: when it was approved, what they played, a win.
+Seat = tuple[datetime, str | None, str | None, bool]
+
+
+def collect(db: Any, edition: str) -> dict[str, dict[int, list[Seat]]]:
+    """One pass over an edition's matches, every seat bucketed into every scope."""
+    scopes: dict[str, dict[int, list[Seat]]] = defaultdict(lambda: defaultdict(list))
     matches = 0
     unmigrated = 0
+    malformed = 0
     for match in db["validated_matches"].find({"game": edition}):
         mode = game_mode(match.get("game_mode"))
         if mode not in MODES:
@@ -94,11 +102,16 @@ def collect(db: Any, edition: str) -> dict[str, dict[int, dict[str, Any]]]:
             continue
         matches += 1
         is_cloud = bool(match.get("is_cloud"))
-        players = [
-            p
-            for p in match.get("players", [])
-            if not is_placeholder(p.get("discord_id"))
-        ]
+        approved = match.get("approved_at") or match["_id"].generation_time
+        players = []
+        for p in match.get("players", []):
+            did = str(p.get("discord_id") or "")
+            if is_placeholder(did):
+                continue
+            if not (did.isascii() and did.isdigit()):
+                malformed += 1
+                continue
+            players.append(p)
         unmigrated += sum(1 for p in players if read_tokens(p)[0] is None)
         for is_seasonal, is_combined in stat_legs(is_cloud=is_cloud):
             scope = stat_scope(
@@ -109,20 +122,39 @@ def collect(db: Any, edition: str) -> dict[str, dict[int, dict[str, Any]]]:
                 is_combined=is_combined,
             )
             for player in players:
-                entry = scopes[scope][int(player["discord_id"])]
                 won = float(player.get("delta") or 0) > 0
                 civ, leader = read_tokens(player)
-                if civ:
-                    bump(entry["civs"], civ, won=won, step=1)
-                if leader:
-                    bump(entry["leaders"], leader, won=won, step=1)
-    print(f"{edition}: {matches} matches, {unmigrated} entries with no civ token")
+                scopes[scope][int(player["discord_id"])].append(
+                    (approved, civ, leader, won)
+                )
+    print(
+        f"{edition}: {matches} matches, {unmigrated} entries with no civ token, "
+        f"{malformed} with a player id that is not a number"
+    )
     return scopes
 
 
-def write(client: MongoClient, scope: str, tallies: dict[int, dict[str, Any]]) -> None:
-    db_name, col_name = scope.split(".", 1)
-    col = client[db_name][col_name]
+def tallies_for(
+    col: Any, seats: dict[int, list[Seat]]
+) -> dict[int, dict[str, dict[str, Any]]]:
+    """Each player's newest seats, as many as their stat document's games."""
+    games = {
+        doc["_id"]: int(doc.get("games") or 0) for doc in col.find({}, {"games": 1})
+    }
+    tallies: dict[int, dict[str, dict[str, Any]]] = {}
+    for pid, played in seats.items():
+        entry: dict[str, dict[str, Any]] = {"civs": {}, "leaders": {}}
+        newest = sorted(played, key=lambda seat: seat[0], reverse=True)
+        for _, civ, leader, won in newest[: max(0, games.get(pid, 0))]:
+            if civ:
+                bump(entry["civs"], civ, won=won, step=1)
+            if leader:
+                bump(entry["leaders"], leader, won=won, step=1)
+        tallies[pid] = entry
+    return tallies
+
+
+def write(col: Any, scope: str, tallies: dict[int, dict[str, Any]]) -> None:
     started = time.monotonic()
 
     cleared = col.update_many({}, {"$set": {"civs": {}, "leaders": {}}}).modified_count
@@ -155,17 +187,19 @@ def main(argv: list[str]) -> int:
         print(f"unknown edition: {edition}")
         return 2
 
-    client = MongoClient(settings.mongo_url.get_secret_value())
+    # Aware datetimes, so an approval time and an id's time compare.
+    client = MongoClient(settings.mongo_url.get_secret_value(), tz_aware=True)
     try:
         for name in editions:
             collected = collect(client[GAMES_DB], name)
             for scope in all_scopes(name):
-                tallies = collected.get(scope, {})
-                if apply:
-                    write(client, scope, tallies)
-                    continue
                 db_name, col_name = scope.split(".", 1)
-                docs = client[db_name][col_name].count_documents({})
+                col = client[db_name][col_name]
+                tallies = tallies_for(col, collected.get(scope, {}))
+                if apply:
+                    write(col, scope, tallies)
+                    continue
+                docs = col.count_documents({})
                 civ_keys = {k for t in tallies.values() for k in t["civs"]}
                 leaders = {k for t in tallies.values() for k in t["leaders"]}
                 print(

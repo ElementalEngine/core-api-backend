@@ -83,8 +83,8 @@ class MatchRepository:
                     found[key] = doc
         return found
 
-    async def find_pending_by_hash(self, save_file_hash: str) -> dict[str, Any] | None:
-        return await self._pending.find_one({"save_file_hash": save_file_hash})
+    async def find_pending_by_hash(self, hashes: list[str]) -> dict[str, Any] | None:
+        return await self._pending.find_one({"save_file_hash": {"$in": hashes}})
 
     async def find_pending_by_bytes(
         self, save_bytes_sha256: str
@@ -98,9 +98,9 @@ class MatchRepository:
         so approval moving a match out of pending would otherwise reopen it."""
         return await self._validated.find_one({"save_bytes_sha256": save_bytes_sha256})
 
-    async def find_validated_by_hash(self, save_file_hash: str) -> list[dict[str, Any]]:
-        """Approved games with this composition, newest first."""
-        cursor = self._validated.find({"save_file_hash": save_file_hash})
+    async def find_validated_by_hash(self, hashes: list[str]) -> list[dict[str, Any]]:
+        """Approved games with any of these compositions, newest first."""
+        cursor = self._validated.find({"save_file_hash": {"$in": hashes}})
         return await cursor.sort("_id", DESCENDING).limit(20).to_list()
 
     async def find_pending_by_id(self, oid: ObjectId) -> dict[str, Any] | None:
@@ -137,11 +137,18 @@ class MatchRepository:
     # gone or an approve holds it; the caller asks which.
 
     async def set_pending_players(
-        self, oid: ObjectId, players: list[dict[str, Any]], *, now: datetime
+        self,
+        oid: ObjectId,
+        players: list[dict[str, Any]],
+        *,
+        was: list[dict[str, Any]],
+        now: datetime,
     ) -> bool:
-        # Players only, so a contest written meanwhile is kept.
+        # Players only, so a contest written meanwhile is kept; only over the
+        # seats the edit was built from, so a second edit cannot undo the first.
         res = await self._pending.update_one(
-            {"_id": oid, **_editable(now)}, {"$set": {"players": players}}
+            {"_id": oid, "players": was, **_editable(now)},
+            {"$set": {"players": players}},
         )
         return res.matched_count == 1
 

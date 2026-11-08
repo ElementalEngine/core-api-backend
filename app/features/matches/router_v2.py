@@ -201,7 +201,7 @@ async def patch_players(
         )
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
-    except ApprovingError as exc:
+    except (ApprovingError, RetryLaterError) as exc:
         raise _retry_later(exc) from exc
     except MatchServiceError as exc:
         raise invalid_request(str(exc)) from exc

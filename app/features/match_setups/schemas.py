@@ -276,7 +276,8 @@ class SettingQuestion(BaseModel):
     id: str
     title: str
     options: list[SettingOption]
-    # None means the host must choose; a host-only setting is never voted.
+    # None means the host must choose. /vote never asks a host-only setting; a
+    # lobby's host may still put it to the players.
     default_option_id: str | None
     host_only: bool = False
     # Asked whatever the draft, but in force only when it resolves to Standard.

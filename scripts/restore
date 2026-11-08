@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""restore <export dir> [<db> | <db>.<collection> ...] [--apply]
+
+Puts collections back from an `export`: each named one, or every one in the
+manifest, is dropped and rebuilt from its file with its options and indexes,
+then counted against the manifest. Dry run unless --apply.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+from bson import json_util
+from pymongo import MongoClient
+
+CHUNK = 1000
+
+
+def connect() -> MongoClient:
+    uri = os.environ["MONGO_URL"]
+    if "MONGO_URL_ALLOW_ANY" not in os.environ and "-dev" not in uri:
+        sys.exit("refusing: MONGO_URL does not look like the dev cluster")
+    return MongoClient(uri, serverSelectionTimeoutMS=5000)
+
+
+def chosen(entries: list[dict], names: list[str]) -> list[dict]:
+    if not names:
+        return entries
+    picked = [e for e in entries
+              if e["database"] in names
+              or f"{e['database']}.{e['collection']}" in names]
+    found = {e["database"] for e in picked} | {
+        f"{e['database']}.{e['collection']}" for e in picked}
+    missing = [n for n in names if n not in found]
+    if missing:
+        sys.exit(f"not in the manifest: {', '.join(missing)}")
+    return picked
+
+
+def restore_one(c: MongoClient, folder: Path, entry: dict) -> None:
+    db, coll = entry["database"], entry["collection"]
+    c[db].drop_collection(coll)
+    c[db].create_collection(coll, **entry.get("options", {}))
+    batch: list[dict] = []
+    with (folder / entry["file"]).open() as f:
+        for line in f:
+            batch.append(json_util.loads(line))
+            if len(batch) == CHUNK:
+                c[db][coll].insert_many(batch, ordered=False)
+                batch = []
+    if batch:
+        c[db][coll].insert_many(batch, ordered=False)
+    for index in entry.get("indexes", []):
+        if index["name"] == "_id_":
+            continue
+        options = {k: v for k, v in index.items() if k not in ("v", "key", "ns")}
+        c[db][coll].create_index(list(index["key"].items()), **options)
+    count = c[db][coll].count_documents({})
+    ok = count == entry["count"]
+    print(f"  {db}.{coll}: {count} restored, {entry['count']} in the manifest -- "
+          f"{'ok' if ok else 'MISMATCH'}")
+    if not ok:
+        sys.exit(f"count mismatch on {db}.{coll}")
+
+
+def main(argv: list[str]) -> None:
+    apply = "--apply" in argv
+    rest = [a for a in argv if a != "--apply"]
+    if not rest:
+        sys.exit(__doc__)
+    folder, names = Path(rest[0]), rest[1:]
+    manifest = json_util.loads((folder / "manifest.json").read_text())
+    entries = chosen(manifest["collections"], names)
+
+    c = connect()
+    print(f"restore <- {folder} (exported {manifest['exported_at']})")
+    for e in entries:
+        now = c[e["database"]][e["collection"]].count_documents({})
+        print(f"  {e['database']}.{e['collection']}: {now} now, "
+              f"{e['count']} in the export")
+    if not apply:
+        print("dry run -- nothing written. pass --apply to replace these.")
+        return
+    for e in entries:
+        restore_one(c, folder, e)
+    print(f"{len(entries)} collection(s) restored")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
