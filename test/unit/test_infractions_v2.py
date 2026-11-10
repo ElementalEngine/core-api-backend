@@ -270,6 +270,22 @@ def test_the_category_being_served_does_not_decay():
     assert stored(members)["major"]["tier"] == 2
 
 
+def test_nothing_decays_during_a_hold_and_every_clock_restarts_after_it():
+    # A banned member's other tiers kept decaying, and would all drop once lifted.
+    service, members = setup(
+        suspended=True,
+        ends=None,
+        active_category="extreme",
+        extreme={"tier": 2, "decays": NOW - 2000 * DAY},
+        quit={"tier": 4, "decays": NOW - 400 * DAY},
+    )
+    assert run(service.record(PLAYER)).tiers[TierCategory.quit] == 4
+    run(service.unsuspend(PLAYER, "appeal upheld", STAFF))
+    doc = stored(members)
+    assert doc["quit"] == {"tier": 4, "decays": NOW + 90 * DAY}
+    assert doc["extreme"] == {"tier": 2, "decays": NOW + 1460 * DAY}
+
+
 def test_days_need_a_suspension_with_an_end():
     # v1 marked an unsuspended member suspended without touching their roles.
     service, members = setup()

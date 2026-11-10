@@ -87,8 +87,10 @@ def now_utc() -> datetime:
 
 
 def decay(doc: SuspensionDocument, now: datetime) -> dict[str, Any]:
-    """A tier off for each full period since it was due, keeping the clock; the
-    category being served does not decay."""
+    """A tier off for each full period since it was due, keeping the clock. Nothing
+    decays during a hold, and the category being served never does."""
+    if _held(doc):
+        return {}
     updates: dict[str, Any] = {}
     for category in TierCategory:
         if doc.suspended and category == doc.active_category:
@@ -133,13 +135,16 @@ def _start(doc: SuspensionDocument, now: datetime) -> datetime:
 
 
 def _restart(doc: SuspensionDocument, now: datetime) -> dict[str, Any]:
-    """A category stops being served: its decay clock starts again from now."""
-    served = doc.active_category
-    if not doc.suspended or served not in DECAY_DAYS:
+    """A category stops being served: its decay clock starts again from now. A
+    hold froze every category, so each one's clock starts again."""
+    if not doc.suspended:
         return {}
-    if getattr(doc, str(served)).tier <= 0:
-        return {}
-    return {f"{served}.decays": now + timedelta(days=DECAY_DAYS[str(served)])}
+    served = list(DECAY_DAYS) if _held(doc) else [str(doc.active_category)]
+    return {
+        f"{category}.decays": now + timedelta(days=DECAY_DAYS[category])
+        for category in served
+        if category in DECAY_DAYS and getattr(doc, category).tier > 0
+    }
 
 
 def _kept(doc: SuspensionDocument, roles: list[str]) -> list[str]:
