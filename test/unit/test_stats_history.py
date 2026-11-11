@@ -164,8 +164,8 @@ def test_a_realtime_read_takes_documents_with_no_cloud_flag():
     assert "approved_at" not in h._validated.filters[0]
 
 
-def test_only_five_civs_most_played_first():
-    leaders = ["A", "B", "B", "C", "C", "C", "D", "E", "F", "F"]
+def test_only_ten_civs_most_played_first():
+    leaders = "A B B C C C D E F F G H I J K".split()
     h = _history(
         [_match(_seat(ME, placement=1, leader=f"LEADER_{x}")) for x in leaders]
     )
@@ -178,6 +178,11 @@ def test_only_five_civs_most_played_first():
         "LEADER_F",
         "LEADER_A",
         "LEADER_D",
+        "LEADER_E",
+        "LEADER_G",
+        "LEADER_H",
+        "LEADER_I",
+        "LEADER_J",
     ]
 
 
@@ -252,8 +257,8 @@ def test_a_page_past_the_cap_is_refused():
         ("Pangaea", "Pangaea"),
         ("../../Assets/Maps/Pangaea_Ultima", "Pangaea_Ultima"),
         ("..\\Assets\\Maps\\Lakes.lua", "Lakes"),
-        ("", "Unknown"),
-        (None, "Unknown"),
+        ("Unknown", "No map stored"),
+        (None, "No map stored"),
     ],
 )
 def test_a_map_saved_as_a_script_path_counts_as_its_file_name(raw, name):
