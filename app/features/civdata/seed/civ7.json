@@ -1,6 +1,6 @@
 {
   "edition": "civ7",
-  "leader_data_version": 5,
+  "leader_data_version": 6,
   "leaders": [
     {
       "token": "LEADER_ADA_LOVELACE",
