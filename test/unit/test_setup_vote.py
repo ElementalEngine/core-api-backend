@@ -47,7 +47,10 @@ def voting(edition="civ6", mode="ffa", players=("a", "b", "c"), **fields):
     return {**made, "_id": ObjectId("652f1a2b3c4d5e6f7a8b9c0d")}
 
 
-def tally(vote, settings=None, bans=None, civs=(), actor="a"):
+def tally(vote, settings=None, bans=None, civs=(), actor="a", everyone_finished=True):
+    if everyone_finished:
+        done = [p["discord_id"] for p in vote["players"]]
+        vote = {**vote, "vote": {**vote["vote"], "finished": done}}
     return {
         **vote,
         **vote_tallied(
@@ -225,10 +228,17 @@ def test_a_civ7_blind_draft_picks_a_leader_and_a_civ_and_the_rest_are_auto_picke
     assert shown["picks"][1]["civ"] in picking["pools"][1]["civs"]
 
 
-def test_a_vote_finishes_once_per_player_and_speaks_of_itself():
+def test_a_vote_finishes_once_per_player_and_is_cancelled_unless_all_finish():
     made = voting()
     done = {**made, **finished(made, "b")}
     assert done["vote"]["finished"] == ["b"]
+    closed = tally(done, everyone_finished=False)
+    assert (closed["status"], closed["cancel_reason"], closed["deadline"]) == (
+        "cancelled",
+        "inactive",
+        None,
+    )
+    assert closed["pools"] == []
     with pytest.raises(LobbyRefused, match="not a player in this vote"):
         finished(made, "z")
     with pytest.raises(LobbyRefused, match="the vote is closed"):

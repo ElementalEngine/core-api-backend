@@ -16,6 +16,7 @@ from app.features.match_setups.lobby import (
     VOTING,
     LobbyRefused,
     drafted,
+    inactive,
     require_host,
     require_phase,
     with_voted_bans,
@@ -165,11 +166,14 @@ def vote_tallied(
     now: datetime,
     rng: Any = _RANDOM,
 ) -> dict[str, Any]:
-    """The vote counted: each setting not yet won goes to the most reactions,
-    the bans a majority backs land within the caps, and the draft is dealt. A
-    blind draft then has its players pick; any other is done."""
+    """The vote counted once every player has finished: each setting not yet
+    won goes to the most reactions, the bans a majority backs land within the
+    caps, and the draft is dealt. A blind draft then has its players pick; any
+    other is done."""
     require_host(vote, actor_id)
     require_phase(vote, VOTING)
+    if closed := inactive(vote):
+        return closed
     settings = settled(vote, setting_votes, questions, final=True)
     draft_mode = next(s["value"] for s in settings if s["id"] == "draft_mode")
     bans = with_voted_bans(vote, ban_votes, {"leader": leaders, "civ": civs})

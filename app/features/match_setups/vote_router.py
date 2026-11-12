@@ -190,7 +190,8 @@ async def tally_vote(
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     """Count the settings, the draft mode and the bans, and deal the draft. The
-    bot counts, acting as the host, once all finish or the time is up."""
+    bot counts, acting as the host, once all finish or the time is up; a vote
+    not every player finished is cancelled."""
     read, leaders, civs = await _read(db, vote_id)
     season_id = await open_season_id(db, read["edition"])
 

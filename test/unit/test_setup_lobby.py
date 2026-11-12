@@ -286,7 +286,7 @@ def voting(made):
     return apply(made, started(made, "host", NOW))
 
 
-def test_the_vote_is_posted_once_and_each_player_finishes_once():
+def test_the_vote_is_posted_once_each_player_finishes_once_and_all_must_finish():
     made = voting(lobby(players=["a", "b"]))
     placed = apply(made, vote_placed(made, "host", "v", {"status": "m1"}))
     assert placed["vote"] == {
@@ -304,9 +304,19 @@ def test_the_vote_is_posted_once_and_each_player_finishes_once():
         finished(done, "z")
     with pytest.raises(LobbyRefused, match="not voting"):
         finished(lobby(players=["a"]), "a")
+    assert tally(done, everyone_finished=False) == {
+        "status": "cancelled",
+        "cancel_reason": "inactive",
+        "deadline": None,
+    }
 
 
-def tally(made, ban_votes=None, actor="host", setting_votes=None):
+def tally(
+    made, ban_votes=None, actor="host", setting_votes=None, everyone_finished=True
+):
+    if everyone_finished and made["vote"]:
+        done = [p["discord_id"] for p in made["players"]]
+        made = {**made, "vote": {**made["vote"], "finished": done}}
     rng = random.Random(3)
     return tallied(
         made,

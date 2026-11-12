@@ -6601,7 +6601,7 @@
     },
     "/api/v2/match-setups/lobbies/{lobby_id}/tally": {
       "post": {
-        "description": "Settle the settings put to the vote, count the bans and deal the draft.\nThe bot counts, acting as the host, once all finish or the time is up.",
+        "description": "Settle the settings put to the vote, count the bans and deal the draft.\nThe bot counts, acting as the host, once all finish or the time is up; a\nvote not every player finished is cancelled.",
         "operationId": "tally_vote_api_v2_match_setups_lobbies__lobby_id__tally_post",
         "parameters": [
           {
@@ -7476,7 +7476,7 @@
     },
     "/api/v2/match-setups/votes/{vote_id}/tally": {
       "post": {
-        "description": "Count the settings, the draft mode and the bans, and deal the draft. The\nbot counts, acting as the host, once all finish or the time is up.",
+        "description": "Count the settings, the draft mode and the bans, and deal the draft. The\nbot counts, acting as the host, once all finish or the time is up; a vote\nnot every player finished is cancelled.",
         "operationId": "tally_vote_api_v2_match_setups_votes__vote_id__tally_post",
         "parameters": [
           {

@@ -364,6 +364,15 @@ def finished(lobby: Mapping[str, Any], player_id: str) -> dict[str, Any]:
     return {"vote": {**vote, "finished": [*vote["finished"], player_id]}}
 
 
+def inactive(setup: Mapping[str, Any]) -> dict[str, Any] | None:
+    """A vote counted before every player has finished is cancelled for
+    inactivity, and nothing is dealt."""
+    done = setup["vote"]["finished"]
+    if all(p["discord_id"] in done for p in setup["players"]):
+        return None
+    return {"status": CANCELLED, "cancel_reason": "inactive", "deadline": None}
+
+
 def dealt(
     lobby: Mapping[str, Any],
     teams: Sequence[Sequence[str]],
@@ -484,12 +493,14 @@ def tallied(
     now: datetime,
     rng: Any = _RANDOM,
 ) -> dict[str, Any]:
-    """The vote counted and the draft dealt: every setting put to the vote is
-    settled, and more leader bans land with a majority of the players, as many
-    as the cap leaves room for. A blind draft then has its players pick; any
-    other is done."""
+    """The vote counted once every player has finished, and the draft dealt:
+    every setting put to the vote is settled, and more leader bans land with a
+    majority of the players, as many as the cap leaves room for. A blind draft
+    then has its players pick; any other is done."""
     require_host(lobby, actor_id)
     require_phase(lobby, VOTING)
+    if closed := inactive(lobby):
+        return closed
     settings = with_voted_settings(lobby, setting_votes, questions, final=True)
     draft_mode = _draft_mode(settings)
     bans = with_voted_bans(lobby, ban_votes, {"leader": leaders})
@@ -581,6 +592,7 @@ __all__ = [
     "drafted",
     "edited",
     "finished",
+    "inactive",
     "joined",
     "left",
     "lobby_code",
