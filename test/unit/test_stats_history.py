@@ -257,8 +257,8 @@ def test_a_page_past_the_cap_is_refused():
         ("Pangaea", "Pangaea"),
         ("../../Assets/Maps/Pangaea_Ultima", "Pangaea_Ultima"),
         ("..\\Assets\\Maps\\Lakes.lua", "Lakes"),
-        ("Unknown", "Older history"),
-        (None, "Older history"),
+        ("Unknown", "Legacy Stats"),
+        (None, "Legacy Stats"),
     ],
 )
 def test_a_map_saved_as_a_script_path_counts_as_its_file_name(raw, name):
