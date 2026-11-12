@@ -54,8 +54,12 @@ def _clean_cache():
 def test_seed_is_one_row_per_edition_with_no_ended_at():
     docs = seed_documents(NOW)
     assert [d["edition"] for d in docs] == ["civ6", "civ7"]
-    assert [d["label"] for d in docs] == ["Season 6", "Season 1"]
-    assert all(d["started_at"] == NOW for d in docs)
+    assert [d["label"] for d in docs] == ["Season 7", "Season 1"]
+    # Civ 6's Season 7 began on v1 at a known time; Civ 7's start is not known.
+    assert [d["started_at"] for d in docs] == [
+        datetime(2026, 11, 11, 21, 56, 14, tzinfo=UTC),
+        NOW,
+    ]
     assert all(set(d) == {"edition", "label", "started_at"} for d in docs)
 
 
@@ -64,13 +68,13 @@ def test_a_caller_cannot_poison_the_cache():
     first = asyncio.run(repo.get_current_season("civ6"))
     first["label"] = "tampered"
     second = asyncio.run(repo.get_current_season("civ6"))
-    assert second["label"] == "Season 6"
+    assert second["label"] == "Season 7"
     assert collection.find_one_calls == 1
 
 
 def test_the_label_names_the_open_season_or_none():
     repo, _ = _repo(seed_documents(NOW))
-    assert asyncio.run(repo.label_for("civ6")) == "Season 6"
+    assert asyncio.run(repo.label_for("civ6")) == "Season 7"
     clear_cache()
     empty, _ = _repo([])
     assert asyncio.run(empty.label_for("civ6")) is None
@@ -99,20 +103,20 @@ def test_a_match_s_season_is_named_by_its_id_once():
 
 def test_cache_holds_one_entry_per_edition():
     repo, collection = _repo(seed_documents(NOW))
-    assert asyncio.run(repo.get_current_season("civ6"))["label"] == "Season 6"
+    assert asyncio.run(repo.get_current_season("civ6"))["label"] == "Season 7"
     assert asyncio.run(repo.get_current_season("civ7"))["label"] == "Season 1"
     # Two editions, two reads. A one-slot cache makes this three or more; a
-    # cache not keyed by edition returns Season 6 for civ7.
+    # cache not keyed by edition returns Season 7 for civ7.
     assert collection.find_one_calls == 2
 
 
 def test_latest_started_at_wins_per_edition():
     later = datetime(2026, 12, 1, tzinfo=UTC)
     docs = seed_documents(NOW) + [
-        {"edition": "civ6", "label": "Season 7", "started_at": later}
+        {"edition": "civ6", "label": "Season 8", "started_at": later}
     ]
     repo, _ = _repo(docs)
-    assert asyncio.run(repo.get_current_season("civ6"))["label"] == "Season 7"
+    assert asyncio.run(repo.get_current_season("civ6"))["label"] == "Season 8"
     assert asyncio.run(repo.get_current_season("civ7"))["label"] == "Season 1"
 
 

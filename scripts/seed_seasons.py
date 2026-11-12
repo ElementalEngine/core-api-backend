@@ -2,8 +2,12 @@
 """seed_seasons [--dry-run]
 
 Creates the two seed rows in `seasons`, one per
-edition. `started_at` is the migration timestamp, recorded as the TRACKING
-start, not the true start of either season.
+edition: the season it is in when v2 starts. `started_at` is the season's true
+start where SEED_STARTS holds one; otherwise the migration timestamp, recorded
+as the TRACKING start, not the true start.
+
+Run stamp_v1_season after it: the matches v1 approved in a season seeded with
+its true start carry no season until then.
 
 Deliberately NOT idempotent: a second run must fail with E11000 against
 unique_label_per_edition. That index is what stops
