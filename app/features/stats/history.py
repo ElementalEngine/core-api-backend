@@ -27,9 +27,10 @@ MAX_PAGE = 49
 TOP_CIVS = 10
 # Civ and leader values that name nothing: older saves and unpicked seats.
 _NO_PICK = frozenset({"", "Unknown", "None", "LEADER_NONE", "CIVILIZATION_NONE"})
-# Map values that name nothing, and how a game stored with no map is named.
+# Map values that name nothing, and how a game stored with no map is named:
+# the older history, brought in before saves were kept.
 _NO_MAP = frozenset({"", "Unknown", "None"})
-NO_MAP = "No map stored"
+NO_MAP = "Older history"
 
 
 def _validate(
@@ -59,7 +60,7 @@ def _pick(match: dict[str, Any], seat: dict[str, Any]) -> str | None:
 def map_name(map_type: Any) -> str:
     """A map as the summary groups it: a saved script path counts as its file
     name, so `../../Assets/Maps/Lakes` and `Lakes` are one map. A game stored
-    with no map is named No map stored."""
+    with no map is named Older history."""
     name = re.split(r"[\\/]", str(map_type or "").strip())[-1]
     name = re.sub(r"\.(lua|civ6map|civ7map|xml)$", "", name, flags=re.IGNORECASE)
     return NO_MAP if name in _NO_MAP else name
