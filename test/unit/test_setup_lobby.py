@@ -264,10 +264,10 @@ def test_the_host_starts_early_only_when_the_lobby_can_draft(shape, players, ref
         started(lobby(shape, players=players), "host", NOW)
 
 
-def test_starting_locks_the_seats_for_a_three_minute_bans_vote():
+def test_starting_locks_the_seats_for_a_five_minute_bans_vote():
     seated = lobby(players=["a", "b"])
     made = apply(seated, started(seated, "host", NOW))
-    assert (made["phase"], made["deadline"]) == ("voting", NOW + timedelta(minutes=3))
+    assert (made["phase"], made["deadline"]) == ("voting", NOW + timedelta(minutes=5))
     for locked in (
         lambda: joined(made, "c", NOW),
         lambda: left(made, "a"),

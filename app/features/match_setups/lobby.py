@@ -36,7 +36,7 @@ PICKING = "picking"
 IDLE_LIMIT = timedelta(hours=2, minutes=30)
 # A lobby still in setup has outlived its editor by then, so it frees its host.
 SETUP_IDLE_LIMIT = timedelta(minutes=15)
-BANS_VOTE_LIMIT = timedelta(minutes=3)
+BANS_VOTE_LIMIT = timedelta(minutes=5)
 # A full lobby waits this long before its vote, so players can check everyone
 # is there; the host may start sooner.
 FILL_WAIT = timedelta(minutes=3)
