@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, Path, status
 from pymongo import AsyncMongoClient
@@ -22,6 +22,7 @@ from app.features.infractions.schemas_v2 import (
     Suspended,
     SuspensionCleared,
     SuspensionRecord,
+    TierMembers,
     TierRemoved,
     TierResult,
 )
@@ -34,6 +35,8 @@ router = APIRouter(
 )
 
 MemberId = Annotated[str, Path(pattern=r"^[0-9]{17,20}$")]
+# The suspension ladders; laggers have their own list.
+Ladder = Literal["quit", "minor", "moderate", "major", "extreme"]
 
 
 def _actor(
@@ -59,6 +62,11 @@ async def due(service: Service) -> DueSuspensions:
 @router.get("/laggers", response_model=Laggers)
 async def laggers(service: Service) -> Laggers:
     return await service.laggers()
+
+
+@router.get("/tiers/{category}", response_model=TierMembers)
+async def tier_members(category: Ladder, service: Service) -> TierMembers:
+    return await service.tier_members(TierCategory(category))
 
 
 @router.get("/suspended", response_model=Suspended)

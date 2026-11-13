@@ -3297,6 +3297,45 @@
         "title": "TierCategory",
         "type": "string"
       },
+      "TierMember": {
+        "properties": {
+          "discord_id": {
+            "title": "Discord Id",
+            "type": "string"
+          },
+          "held": {
+            "title": "Held",
+            "type": "boolean"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "discord_id",
+          "tier",
+          "held"
+        ],
+        "title": "TierMember",
+        "type": "object"
+      },
+      "TierMembers": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/TierMember"
+            },
+            "title": "Members",
+            "type": "array"
+          }
+        },
+        "required": [
+          "members"
+        ],
+        "title": "TierMembers",
+        "type": "object"
+      },
       "TierRemoved": {
         "properties": {
           "category": {
@@ -4806,6 +4845,71 @@
           }
         },
         "summary": "Suspended",
+        "tags": [
+          "infractions-v2"
+        ]
+      }
+    },
+    "/api/v2/infractions/tiers/{category}": {
+      "get": {
+        "operationId": "tier_members_api_v2_infractions_tiers__category__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category",
+            "required": true,
+            "schema": {
+              "enum": [
+                "quit",
+                "minor",
+                "moderate",
+                "major",
+                "extreme"
+              ],
+              "title": "Category",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TierMembers"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tier Members",
         "tags": [
           "infractions-v2"
         ]

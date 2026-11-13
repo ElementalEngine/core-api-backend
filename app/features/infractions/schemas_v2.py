@@ -129,3 +129,13 @@ class Lagger(BaseModel):
 
 class Laggers(BaseModel):
     members: list[Lagger]
+
+
+class TierMember(BaseModel):
+    discord_id: str
+    tier: int
+    held: bool
+
+
+class TierMembers(BaseModel):
+    members: list[TierMember]

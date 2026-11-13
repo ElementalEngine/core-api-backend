@@ -34,6 +34,8 @@ from app.features.infractions.schemas_v2 import (
     Suspended,
     SuspensionCleared,
     SuspensionRecord,
+    TierMember,
+    TierMembers,
     TierRemoved,
     TierResult,
 )
@@ -440,6 +442,23 @@ class Infractions:
         ]
         members.sort(key=lambda m: (-m.strikes, m.discord_id))
         return Laggers(members=members)
+
+    async def tier_members(self, category: TierCategory) -> TierMembers:
+        """Every member at a tier in this category, read as decayed, the highest
+        first; nothing written."""
+        now = now_utc()
+        members = []
+        for raw in await self._col.find(
+            {f"{category.value}.tier": {"$gt": 0}}
+        ).to_list():
+            doc = SuspensionDocument.model_validate(raw)
+            tier = getattr(decayed(doc, decay(doc, now)), category.value).tier
+            if tier:
+                members.append(
+                    TierMember(discord_id=doc.discord_id, tier=tier, held=_held(doc))
+                )
+        members.sort(key=lambda m: (-m.tier, m.discord_id))
+        return TierMembers(members=members)
 
     async def due(self) -> DueSuspensions:
         now = now_utc()

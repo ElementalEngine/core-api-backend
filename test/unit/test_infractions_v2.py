@@ -403,6 +403,25 @@ def test_the_laggers_list_names_every_strike_with_the_tagged_first():
     ]
 
 
+def test_a_tier_list_names_every_member_at_a_tier_as_decayed_the_highest_first():
+    service, members = setup(quit={"tier": 2, "decays": NOW + DAY})
+    for n, (tier, decays, suspended) in enumerate(
+        [(6, None, True), (1, NOW - DAY, False), (3, NOW + DAY, False)]
+    ):
+        doc = {"discord_id": f"99999999999999990{n}", "suspended": suspended}
+        doc |= {"ends": None} | {c.value: dict(ZERO) for c in TierCategory}
+        doc["quit"] = {"tier": tier, "decays": decays}
+        members["suspensions"].docs.append(doc)
+    listed = run(service.tier_members(TierCategory.quit)).members
+    assert [(m.discord_id, m.tier, m.held) for m in listed] == [
+        ("999999999999999900", 6, True),
+        ("999999999999999902", 3, False),
+        (PLAYER, 2, False),
+    ]
+    assert run(service.tier_members(TierCategory.major)).members == []
+    assert stored(members)["quit"]["tier"] == 2
+
+
 def test_a_rejoin_says_whether_the_member_wears_the_lagger_tag():
     service, _ = setup(lagger={"tier": 3, "decays": None})
     applied = run(service.apply_pending(PLAYER, []))
