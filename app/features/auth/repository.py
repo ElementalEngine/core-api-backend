@@ -22,9 +22,12 @@ class AuthRepository:
         self._users: AsyncCollection = client[DB_SERVER_MEMBERS][COL_USERS]
 
     async def ensure_indexes(self) -> None:
+        # Unique, so the gap between the clash check and the write cannot give one
+        # member two records, or one linked account two members.
         await self._users.create_index(
             [("discord_id", ASCENDING)],
-            name="auth_user_discord_id_idx",
+            name="auth_user_discord_id_unique_idx",
+            unique=True,
         )
         await self._users.create_index(
             [("linked_account_id", ASCENDING)],
@@ -32,7 +35,11 @@ class AuthRepository:
         )
         await self._users.create_index(
             [("linked_platform", ASCENDING), ("linked_account_id", ASCENDING)],
-            name="auth_user_linked_platform_account_idx",
+            name="auth_user_linked_account_unique_idx",
+            unique=True,
+            partialFilterExpression={
+                "linked_account_id": {"$type": "string", "$gt": ""}
+            },
         )
         await self._users.create_index(
             [("steam_id", ASCENDING)],
