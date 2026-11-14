@@ -11,6 +11,7 @@ from typing import Any, cast, get_args
 
 from pymongo import ASCENDING, AsyncMongoClient, ReturnDocument
 from pymongo.asynchronous.collection import AsyncCollection
+from pymongo.errors import DuplicateKeyError
 
 from app.core.config import settings
 from app.core.constants import DB_SERVER_MEMBERS
@@ -647,19 +648,7 @@ class RegistrationFlow:
     ) -> Registration:
         """Refuse a clash, naming the other account's standing; else write the
         player's record."""
-        try:
-            await refuse_clash(
-                self._users,
-                discord_user_id=discord_user_id,
-                platform=platform,
-                account_id=account_id,
-                game=game.value,
-            )
-        except CLASHES as exc:
-            await self._name_standing(
-                cast(dict[str, Any], exc.details), discord_user_id
-            )
-            raise
+        await self._refuse_clash(discord_user_id, platform, account_id, game)
         flags = account_flags(
             discord_user_id,
             datetime.now(UTC),
@@ -667,19 +656,25 @@ class RegistrationFlow:
             steam_created=steam_created,
         )
         extra = {**(extra or {}), **({"flags": flags} if flags else {})}
-        await self._users.upsert_registered_user(
-            discord_user_id=discord_user_id,
-            discord_username=username,
-            display_name=display_name,
-            linked_platform=platform.value,
-            linked_account_id=account_id,
-            linked_account_name=account_name,
-            game=game.value,
-            method=method.value,
-            ownership_verified_at=ownership_verified_at,
-            playtime_minutes=playtime_minutes,
-            entry_extra=extra,
-        )
+        try:
+            await self._users.upsert_registered_user(
+                discord_user_id=discord_user_id,
+                discord_username=username,
+                display_name=display_name,
+                linked_platform=platform.value,
+                linked_account_id=account_id,
+                linked_account_name=account_name,
+                game=game.value,
+                method=method.value,
+                ownership_verified_at=ownership_verified_at,
+                playtime_minutes=playtime_minutes,
+                entry_extra=extra,
+            )
+        except DuplicateKeyError:
+            # Another record was written between the check and this write: answer
+            # as the check now does.
+            await self._refuse_clash(discord_user_id, platform, account_id, game)
+            raise
         _log_registration(
             discord_user_id,
             game,
@@ -698,6 +693,27 @@ class RegistrationFlow:
             role_intents=role_intents(game, platform),
             flags=flags,
         )
+
+    async def _refuse_clash(
+        self,
+        discord_user_id: str,
+        platform: RegistrationPlatform,
+        account_id: str,
+        game: SupportedGame,
+    ) -> None:
+        try:
+            await refuse_clash(
+                self._users,
+                discord_user_id=discord_user_id,
+                platform=platform,
+                account_id=account_id,
+                game=game.value,
+            )
+        except CLASHES as exc:
+            await self._name_standing(
+                cast(dict[str, Any], exc.details), discord_user_id
+            )
+            raise
 
     async def _name_standing(self, details: dict[str, Any], caller: str) -> None:
         """Add the other account's standing to a clash; the refusal stands even
