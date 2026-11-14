@@ -156,7 +156,7 @@ def test_every_unregistered_player_is_named_and_nothing_is_written(monkeypatch):
     edit = EditingService(svc).patch_players(
         OID,
         [SeatPatch(seat=0, discord_id=a), SeatPatch(seat=1, discord_id=b)],
-        actor_is_staff=False,
+        actor_is_staff=True,
     )
     with pytest.raises(
         MatchServiceError, match=f"<@{a}>, <@{b}> are not registered yet"

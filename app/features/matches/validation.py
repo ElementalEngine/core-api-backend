@@ -29,14 +29,13 @@ class Rule(StrEnum):
     DUPLICATE_SEAT = "duplicate_seat"
     UNKNOWN_SEAT = "unknown_seat"
     PLACEMENT_OUT_OF_RANGE = "placement_out_of_range"
-    DUPLICATE_PLACEMENT = "duplicate_placement"
     SUBBED_OUT_PLACEMENT = "subbed_out_placement"
     TEAM_PLACEMENT_MISMATCH = "team_placement_mismatch"
     UNPAIRED_SUB = "unpaired_sub"
     QUIT_ON_PLACEHOLDER = "quit_on_placeholder"
     TOO_FEW_TEAMS = "too_few_teams"
     DUPLICATE_PLAYER = "duplicate_player"
-    STAFF_ONLY_CIV = "staff_only_civ"
+    STAFF_ONLY_PLAYER = "staff_only_player"
     PLACE_GAP = "place_gap"
     NO_LEAVER = "no_leaver"
 
@@ -106,20 +105,6 @@ def _seats(match: MatchModel) -> list[_Seat]:
 def _pairing_faults(seats: Sequence[_Seat]) -> set[int]:
     """Teams holding an is_sub seat with no paired leaver."""
     return {s.team for s in seats if s.is_sub and s.leaver is None}
-
-
-def _teams_at(seats: Sequence[_Seat]) -> dict[int, set[int]]:
-    at: defaultdict[int, set[int]] = defaultdict(set)
-    for s in seats:
-        if s.placement is not None:
-            at[s.placement].add(s.team)
-    return at
-
-
-def _tie_growth(pre: Sequence[_Seat], post: Sequence[_Seat]) -> set[int]:
-    """Placement values the patch ties across teams, or widens a tie onto."""
-    a, b = _teams_at(pre), _teams_at(post)
-    return {v for v, teams in b.items() if len(teams) > 1 and len(teams) > len(a[v])}
 
 
 def _split_teams(seats: Sequence[_Seat]) -> set[int]:
@@ -258,14 +243,20 @@ def validate_players_patch(
                     f"Seat {seat_index[seat] + 1}'s place must be 1 to {t_count}.",
                 )
             )
-        if not actor_is_staff and not (
-            isinstance(e.leader, UnsetType) and isinstance(e.civ, UnsetType)
+        # A real-time save names its players, so a different one is staff's to
+        # check; a cloud save names nobody, so its reporter fills the seats in.
+        if (
+            not actor_is_staff
+            and not match.is_cloud
+            and not isinstance(e.discord_id, UnsetType)
+            and e.discord_id != pre[seat_index[seat]].discord_id
         ):
             out.append(
                 Violation(
-                    Rule.STAFF_ONLY_CIV,
+                    Rule.STAFF_ONLY_PLAYER,
                     seat,
-                    f"Only staff can change seat {seat_index[seat] + 1}'s leader or civ.",
+                    f"Only staff can change seat {seat_index[seat] + 1}'s player "
+                    "in a real-time game.",
                 )
             )
         if e.quit is True and is_placeholder(s.discord_id):
@@ -296,30 +287,12 @@ def validate_players_patch(
                 )
             )
 
-    if not actor_is_staff:
-        for value in sorted(_tie_growth(pre, merged)):
-            holders = [
-                seat
-                for seat, k in sorted(seat_index.items())
-                if merged[k].placement == value
-            ]
-            numbers = [seat_index[seat] + 1 for seat in holders]
-            out.append(
-                Violation(
-                    Rule.DUPLICATE_PLACEMENT,
-                    holders[0],
-                    f"Seats {_listed(numbers)} would share {_ordinal(value + 1)} "
-                    "place, and only staff can set a tie.",
-                )
-            )
-
-    # Said alone: a place out of range or a refused tie already explains a gap.
-    placed = {Rule.PLACEMENT_OUT_OF_RANGE, Rule.DUPLICATE_PLACEMENT}
+    # Said alone: a place out of range already explains a gap.
     gap = _first_gap(merged)
     if (
         gap is not None
         and _first_gap(pre) is None
-        and not placed & {v.rule for v in out}
+        and Rule.PLACEMENT_OUT_OF_RANGE not in {v.rule for v in out}
     ):
         out.append(
             Violation(
