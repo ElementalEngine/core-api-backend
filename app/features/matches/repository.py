@@ -144,11 +144,12 @@ class MatchRepository:
         was: list[dict[str, Any]],
         now: datetime,
     ) -> bool:
-        # Players only, so a contest written meanwhile is kept; only over the
-        # seats the edit was built from, so a second edit cannot undo the first.
+        # Players and the time they changed only, so a contest written meanwhile
+        # is kept; only over the seats the edit was built from, so a second edit
+        # cannot undo the first.
         res = await self._pending.update_one(
             {"_id": oid, "players": was, **_editable(now)},
-            {"$set": {"players": players}},
+            {"$set": {"players": players, "updated_at": now}},
         )
         return res.matched_count == 1
 

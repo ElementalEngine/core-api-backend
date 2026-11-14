@@ -43,6 +43,8 @@ class MatchResponse(BaseModel):
     parser_version: str
     discord_messages_id_list: list[str]
     created_at: datetime
+    # When a pending report's seats or places last changed, if they ever have.
+    updated_at: datetime | None = None
     approved_at: datetime | None = None
     approver_discord_id: str | None = None
     flagged: bool
