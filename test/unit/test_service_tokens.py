@@ -47,7 +47,6 @@ def test_no_token_configured_answers_503(monkeypatch):
 
 
 def test_gate_runs_before_the_edition_is_validated(monkeypatch):
-    pytest.importorskip("httpx")
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
