@@ -10,7 +10,7 @@ from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import DuplicateKeyError
 
 from app.core.constants import COL_MATCH_SETUPS, GAMES_DB
-from app.features.match_setups.lobby import CANCELLED, OPEN, SETUP
+from app.features.match_setups.lobby import CANCELLED, LIVE, OPEN, SETUP
 
 OPEN_LOBBY = {"command": "lobby", "status": OPEN}
 OPEN_VOTE = {"command": "vote", "status": OPEN}
@@ -62,6 +62,11 @@ class MatchSetupRepository:
             name="open_lobbies_by_deadline",
         )
         await self._setups.create_index(
+            [("guild_id", ASCENDING), ("closed_at", DESCENDING)],
+            partialFilterExpression={"command": "lobby"},
+            name="closed_lobbies_by_guild",
+        )
+        await self._setups.create_index(
             [("guild_id", ASCENDING), ("code", ASCENDING)],
             unique=True,
             partialFilterExpression=OPEN_VOTE,
@@ -111,18 +116,31 @@ class MatchSetupRepository:
             raise _refused(exc) from exc
 
     async def open_lobbies(
-        self, guild_id: str, host_id: str | None = None
+        self,
+        guild_id: str,
+        host_id: str | None = None,
+        closed_since: datetime | None = None,
     ) -> list[dict[str, Any]]:
-        """The lobbies players can see; a host's own, in setup or not."""
+        """The lobbies players can see; a host's own, in setup or not; and
+        any closed since the time given."""
         mine = {"host_id": host_id} if host_id else {"phase": {"$ne": SETUP}}
-        cursor = self._setups.find({**OPEN_LOBBY, **mine, "guild_id": guild_id})
+        query: dict[str, Any] = {**OPEN_LOBBY, **mine}
+        if closed_since is not None:
+            closed = {"command": "lobby", "closed_at": {"$gte": closed_since}}
+            query = {"$or": [query, closed]}
+        cursor = self._setups.find({**query, "guild_id": guild_id})
         return await cursor.sort("created_at", DESCENDING).to_list(None)
 
     async def due(self, now: datetime, command: str = "lobby") -> list[dict[str, Any]]:
-        """The open lobbies, or votes, whose countdown, vote or blind picks are
-        past their time."""
+        """The open lobbies, or votes, whose vote or blind picks are past their
+        time; a lobby still taking players has none."""
         cursor = self._setups.find(
-            {"command": command, "status": OPEN, "deadline": {"$lt": now}}
+            {
+                "command": command,
+                "status": OPEN,
+                "phase": {"$ne": LIVE},
+                "deadline": {"$lt": now},
+            }
         )
         return await cursor.sort("deadline", ASCENDING).to_list(None)
 

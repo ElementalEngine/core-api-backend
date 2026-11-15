@@ -1351,6 +1351,18 @@
             "title": "Channel Id",
             "type": "string"
           },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
           "code": {
             "title": "Code",
             "type": "string"
@@ -1479,6 +1491,18 @@
             ],
             "title": "Shape",
             "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
           },
           "status": {
             "enum": [
@@ -5673,7 +5697,7 @@
     },
     "/api/v2/match-setups/lobbies": {
       "get": {
-        "description": "The lobbies players can see; with a host, that host's own, in setup or\nnot.",
+        "description": "The lobbies players can see; with a host, that host's own, in setup or\nnot; with recent, also those closed in the last day.",
         "operationId": "open_lobbies_api_v2_match_setups_lobbies_get",
         "parameters": [
           {
@@ -5703,6 +5727,16 @@
                 }
               ],
               "title": "Host Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "recent",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Recent",
+              "type": "boolean"
             }
           },
           {
@@ -5958,7 +5992,7 @@
     },
     "/api/v2/match-setups/lobbies/due": {
       "get": {
-        "description": "Countdowns, votes and blind picks past their time, for the bot to move\non.",
+        "description": "Votes and blind picks past their time, for the bot to move on.",
         "operationId": "lobbies_due_api_v2_match_setups_lobbies_due_get",
         "parameters": [
           {
@@ -6296,7 +6330,7 @@
     },
     "/api/v2/match-setups/lobbies/{lobby_id}/join": {
       "post": {
-        "description": "A player sits down; the last seat starts the countdown to the vote.",
+        "description": "A player sits down; a full lobby waits for its host to start it.",
         "operationId": "join_lobby_api_v2_match_setups_lobbies__lobby_id__join_post",
         "parameters": [
           {
@@ -6660,7 +6694,7 @@
     },
     "/api/v2/match-setups/lobbies/{lobby_id}/start": {
       "post": {
-        "description": "The host starts, or the bot once a full lobby's countdown ends: the\nseats lock and the bans vote opens.",
+        "description": "The host starts: the seats lock and the bans vote opens.",
         "operationId": "start_lobby_api_v2_match_setups_lobbies__lobby_id__start_post",
         "parameters": [
           {

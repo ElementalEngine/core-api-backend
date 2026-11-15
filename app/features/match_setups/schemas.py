@@ -219,6 +219,8 @@ class LobbyView(SetupView):
     message: str | None = None
     lfg: bool = False
     vote: LobbyVote | None
+    started_at: datetime | None = None
+    closed_at: datetime | None = None
 
 
 class VoteRequest(BaseModel):
