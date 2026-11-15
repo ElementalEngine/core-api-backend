@@ -15,7 +15,7 @@ router = APIRouter(tags=["health"])
 
 @router.get("/")
 async def root():
-    return {"service": "civ-save-tool", "status": "ok"}
+    return {"service": "core-api", "status": "ok"}
 
 
 @router.get("/healthz")
