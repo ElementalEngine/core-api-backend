@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import pytest
 from pydantic import SecretStr
 
 TOKEN = "mito-test-token"
 
 
 def _client(monkeypatch):
-    pytest.importorskip("httpx")
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
