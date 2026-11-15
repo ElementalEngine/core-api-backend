@@ -230,11 +230,7 @@ async def refuse_clash(
     """Refuse an account another player holds, a player who already holds a
     different account, and a game the player already has."""
     by_discord = await users.get_user_by_discord_id(discord_user_id)
-    by_linked = (
-        await users.get_user_by_steam_id(account_id)
-        if platform is RegistrationPlatform.STEAM
-        else await users.get_user_by_linked_account(platform.value, account_id)
-    )
+    by_linked = await users.get_user_by_linked_account(platform.value, account_id)
     if by_linked and str(by_linked.get("discord_id")) != discord_user_id:
         holder = str(by_linked.get("discord_id", ""))
         if platform is RegistrationPlatform.STEAM:
@@ -246,15 +242,6 @@ async def refuse_clash(
         return
     held_platform = by_discord.get("linked_platform")
     held_account = by_discord.get("linked_account_id")
-    held_steam = by_discord.get("steam_id")
-    if (
-        platform is RegistrationPlatform.STEAM
-        and held_steam
-        and str(held_steam) != account_id
-    ):
-        raise DiscordSteamConflictError(
-            discord_user_id=discord_user_id, existing_steam_id=str(held_steam)
-        )
     if (
         held_platform
         and held_account
@@ -492,7 +479,7 @@ class RegistrationFlow:
         registrations = user.get("registrations") or {}
         if game.value in registrations:
             raise AlreadyRegisteredError(game.value)
-        steam_id = user.get("steam_id") or (
+        steam_id = (
             user.get("linked_account_id")
             if user.get("linked_platform") == "steam"
             else None

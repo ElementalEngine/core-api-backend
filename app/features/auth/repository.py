@@ -41,11 +41,6 @@ class AuthRepository:
                 "linked_account_id": {"$type": "string", "$gt": ""}
             },
         )
-        await self._users.create_index(
-            [("steam_id", ASCENDING)],
-            sparse=True,
-            name="auth_user_steam_id_idx",
-        )
 
     async def get_user_by_discord_id(self, discord_id: str) -> dict[str, Any] | None:
         return await self._users.find_one({"discord_id": discord_id})
@@ -57,35 +52,17 @@ class AuthRepository:
                 [
                     ("linked_platform", ASCENDING),
                     ("linked_account_id", ASCENDING),
-                    ("steam_id", ASCENDING),
                 ]
             )
             .limit(LOOKUP_LIMIT)
         )
         return await cursor.to_list(length=LOOKUP_LIMIT)
 
-    async def get_user_by_steam_id(self, steam_id: str) -> dict[str, Any] | None:
-        return await self._users.find_one(
-            {
-                "$or": [
-                    {"steam_id": steam_id},
-                    {"linked_platform": "steam", "linked_account_id": steam_id},
-                ]
-            }
-        )
-
     async def find_users_by_linked_account_id(
         self, linked_account_id: str
     ) -> list[dict[str, Any]]:
         cursor = (
-            self._users.find(
-                {
-                    "$or": [
-                        {"linked_account_id": linked_account_id},
-                        {"steam_id": linked_account_id},
-                    ]
-                }
-            )
+            self._users.find({"linked_account_id": linked_account_id})
             .sort(
                 [
                     ("discord_id", ASCENDING),
@@ -129,7 +106,6 @@ class AuthRepository:
                 "linked_platform": 1,
                 "linked_account_id": 1,
                 "linked_account_name": 1,
-                "steam_id": 1,
                 "server_registered_at": 1,
                 "first_registered_at": 1,
                 "created_at": 1,
@@ -259,7 +235,6 @@ def _build_existing_user_update(
         registration_key: dict(registration_doc),
     }
     unset_payload: dict[str, str] = {
-        "steam_id": "",
         "steam_name": "",
         "locale": "",
         "verified": "",
@@ -328,16 +303,12 @@ def _resolve_server_registered_at(
 def platform_of(doc: Mapping[str, Any]) -> RegistrationPlatform | None:
     if doc.get("linked_platform"):
         return RegistrationPlatform(str(doc["linked_platform"]))
-    if doc.get("steam_id"):
-        return RegistrationPlatform.STEAM
     return None
 
 
 def account_id_of(doc: Mapping[str, Any]) -> str | None:
     if doc.get("linked_account_id"):
         return str(doc["linked_account_id"])
-    if doc.get("steam_id"):
-        return str(doc["steam_id"])
     return None
 
 
