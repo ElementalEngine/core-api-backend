@@ -44,6 +44,7 @@ def test_users_indexes_are_unique():
     }
     assert "auth_user_discord_id_idx" not in made
     assert "auth_user_linked_platform_account_idx" not in made
+    assert "auth_user_steam_id_idx" not in made
 
 
 class _Users:
@@ -57,7 +58,7 @@ class _Users:
     async def get_user_by_discord_id(self, discord_id):
         return self.by_discord
 
-    async def get_user_by_steam_id(self, steam_id):
+    async def get_user_by_linked_account(self, platform, account_id):
         return self.by_account
 
     async def upsert_registered_user(self, **fields):
