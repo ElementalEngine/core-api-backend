@@ -467,7 +467,7 @@ class ApprovalService:
             }
         except Exception:
             # A write conflict is an ordinary transaction outcome; leaving the
-            # claim set would make the match permanently unapprovable.
+            # claim set would block approving the match until the claim lapses.
             await self._m.q.release_pending_claim(oid, claimed_at=claimed_at)
             raise
 
