@@ -25,6 +25,7 @@ from app.features.match_setups.lobby import (
     CANCELLED,
     DONE,
     IDLE_LIMIT,
+    RECENT_LIMIT,
     SETUP_IDLE_LIMIT,
     SHAPES,
     LobbyRefused,
@@ -225,11 +226,13 @@ async def host_lobby(
 async def open_lobbies(
     guild_id: str = Query(min_length=1, max_length=32),
     host_id: str | None = Query(default=None, min_length=1, max_length=32),
+    recent: bool = Query(default=False),
     db: AsyncMongoClient = Depends(get_database),
 ) -> list[dict[str, Any]]:
     """The lobbies players can see; with a host, that host's own, in setup or
-    not."""
-    found = await MatchSetupRepository(db).open_lobbies(guild_id, host_id)
+    not; with recent, also those closed in the last day."""
+    closed_since = datetime.now(UTC) - RECENT_LIMIT if recent and not host_id else None
+    found = await MatchSetupRepository(db).open_lobbies(guild_id, host_id, closed_since)
     return [lobby_view(lobby) for lobby in found]
 
 
@@ -250,8 +253,7 @@ async def close_idle_lobbies(
 async def lobbies_due(
     db: AsyncMongoClient = Depends(get_database),
 ) -> list[dict[str, Any]]:
-    """Countdowns, votes and blind picks past their time, for the bot to move
-    on."""
+    """Votes and blind picks past their time, for the bot to move on."""
     due = await MatchSetupRepository(db).due(datetime.now(UTC))
     return [lobby_view(lobby) for lobby in due]
 
@@ -296,9 +298,8 @@ async def join_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """A player sits down; the last seat starts the countdown to the vote."""
-    now = datetime.now(UTC)
-    return await change_setup(db, lobby_id, lambda lobby: joined(lobby, actor, now))
+    """A player sits down; a full lobby waits for its host to start it."""
+    return await change_setup(db, lobby_id, lambda lobby: joined(lobby, actor))
 
 
 @router.post("/lobbies/{lobby_id}/leave", response_model=LobbyView)
@@ -334,7 +335,6 @@ async def edit_lobby(
             bans=bans,
             teams=body.teams,
             removed=body.removed,
-            now=datetime.now(UTC),
         )
 
     return await change_setup(db, lobby_id, saved)
@@ -346,8 +346,7 @@ async def start_lobby(
     actor: str = Depends(actor_discord_id),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """The host starts, or the bot once a full lobby's countdown ends: the
-    seats lock and the bans vote opens."""
+    """The host starts: the seats lock and the bans vote opens."""
     now = datetime.now(UTC)
     return await change_setup(db, lobby_id, lambda lobby: started(lobby, actor, now))
 

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import logging
 
-import pytest
-
 from app.core.errors import INTERNAL_MESSAGE, unhandled_exception_handler
 from app.core.middleware import CorrelationIdMiddleware, new_correlation_id
 
@@ -22,7 +20,6 @@ def test_correlation_ids_are_short_and_distinct():
 
 
 def _client():
-    pytest.importorskip("httpx")
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 

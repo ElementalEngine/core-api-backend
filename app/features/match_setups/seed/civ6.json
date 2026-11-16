@@ -296,17 +296,17 @@
       },
       {
         "id": "trade_forbidden",
-        "title": "Trade Forbidden",
+        "title": "Draft trading between players",
         "options": [
           {
-            "id": "yes",
+            "id": "no",
             "emoji": "✅",
-            "label": "Yes"
+            "label": "Allowed"
           },
           {
-            "id": "no",
+            "id": "yes",
             "emoji": "⛔",
-            "label": "No"
+            "label": "Not allowed"
           }
         ],
         "default_option_id": "no",

@@ -2,7 +2,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/python-3.14-3776AB" alt="Python 3.14" />
-  <img src="https://img.shields.io/badge/FastAPI-0.136-009688" alt="FastAPI 0.136" />
+  <img src="https://img.shields.io/badge/FastAPI-0.163-009688" alt="FastAPI 0.163" />
   <img src="https://img.shields.io/badge/MongoDB-Atlas-47A248" alt="MongoDB Atlas" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT" />
 </p>
@@ -21,6 +21,7 @@ Lady Justice ─┘
 - [Talking to it](#talking-to-it)
 - [Running it](#running-it)
 - [Configuration](#configuration)
+- [Dependencies](#dependencies)
 - [Checks](#checks)
 - [Project layout](#project-layout)
 - [Operations](#operations)
@@ -89,7 +90,7 @@ Auth's routes, under `/api/v2/auth`, answer with their own codes, such as `STEAM
 
 ```bash
 python3.14 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pip install --require-hashes -r requirements-dev.lock
 cp .env.example .env        # then fill in the required values
 .venv/bin/python -m app     # uvicorn on API_HOST:API_PORT, 127.0.0.1:8000 by default
 ```
@@ -109,6 +110,19 @@ Everything comes from the environment or `.env`. [`.env.example`](.env.example) 
 - **Tokens:** `LJ_SERVICE_TOKEN` (required at startup), `MITO_SERVICE_TOKEN` and `AUTH_SERVICE_TOKEN` (each bot's routes answer 503 until set).
 - **Registration:** the Discord OAuth app and the Steam Web API key.
 - **Ratings:** the `TS_*` values. They must match production, or ratings stop being comparable.
+
+## Dependencies
+
+`requirements.txt` and `requirements-dev.txt` pin the packages core-api uses directly. `requirements.lock` and `requirements-dev.lock` pin those and everything they pull in, each file with its sha256 hashes. Every install, in CI and on the server, reads a lock with `--require-hashes`, so only the exact files locked will install: production runs what dev tested.
+
+To change a package, change its pin, then rebuild both locks with uv and review what else moved:
+
+```bash
+uv pip compile requirements.txt --generate-hashes --python-version 3.14 -o requirements.lock
+uv pip compile requirements-dev.txt --generate-hashes --python-version 3.14 -o requirements-dev.lock
+```
+
+A test fails when a pin and its lock disagree.
 
 ## Checks
 
@@ -136,7 +150,7 @@ app/
     ratings/       TrueSkill, the rating ledger and its reconciliation
     seasons/       seasons and the season change
     stats/         stats, history, team generation
-scripts/        seeding, migrations, export, reconcile, the differential
+scripts/        seeding, migrations, export, reconcile
 test/           unit/, parsing/ and the save files in data/
 ```
 
@@ -147,7 +161,7 @@ Each feature owns its routes, schemas, service and data access.
 - `scripts/reconcile.py` checks that the rating ledger sums to the stats. The failure it detects has no other symptom, so it runs after any migration and from time to time in production.
 - `scripts/export` writes collections to JSON lines with a manifest. It is the rollback for a cluster without point-in-time restore: run it before anything that rewrites data.
 - `scripts/copy_database.py` copies one database into an empty one and checks the copy, byte for byte.
-- The migration and differential scripts are one-off tools for the v2 cutover. The migrations are dry runs unless given `--apply`.
+- The migration scripts are one-off tools for the v2 cutover. The migrations are dry runs unless given `--apply`.
 
 The bots' privacy policy is in [`PRIVACY.md`](PRIVACY.md).
 

@@ -37,9 +37,8 @@ IDLE_LIMIT = timedelta(hours=2, minutes=30)
 # A lobby still in setup has outlived its editor by then, so it frees its host.
 SETUP_IDLE_LIMIT = timedelta(minutes=15)
 BANS_VOTE_LIMIT = timedelta(minutes=5)
-# A full lobby waits this long before its vote, so players can check everyone
-# is there; the host may start sooner.
-FILL_WAIT = timedelta(minutes=3)
+# /lobby browse lists lobbies closed this recently beside the open ones.
+RECENT_LIMIT = timedelta(hours=24)
 PICK_LIMIT = timedelta(minutes=3)
 STEAM_LINK = re.compile(r"steam://joinlobby/289070/[0-9]+/7656119[0-9]+")
 CODE_LETTERS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
@@ -189,20 +188,9 @@ def team_sizes(lobby: Mapping[str, Any]) -> list[int]:
     return sizes
 
 
-def _countdown(
-    lobby: Mapping[str, Any], players: Sequence[Any], seats: int, now: datetime
-) -> datetime | None:
-    """When a full live lobby starts its vote: a clock that starts as the last
-    seat fills and stops if a seat frees."""
-    if len(players) < seats:
-        return None
-    deadline: datetime | None = lobby["deadline"]
-    return deadline or now + FILL_WAIT
-
-
-def joined(lobby: Mapping[str, Any], player_id: str, now: datetime) -> dict[str, Any]:
-    """This player sits down, on the emptiest team in a teamer. The last seat
-    filled starts the countdown to the bans vote."""
+def joined(lobby: Mapping[str, Any], player_id: str) -> dict[str, Any]:
+    """This player sits down, on the emptiest team in a teamer. A full lobby
+    waits for its host to start it."""
     require_phase(lobby, LIVE)
     players = list(lobby["players"])
     if any(p["discord_id"] == player_id for p in players):
@@ -214,22 +202,18 @@ def joined(lobby: Mapping[str, Any], player_id: str, now: datetime) -> dict[str,
         sizes = team_sizes(lobby)
         team = sizes.index(min(sizes)) + 1
     players.append({"discord_id": player_id, "team": team})
-    return {
-        "players": players,
-        "deadline": _countdown(lobby, players, lobby["seats"], now),
-    }
+    return {"players": players}
 
 
 def left(lobby: Mapping[str, Any], player_id: str) -> dict[str, Any]:
-    """This player stands up, stopping any countdown. The host cancels
-    instead."""
+    """This player stands up. The host cancels instead."""
     require_phase(lobby, LIVE)
     if player_id == lobby["host_id"]:
         raise LobbyRefused("the host cancels the lobby rather than leaving it")
     players = [p for p in lobby["players"] if p["discord_id"] != player_id]
     if len(players) == len(lobby["players"]):
         raise LobbyRefused("you are not in this lobby")
-    return {"players": players, "deadline": None}
+    return {"players": players}
 
 
 def edited(
@@ -242,12 +226,10 @@ def edited(
     bans: Sequence[str],
     teams: Mapping[str, int],
     removed: Sequence[str],
-    now: datetime,
 ) -> dict[str, Any]:
     """The host's edit as one change: the size, the settings (every one, once
     live), the leaders they ban, and players moved or removed. Players who
-    joined meanwhile keep their seats; a lobby the edit fills, or frees, starts
-    or stops its countdown."""
+    joined meanwhile keep their seats."""
     require_host(lobby, actor_id)
     require_phase(lobby, SETUP, LIVE)
     chosen, current = SHAPES[shape], SHAPES[lobby["shape"]]
@@ -285,9 +267,6 @@ def edited(
         "shape": shape,
         "seats": chosen.seats,
         "players": players,
-        "deadline": _countdown(lobby, players, chosen.seats, now)
-        if lobby["phase"] == LIVE
-        else None,
         "draft_mode": settings.get("draft_mode"),
         "settings": [
             {"id": q["id"], "value": settings[q["id"]], "by": "host"}
@@ -313,9 +292,9 @@ def _groups(lobby: Mapping[str, Any]) -> list[list[str]]:
 
 
 def started(lobby: Mapping[str, Any], actor_id: str, now: datetime) -> dict[str, Any]:
-    """The host starts, or the bot for the host once a full lobby's countdown
-    ends: two duellists, three or more in an FFA, or equal teams of two or
-    more. The seats lock while the players vote on more bans."""
+    """The host starts: two duellists, three or more in an FFA, or equal teams
+    of two or more. The seats lock while the players vote on more bans, and
+    the start is stamped for the lobby's record."""
     require_host(lobby, actor_id)
     require_phase(lobby, LIVE)
     players = lobby["players"]
@@ -330,6 +309,7 @@ def started(lobby: Mapping[str, Any], actor_id: str, now: datetime) -> dict[str,
         raise LobbyRefused("the teams must be the same size")
     return {
         "phase": VOTING,
+        "started_at": now,
         "deadline": now + BANS_VOTE_LIMIT,
         "vote": {"channel_id": None, "messages": {}, "finished": []},
     }

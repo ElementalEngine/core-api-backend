@@ -125,8 +125,6 @@ class MatchService:
         player = await self.q.get_user_by_discord_id(discord_id)
         if not player:
             raise MatchServiceError(f"User {discord_id} not found")
-        if player.get("steam_id"):
-            return str(player["steam_id"])
         if player.get("linked_platform") == "steam" and player.get("linked_account_id"):
             return str(player["linked_account_id"])
         return None

@@ -18,8 +18,9 @@ def P(team=0, placement=None, discord_id="d", is_sub=False, subbed_out=False):
     )
 
 
-def M(*players):
-    return SimpleNamespace(players=list(players))
+def M(*players, is_cloud=True):
+    # Cloud unless a test says otherwise: there a reporter may assign players.
+    return SimpleNamespace(players=list(players), is_cloud=is_cloud)
 
 
 def check(match, patch, *, staff=False):
@@ -71,10 +72,11 @@ def test_placement_range_is_team_count_not_player_count():
     ]
 
 
-def test_tie_requires_staff_and_staff_may_set_one():
-    patch = [SeatPatch(2, placement=1)]
-    assert rules(check(ffa(), patch)) == [Rule.DUPLICATE_PLACEMENT]
-    assert check(ffa(), patch, staff=True) == []
+def test_a_reporter_may_set_or_widen_a_tie():
+    assert check(ffa(), [SeatPatch(2, placement=1)]) == []
+    assert check(ffa(), [SeatPatch(2, placement=1)], staff=True) == []
+    tied = M(P(0, 0, "a"), P(1, 0, "b"), P(2, 2, "c"))
+    assert check(tied, [SeatPatch(2, placement=0)]) == []
 
 
 def test_places_stay_dense_even_for_staff():
@@ -84,38 +86,14 @@ def test_places_stay_dense_even_for_staff():
     ]
 
 
-def test_tie_against_an_unpatched_seat_is_caught():
-    # Merge-before-check: the duplicate is created against seat 1's existing
-    # placement, which this patch never mentions.
-    assert rules(check(ffa(), [SeatPatch(0, placement=1)])) == [
-        Rule.DUPLICATE_PLACEMENT
-    ]
-
-
-def test_pre_existing_tie_is_grandfathered():
-    tied = M(P(0, 0, "a"), P(1, 0, "b"), P(2, 2, "c"))
-    assert check(tied, [SeatPatch(2, discord_id="z")]) == []
-
-
-def test_widening_an_existing_tie_requires_staff():
-    tied = M(P(0, 0, "a"), P(1, 0, "b"), P(2, 2, "c"))
-    patch = [SeatPatch(2, placement=0)]
-    assert rules(check(tied, patch)) == [Rule.DUPLICATE_PLACEMENT]
-    assert check(tied, patch, staff=True) == []
-
-
 def test_teammates_sharing_a_placement_is_not_a_tie():
     # The normal teamer shape: one placement per team, shared by its members.
     assert check(teamer(), [SeatPatch(1, placement=0)]) == []
 
 
-def test_split_team_placement_rejected_with_the_tie_it_causes():
-    # Both facts about the resulting state are reported, None-seat first.
+def test_split_team_placement_rejected():
     got = check(teamer(), [SeatPatch(1, placement=1)])
-    assert [(v.seat, v.rule) for v in got] == [
-        (None, Rule.TEAM_PLACEMENT_MISMATCH),
-        (1, Rule.DUPLICATE_PLACEMENT),
-    ]
+    assert [(v.seat, v.rule) for v in got] == [(None, Rule.TEAM_PLACEMENT_MISMATCH)]
 
 
 def test_subbed_out_row_is_derived_not_editable():
@@ -199,19 +177,25 @@ def test_one_player_per_seat():
 
 
 def test_messages_number_seats_as_players_see_them():
-    (tie,) = check(paired_duel(), [SeatPatch(2, placement=0)])
-    assert tie.message == (
-        "Seats 1 and 2 would share 1st place, and only staff can set a tie."
-    )
     (dup,) = check(ffa(), [SeatPatch(0, discord_id="b")])
     assert dup.message == "<@b> would be in seats 1 and 2."
     (own,) = check(ffa(), [SeatPatch(2, sub_out="c")])
     assert own.message == "<@c> cannot come in for themselves in seat 3."
 
 
-def test_only_staff_change_a_leader_or_civ():
-    (refused,) = check(ffa(), [SeatPatch(1, leader="LEADER_X")])
-    assert refused.rule == Rule.STAFF_ONLY_CIV
-    assert refused.message == "Only staff can change seat 2's leader or civ."
-    staff = check(ffa(), [SeatPatch(1, leader="LEADER_X", civ="CIV_Y")], staff=True)
-    assert staff == []
+def test_a_reporter_may_change_a_leader_or_civ():
+    assert check(ffa(), [SeatPatch(1, leader="LEADER_X", civ="CIV_Y")]) == []
+
+
+def test_on_a_real_time_report_only_staff_change_a_player():
+    real_time = M(P(0, 0, "a"), P(1, 1, "b"), P(2, 2, "c"), is_cloud=False)
+    (refused,) = check(real_time, [SeatPatch(1, discord_id="z")])
+    assert refused.rule == Rule.STAFF_ONLY_PLAYER
+    assert refused.message == (
+        "Only staff can change seat 2's player in a real-time game."
+    )
+    assert check(real_time, [SeatPatch(1, discord_id="z")], staff=True) == []
+    # Naming the player already there changes nothing, so it is not refused.
+    assert check(real_time, [SeatPatch(1, discord_id="b", quit=True)]) == []
+    # A cloud report's reporter fills its seats in.
+    assert check(ffa(), [SeatPatch(1, discord_id="z")]) == []

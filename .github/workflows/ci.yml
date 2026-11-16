@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, v2]
+    branches: [main, 'v*']
   pull_request:
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
           python-version: '3.14'
 
       - name: Install
-        run: pip install -r requirements-dev.txt
+        run: pip install --require-hashes -r requirements-dev.lock
 
       - name: Typecheck
         run: mypy

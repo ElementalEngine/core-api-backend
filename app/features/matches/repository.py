@@ -48,39 +48,18 @@ class MatchRepository:
     async def get_user_by_discord_id(self, discord_id: str) -> dict[str, Any] | None:
         return await self._users.find_one({"discord_id": discord_id})
 
-    async def get_user_by_steam_id(self, steam_id: str) -> dict[str, Any] | None:
-        return await self._users.find_one(
-            {
-                "$or": [
-                    {"steam_id": steam_id},
-                    {"linked_platform": "steam", "linked_account_id": steam_id},
-                ]
-            }
-        )
-
     async def get_users_by_steam_ids(
         self, steam_ids: list[str]
     ) -> dict[str, dict[str, Any]]:
         """The registered user for each Steam id found, in one query."""
         cursor = self._users.find(
-            {
-                "$or": [
-                    {"steam_id": {"$in": steam_ids}},
-                    {
-                        "linked_platform": "steam",
-                        "linked_account_id": {"$in": steam_ids},
-                    },
-                ]
-            }
+            {"linked_platform": "steam", "linked_account_id": {"$in": steam_ids}}
         )
         found: dict[str, dict[str, Any]] = {}
         async for doc in cursor:
-            keys = [doc.get("steam_id")]
-            if doc.get("linked_platform") == "steam":
-                keys.append(doc.get("linked_account_id"))
-            for key in keys:
-                if key in steam_ids and key not in found:
-                    found[key] = doc
+            key = doc.get("linked_account_id")
+            if key in steam_ids and key not in found:
+                found[key] = doc
         return found
 
     async def find_pending_by_hash(self, hashes: list[str]) -> dict[str, Any] | None:
@@ -144,11 +123,12 @@ class MatchRepository:
         was: list[dict[str, Any]],
         now: datetime,
     ) -> bool:
-        # Players only, so a contest written meanwhile is kept; only over the
-        # seats the edit was built from, so a second edit cannot undo the first.
+        # Players and the time they changed only, so a contest written meanwhile
+        # is kept; only over the seats the edit was built from, so a second edit
+        # cannot undo the first.
         res = await self._pending.update_one(
             {"_id": oid, "players": was, **_editable(now)},
-            {"$set": {"players": players}},
+            {"$set": {"players": players, "updated_at": now}},
         )
         return res.matched_count == 1
 

@@ -1,6 +1,6 @@
 {
   "edition": "civ6",
-  "leader_data_version": 6,
+  "leader_data_version": 7,
   "leaders": [
     {
       "token": "LEADER_ABRAHAM_LINCOLN",
@@ -384,10 +384,10 @@
       "token": "LEADER_LIME_TEO_OWL",
       "name": "Spearthrower",
       "display": "Spearthrower Owl",
-      "civ": null,
+      "civ": "CIVILIZATION_LIME_TEOTIHUACAN",
       "civ_display": "Teotihuacan",
       "type": "None",
-      "civ_source": "unmapped"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_LIME_THULE_DAVE",
@@ -456,10 +456,10 @@
       "token": "LEADER_MER_THEODORIC",
       "name": "GothsTheodoric",
       "display": "Theodoric",
-      "civ": null,
+      "civ": "CIVILIZATION_MER_GOTHS",
       "civ_display": "Goths",
       "type": "Religious",
-      "civ_source": "unmapped"
+      "civ_source": "observed"
     },
     {
       "token": "LEADER_MONTEZUMA",

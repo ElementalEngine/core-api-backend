@@ -115,6 +115,28 @@ def test_a_patch_writes_the_players_alone(monkeypatch):
     assert [p["placement"] for p in q.players] == [1, 0]
 
 
+class _Updates:
+    def __init__(self):
+        self.calls = []
+
+    async def update_one(self, flt, update):
+        self.calls.append((flt, update))
+        return SimpleNamespace(matched_count=1)
+
+
+def test_a_seat_edit_records_when_the_report_changed():
+    repo = MatchRepository.__new__(MatchRepository)
+    repo._pending = _Updates()
+    now = datetime(2026, 11, 15, 12, 0, tzinfo=UTC)
+    done = asyncio.run(
+        repo.set_pending_players(ObjectId(), [{"n": 1}], was=[{"n": 0}], now=now)
+    )
+    assert done
+    flt, update = repo._pending.calls[0]
+    assert flt["players"] == [{"n": 0}]
+    assert update == {"$set": {"players": [{"n": 1}], "updated_at": now}}
+
+
 def test_a_patch_during_an_approve_is_refused(monkeypatch):
     with pytest.raises(ApprovingError, match="being approved"):
         _patch(_svc(_Q(_doc(), held=True), monkeypatch))
@@ -134,7 +156,7 @@ def test_every_unregistered_player_is_named_and_nothing_is_written(monkeypatch):
     edit = EditingService(svc).patch_players(
         OID,
         [SeatPatch(seat=0, discord_id=a), SeatPatch(seat=1, discord_id=b)],
-        actor_is_staff=False,
+        actor_is_staff=True,
     )
     with pytest.raises(
         MatchServiceError, match=f"<@{a}>, <@{b}> are not registered yet"
