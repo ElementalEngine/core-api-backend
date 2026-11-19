@@ -80,10 +80,12 @@ def _retry_later(exc: MatchServiceError) -> Exception:
     return api_error(code="CONFLICT", message=str(exc), status_code=409, retryable=True)
 
 
-def _require_player(doc: dict[str, Any], actor: str) -> None:
-    """Only a player in the match contests it; staff edit or remove instead."""
+def _require_player(doc: dict[str, Any], actor: str, is_staff: bool) -> None:
+    """A player in the match contests it; staff contest any report, as a hold."""
+    if is_staff:
+        return
     if not any(p.get("discord_id") == actor for p in doc.get("players", [])):
-        raise forbidden("Only a player in this match may contest it.")
+        raise forbidden("Only a player in this match or staff may contest it.")
 
 
 @router.post("/matches", response_model=UploadResponse)
@@ -235,13 +237,14 @@ async def contest_match(
     match_id: str,
     body: ContestBody,
     actor: str = Depends(actor_discord_id),
+    is_staff: bool = Depends(actor_is_staff),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
     svc = MatchService(db)
-    _require_player(await _load(svc, match_id), actor)
+    _require_player(await _load(svc, match_id), actor, is_staff)
     try:
         contested = await EditingService(svc).contest_report(
-            match_id, actor, body.reason
+            match_id, actor, body.reason, by_staff=is_staff
         )
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
@@ -256,12 +259,15 @@ async def contest_match(
 async def withdraw_contest(
     match_id: str,
     actor: str = Depends(actor_discord_id),
+    is_staff: bool = Depends(actor_is_staff),
     db: AsyncMongoClient = Depends(get_database),
 ) -> dict[str, Any]:
-    """A player takes back their own contest."""
+    """A player takes back their own contest; staff lift every staff hold."""
     svc = MatchService(db)
     try:
-        withdrawn = await EditingService(svc).withdraw_contest(match_id, actor)
+        withdrawn = await EditingService(svc).withdraw_contest(
+            match_id, actor, by_staff=is_staff
+        )
     except NotFoundError as exc:
         raise not_found("Match not found") from exc
     except ApprovingError as exc:
