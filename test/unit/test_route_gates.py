@@ -15,7 +15,12 @@ from app.main import app
 # token. Without a database the lifespan never connects, so a request the gate
 # admits fails on the missing client and nothing is read or written.
 
-TOKENS = {"mite": "mite-test-token", "lj": "lj-test-token", "auth": "auth-test-token"}
+TOKENS = {
+    "mite": "mite-test-token",
+    "lj": "lj-test-token",
+    "auth": "auth-test-token",
+    "website": "website-test-token",
+}
 
 PUBLIC_PATHS = frozenset(
     {
@@ -30,7 +35,7 @@ PUBLIC_PATHS = frozenset(
     }
 )
 
-# Which bots each prefix admits. An operation under no prefix here fails the
+# Which callers each prefix admits. An operation under no prefix here fails the
 # check, so a new router has to say whose token it takes.
 ADMITS = (
     ("/api/v2/auth", {"auth"}),
@@ -40,6 +45,7 @@ ADMITS = (
     ("/api/v2/stats", {"mite"}),
     ("/api/v2/match-setups", {"mite"}),
     ("/api/v2/seasons", {"mite"}),
+    ("/api/v2/public", {"website"}),
 )
 
 METHODS = ("get", "post", "put", "patch", "delete")
@@ -51,6 +57,7 @@ def _tokens(monkeypatch):
     monkeypatch.setattr(settings, "mito_service_token", SecretStr(TOKENS["mite"]))
     monkeypatch.setattr(settings, "lj_service_token", SecretStr(TOKENS["lj"]))
     monkeypatch.setattr(settings, "auth_service_token", SecretStr(TOKENS["auth"]))
+    monkeypatch.setattr(settings, "website_service_token", SecretStr(TOKENS["website"]))
 
 
 def operations(application: FastAPI = app) -> list[tuple[str, str]]:

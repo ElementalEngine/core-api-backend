@@ -10,6 +10,7 @@ from app.features.infractions.router_v2 import router as infractions_v2_router
 from app.features.match_setups.router import router as match_setups_router
 from app.features.match_setups.vote_router import router as votes_router
 from app.features.matches.router_v2 import router as matches_v2_router
+from app.features.public.router import router as public_router
 from app.features.seasons.router import router as seasons_router
 from app.features.stats.router_v2 import router as stats_v2_router
 
@@ -24,3 +25,4 @@ router.include_router(civ_data_router)
 router.include_router(match_setups_router)
 router.include_router(votes_router)
 router.include_router(seasons_router)
+router.include_router(public_router)

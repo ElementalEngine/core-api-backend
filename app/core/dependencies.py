@@ -86,8 +86,18 @@ def require_mito_token(authorization: str | None = Header(default=None)) -> None
     )
 
 
+def require_website_token(authorization: str | None = Header(default=None)) -> None:
+    _require_bearer(
+        authorization,
+        configured=settings.website_service_token.get_secret_value(),
+        misconfig_code="WEBSITE_SERVICE_MISCONFIGURED",
+        misconfig_message="Website service token is not configured on the backend.",
+    )
+
+
 def require_any_service_token(authorization: str | None = Header(default=None)) -> None:
-    """Accept any configured service token."""
+    """Accept any bot's service token. The website's is not one of them: it
+    reads only the public routes."""
     configured = [
         settings.mito_service_token.get_secret_value(),
         settings.lj_service_token.get_secret_value(),
