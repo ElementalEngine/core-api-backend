@@ -15,7 +15,7 @@ CODES = {
     "INTERNAL",
 }
 
-# Every file Mite's routes answer from; Auth and Lady Justice keep their own codes.
+# Every file Mite's and the website's routes answer from; Auth and Lady Justice keep their own codes.
 GOVERNED = (
     "api/health.py",
     "core/dependencies.py",
@@ -24,6 +24,7 @@ GOVERNED = (
     "features/match_setups/router.py",
     "features/match_setups/vote_router.py",
     "features/matches/router_v2.py",
+    "features/public/router.py",
     "features/seasons/router.py",
     "features/stats/router_v2.py",
 )
