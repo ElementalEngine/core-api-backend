@@ -1,5 +1,5 @@
-"""The website's totals and ladders. Each ladder is every ranked player, best
-first, named as they registered."""
+"""The website's totals, ladders and season stats. Each ladder is every ranked
+player, best first, named as they registered."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from pymongo import AsyncMongoClient
 from app.core.coerce import as_float, as_int
 from app.core.config import settings
 from app.core.constants import Edition
+from app.features.civdata.repository import CivDataRepository
 from app.features.public.repository import NAME_FIELDS, PublicRepository
 from app.features.public.schemas import (
     Ladder,
@@ -19,7 +20,9 @@ from app.features.public.schemas import (
     LadderRow,
     Ladders,
     Overview,
+    SeasonStats,
 )
+from app.features.public.season_stats import MODES, mode_stats
 from app.features.ratings.repository import RatingsRepository
 from app.features.seasons.repository import SeasonNotSeededError, SeasonsRepository
 
@@ -125,6 +128,40 @@ async def ladders(db: AsyncMongoClient, edition: Edition) -> Ladders:
     )
 
 
+async def season_stats(db: AsyncMongoClient, edition: Edition) -> SeasonStats:
+    """The open season's stats; SeasonNotSeededError when the edition has none."""
+    updated_at = datetime.now(UTC)
+    season = await SeasonsRepository(db).get_current_season(edition)
+    repo = PublicRepository(db)
+    games = await repo.season_games(season["_id"])
+    setups = await repo.season_draft_bans(season["_id"])
+    civ_data = await CivDataRepository(db).fetch(edition)
+    names = {
+        row["token"]: row.get("display") or row["token"]
+        for row in civ_data["leaders"] + civ_data["civs"]
+    }
+    return SeasonStats(
+        updated_at=updated_at,
+        edition=edition,
+        season_label=season["label"],
+        season_started_at=season["started_at"],
+        min_games=settings.stats_min_games,
+        map_top_n=settings.stats_map_top_n,
+        modes=[
+            mode_stats(
+                mode=mode,
+                edition=edition,
+                matches=games,
+                setups=setups,
+                names=names,
+                min_games=settings.stats_min_games,
+                top_n=settings.stats_map_top_n,
+            )
+            for mode in MODES
+        ],
+    )
+
+
 __all__ = [
     "LADDERS",
     "UNREGISTERED",
@@ -132,4 +169,5 @@ __all__ = [
     "ladder_rows",
     "ladders",
     "overview",
+    "season_stats",
 ]

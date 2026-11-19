@@ -167,6 +167,15 @@ class Settings(BaseSettings):
     ladder_min_games: int = Field(
         default=3, ge=1, validation_alias=AliasChoices("LADDER_MIN_GAMES")
     )
+    # Games a leader or civ needs before season stats show its win rate, or
+    # rank it on a map by its average place.
+    stats_min_games: int = Field(
+        default=5, ge=1, validation_alias=AliasChoices("STATS_MIN_GAMES")
+    )
+    # How many leaders, and civs on Civ 7, season stats list per FFA map.
+    stats_map_top_n: int = Field(
+        default=5, ge=1, validation_alias=AliasChoices("STATS_MAP_TOP_N")
+    )
     min_points_for_subs: int = Field(
         default=5, ge=0, validation_alias=AliasChoices("MIN_POINTS_FOR_SUBS")
     )
