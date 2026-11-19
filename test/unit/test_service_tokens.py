@@ -5,26 +5,18 @@ from fastapi import HTTPException
 from pydantic import SecretStr
 
 from app.core import dependencies
-from app.core.dependencies import (
-    require_any_service_token,
-    require_mito_token,
-    require_website_token,
-)
+from app.core.dependencies import require_any_service_token, require_mito_token
 from app.features.civdata.router import router as civ_data_router
 
 MITO = "mito-test-token"
 LJ = "lj-test-token"
 AUTH = "auth-test-token"
-WEBSITE = "website-test-token"
 
 
-def _set_tokens(monkeypatch, mito=MITO, lj=LJ, auth=AUTH, website=WEBSITE) -> None:
+def _set_tokens(monkeypatch, mito=MITO, lj=LJ, auth=AUTH) -> None:
     monkeypatch.setattr(dependencies.settings, "mito_service_token", SecretStr(mito))
     monkeypatch.setattr(dependencies.settings, "lj_service_token", SecretStr(lj))
     monkeypatch.setattr(dependencies.settings, "auth_service_token", SecretStr(auth))
-    monkeypatch.setattr(
-        dependencies.settings, "website_service_token", SecretStr(website)
-    )
 
 
 @pytest.mark.parametrize("token", [MITO, LJ, AUTH])
@@ -33,9 +25,7 @@ def test_every_configured_service_token_is_admitted(monkeypatch, token):
     assert require_any_service_token(authorization=f"Bearer {token}") is None
 
 
-@pytest.mark.parametrize(
-    "gate", [require_any_service_token, require_mito_token, require_website_token]
-)
+@pytest.mark.parametrize("gate", [require_any_service_token, require_mito_token])
 @pytest.mark.parametrize(
     "authorization",
     [None, "", "Bearer", "Bearer ", "Bearer wrong-token", f"Basic {MITO}", MITO],

@@ -9,10 +9,10 @@ from typing import Any
 from pymongo import AsyncMongoClient
 
 from app.core.coerce import as_float, as_int
-from app.core.config import settings
 from app.core.constants import EDITIONS
 from app.features.ratings.repository import RatingsRepository
 
+MIN_GAMES = 3
 LIMIT = 100
 CLOUD_VALUES = {"pbc", "cloud", "true", "1"}
 
@@ -39,7 +39,7 @@ class LeaderboardService:
             match_type=match_type,
             is_cloud=is_cloud_game,
             is_combined=is_combined,
-            min_games=settings.ladder_min_games,
+            min_games=MIN_GAMES,
             limit=LIMIT,
         )
 

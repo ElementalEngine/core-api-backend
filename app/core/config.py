@@ -63,12 +63,6 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("MITO_SERVICE_TOKEN"),
     )
 
-    # The CPL website's read-only token; unset, the public routes answer 503.
-    website_service_token: SecretStr = Field(
-        default=SecretStr(""),
-        validation_alias=AliasChoices("WEBSITE_SERVICE_TOKEN"),
-    )
-
     # Auth parameters
     auth_service_token: SecretStr = Field(
         default=SecretStr(""),
@@ -162,10 +156,6 @@ class Settings(BaseSettings):
     ts_tau: float = Field(default=10.0, ge=0, validation_alias=AliasChoices("TS_TAU"))
     ts_draw_prob: float = Field(
         default=0.0, ge=0, le=1, validation_alias=AliasChoices("TS_DRAW_PROB")
-    )
-    # Games a player needs before a ladder ranks them.
-    ladder_min_games: int = Field(
-        default=3, ge=1, validation_alias=AliasChoices("LADDER_MIN_GAMES")
     )
     min_points_for_subs: int = Field(
         default=5, ge=0, validation_alias=AliasChoices("MIN_POINTS_FOR_SUBS")

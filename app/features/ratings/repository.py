@@ -23,16 +23,6 @@ from app.features.ratings.scope import (
 
 logger = logging.getLogger(__name__)
 
-# What a ladder row reads from a stat document; its tallies are left behind.
-LADDER_FIELDS = {
-    "mu": 1,
-    "sigma": 1,
-    "games": 1,
-    "wins": 1,
-    "first": 1,
-    "lastModified": 1,
-}
-
 
 @dataclass(frozen=True)
 class LeaderboardResult:
@@ -245,12 +235,9 @@ class RatingsRepository:
         match_type: str,
         is_cloud: bool,
         is_combined: bool,
-        min_games: int,
-        limit: int | None = None,
+        min_games: int = 3,
+        limit: int = 100,
     ) -> LeaderboardResult:
-        """Players with at least min_games games, best first: highest mu, then
-        lowest sigma, then id, so ties read in the same order every time. With
-        no limit it is the whole ladder, one row per ranked player."""
         col = self._stats_collection(
             civ_version=civ_version,
             is_seasonal=is_seasonal,
@@ -264,11 +251,11 @@ class RatingsRepository:
         )
         last_updated = (last or {}).get("lastModified")
 
-        cursor = col.find({"games": {"$gte": min_games}}, LADDER_FIELDS).sort(
-            {"mu": DESCENDING, "sigma": ASCENDING, "_id": ASCENDING}
+        cursor = (
+            col.find({"games": {"$gte": min_games}})
+            .sort({"mu": DESCENDING, "sigma": ASCENDING})
+            .limit(limit)
         )
-        if limit is not None:
-            cursor = cursor.limit(limit)
         rows = await cursor.to_list(length=limit)
         return LeaderboardResult(rows=rows, last_updated=last_updated)
 
