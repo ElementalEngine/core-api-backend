@@ -54,34 +54,53 @@ class EditingService:
         match_id: str,
         contestor_discord_id: str,
         reason: str,
+        *,
+        by_staff: bool = False,
     ) -> dict[str, Any]:
         oid = self._m._to_oid(match_id)
-        entry = ContestReport(contestor_discord_id=contestor_discord_id, reason=reason)
+        entry = ContestReport(
+            contestor_discord_id=contestor_discord_id, reason=reason, by_staff=by_staff
+        )
         pushed = await self._m.q.push_contest(
             oid, entry.model_dump(), now=datetime.now(UTC)
         )
         if not pushed:
             raise await self._m.refusal(oid)
-        logger.info("✅ 🔄 Match %s contested by %s", match_id, contestor_discord_id)
+        logger.info(
+            "✅ 🔄 Match %s %s by %s",
+            match_id,
+            "held for review" if by_staff else "contested",
+            contestor_discord_id,
+        )
         return await self._reload_pending(oid)
 
     async def withdraw_contest(
-        self, match_id: str, contestor_discord_id: str
+        self, match_id: str, contestor_discord_id: str, *, by_staff: bool = False
     ) -> dict[str, Any]:
+        """A player withdraws their own contest; staff lift every staff hold, so
+        a hold never waits on the one who placed it."""
         oid = self._m._to_oid(match_id)
-        if await self._m.q.pull_contest(
-            oid, contestor_discord_id, now=datetime.now(UTC)
-        ):
+        now = datetime.now(UTC)
+        pulled = (
+            by_staff and await self._m.q.pull_staff_holds(oid, now=now)
+        ) or await self._m.q.pull_contest(oid, contestor_discord_id, now=now)
+        if pulled:
             logger.info(
                 "Match %s contest withdrawn by %s", match_id, contestor_discord_id
             )
             return await self._reload_pending(oid)
         doc = await self._m.q.find_pending_by_id(oid)
         contests = (doc or {}).get("contest_report_list") or []
-        if doc is not None and all(
-            c.get("contestor_discord_id") != contestor_discord_id for c in contests
+        if doc is not None and not any(
+            c.get("contestor_discord_id") == contestor_discord_id
+            or (by_staff and c.get("by_staff"))
+            for c in contests
         ):
-            raise MatchServiceError("You have not contested this report.")
+            raise MatchServiceError(
+                "This report has no staff hold or contest of yours."
+                if by_staff
+                else "You have not contested this report."
+            )
         raise await self._m.refusal(oid)
 
     async def patch_players(

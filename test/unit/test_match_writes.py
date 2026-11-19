@@ -175,6 +175,7 @@ def test_a_contest_is_pushed_not_rewritten(monkeypatch):
     assert q.pushed == {
         "contestor_discord_id": "100000000000000002",
         "reason": "wrong order",
+        "by_staff": False,
     }
 
 

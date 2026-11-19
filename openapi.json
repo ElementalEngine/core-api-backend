@@ -372,6 +372,11 @@
       },
       "ContestReport": {
         "properties": {
+          "by_staff": {
+            "default": false,
+            "title": "By Staff",
+            "type": "boolean"
+          },
           "contestor_discord_id": {
             "title": "Contestor Discord Id",
             "type": "string"
@@ -8656,7 +8661,7 @@
     },
     "/api/v2/matches/{match_id}/contest": {
       "delete": {
-        "description": "A player takes back their own contest.",
+        "description": "A player takes back their own contest; staff lift every staff hold.",
         "operationId": "withdraw_contest_api_v2_matches__match_id__contest_delete",
         "parameters": [
           {
@@ -8692,6 +8697,16 @@
               "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-is-staff",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "X-Actor-Is-Staff",
+              "type": "boolean"
             }
           }
         ],
@@ -8758,6 +8773,16 @@
               "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-is-staff",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "X-Actor-Is-Staff",
+              "type": "boolean"
             }
           }
         ],
