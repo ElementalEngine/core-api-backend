@@ -39,7 +39,7 @@ CPL website ──┘
 | **Civ data** | every leader and civ, with display names and emoji | all three bots |
 | **Auth** | Discord OAuth and Steam checks for registration, account lookups with standing, rank-role requests; v2 keeps only the registered player, in `server_members.users` | Auth |
 | **Infractions** | tiered and flat suspensions, days added or removed, overdue suspensions | Lady Justice |
-| **Public** | league totals and each edition's ladders, players named by display name, read only | CPL website |
+| **Public** | league totals, each edition's ladders and current season stats, players named by display name, read only | CPL website |
 
 **How a game is rated.** Mite uploads the save. The parser reads the placements, leaders and civs, and the match waits as a report the players can fix and contest. On approve, ratings move in one transaction, and every change is written to a ledger of rating events beside it. A revert writes the opposite events, so the ledger always sums to the stats. A report that needs no staff (every seat registered, every leader and civ known, no quit, sub or contest) is approved 48 hours after upload.
 
@@ -149,7 +149,7 @@ app/
     infractions/   suspensions
     match_setups/  drafts, lobbies, votes and their settings
     matches/       uploads, reports, approve and revert; parsers/ reads the saves
-    public/        the website's read-only totals and ladders
+    public/        the website's read-only totals, ladders and season stats
     ratings/       TrueSkill, the rating ledger and its reconciliation
     seasons/       seasons and the season change
     stats/         stats, history, team generation

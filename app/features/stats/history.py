@@ -26,7 +26,7 @@ PAGE_SIZE = 20
 MAX_PAGE = 49
 TOP_CIVS = 10
 # Civ and leader values that name nothing: older saves and unpicked seats.
-_NO_PICK = frozenset({"", "Unknown", "None", "LEADER_NONE", "CIVILIZATION_NONE"})
+NO_PICK = frozenset({"", "Unknown", "None", "LEADER_NONE", "CIVILIZATION_NONE"})
 # Map values that name nothing, and how a game stored with no map is named:
 # the league's stats from before saves were kept, brought in as older history.
 _NO_MAP = frozenset({"", "Unknown", "None"})
@@ -54,7 +54,7 @@ def _pick(match: dict[str, Any], seat: dict[str, Any]) -> str | None:
     """The token a civ6 player picks is the leader; a civ7 player picks a civ."""
     value = seat.get("civ") if match.get("game") == "civ7" else seat.get("leader")
     value = value or seat.get("civ")
-    return None if value in _NO_PICK else value
+    return None if value in NO_PICK else value
 
 
 def map_name(map_type: Any) -> str:
@@ -184,8 +184,8 @@ def _game(match: dict[str, Any], did: str) -> HistoryGame | None:
         game_mode=str(match.get("game_mode") or ""),
         map_type=map_name(match.get("map_type")),
         turn=match.get("turn") if isinstance(match.get("turn"), int) else None,
-        civ=seat.get("civ") if seat.get("civ") not in _NO_PICK else None,
-        leader=seat.get("leader") if seat.get("leader") not in _NO_PICK else None,
+        civ=seat.get("civ") if seat.get("civ") not in NO_PICK else None,
+        leader=seat.get("leader") if seat.get("leader") not in NO_PICK else None,
         placement=seat.get("placement"),
         sides=len(teams),
         delta=round(float(seat.get("delta") or 0.0)),
@@ -194,4 +194,4 @@ def _game(match: dict[str, Any], did: str) -> HistoryGame | None:
     )
 
 
-__all__ = ["MAX_PAGE", "PAGE_SIZE", "MatchHistory"]
+__all__ = ["MAX_PAGE", "NO_MAP", "NO_PICK", "PAGE_SIZE", "MatchHistory", "map_name"]
