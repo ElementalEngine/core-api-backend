@@ -372,6 +372,11 @@
       },
       "ContestReport": {
         "properties": {
+          "by_staff": {
+            "default": false,
+            "title": "By Staff",
+            "type": "boolean"
+          },
           "contestor_discord_id": {
             "title": "Contestor Discord Id",
             "type": "string"
@@ -478,6 +483,38 @@
           "civs"
         ],
         "title": "DealtPool",
+        "type": "object"
+      },
+      "DraftBan": {
+        "properties": {
+          "bans": {
+            "title": "Bans",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "leader",
+              "civ"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "name",
+          "kind",
+          "bans"
+        ],
+        "title": "DraftBan",
         "type": "object"
       },
       "DraftDeal": {
@@ -901,6 +938,157 @@
           }
         },
         "title": "InfractionBody",
+        "type": "object"
+      },
+      "Ladder": {
+        "properties": {
+          "key": {
+            "enum": [
+              "season-ffa",
+              "season-teamer",
+              "season-duel",
+              "cloud"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/LadderRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "total",
+          "rows"
+        ],
+        "title": "Ladder",
+        "type": "object"
+      },
+      "LadderRow": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "first": {
+            "title": "First",
+            "type": "integer"
+          },
+          "games": {
+            "title": "Games",
+            "type": "integer"
+          },
+          "last_active_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Active At"
+          },
+          "mu": {
+            "title": "Mu",
+            "type": "number"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "integer"
+          },
+          "sigma": {
+            "title": "Sigma",
+            "type": "number"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rank",
+          "display_name",
+          "rating",
+          "mu",
+          "sigma",
+          "games",
+          "wins",
+          "first",
+          "last_active_at"
+        ],
+        "title": "LadderRow",
+        "type": "object"
+      },
+      "Ladders": {
+        "description": "An edition's ladders: this season's per mode, and cloud over all time.",
+        "properties": {
+          "edition": {
+            "title": "Edition",
+            "type": "string"
+          },
+          "ladders": {
+            "items": {
+              "$ref": "#/components/schemas/Ladder"
+            },
+            "title": "Ladders",
+            "type": "array"
+          },
+          "min_games": {
+            "title": "Min Games",
+            "type": "integer"
+          },
+          "season_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season Label"
+          },
+          "season_started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season Started At"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "updated_at",
+          "edition",
+          "season_label",
+          "season_started_at",
+          "min_games",
+          "ladders"
+        ],
+        "title": "Ladders",
         "type": "object"
       },
       "Lagger": {
@@ -1696,6 +1884,88 @@
         "title": "ManualRegistrationChoice",
         "type": "string"
       },
+      "MapGames": {
+        "properties": {
+          "games": {
+            "title": "Games",
+            "type": "integer"
+          },
+          "map": {
+            "title": "Map",
+            "type": "string"
+          }
+        },
+        "required": [
+          "map",
+          "games"
+        ],
+        "title": "MapGames",
+        "type": "object"
+      },
+      "MapPick": {
+        "description": "avg_placement counts first place as 1.",
+        "properties": {
+          "avg_placement": {
+            "title": "Avg Placement",
+            "type": "number"
+          },
+          "firsts": {
+            "title": "Firsts",
+            "type": "integer"
+          },
+          "games": {
+            "title": "Games",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "name",
+          "games",
+          "firsts",
+          "avg_placement"
+        ],
+        "title": "MapPick",
+        "type": "object"
+      },
+      "MapPicks": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "leader",
+              "civ"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "map": {
+            "title": "Map",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MapPick"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "map",
+          "kind",
+          "rows"
+        ],
+        "title": "MapPicks",
+        "type": "object"
+      },
       "MapRecord": {
         "description": "Games on a map, those whose rating went up, and first places.",
         "properties": {
@@ -1906,6 +2176,95 @@
         "title": "MatchResponse",
         "type": "object"
       },
+      "ModeStats": {
+        "description": "One mode's season: civs are listed on Civ 7 only, and map_picks on\nFFA only.",
+        "properties": {
+          "civs": {
+            "items": {
+              "$ref": "#/components/schemas/PickRecord"
+            },
+            "title": "Civs",
+            "type": "array"
+          },
+          "draft_bans": {
+            "items": {
+              "$ref": "#/components/schemas/DraftBan"
+            },
+            "title": "Draft Bans",
+            "type": "array"
+          },
+          "games": {
+            "title": "Games",
+            "type": "integer"
+          },
+          "leaders": {
+            "items": {
+              "$ref": "#/components/schemas/PickRecord"
+            },
+            "title": "Leaders",
+            "type": "array"
+          },
+          "map_picks": {
+            "items": {
+              "$ref": "#/components/schemas/MapPicks"
+            },
+            "title": "Map Picks",
+            "type": "array"
+          },
+          "maps": {
+            "items": {
+              "$ref": "#/components/schemas/MapGames"
+            },
+            "title": "Maps",
+            "type": "array"
+          },
+          "mode": {
+            "enum": [
+              "ffa",
+              "teamer",
+              "duel"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "games",
+          "maps",
+          "draft_bans",
+          "leaders",
+          "civs",
+          "map_picks"
+        ],
+        "title": "ModeStats",
+        "type": "object"
+      },
+      "Overview": {
+        "description": "League totals: everyone who has registered, and every approved match.",
+        "properties": {
+          "matches_played": {
+            "title": "Matches Played",
+            "type": "integer"
+          },
+          "registered_players": {
+            "title": "Registered Players",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "updated_at",
+          "registered_players",
+          "matches_played"
+        ],
+        "title": "Overview",
+        "type": "object"
+      },
       "PendingApplied": {
         "properties": {
           "applied": {
@@ -2001,6 +2360,52 @@
           "punishment_type"
         ],
         "title": "PendingBody",
+        "type": "object"
+      },
+      "PickRecord": {
+        "description": "A leader or civ this season. A win is a game whose rating went up;\nwin_rate is null below the season stats' minimum games.",
+        "properties": {
+          "firsts": {
+            "title": "Firsts",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "picks": {
+            "title": "Picks",
+            "type": "integer"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "win_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token",
+          "name",
+          "picks",
+          "wins",
+          "firsts",
+          "win_rate"
+        ],
+        "title": "PickRecord",
         "type": "object"
       },
       "PlayerLeaderboard": {
@@ -2562,6 +2967,55 @@
           "records"
         ],
         "title": "SeasonRolled",
+        "type": "object"
+      },
+      "SeasonStats": {
+        "description": "An edition's open season, counted from its approved real-time games\nand the bans of its drafts.",
+        "properties": {
+          "edition": {
+            "title": "Edition",
+            "type": "string"
+          },
+          "map_top_n": {
+            "title": "Map Top N",
+            "type": "integer"
+          },
+          "min_games": {
+            "title": "Min Games",
+            "type": "integer"
+          },
+          "modes": {
+            "items": {
+              "$ref": "#/components/schemas/ModeStats"
+            },
+            "title": "Modes",
+            "type": "array"
+          },
+          "season_label": {
+            "title": "Season Label",
+            "type": "string"
+          },
+          "season_started_at": {
+            "format": "date-time",
+            "title": "Season Started At",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "updated_at",
+          "edition",
+          "season_label",
+          "season_started_at",
+          "min_games",
+          "map_top_n",
+          "modes"
+        ],
+        "title": "SeasonStats",
         "type": "object"
       },
       "SeatPatchIn": {
@@ -8207,7 +8661,7 @@
     },
     "/api/v2/matches/{match_id}/contest": {
       "delete": {
-        "description": "A player takes back their own contest.",
+        "description": "A player takes back their own contest; staff lift every staff hold.",
         "operationId": "withdraw_contest_api_v2_matches__match_id__contest_delete",
         "parameters": [
           {
@@ -8243,6 +8697,16 @@
               "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-is-staff",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "X-Actor-Is-Staff",
+              "type": "boolean"
             }
           }
         ],
@@ -8309,6 +8773,16 @@
               "minLength": 1,
               "title": "X-Actor-Discord-Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-is-staff",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "X-Actor-Is-Staff",
+              "type": "boolean"
             }
           }
         ],
@@ -8565,6 +9039,179 @@
         "summary": "Revert Match",
         "tags": [
           "matches-v2"
+        ]
+      }
+    },
+    "/api/v2/public/ladders/{edition}": {
+      "get": {
+        "operationId": "get_ladders_api_v2_public_ladders__edition__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edition",
+            "required": true,
+            "schema": {
+              "enum": [
+                "civ6",
+                "civ7"
+              ],
+              "title": "Edition",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ladders"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ladders",
+        "tags": [
+          "public-v2"
+        ]
+      }
+    },
+    "/api/v2/public/overview": {
+      "get": {
+        "operationId": "get_overview_api_v2_public_overview_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Overview",
+        "tags": [
+          "public-v2"
+        ]
+      }
+    },
+    "/api/v2/public/seasons/{edition}/current/stats": {
+      "get": {
+        "operationId": "get_season_stats_api_v2_public_seasons__edition__current_stats_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edition",
+            "required": true,
+            "schema": {
+              "enum": [
+                "civ6",
+                "civ7"
+              ],
+              "title": "Edition",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonStats"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Season Stats",
+        "tags": [
+          "public-v2"
         ]
       }
     },

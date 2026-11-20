@@ -7,12 +7,13 @@
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT" />
 </p>
 
-The backend of the Civilization Players League's Discord bots. Mite, Auth and Lady Justice each call it over HTTPS with their own service token. It parses Civ VI and Civ VII save files, keeps every player's TrueSkill rating, runs drafts, lobbies and votes, and handles registration and infractions. It is the only service that talks to the database.
+The backend of the Civilization Players League's Discord bots and website. Mite, Auth and Lady Justice each call it over HTTPS with their own service token, and the CPL website reads its ladders with a read-only one. It parses Civ VI and Civ VII save files, keeps every player's TrueSkill rating, runs drafts, lobbies and votes, and handles registration and infractions. It is the only service that talks to the database.
 
 ```
 Mite ─────────┐
-Auth ─────────┼──HTTPS, one token per bot──▶ core-api ──▶ MongoDB Atlas
-Lady Justice ─┘
+Auth ─────────┤
+Lady Justice ─┼──HTTPS, one token per caller──▶ core-api ──▶ MongoDB Atlas
+CPL website ──┘
 ```
 
 ## Contents
@@ -38,6 +39,7 @@ Lady Justice ─┘
 | **Civ data** | every leader and civ, with display names and emoji | all three bots |
 | **Auth** | Discord OAuth and Steam checks for registration, account lookups with standing, rank-role requests; v2 keeps only the registered player, in `server_members.users` | Auth |
 | **Infractions** | tiered and flat suspensions, days added or removed, overdue suspensions | Lady Justice |
+| **Public** | league totals, each edition's ladders and current season stats, players named by display name, read only | CPL website |
 
 **How a game is rated.** Mite uploads the save. The parser reads the placements, leaders and civs, and the match waits as a report the players can fix and contest. On approve, ratings move in one transaction, and every change is written to a ledger of rating events beside it. A revert writes the opposite events, so the ledger always sums to the stats. A report that needs no staff (every seat registered, every leader and civ known, no quit, sub or contest) is approved 48 hours after upload.
 
@@ -45,7 +47,7 @@ The full route list is in [`openapi.json`](openapi.json). CI fails if the app an
 
 ## Talking to it
 
-Every route under `/api` needs the calling bot's Bearer token. A route that acts for a member, such as an upload or an approve, also takes their Discord id in `x-actor-discord-id`.
+Every route under `/api` needs the caller's Bearer token: each bot has its own, and the website's opens only `/api/v2/public`, at most `PUBLIC_REQUESTS_PER_MINUTE` calls a minute (10 unless set), each answer kept for `PUBLIC_CACHE_SECONDS` (600 unless set). A route that acts for a member, such as an upload or an approve, also takes their Discord id in `x-actor-discord-id`.
 
 A read:
 
@@ -107,7 +109,7 @@ At startup the service builds every index it needs, then serves. Seeding the lea
 Everything comes from the environment or `.env`. [`.env.example`](.env.example) lists each variable, its default and what it changes. The four groups to know:
 
 - **Database:** `MONGO_URL`.
-- **Tokens:** `LJ_SERVICE_TOKEN` (required at startup), `MITO_SERVICE_TOKEN` and `AUTH_SERVICE_TOKEN` (each bot's routes answer 503 until set).
+- **Tokens:** `LJ_SERVICE_TOKEN` (required at startup), `MITO_SERVICE_TOKEN`, `AUTH_SERVICE_TOKEN` and `WEBSITE_SERVICE_TOKEN` (each caller's routes answer 503 until set).
 - **Registration:** the Discord OAuth app and the Steam Web API key.
 - **Ratings:** the `TS_*` values. They must match production, or ratings stop being comparable.
 
@@ -147,10 +149,11 @@ app/
     infractions/   suspensions
     match_setups/  drafts, lobbies, votes and their settings
     matches/       uploads, reports, approve and revert; parsers/ reads the saves
+    public/        the website's read-only totals, ladders and season stats
     ratings/       TrueSkill, the rating ledger and its reconciliation
     seasons/       seasons and the season change
     stats/         stats, history, team generation
-scripts/        seeding, migrations, export, reconcile
+scripts/        civ data seed, export and restore, reconcile, repair
 test/           unit/, parsing/ and the save files in data/
 ```
 
@@ -161,9 +164,9 @@ Each feature owns its routes, schemas, service and data access.
 - `scripts/reconcile.py` checks that the rating ledger sums to the stats. The failure it detects has no other symptom, so it runs after any migration and from time to time in production.
 - `scripts/export` writes collections to JSON lines with a manifest. It is the rollback for a cluster without point-in-time restore: run it before anything that rewrites data.
 - `scripts/copy_database.py` copies one database into an empty one and checks the copy, byte for byte.
-- The migration scripts are one-off tools for the v2 cutover. The migrations are dry runs unless given `--apply`.
+- `scripts/rebuild_civ_tallies.py` rebuilds the civ and leader tallies from the matches. It is a dry run unless given `--apply`.
 
-The bots' privacy policy is in [`PRIVACY.md`](PRIVACY.md).
+The privacy policy for the bots and the website is at https://cpl.elementalengine.net/privacy/.
 
 ## License
 

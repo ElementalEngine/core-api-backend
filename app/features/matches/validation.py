@@ -141,7 +141,14 @@ _NO_CIV = frozenset({"LEADER_NONE", "CIVILIZATION_NONE"})
 
 
 def approval_refusal(match: MatchModel) -> str | None:
-    """Why a match cannot be approved yet: a seat with no player, or no civ."""
+    """Why a match cannot be approved yet: a staff hold, a seat with no player,
+    or no civ."""
+    held = next((c for c in match.contest_report_list if c.by_staff), None)
+    if held:
+        return (
+            f"Held by staff for review: {held.reason} "
+            "Staff must withdraw the hold before it can be approved."
+        )
     rows = [p for p in match.players if not p.subbed_out]
     missing = [n for n, p in enumerate(rows, 1) if is_placeholder(p.discord_id)]
     if missing:

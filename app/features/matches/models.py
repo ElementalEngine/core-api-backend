@@ -86,6 +86,9 @@ class PlayerModel(BaseModel):
 class ContestReport(BaseModel):
     contestor_discord_id: str
     reason: str
+    # A staff member's contest holds the report: nothing approves it, by hand or
+    # automatically, until staff withdraw the hold.
+    by_staff: bool = False
 
 
 class MatchModel(BaseModel):

@@ -175,6 +175,13 @@ class MatchRepository:
         )
         return res.matched_count == 1
 
+    async def pull_staff_holds(self, oid: ObjectId, *, now: datetime) -> bool:
+        res = await self._pending.update_one(
+            {"_id": oid, **_editable(now), "contest_report_list.by_staff": True},
+            {"$pull": {"contest_report_list": {"by_staff": True}}},
+        )
+        return res.matched_count == 1
+
     def pending_uploaded_before(self, cutoff: ObjectId) -> AsyncCursor[dict[str, Any]]:
         """Uncontested pending reports uploaded before the cutoff, oldest first."""
         return self._pending.find(

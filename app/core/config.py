@@ -63,6 +63,12 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("MITO_SERVICE_TOKEN"),
     )
 
+    # The CPL website's read-only token; unset, the public routes answer 503.
+    website_service_token: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("WEBSITE_SERVICE_TOKEN"),
+    )
+
     # Auth parameters
     auth_service_token: SecretStr = Field(
         default=SecretStr(""),
@@ -156,6 +162,25 @@ class Settings(BaseSettings):
     ts_tau: float = Field(default=10.0, ge=0, validation_alias=AliasChoices("TS_TAU"))
     ts_draw_prob: float = Field(
         default=0.0, ge=0, le=1, validation_alias=AliasChoices("TS_DRAW_PROB")
+    )
+    # Games a player needs before a ladder ranks them.
+    ladder_min_games: int = Field(
+        default=3, ge=1, validation_alias=AliasChoices("LADDER_MIN_GAMES")
+    )
+    # Games a leader or civ needs before season stats show its win rate, or
+    # rank it on a map by its average place.
+    stats_min_games: int = Field(
+        default=5, ge=1, validation_alias=AliasChoices("STATS_MIN_GAMES")
+    )
+    # How many leaders, and civs on Civ 7, season stats list per FFA map.
+    stats_map_top_n: int = Field(
+        default=5, ge=1, validation_alias=AliasChoices("STATS_MAP_TOP_N")
+    )
+    public_requests_per_minute: int = Field(
+        default=10, ge=1, validation_alias=AliasChoices("PUBLIC_REQUESTS_PER_MINUTE")
+    )
+    public_cache_seconds: int = Field(
+        default=600, ge=0, validation_alias=AliasChoices("PUBLIC_CACHE_SECONDS")
     )
     min_points_for_subs: int = Field(
         default=5, ge=0, validation_alias=AliasChoices("MIN_POINTS_FOR_SUBS")
