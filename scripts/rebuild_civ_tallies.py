@@ -11,11 +11,10 @@ tallies.stat_legs(): lifetime and combined always, season only for realtime.
 Every scope is cleared, not only the ones with matches -- a scope whose
 matches were all reverted must end up empty, not stale.
 
-A record still holding a LEADER_* token in civ has not been through
-migrate_civ6_leader_field, or its leader has no civ token yet. The leader is known
-there and the civ is not, so it counts once, in leaders. A value that is not
-a token at all -- 'Unknown', 'None', a name key from before that migration --
-counts nowhere.
+A record still holding a LEADER_* token in civ is one whose leader has no
+civ token yet. The leader is known there and the civ is not, so it counts
+once, in leaders. A value that is not a token at all -- 'Unknown', 'None', an
+older name key -- counts nowhere.
 
 Each player's tally counts their newest matches, as many as the stat document's
 own games: a reset or a new season starts that count again, so games from
