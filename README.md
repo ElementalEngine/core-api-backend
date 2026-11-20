@@ -47,7 +47,7 @@ The full route list is in [`openapi.json`](openapi.json). CI fails if the app an
 
 ## Talking to it
 
-Every route under `/api` needs the caller's Bearer token: each bot has its own, and the website's opens only `/api/v2/public`. A route that acts for a member, such as an upload or an approve, also takes their Discord id in `x-actor-discord-id`.
+Every route under `/api` needs the caller's Bearer token: each bot has its own, and the website's opens only `/api/v2/public`, at most `PUBLIC_REQUESTS_PER_MINUTE` calls a minute (30 unless set). A route that acts for a member, such as an upload or an approve, also takes their Discord id in `x-actor-discord-id`.
 
 A read:
 

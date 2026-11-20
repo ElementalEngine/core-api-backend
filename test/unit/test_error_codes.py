@@ -24,6 +24,7 @@ GOVERNED = (
     "features/match_setups/router.py",
     "features/match_setups/vote_router.py",
     "features/matches/router_v2.py",
+    "features/public/limit.py",
     "features/public/router.py",
     "features/seasons/router.py",
     "features/stats/router_v2.py",
