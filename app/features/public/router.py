@@ -10,6 +10,7 @@ from pymongo import AsyncMongoClient
 from app.core.constants import Edition
 from app.core.dependencies import get_database, require_website_token
 from app.core.errors import not_found
+from app.features.public.cache import cached
 from app.features.public.limit import within_limit
 from app.features.public.schemas import Ladders, Overview, SeasonStats
 from app.features.public.service import ladders, overview, season_stats
@@ -24,14 +25,14 @@ router = APIRouter(
 
 @router.get("/overview", response_model=Overview)
 async def get_overview(db: AsyncMongoClient = Depends(get_database)) -> Overview:
-    return await overview(db)
+    return await cached(("overview",), lambda: overview(db))
 
 
 @router.get("/ladders/{edition}", response_model=Ladders)
 async def get_ladders(
     edition: Edition, db: AsyncMongoClient = Depends(get_database)
 ) -> Ladders:
-    return await ladders(db, edition)
+    return await cached(("ladders", edition), lambda: ladders(db, edition))
 
 
 @router.get("/seasons/{edition}/current/stats", response_model=SeasonStats)
@@ -39,7 +40,7 @@ async def get_season_stats(
     edition: Edition, db: AsyncMongoClient = Depends(get_database)
 ) -> SeasonStats:
     try:
-        return await season_stats(db, edition)
+        return await cached(("stats", edition), lambda: season_stats(db, edition))
     except SeasonNotSeededError as exc:
         raise not_found(str(exc)) from exc
 
