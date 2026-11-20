@@ -176,6 +176,9 @@ class Settings(BaseSettings):
     stats_map_top_n: int = Field(
         default=5, ge=1, validation_alias=AliasChoices("STATS_MAP_TOP_N")
     )
+    public_requests_per_minute: int = Field(
+        default=30, ge=1, validation_alias=AliasChoices("PUBLIC_REQUESTS_PER_MINUTE")
+    )
     min_points_for_subs: int = Field(
         default=5, ge=0, validation_alias=AliasChoices("MIN_POINTS_FOR_SUBS")
     )

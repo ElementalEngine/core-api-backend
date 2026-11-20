@@ -47,7 +47,7 @@ The full route list is in [`openapi.json`](openapi.json). CI fails if the app an
 
 ## Talking to it
 
-Every route under `/api` needs the caller's Bearer token: each bot has its own, and the website's opens only `/api/v2/public`. A route that acts for a member, such as an upload or an approve, also takes their Discord id in `x-actor-discord-id`.
+Every route under `/api` needs the caller's Bearer token: each bot has its own, and the website's opens only `/api/v2/public`, at most `PUBLIC_REQUESTS_PER_MINUTE` calls a minute (30 unless set). A route that acts for a member, such as an upload or an approve, also takes their Discord id in `x-actor-discord-id`.
 
 A read:
 
@@ -153,7 +153,7 @@ app/
     ratings/       TrueSkill, the rating ledger and its reconciliation
     seasons/       seasons and the season change
     stats/         stats, history, team generation
-scripts/        seeding, migrations, export, reconcile
+scripts/        civ data seed, export and restore, reconcile, repair
 test/           unit/, parsing/ and the save files in data/
 ```
 
@@ -164,7 +164,7 @@ Each feature owns its routes, schemas, service and data access.
 - `scripts/reconcile.py` checks that the rating ledger sums to the stats. The failure it detects has no other symptom, so it runs after any migration and from time to time in production.
 - `scripts/export` writes collections to JSON lines with a manifest. It is the rollback for a cluster without point-in-time restore: run it before anything that rewrites data.
 - `scripts/copy_database.py` copies one database into an empty one and checks the copy, byte for byte.
-- The migration scripts are one-off tools for the v2 cutover. The migrations are dry runs unless given `--apply`.
+- `scripts/rebuild_civ_tallies.py` rebuilds the civ and leader tallies from the matches. It is a dry run unless given `--apply`.
 
 The privacy policy for the bots and the website is at https://cpl.elementalengine.net/privacy/.
 

@@ -3,38 +3,22 @@ the greatest `started_at`: season N's end is season N+1's start."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
 from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.collection import AsyncCollection
-from pymongo.errors import BulkWriteError
 
 from app.core.constants import COL_SEASONS, GAMES_DB
 
-# The season each edition is in when v2 starts: the rows the seed inserts.
-SEED_LABELS: dict[str, str] = {"civ6": "Season 7", "civ7": "Season 1"}
-# When a seeded season began, where that is known. Civ 6's Season 6 was ended on
-# v1 by hand on 11 Nov 2026, between this instant and 22:59 UTC; v1 approved
-# nothing in between, so a match it approved later is Season 7's.
-SEED_STARTS: dict[str, datetime] = {
-    "civ6": datetime(2026, 11, 11, 21, 56, 14, tzinfo=UTC)
-}
 # The season a match with no season_id belongs to, or an older one: v1 stamped
-# none. scripts/stamp_v1_season.py stamps the ones v1 approved in Civ 6's
-# Season 7; every Civ 7 match v1 approved is Season 1's.
+# none. The ones v1 approved in Civ 6's Season 7 were stamped at the cutover;
+# every Civ 7 match v1 approved is Season 1's.
 V1_LABELS: dict[str, str] = {"civ6": "Season 6", "civ7": "Season 1"}
-
-DUPLICATE_KEY = 11000
 
 
 class SeasonNotSeededError(RuntimeError):
     """No season row exists for an edition."""
-
-
-class SeasonsAlreadySeededError(RuntimeError):
-    """A seed run was rejected by unique_label_per_edition."""
 
 
 _CACHE: dict[str, dict[str, Any]] = {}
@@ -45,22 +29,6 @@ _LABELS: dict[Any, str] = {}
 def clear_cache() -> None:
     _CACHE.clear()
     _LABELS.clear()
-
-
-def seed_documents(now: datetime) -> list[dict[str, Any]]:
-    """
-    One row per edition. Where a season's start is not known, `now` is the
-    tracking start, not its true start -- the only boundary that will ever be
-    guessed.
-    """
-    return [
-        {
-            "edition": edition,
-            "label": label,
-            "started_at": SEED_STARTS.get(edition, now),
-        }
-        for edition, label in SEED_LABELS.items()
-    ]
 
 
 class SeasonsRepository:
@@ -77,22 +45,6 @@ class SeasonsRepository:
             unique=True,
             name="unique_label_per_edition",
         )
-
-    async def seed(self, documents: list[dict[str, Any]]) -> int:
-        """Insert the seed rows. Not an upsert: a second run must be refused by the
-        unique label index."""
-        try:
-            result = await self._seasons.insert_many(documents)
-        except BulkWriteError as exc:
-            write_errors = (exc.details or {}).get("writeErrors") or []
-            if write_errors and all(
-                e.get("code") == DUPLICATE_KEY for e in write_errors
-            ):
-                raise SeasonsAlreadySeededError(
-                    "seasons already holds a row for one of these labels"
-                ) from exc
-            raise
-        return len(result.inserted_ids)
 
     async def read_open(
         self, edition: str, *, session: AsyncClientSession | None = None
@@ -132,13 +84,8 @@ class SeasonsRepository:
 
 
 __all__ = [
-    "DUPLICATE_KEY",
-    "SEED_LABELS",
-    "SEED_STARTS",
     "V1_LABELS",
     "SeasonNotSeededError",
-    "SeasonsAlreadySeededError",
     "SeasonsRepository",
     "clear_cache",
-    "seed_documents",
 ]

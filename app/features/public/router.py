@@ -10,6 +10,7 @@ from pymongo import AsyncMongoClient
 from app.core.constants import Edition
 from app.core.dependencies import get_database, require_website_token
 from app.core.errors import not_found
+from app.features.public.limit import within_limit
 from app.features.public.schemas import Ladders, Overview, SeasonStats
 from app.features.public.service import ladders, overview, season_stats
 from app.features.seasons.repository import SeasonNotSeededError
@@ -17,7 +18,7 @@ from app.features.seasons.repository import SeasonNotSeededError
 router = APIRouter(
     prefix="/api/v2/public",
     tags=["public-v2"],
-    dependencies=[Depends(require_website_token)],
+    dependencies=[Depends(require_website_token), Depends(within_limit)],
 )
 
 
